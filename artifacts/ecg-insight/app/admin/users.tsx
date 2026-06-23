@@ -238,14 +238,18 @@ export default function UsersScreen() {
     return true;
   });
 
-  function handleCreate() {
+  async function handleCreate() {
     setCreateError("");
     if (!newName.trim()) { setCreateError("Name is required."); return; }
     if (!newEmail.trim() || !newEmail.includes("@")) { setCreateError("Valid email required."); return; }
     if (!isSuperAdmin) { setCreateError("Only Super Admins can create internal accounts."); return; }
-    createInternalAccount(newName.trim(), newEmail.trim(), newRole);
-    setNewName(""); setNewEmail(""); setNewRole("doctor");
-    setShowCreate(false);
+    try {
+      await createInternalAccount(newName.trim(), newEmail.trim(), newRole);
+      setNewName(""); setNewEmail(""); setNewRole("doctor");
+      setShowCreate(false);
+    } catch (error) {
+      setCreateError(error instanceof Error ? error.message : "Could not create account.");
+    }
   }
 
   const styles = StyleSheet.create({

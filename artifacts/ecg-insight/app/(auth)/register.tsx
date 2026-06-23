@@ -47,9 +47,13 @@ export default function RegisterScreen() {
     if (!validate()) return;
     setLoading(true);
     try {
-      await register(name.trim(), email.trim(), password, role);
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      router.replace("/(tabs)");
+      const result = await register(name.trim(), email.trim(), password, role);
+      if (result.success) {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        router.replace("/(tabs)");
+      } else {
+        setErrors({ form: result.error ?? "Registration failed." });
+      }
     } finally {
       setLoading(false);
     }
@@ -91,6 +95,7 @@ export default function RegisterScreen() {
 
         <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
           <View style={styles.form}>
+            {errors.form && <Text style={[styles.error, { color: colors.destructive }]}>{errors.form}</Text>}
             <View style={styles.field}>
               <Text style={[styles.label, { color: colors.foreground }]}>Full Name</Text>
               <View style={[styles.inputWrap, { backgroundColor: colors.muted, borderColor: errors.name ? colors.destructive : colors.border }]}>

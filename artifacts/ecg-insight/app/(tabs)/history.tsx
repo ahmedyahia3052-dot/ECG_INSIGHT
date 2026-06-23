@@ -1,4 +1,5 @@
 import { Feather } from "@expo/vector-icons";
+import { useQuery } from "@tanstack/react-query";
 import * as Haptics from "expo-haptics";
 import React, { useState } from "react";
 import {
@@ -16,6 +17,7 @@ import { useColors } from "@/hooks/useColors";
 import { CaseListItem } from "@/components/history/CaseListItem";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { MOCK_CASES, type ECGStatus } from "@/data/mockData";
+import { apiCaseToEcgCase, listCases } from "@/services/clinical";
 
 type FilterStatus = "all" | ECGStatus;
 
@@ -29,15 +31,26 @@ const FILTERS: { key: FilterStatus; label: string }[] = [
 export default function HistoryScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
-  const { user } = useAuth();
+  const { authToken } = useAuth();
 
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<FilterStatus>("all");
 
   const topInset = Platform.OS === "web" ? 67 : insets.top;
   const bottomInset = Platform.OS === "web" ? 34 : insets.bottom;
+  const accessToken = authToken?.token;
 
-  const allCases = MOCK_CASES;
+  const casesQuery = useQuery({
+    enabled: !!accessToken,
+    queryFn: async () => {
+      const params = new URLSearchParams({ page: "1", pageSize: "100" });
+      if (search) params.set("q", search);
+      return listCases(accessToken!, params);
+    },
+    queryKey: ["ecg-cases", accessToken, search],
+  });
+
+  const allCases = casesQuery.data?.cases.map(apiCaseToEcgCase) ?? MOCK_CASES;
 
   const filtered = allCases.filter((c) => {
     const matchSearch =
@@ -64,8 +77,13 @@ export default function HistoryScreen() {
           ECG History
         </Text>
         <Text style={[styles.sub, { color: colors.mutedForeground }]}>
-          {filtered.length} case{filtered.length !== 1 ? "s" : ""}
+          {casesQuery.isLoading ? "Loading cases..." : `${filtered.length} case${filtered.length !== 1 ? "s" : ""}`}
         </Text>
+        {casesQuery.isError && (
+          <Text style={[styles.sub, { color: colors.destructive }]}>
+            Live case data unavailable. Showing local clinical examples.
+          </Text>
+        )}
 
         <View
           style={[

@@ -1,5 +1,5 @@
 import { useAuth } from "@/context/AuthContext";
-import { getSystemStats } from "@/data/mockData";
+import { MOCK_CASES } from "@/data/mockData";
 import { useColors } from "@/hooks/useColors";
 import { useRouter } from "expo-router";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
@@ -116,9 +116,19 @@ function MenuItem({ icon, title, description, badge, badgeColor, onPress }: Menu
 
 export default function AdminDashboard() {
   const colors = useColors();
-  const { user, isImpersonating, stopImpersonation } = useAuth();
+  const { user, isImpersonating, stopImpersonation, managedUsers } = useAuth();
   const router = useRouter();
-  const stats = getSystemStats();
+  const stats = {
+    active: managedUsers.filter((u) => u.isActive).length,
+    doctors: managedUsers.filter((u) => u.role === "doctor").length,
+    enterprise: managedUsers.filter((u) => u.subscriptionTier === "enterprise").length,
+    inactive: managedUsers.filter((u) => !u.isActive).length,
+    professional: managedUsers.filter((u) => u.subscriptionTier === "professional").length,
+    students: managedUsers.filter((u) => u.role === "student").length,
+    total: managedUsers.length,
+    totalCases: MOCK_CASES.length,
+    unverified: managedUsers.filter((u) => !u.emailVerified).length,
+  };
 
   const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: colors.background },

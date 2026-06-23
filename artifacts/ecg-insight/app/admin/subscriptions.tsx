@@ -1,5 +1,5 @@
 import { useAuth } from "@/context/AuthContext";
-import { MANAGED_USERS } from "@/data/mockData";
+import { type ManagedUser } from "@/data/mockData";
 import { useColors } from "@/hooks/useColors";
 import { ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -27,10 +27,10 @@ const TIER_META: Record<Tier, { label: string; icon: string; color: string; feat
   },
 };
 
-function TierCard({ tier }: { tier: Tier }) {
+function TierCard({ tier, managedUsers }: { tier: Tier; managedUsers: ManagedUser[] }) {
   const colors = useColors();
   const meta = TIER_META[tier];
-  const users = MANAGED_USERS.filter((u) => u.subscriptionTier === tier);
+  const users = managedUsers.filter((u) => u.subscriptionTier === tier);
   const active = users.filter((u) => u.isActive).length;
 
   return (
@@ -162,11 +162,11 @@ function TierCard({ tier }: { tier: Tier }) {
 
 export default function SubscriptionsScreen() {
   const colors = useColors();
-  const { user } = useAuth();
+  const { managedUsers } = useAuth();
 
   const totalRevenue =
-    MANAGED_USERS.filter((u) => u.subscriptionTier === "professional").length * 49 +
-    MANAGED_USERS.filter((u) => u.subscriptionTier === "enterprise").length * 199;
+    managedUsers.filter((u) => u.subscriptionTier === "professional").length * 49 +
+    managedUsers.filter((u) => u.subscriptionTier === "enterprise").length * 199;
 
   const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: colors.background },
@@ -212,14 +212,14 @@ export default function SubscriptionsScreen() {
             <Text style={styles.mrrLabel}>Monthly Recurring Revenue</Text>
             <Text style={styles.mrrValue}>${totalRevenue.toLocaleString()}</Text>
             <Text style={styles.mrrSub}>
-              {MANAGED_USERS.filter((u) => u.subscriptionTier !== "free").length} paid subscribers
+              {managedUsers.filter((u) => u.subscriptionTier !== "free").length} paid subscribers
             </Text>
           </View>
         </View>
 
         <Text style={styles.sectionTitle}>Subscription Plans</Text>
         {(["enterprise", "professional", "free"] as Tier[]).map((tier) => (
-          <TierCard key={tier} tier={tier} />
+          <TierCard key={tier} tier={tier} managedUsers={managedUsers} />
         ))}
       </ScrollView>
     </SafeAreaView>

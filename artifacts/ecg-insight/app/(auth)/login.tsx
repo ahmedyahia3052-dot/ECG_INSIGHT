@@ -60,6 +60,7 @@ export default function LoginScreen() {
       setError(result.error ?? "Login failed. Please try again.");
     } else {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      router.replace("/(tabs)");
     }
   };
 

@@ -1,0 +1,781 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Role {
+  SUPER_ADMIN
+  ADMIN
+  DOCTOR
+  STUDENT
+}
+
+enum SubscriptionTier {
+  FREE
+  PROFESSIONAL
+  ENTERPRISE
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  PAST_DUE
+  CANCELED
+  TRIALING
+}
+
+enum NotificationType {
+  INFO
+  WARNING
+  SUCCESS
+  CRITICAL
+}
+
+enum Gender {
+  MALE
+  FEMALE
+  OTHER
+  UNKNOWN
+}
+
+enum ECGCaseStatus {
+  PENDING
+  PROCESSING
+  REVIEWED
+  FINALIZED
+}
+
+enum ECGPriority {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum AIStatus {
+  QUEUED
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+enum AIAnalysisStatus {
+  QUEUED
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+enum AISeverity {
+  NORMAL
+  MILD
+  MODERATE
+  SEVERE
+  CRITICAL
+}
+
+enum SignalQuality {
+  EXCELLENT
+  GOOD
+  FAIR
+  POOR
+}
+
+enum OrganizationType {
+  HOSPITAL
+  CLINIC
+  COMPANY
+  CONTRACTOR
+  GOVERNMENT
+  OTHER
+}
+
+enum OrganizationStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum SmokingStatus {
+  NEVER
+  FORMER
+  CURRENT
+  UNKNOWN
+}
+
+enum ProcedureType {
+  CORONARY_ANGIOGRAPHY
+  PCI_STENTS
+  CABG
+  VALVE_SURGERY
+  PACEMAKER
+  ICD
+  ABLATION
+  OPEN_HEART_SURGERY
+}
+
+enum CardiacProcedureType {
+  CORONARY_ANGIOGRAPHY
+  PCI
+  CABG
+  OPEN_HEART_SURGERY
+  VALVE_REPLACEMENT
+  PACEMAKER
+  ICD
+  CRT
+  ABLATION
+  CARDIAC_CATHETERIZATION
+}
+
+enum CardiacImagingType {
+  ECHOCARDIOGRAPHY
+  STRESS_ECG
+  HOLTER_ECG
+  CARDIAC_CT
+  CARDIAC_MRI
+  CORONARY_CTA
+  ANGIOGRAPHY_IMAGES
+  CHEST_XRAY
+}
+
+enum MedicationCategory {
+  ACE_INHIBITOR
+  ARB
+  BETA_BLOCKER
+  CALCIUM_CHANNEL_BLOCKER
+  DIURETIC
+  ANTIPLATELET
+  ANTICOAGULANT
+  STATIN
+  ANTIARRHYTHMIC
+  NITRATE
+  SGLT2_INHIBITOR
+  OTHER
+}
+
+enum DocumentCategory {
+  ECG
+  ECHOCARDIOGRAPHY
+  STRESS_ECG
+  HOLTER
+  CARDIAC_CT
+  CARDIAC_MRI
+  ANGIOGRAPHY
+  CATH_REPORTS
+  LABORATORY_RESULTS
+  SURGERY_REPORTS
+  DISCHARGE_SUMMARY
+  OTHER
+}
+
+enum TimelineEventType {
+  ECG_UPLOADED
+  AI_ANALYSIS_COMPLETED
+  ECHO_UPLOADED
+  PROCEDURE_ADDED
+  SURGERY_ADDED
+  CLINICAL_NOTE_ADDED
+  DOCUMENT_UPLOADED
+  FITNESS_DECISION_ADDED
+  CARDIAC_PROCEDURE_ADDED
+  CARDIAC_IMAGING_UPLOADED
+  MEDICATION_ADDED
+  MEDICATION_UPDATED
+  HOSPITALIZATION_ADDED
+}
+
+enum FitnessDecisionValue {
+  FIT
+  FIT_WITH_RESTRICTIONS
+  TEMPORARILY_UNFIT
+  PERMANENTLY_UNFIT
+  REFER_TO_CARDIOLOGIST
+}
+
+enum ReportStatus {
+  DRAFT
+  UNDER_REVIEW
+  FINALIZED
+  SIGNED
+  ARCHIVED
+}
+
+enum AuditAction {
+  CASE_CREATED
+  CASE_UPDATED
+  CASE_ASSIGNED
+  CASE_STATUS_CHANGED
+  ECG_UPLOADED
+  AI_ANALYSIS_QUEUED
+  AI_ANALYSIS_COMPLETED
+  AI_ANALYSIS_FAILED
+  DOCUMENT_UPLOADED
+  PROCEDURE_ADDED
+  FITNESS_DECISION_ADDED
+  CARDIAC_PROCEDURE_ADDED
+  CARDIAC_IMAGING_UPLOADED
+  MEDICATION_ADDED
+  MEDICATION_UPDATED
+  REPORT_CREATED
+  REPORT_UPDATED
+  REPORT_FINALIZED
+  REPORT_SIGNED
+  REPORT_ARCHIVED
+  DIAGNOSIS_CHANGED
+  PATIENT_CREATED
+  PATIENT_UPDATED
+  PATIENT_ARCHIVED
+}
+
+model User {
+  id                         String         @id @default(cuid())
+  name                       String
+  email                      String         @unique
+  passwordHash               String
+  role                       Role           @default(STUDENT)
+  specialization             String?
+  licenseNumber              String?
+  institution                String?
+  avatarInitials             String
+  isActive                   Boolean        @default(true)
+  emailVerified              Boolean        @default(false)
+  emailVerificationTokenHash String?
+  emailVerificationExpiresAt DateTime?
+  passwordResetTokenHash     String?
+  passwordResetExpiresAt     DateTime?
+  createdAt                  DateTime       @default(now())
+  updatedAt                  DateTime       @updatedAt
+  sessions                   Session[]
+  subscription               Subscription?
+  notifications              Notification[]
+  uploadedCases              ECGCase[]      @relation("UploadedCases")
+  assignedCases              ECGCase[]      @relation("AssignedCases")
+  auditLogs                  AuditLog[]
+  fitnessDecisions           FitnessDecision[]
+  authoredReports            ClinicalReport[] @relation("AuthoredReports")
+  finalizedReports           ClinicalReport[] @relation("FinalizedReports")
+  signedReports              ClinicalReport[] @relation("SignedReports")
+  reportVersions             ReportVersion[]
+  reportSignatures           ReportSignature[]
+  sentEmails                 EmailLog[]        @relation("SentReportEmails")
+
+  @@index([role])
+  @@index([isActive])
+}
+
+model Patient {
+  id                  String    @id @default(cuid())
+  firstName           String
+  lastName            String
+  gender              Gender    @default(UNKNOWN)
+  dateOfBirth         DateTime
+  employeeId          String?
+  phone               String?
+  email               String?
+  medicalRecordNumber String    @unique
+  nationalId          String?   @unique
+  organizationId      String?
+  departmentId        String?
+  contractorId        String?
+  occupation          String?
+  hireDate            DateTime?
+  smokingStatus       SmokingStatus @default(UNKNOWN)
+  hypertension        Boolean   @default(false)
+  diabetes            Boolean   @default(false)
+  dyslipidemia        Boolean   @default(false)
+  obesity             Boolean   @default(false)
+  familyHistory       String?
+  address             String?
+  emergencyContact    String?
+  allergies           String?
+  medicalHistory      String?
+  medications         String?
+  notes               String?
+  archivedAt          DateTime?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+  organization        Organization? @relation(fields: [organizationId], references: [id])
+  department          Department?   @relation(fields: [departmentId], references: [id])
+  contractor          Contractor?   @relation(fields: [contractorId], references: [id])
+  cases               ECGCase[]
+  cardiacHistory      CardiacHistory?
+  procedureHistories  ProcedureHistory[]
+  cardiacProcedures   CardiacProcedure[]
+  cardiacImaging      CardiacImaging[]
+  medicationHistories MedicationHistory[]
+  documents           ClinicalDocument[]
+  fitnessDecisions    FitnessDecision[]
+  timelineEvents      TimelineEvent[]
+  reports             ClinicalReport[]
+  auditLogs           AuditLog[]
+
+  @@index([lastName, firstName])
+  @@index([employeeId])
+  @@index([medicalRecordNumber])
+  @@index([organizationId])
+  @@index([departmentId])
+  @@index([contractorId])
+  @@index([archivedAt])
+  @@unique([organizationId, employeeId])
+}
+
+model Organization {
+  id          String             @id @default(cuid())
+  name        String
+  type        OrganizationType   @default(COMPANY)
+  address     String?
+  phone       String?
+  email       String?
+  logo        String?
+  status      OrganizationStatus @default(ACTIVE)
+  createdAt   DateTime           @default(now())
+  departments Department[]
+  contractors Contractor[]
+  patients    Patient[]
+
+  @@index([name])
+  @@index([status])
+  @@index([type])
+}
+
+model Department {
+  id             String       @id @default(cuid())
+  organizationId String
+  name           String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  patients       Patient[]
+
+  @@index([organizationId])
+  @@unique([organizationId, name])
+}
+
+model Contractor {
+  id             String       @id @default(cuid())
+  organizationId String
+  name           String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  patients       Patient[]
+
+  @@index([organizationId])
+  @@unique([organizationId, name])
+}
+
+model CardiacHistory {
+  id                          String   @id @default(cuid())
+  patientId                   String   @unique
+  coronaryArteryDisease       Boolean  @default(false)
+  heartFailure                Boolean  @default(false)
+  arrhythmia                  Boolean  @default(false)
+  valvularDisease             Boolean  @default(false)
+  congenitalHeartDisease      Boolean  @default(false)
+  myocardialInfarctionHistory Boolean  @default(false)
+  hypertension                Boolean  @default(false)
+  diabetesMellitus            Boolean  @default(false)
+  dyslipidemia                Boolean  @default(false)
+  smokingStatus               SmokingStatus @default(UNKNOWN)
+  obesity                     Boolean  @default(false)
+  familyHistoryHeartDisease   Boolean  @default(false)
+  previousStroke              Boolean  @default(false)
+  arrhythmiaHistory           Boolean  @default(false)
+  rheumaticHeartDisease       Boolean  @default(false)
+  createdAt                   DateTime @default(now())
+  updatedAt                   DateTime @updatedAt
+  patient                     Patient  @relation(fields: [patientId], references: [id], onDelete: Cascade)
+}
+
+model CardiacProcedure {
+  id                String               @id @default(cuid())
+  patientId         String
+  procedureType     CardiacProcedureType
+  procedureDate     DateTime
+  hospital          String?
+  operatorPhysician String?
+  findings          String?
+  documents         String[]
+  images            String[]
+  notes             String?
+  createdAt         DateTime             @default(now())
+  updatedAt         DateTime             @updatedAt
+  patient           Patient              @relation(fields: [patientId], references: [id], onDelete: Cascade)
+
+  @@index([patientId])
+  @@index([procedureType])
+  @@index([procedureDate])
+}
+
+model CardiacImaging {
+  id           String             @id @default(cuid())
+  patientId    String
+  imagingType  CardiacImagingType
+  title        String
+  performedAt  DateTime?
+  originalName String
+  storedName   String
+  mimeType     String
+  sizeBytes    Int
+  storagePath  String
+  uploadedById String
+  findings     String?
+  notes        String?
+  createdAt    DateTime           @default(now())
+  patient      Patient            @relation(fields: [patientId], references: [id], onDelete: Cascade)
+
+  @@index([patientId])
+  @@index([imagingType])
+  @@index([createdAt])
+}
+
+model MedicationHistory {
+  id        String             @id @default(cuid())
+  patientId String
+  drugName  String
+  category  MedicationCategory @default(OTHER)
+  dose      String
+  frequency String
+  startDate DateTime
+  stopDate  DateTime?
+  active    Boolean            @default(true)
+  notes     String?
+  createdAt DateTime           @default(now())
+  updatedAt DateTime           @updatedAt
+  patient   Patient            @relation(fields: [patientId], references: [id], onDelete: Cascade)
+
+  @@index([patientId])
+  @@index([drugName])
+  @@index([category])
+  @@index([active])
+  @@index([startDate])
+}
+
+model ProcedureHistory {
+  id            String        @id @default(cuid())
+  patientId     String
+  procedureType ProcedureType
+  procedureDate DateTime
+  hospital      String?
+  notes         String?
+  attachments   String[]
+  createdAt     DateTime      @default(now())
+  patient       Patient       @relation(fields: [patientId], references: [id], onDelete: Cascade)
+
+  @@index([patientId])
+  @@index([procedureType])
+  @@index([procedureDate])
+}
+
+model ClinicalDocument {
+  id           String           @id @default(cuid())
+  patientId    String
+  caseId       String?
+  category     DocumentCategory
+  title        String
+  originalName String
+  storedName   String
+  mimeType     String
+  sizeBytes    Int
+  storagePath  String
+  uploadedById String
+  createdAt    DateTime         @default(now())
+  patient      Patient          @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  case         ECGCase?         @relation(fields: [caseId], references: [id], onDelete: SetNull)
+
+  @@index([patientId])
+  @@index([caseId])
+  @@index([category])
+  @@index([createdAt])
+}
+
+model TimelineEvent {
+  id        String            @id @default(cuid())
+  patientId String
+  caseId    String?
+  type      TimelineEventType
+  title     String
+  notes     String?
+  metadata  Json?
+  createdAt DateTime          @default(now())
+  patient   Patient           @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  case      ECGCase?          @relation(fields: [caseId], references: [id], onDelete: SetNull)
+
+  @@index([patientId])
+  @@index([caseId])
+  @@index([type])
+  @@index([createdAt])
+}
+
+model FitnessDecision {
+  id          String               @id @default(cuid())
+  patientId   String
+  decision    FitnessDecisionValue
+  restrictions String?
+  notes       String?
+  decidedById String
+  validUntil  DateTime?
+  createdAt   DateTime             @default(now())
+  patient     Patient              @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  decidedBy   User                 @relation(fields: [decidedById], references: [id])
+
+  @@index([patientId])
+  @@index([decision])
+  @@index([createdAt])
+}
+
+model ECGCase {
+  id               String        @id @default(cuid())
+  caseId           String        @unique
+  patientId        String
+  uploadedById     String
+  assignedDoctorId String?
+  uploadDate       DateTime      @default(now())
+  ecgType          String
+  status           ECGCaseStatus @default(PENDING)
+  priority         ECGPriority   @default(MEDIUM)
+  aiStatus         AIStatus      @default(QUEUED)
+  finalDiagnosis   String?
+  clinicalNotes    String?
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+  patient          Patient       @relation(fields: [patientId], references: [id])
+  uploadedBy       User          @relation("UploadedCases", fields: [uploadedById], references: [id])
+  assignedDoctor   User?         @relation("AssignedCases", fields: [assignedDoctorId], references: [id])
+  files            ECGFile[]
+  analyses         AIAnalysis[]
+  measurements     ECGMeasurement[]
+  auditLogs        AuditLog[]
+  notifications    Notification[]
+  documents        ClinicalDocument[]
+  timelineEvents   TimelineEvent[]
+  reports          ClinicalReport[]
+
+  @@index([patientId])
+  @@index([uploadedById])
+  @@index([assignedDoctorId])
+  @@index([status])
+  @@index([priority])
+  @@index([uploadDate])
+}
+
+model ClinicalReport {
+  id                         String          @id @default(cuid())
+  caseId                     String
+  patientId                  String
+  status                     ReportStatus    @default(DRAFT)
+  reportNumber               String          @unique
+  organizationName           String?
+  contractorName             String?
+  acquisitionDate            DateTime
+  reportingDate              DateTime        @default(now())
+  referringPhysician         String?
+  clinicalIndication         String?
+  aiFindings                 String?
+  ecgMeasurements            Json?
+  rhythmInterpretation       String?
+  severityClassification     String?
+  differentialDiagnosis      String[]
+  recommendations            String[]
+  urgentActions              String[]
+  finalPhysicianImpression   String?
+  physicianName              String
+  physicianSpecialty         String?
+  physicianLicenseNumber     String?
+  electronicSignaturePath    String?
+  generatedAt                DateTime        @default(now())
+  finalizedAt                DateTime?
+  signedAt                   DateTime?
+  archivedAt                 DateTime?
+  authorId                   String
+  finalizedById              String?
+  signedById                 String?
+  createdAt                  DateTime        @default(now())
+  updatedAt                  DateTime        @updatedAt
+  case                       ECGCase         @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  patient                    Patient         @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  author                     User            @relation("AuthoredReports", fields: [authorId], references: [id])
+  finalizedBy                User?           @relation("FinalizedReports", fields: [finalizedById], references: [id])
+  signedBy                   User?           @relation("SignedReports", fields: [signedById], references: [id])
+  versions                   ReportVersion[]
+  emailLogs                  EmailLog[]
+
+  @@index([caseId])
+  @@index([patientId])
+  @@index([status])
+  @@index([authorId])
+  @@index([createdAt])
+}
+
+model ReportVersion {
+  id            String         @id @default(cuid())
+  reportId      String
+  versionNumber Int
+  authorId      String
+  modifications String
+  snapshot      Json
+  createdAt     DateTime       @default(now())
+  report        ClinicalReport @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  author        User           @relation(fields: [authorId], references: [id])
+
+  @@index([reportId])
+  @@index([authorId])
+  @@unique([reportId, versionNumber])
+}
+
+model ReportSignature {
+  id          String   @id @default(cuid())
+  physicianId String
+  imagePath   String
+  source      String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  physician   User     @relation(fields: [physicianId], references: [id], onDelete: Cascade)
+
+  @@index([physicianId])
+  @@unique([physicianId])
+}
+
+model EmailLog {
+  id        String         @id @default(cuid())
+  reportId  String
+  recipient String
+  senderId  String
+  sentAt    DateTime       @default(now())
+  status    String         @default("queued")
+  metadata  Json?
+  report    ClinicalReport @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  sender    User           @relation("SentReportEmails", fields: [senderId], references: [id])
+
+  @@index([reportId])
+  @@index([recipient])
+  @@index([sentAt])
+}
+
+model ECGMeasurement {
+  id               String        @id @default(cuid())
+  caseId           String
+  heartRate        Int
+  prInterval       Int
+  qrsDuration      Int
+  qtInterval       Int
+  qtcInterval      Int
+  stDeviation      Float
+  rhythmRegularity Float
+  signalQuality    SignalQuality
+  createdAt        DateTime      @default(now())
+  case             ECGCase       @relation(fields: [caseId], references: [id], onDelete: Cascade)
+
+  @@index([caseId])
+  @@index([signalQuality])
+  @@index([createdAt])
+}
+
+model AIAnalysis {
+  id              String           @id @default(cuid())
+  caseId          String
+  rhythm          String
+  heartRate       Int
+  severity        AISeverity
+  confidenceScore Float
+  interpretation  String
+  recommendations String[]
+  urgentActions   String[]
+  aiVersion       String
+  processingTime  Int
+  status          AIAnalysisStatus @default(QUEUED)
+  diagnosis       String
+  createdAt       DateTime         @default(now())
+  case            ECGCase          @relation(fields: [caseId], references: [id], onDelete: Cascade)
+
+  @@index([caseId])
+  @@index([severity])
+  @@index([status])
+  @@index([diagnosis])
+  @@index([createdAt])
+}
+
+model ECGFile {
+  id             String   @id @default(cuid())
+  caseId         String
+  originalName   String
+  storedName     String
+  mimeType       String
+  sizeBytes      Int
+  storagePath    String
+  uploadedById   String
+  createdAt      DateTime @default(now())
+  case           ECGCase  @relation(fields: [caseId], references: [id], onDelete: Cascade)
+
+  @@index([caseId])
+  @@index([uploadedById])
+}
+
+model AuditLog {
+  id        String      @id @default(cuid())
+  action    AuditAction
+  actorId   String
+  caseId    String?
+  patientId String?
+  message   String
+  metadata  Json?
+  createdAt DateTime    @default(now())
+  actor     User        @relation(fields: [actorId], references: [id])
+  case      ECGCase?    @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  patient   Patient?    @relation(fields: [patientId], references: [id])
+
+  @@index([actorId])
+  @@index([caseId])
+  @@index([patientId])
+  @@index([createdAt])
+}
+
+model Session {
+  id               String    @id @default(cuid())
+  userId           String
+  refreshTokenHash String
+  rememberMe       Boolean   @default(false)
+  expiresAt        DateTime
+  revokedAt        DateTime?
+  replacedById     String?
+  userAgent        String?
+  ipAddress        String?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+  user             User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+model Subscription {
+  id                  String             @id @default(cuid())
+  userId              String             @unique
+  tier                SubscriptionTier   @default(FREE)
+  status              SubscriptionStatus @default(ACTIVE)
+  currentPeriodStart  DateTime?
+  currentPeriodEnd    DateTime?
+  providerCustomerId  String?
+  providerSubscriptionId String?
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime           @updatedAt
+  user                User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([tier])
+  @@index([status])
+}
+
+model Notification {
+  id         String           @id @default(cuid())
+  userId     String?
+  caseId     String?
+  targetRole Role?
+  type       NotificationType @default(INFO)
+  title      String
+  message    String
+  read       Boolean          @default(false)
+  createdAt  DateTime         @default(now())
+  user       User?            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  case       ECGCase?         @relation(fields: [caseId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([caseId])
+  @@index([targetRole])
+}

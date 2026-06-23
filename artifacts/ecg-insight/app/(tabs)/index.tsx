@@ -1,4 +1,5 @@
 import { Feather } from "@expo/vector-icons";
+import { useQuery } from "@tanstack/react-query";
 import * as Haptics from "expo-haptics";
 import { useRouter } from "expo-router";
 import React, { useState } from "react";
@@ -24,6 +25,7 @@ import {
   MOCK_CASES,
   NOTIFICATIONS,
 } from "@/data/mockData";
+import { getAIStatistics } from "@/services/ai";
 
 function ImpersonationBanner() {
   const colors = useColors();
@@ -60,14 +62,21 @@ function ImpersonationBanner() {
 export default function DashboardScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
-  const { user, canAccess } = useAuth();
+  const { user, canAccess, authToken } = useAuth();
   const router = useRouter();
   const [showNotifications, setShowNotifications] = useState(false);
+  const aiStatsQuery = useQuery({
+    enabled: !!authToken?.token && canAccess("admin"),
+    queryFn: async () => getAIStatistics(authToken!.token),
+    queryKey: ["ai-statistics", authToken?.token],
+    retry: false,
+  });
 
   const cases = user ? getCasesByUser(user.id) : MOCK_CASES.slice(0, 5);
   const stats = user
     ? getDashboardStats(user.id)
     : { totalCases: 10, thisWeek: 4, accuracyRate: 95, criticalAlerts: 1, normalCount: 6, abnormalCount: 4 };
+  const aiStats = aiStatsQuery.data?.statistics;
 
   const recentCases = cases.slice(0, 4);
 
@@ -208,16 +217,16 @@ export default function DashboardScreen() {
         <View style={styles.statsRow}>
           <StatsCard
             icon="check-circle"
-            label="Accuracy Rate"
-            value={`${stats.accuracyRate}%`}
-            sub="AI model v2.4"
+            label="Avg Confidence"
+            value={`${aiStats?.averageConfidence ?? stats.accuracyRate}%`}
+            sub={`${aiStats?.totalAnalyses ?? stats.totalCases} AI analyses`}
           />
           <StatsCard
             icon="alert-triangle"
             label="Critical Alerts"
-            value={stats.criticalAlerts}
-            sub={stats.criticalAlerts > 0 ? "Action required" : "All clear"}
-            danger={stats.criticalAlerts > 0}
+            value={aiStats?.criticalPercentage ?? stats.criticalAlerts}
+            sub={aiStats ? "Critical %" : stats.criticalAlerts > 0 ? "Action required" : "All clear"}
+            danger={(aiStats?.criticalPercentage ?? stats.criticalAlerts) > 0}
           />
         </View>
         <View style={styles.statsRow}>
@@ -230,9 +239,9 @@ export default function DashboardScreen() {
           <StatsCard
             icon="alert-octagon"
             label="Abnormal"
-            value={stats.abnormalCount}
-            sub="Requires review"
-            danger={stats.abnormalCount > 0}
+            value={aiStats?.abnormalPercentage ?? stats.abnormalCount}
+            sub={aiStats ? "Abnormal %" : "Requires review"}
+            danger={(aiStats?.abnormalPercentage ?? stats.abnormalCount) > 0}
           />
         </View>
 

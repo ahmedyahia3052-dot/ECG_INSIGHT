@@ -1,7 +1,9 @@
 import { Feather } from "@expo/vector-icons";
+import { useQuery } from "@tanstack/react-query";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import React from "react";
+import React, { useState } from "react";
 import {
+  Linking,
   Platform,
   ScrollView,
   StyleSheet,
@@ -15,15 +17,59 @@ import { StatusBadge } from "@/components/ui/Badge";
 import { ConfidenceBar } from "@/components/ui/ConfidenceBar";
 import { DiagnosisCard } from "@/components/ecg/DiagnosisCard";
 import { RecommendationCard } from "@/components/ecg/RecommendationCard";
+import { WaveformViewer } from "@/components/ecg/WaveformViewer";
 import { getCaseById } from "@/data/mockData";
+import { useAuth } from "@/context/AuthContext";
+import { apiFileUrl } from "@/services/api";
+import { apiCaseToEcgCase, getCase } from "@/services/clinical";
+import { analyzeCase, getAIResult } from "@/services/ai";
+import { getECGMeasurement, getECGWaveform, processECGCase } from "@/services/ecgProcessing";
 
 export default function CaseDetailScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
+  const { authToken } = useAuth();
+  const [zoom, setZoom] = useState(1);
+  const [rotation, setRotation] = useState(0);
+  const [panX, setPanX] = useState(0);
+  const [fullscreen, setFullscreen] = useState(false);
 
-  const ecgCase = getCaseById(id ?? "");
+  const caseQuery = useQuery({
+    enabled: !!authToken?.token && !!id,
+    queryFn: async () => getCase(authToken!.token, id),
+    queryKey: ["ecg-case", authToken?.token, id],
+    retry: false,
+  });
+  const aiQuery = useQuery({
+    enabled: !!authToken?.token && !!id,
+    queryFn: async () => getAIResult(authToken!.token, id),
+    queryKey: ["ai-result", authToken?.token, id],
+    refetchInterval: (query) => {
+      const status = query.state.data?.analysis?.status;
+      return status === "queued" || status === "processing" ? 1500 : false;
+    },
+    retry: false,
+  });
+  const measurementQuery = useQuery({
+    enabled: !!authToken?.token && !!id,
+    queryFn: async () => getECGMeasurement(authToken!.token, id),
+    queryKey: ["ecg-measurement", authToken?.token, id],
+    retry: false,
+  });
+  const waveformQuery = useQuery({
+    enabled: !!authToken?.token && !!id,
+    queryFn: async () => getECGWaveform(authToken!.token, id),
+    queryKey: ["ecg-waveform", authToken?.token, id],
+    retry: false,
+  });
+
+  const liveCase = caseQuery.data?.case;
+  const ecgCase = liveCase ? apiCaseToEcgCase(liveCase) : getCaseById(id ?? "");
+  const aiResult = aiQuery.data?.analysis;
+  const measurement = measurementQuery.data?.measurement;
+  const waveform = waveformQuery.data?.waveform;
   const bottomInset = Platform.OS === "web" ? 34 : insets.bottom;
 
   if (!ecgCase) {
@@ -48,11 +94,28 @@ export default function CaseDetailScreen() {
   });
 
   const intervals = [
-    { label: "PR Interval", value: ecgCase.prInterval ? `${ecgCase.prInterval} ms` : "—" },
-    { label: "QRS Duration", value: `${ecgCase.qrsDuration} ms` },
-    { label: "QT Interval", value: `${ecgCase.qtInterval} ms` },
-    { label: "Heart Rate", value: `${ecgCase.heartRate} bpm` },
+    { label: "PR Interval", value: measurement ? `${measurement.prInterval} ms` : ecgCase.prInterval ? `${ecgCase.prInterval} ms` : "—" },
+    { label: "QRS Duration", value: `${measurement?.qrsDuration ?? ecgCase.qrsDuration} ms` },
+    { label: "QT Interval", value: `${measurement?.qtInterval ?? ecgCase.qtInterval} ms` },
+    { label: "Heart Rate", value: `${aiResult?.heartRate ?? ecgCase.heartRate} bpm` },
+    ...(measurement ? [{ label: "QTc", value: `${measurement.qtcInterval} ms` }] : []),
+    ...(measurement ? [{ label: "ST Segment", value: `${measurement.stDeviation} mm` }] : []),
   ];
+  const aiFindings = aiResult
+    ? [
+        {
+          label: "Rhythm",
+          severity: aiResult.severity === "critical" ? ("severe" as const) : ("normal" as const),
+          value: aiResult.rhythm,
+        },
+        {
+          label: "Interpretation",
+          severity: aiResult.severity === "critical" ? ("severe" as const) : ("moderate" as const),
+          value: aiResult.interpretation,
+        },
+      ]
+    : null;
+  const recommendations = aiResult?.recommendations ?? ecgCase.recommendations;
 
   return (
     <ScrollView
@@ -83,17 +146,37 @@ export default function CaseDetailScreen() {
       </View>
 
       <View style={[styles.ecgPreview, { backgroundColor: colors.card, borderColor: colors.border }]}>
-        <View style={[styles.waveformArea, { backgroundColor: colors.primary + "06" }]}>
+        {waveform ? (
+          <WaveformViewer waveform={waveform} />
+        ) : (
+          <View
+            style={[
+              styles.waveformArea,
+              fullscreen && styles.waveformAreaFull,
+              { backgroundColor: colors.primary + "06" },
+            ]}
+          >
           <View style={styles.waveformContent}>
             <Feather name="activity" size={28} color={colors.primary} />
             <Text style={[styles.waveformLabel, { color: colors.primary }]}>
               12-Lead ECG Trace
             </Text>
             <Text style={[styles.waveformSub, { color: colors.mutedForeground }]}>
-              {ecgCase.rhythm}
+              {liveCase?.files[0]?.originalName ?? ecgCase.rhythm}
             </Text>
           </View>
-          <View style={styles.waveformLines}>
+          <View
+            style={[
+              styles.waveformLines,
+              {
+                transform: [
+                  { translateX: panX },
+                  { rotate: `${rotation}deg` },
+                  { scale: zoom },
+                ],
+              },
+            ]}
+          >
             {Array.from({ length: 8 }).map((_, i) => (
               <View
                 key={i}
@@ -107,22 +190,92 @@ export default function CaseDetailScreen() {
               />
             ))}
           </View>
+          </View>
+        )}
+        <View style={styles.viewerControls}>
+          <TouchableOpacity style={[styles.viewerBtn, { borderColor: colors.border }]} onPress={() => setZoom((v) => Math.min(v + 0.2, 2.4))}>
+            <Text style={[styles.viewerBtnText, { color: colors.primary }]}>Zoom +</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={[styles.viewerBtn, { borderColor: colors.border }]} onPress={() => setZoom((v) => Math.max(v - 0.2, 0.8))}>
+            <Text style={[styles.viewerBtnText, { color: colors.primary }]}>Zoom -</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={[styles.viewerBtn, { borderColor: colors.border }]} onPress={() => setPanX((v) => (v === 0 ? 18 : 0))}>
+            <Text style={[styles.viewerBtnText, { color: colors.primary }]}>Pan</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={[styles.viewerBtn, { borderColor: colors.border }]} onPress={() => setRotation((v) => (v + 90) % 360)}>
+            <Text style={[styles.viewerBtnText, { color: colors.primary }]}>Rotate</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={[styles.viewerBtn, { borderColor: colors.border }]} onPress={() => setFullscreen((v) => !v)}>
+            <Text style={[styles.viewerBtnText, { color: colors.primary }]}>Full</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.viewerBtn, { borderColor: colors.border }]}
+            onPress={() => {
+              const file = liveCase?.files[0];
+              if (file) Linking.openURL(apiFileUrl(file.downloadUrl));
+            }}
+          >
+            <Text style={[styles.viewerBtnText, { color: colors.primary }]}>Download</Text>
+          </TouchableOpacity>
+          {liveCase && (
+            <TouchableOpacity
+              style={[styles.viewerBtn, { borderColor: colors.border }]}
+              onPress={() =>
+                authToken?.token &&
+                processECGCase(authToken.token, liveCase.id)
+                  .then(() => Promise.all([measurementQuery.refetch(), waveformQuery.refetch(), aiQuery.refetch()]))
+                  .catch(() => {})
+              }
+            >
+              <Text style={[styles.viewerBtnText, { color: colors.primary }]}>Process</Text>
+            </TouchableOpacity>
+          )}
         </View>
       </View>
 
       <View style={[styles.diagnosisSection, { backgroundColor: colors.card, borderColor: colors.border }]}>
         <Text style={[styles.secTitle, { color: colors.foreground }]}>
-          {ecgCase.diagnosis}
+          {aiResult?.diagnosis ?? ecgCase.diagnosis}
         </Text>
+        {aiResult && (
+          <View
+            style={[
+              styles.severityBadge,
+              {
+                backgroundColor:
+                  aiResult.severity === "critical"
+                    ? colors.destructive + "20"
+                    : colors.primary + "15",
+              },
+            ]}
+          >
+            <Text
+              style={[
+                styles.severityText,
+                { color: aiResult.severity === "critical" ? colors.destructive : colors.primary },
+              ]}
+            >
+              {aiResult.severity.toUpperCase()} · {aiResult.status}
+            </Text>
+          </View>
+        )}
         <View style={styles.confWrap}>
-          <ConfidenceBar value={ecgCase.confidence} />
+          <ConfidenceBar value={aiResult ? Math.round(aiResult.confidenceScore * 100) : ecgCase.confidence} />
         </View>
         <View style={styles.analyzedBy}>
           <Feather name="cpu" size={12} color={colors.mutedForeground} />
           <Text style={[styles.analyzedText, { color: colors.mutedForeground }]}>
-            {ecgCase.analyzedBy}
+            {aiResult ? `${aiResult.aiVersion} · ${aiResult.processingTime}ms` : ecgCase.analyzedBy}
           </Text>
         </View>
+        {liveCase && !aiResult && (
+          <TouchableOpacity
+            style={[styles.analyzeBtn, { backgroundColor: colors.primary }]}
+            onPress={() => authToken?.token && analyzeCase(authToken.token, liveCase.id).then(() => aiQuery.refetch())}
+          >
+            <Text style={styles.analyzeBtnText}>Run AI Analysis</Text>
+          </TouchableOpacity>
+        )}
       </View>
 
       <View style={styles.section}>
@@ -146,21 +299,30 @@ export default function CaseDetailScreen() {
 
       <View style={styles.section}>
         <Text style={[styles.sectionTitle, { color: colors.foreground }]}>
-          Key Findings ({ecgCase.findings.length})
+          Key Findings ({(aiFindings ?? ecgCase.findings).length})
         </Text>
         <View style={styles.findingsList}>
-          {ecgCase.findings.map((f, i) => (
+          {(aiFindings ?? ecgCase.findings).map((f, i) => (
             <DiagnosisCard key={f.label} finding={f} index={i} />
           ))}
         </View>
       </View>
 
+      {aiResult && aiResult.urgentActions.length > 0 && (
+        <View style={[styles.urgentPanel, { backgroundColor: colors.destructive + "12", borderColor: colors.destructive + "30" }]}>
+          <Text style={[styles.sectionTitle, { color: colors.destructive }]}>Urgent Actions</Text>
+          {aiResult.urgentActions.map((action, index) => (
+            <RecommendationCard key={action} text={action} index={index} />
+          ))}
+        </View>
+      )}
+
       <View style={styles.section}>
         <Text style={[styles.sectionTitle, { color: colors.foreground }]}>
-          Clinical Recommendations ({ecgCase.recommendations.length})
+          Clinical Recommendations ({recommendations.length})
         </Text>
         <View style={styles.recList}>
-          {ecgCase.recommendations.map((r, i) => (
+          {recommendations.map((r, i) => (
             <RecommendationCard key={i} text={r} index={i} />
           ))}
         </View>
@@ -220,6 +382,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     position: "relative",
   },
+  waveformAreaFull: { height: 260 },
   waveformContent: { alignItems: "center", gap: 4, zIndex: 1 },
   waveformLabel: { fontSize: 13, fontFamily: "Inter_600SemiBold" },
   waveformSub: { fontSize: 11, fontFamily: "Inter_400Regular" },
@@ -235,6 +398,19 @@ const styles = StyleSheet.create({
     height: 40,
   },
   waveformLine: { width: 3, borderRadius: 2 },
+  viewerControls: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+    padding: 12,
+  },
+  viewerBtn: {
+    borderRadius: 10,
+    borderWidth: 1,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
+  viewerBtnText: { fontSize: 12, fontFamily: "Inter_600SemiBold" },
   diagnosisSection: {
     borderRadius: 16,
     borderWidth: 1,
@@ -242,6 +418,8 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   secTitle: { fontSize: 17, fontFamily: "Inter_700Bold" },
+  severityBadge: { alignSelf: "flex-start", borderRadius: 20, paddingHorizontal: 10, paddingVertical: 5 },
+  severityText: { fontSize: 12, fontFamily: "Inter_700Bold" },
   confWrap: {},
   analyzedBy: {
     flexDirection: "row",
@@ -249,6 +427,9 @@ const styles = StyleSheet.create({
     gap: 5,
   },
   analyzedText: { fontSize: 11, fontFamily: "Inter_400Regular" },
+  analyzeBtn: { alignItems: "center", borderRadius: 12, paddingVertical: 12 },
+  analyzeBtnText: { color: "#fff", fontSize: 14, fontFamily: "Inter_700Bold" },
+  urgentPanel: { borderRadius: 16, borderWidth: 1, gap: 10, padding: 14 },
   section: { gap: 10 },
   sectionTitle: { fontSize: 16, fontFamily: "Inter_700Bold" },
   intervalsGrid: {

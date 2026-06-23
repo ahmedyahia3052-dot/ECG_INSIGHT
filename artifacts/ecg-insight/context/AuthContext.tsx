@@ -1,12 +1,7 @@
-import AsyncStorage from "@react-native-async-storage/async-storage";
-import React, {
-  createContext,
-  useCallback,
-  useContext,
-  useEffect,
-  useState,
-} from "react";
-import { MANAGED_USERS, type ManagedUser } from "@/data/mockData";
+import React, { createContext, useCallback, useContext, useEffect } from "react";
+import { create } from "zustand";
+import { type ManagedUser } from "@/data/mockData";
+import { apiRequest, ApiError } from "@/services/api";
 
 export type UserRole = "super_admin" | "admin" | "doctor" | "student";
 
@@ -19,12 +14,13 @@ export interface User {
   institution?: string;
   avatarInitials: string;
   emailVerified?: boolean;
+  isActive?: boolean;
+  subscriptionTier?: "free" | "professional" | "enterprise";
 }
 
 export interface AuthToken {
   token: string;
   expiresAt: number;
-  refreshToken: string;
 }
 
 interface AuthContextType {
@@ -56,68 +52,51 @@ interface AuthContextType {
     newPassword: string
   ) => Promise<boolean>;
 
-  impersonateUser: (userId: string) => void;
-  stopImpersonation: () => void;
+  impersonateUser: (userId: string) => Promise<void>;
+  stopImpersonation: () => Promise<void>;
 
   managedUsers: ManagedUser[];
-  activateUser: (userId: string) => void;
-  deactivateUser: (userId: string) => void;
+  activateUser: (userId: string) => Promise<void>;
+  deactivateUser: (userId: string) => Promise<void>;
   createInternalAccount: (
     name: string,
     email: string,
     role: UserRole
-  ) => ManagedUser;
+  ) => Promise<ManagedUser>;
 
   canAccess: (requiredRole: UserRole | UserRole[]) => boolean;
 }
 
-const MOCK_CREDENTIALS: (User & {
-  password: string;
-  emailVerified: boolean;
-})[] = [
-  {
-    id: "u0",
-    name: "Dev Super Admin",
-    email: "super@ecginsight.com",
-    password: "password",
-    role: "super_admin",
-    institution: "ECG Insight Dev",
-    avatarInitials: "SA",
-    emailVerified: true,
-  },
-  {
-    id: "u1",
-    name: "Dr. Sarah Chen",
-    email: "doctor@ecginsight.com",
-    password: "password",
-    role: "doctor",
-    specialization: "Cardiology",
-    institution: "Metro General Hospital",
-    avatarInitials: "SC",
-    emailVerified: true,
-  },
-  {
-    id: "u2",
-    name: "James Okafor",
-    email: "student@ecginsight.com",
-    password: "password",
-    role: "student",
-    specialization: "Medical Student (Year 3)",
-    institution: "State Medical University",
-    avatarInitials: "JO",
-    emailVerified: true,
-  },
-  {
-    id: "u3",
-    name: "Admin User",
-    email: "admin@ecginsight.com",
-    password: "password",
-    role: "admin",
-    institution: "ECG Insight HQ",
-    avatarInitials: "AU",
-    emailVerified: true,
-  },
-];
+interface AuthPayload {
+  accessToken: string;
+  emailVerificationToken?: string;
+  user: User;
+}
+
+interface UsersPayload {
+  users: ManagedUser[];
+}
+
+interface UserPayload {
+  user: ManagedUser;
+}
+
+interface ForgotPasswordPayload {
+  resetToken?: string;
+}
+
+interface AuthStore {
+  accessToken: string | null;
+  isLoading: boolean;
+  isImpersonating: boolean;
+  managedUsers: ManagedUser[];
+  originalAccessToken: string | null;
+  originalUser: User | null;
+  rememberMe: boolean;
+  resetTokensByEmail: Record<string, string>;
+  user: User | null;
+  setState: (patch: Partial<Omit<AuthStore, "setState">>) => void;
+}
 
 const ROLE_HIERARCHY: Record<UserRole, number> = {
   super_admin: 4,
@@ -126,19 +105,18 @@ const ROLE_HIERARCHY: Record<UserRole, number> = {
   student: 1,
 };
 
-const AUTH_KEY = "@ecg_insight_auth_v2";
-const TOKEN_KEY = "@ecg_insight_token_v2";
-const REMEMBER_KEY = "@ecg_insight_remember";
-const IMPERSONATION_KEY = "@ecg_insight_impersonate";
-
-function generateMockToken(userId: string, role: UserRole): AuthToken {
-  const now = Date.now();
-  return {
-    token: `eyJhbGciOiJIUzI1NiJ9.mock_${role}_${userId}_${now}`,
-    refreshToken: `refresh_${userId}_${now + 86400000}`,
-    expiresAt: now + 3600000,
-  };
-}
+const useAuthStore = create<AuthStore>((set) => ({
+  accessToken: null,
+  isLoading: true,
+  isImpersonating: false,
+  managedUsers: [],
+  originalAccessToken: null,
+  originalUser: null,
+  rememberMe: false,
+  resetTokensByEmail: {},
+  user: null,
+  setState: (patch) => set(patch),
+}));
 
 const AuthContext = createContext<AuthContextType>({
   user: null,
@@ -153,251 +131,258 @@ const AuthContext = createContext<AuthContextType>({
   forgotPassword: async () => false,
   verifyResetCode: async () => false,
   resetPassword: async () => false,
-  impersonateUser: () => {},
-  stopImpersonation: () => {},
+  impersonateUser: async () => {},
+  stopImpersonation: async () => {},
   managedUsers: [],
-  activateUser: () => {},
-  deactivateUser: () => {},
-  createInternalAccount: () => ({} as ManagedUser),
+  activateUser: async () => {},
+  deactivateUser: async () => {},
+  createInternalAccount: async () => ({} as ManagedUser),
   canAccess: () => false,
 });
 
+function tokenToAuthToken(accessToken: string | null): AuthToken | null {
+  return accessToken
+    ? { token: accessToken, expiresAt: Date.now() + 15 * 60 * 1000 }
+    : null;
+}
+
+function errorMessage(error: unknown, fallback: string): string {
+  if (error instanceof ApiError) return error.message;
+  if (error instanceof Error) return error.message;
+  return fallback;
+}
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
-  const [authToken, setAuthToken] = useState<AuthToken | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [rememberMe, setRememberMe] = useState(false);
-  const [impersonatedUser, setImpersonatedUser] = useState<User | null>(null);
-  const [managedUsers, setManagedUsers] = useState<ManagedUser[]>(MANAGED_USERS);
+  const {
+    accessToken,
+    isImpersonating,
+    isLoading,
+    managedUsers,
+    originalAccessToken,
+    originalUser,
+    rememberMe,
+    resetTokensByEmail,
+    setState,
+    user,
+  } = useAuthStore();
+
+  const fetchManagedUsers = useCallback(
+    async (token?: string | null) => {
+      const currentToken = token ?? useAuthStore.getState().accessToken;
+      if (!currentToken) return;
+      const payload = await apiRequest<UsersPayload>("/users", { accessToken: currentToken });
+      setState({ managedUsers: payload.users });
+    },
+    [setState]
+  );
 
   useEffect(() => {
     (async () => {
       try {
-        const [savedAuth, savedToken, savedRemember, savedImpersonation] =
-          await Promise.all([
-            AsyncStorage.getItem(AUTH_KEY),
-            AsyncStorage.getItem(TOKEN_KEY),
-            AsyncStorage.getItem(REMEMBER_KEY),
-            AsyncStorage.getItem(IMPERSONATION_KEY),
-          ]);
-
-        const remember = savedRemember === "true";
-        setRememberMe(remember);
-
-        if (savedAuth) {
-          const parsed = JSON.parse(savedAuth) as User;
-          setUser(parsed);
+        const refreshed = await apiRequest<AuthPayload>("/auth/refresh", {
+          method: "POST",
+        });
+        setState({
+          accessToken: refreshed.accessToken,
+          isLoading: false,
+          user: refreshed.user,
+        });
+        if (ROLE_HIERARCHY[refreshed.user.role] >= ROLE_HIERARCHY.admin) {
+          await fetchManagedUsers(refreshed.accessToken);
         }
-        if (savedToken) {
-          const parsedToken = JSON.parse(savedToken) as AuthToken;
-          if (parsedToken.expiresAt > Date.now()) {
-            setAuthToken(parsedToken);
-          }
-        }
-        if (savedImpersonation) {
-          setImpersonatedUser(JSON.parse(savedImpersonation) as User);
-        }
-      } finally {
-        setIsLoading(false);
+      } catch {
+        setState({ accessToken: null, isLoading: false, user: null });
       }
     })();
-  }, []);
-
-  const effectiveUser = impersonatedUser ?? user;
-
-  const canAccess = useCallback(
-    (requiredRole: UserRole | UserRole[]): boolean => {
-      if (!effectiveUser) return false;
-      const roles = Array.isArray(requiredRole) ? requiredRole : [requiredRole];
-      const userLevel = ROLE_HIERARCHY[effectiveUser.role];
-      return roles.some((r) => userLevel >= ROLE_HIERARCHY[r]);
-    },
-    [effectiveUser]
-  );
+  }, [fetchManagedUsers, setState]);
 
   const login = useCallback(
-    async (
-      email: string,
-      password: string,
-      remember = false
-    ): Promise<{ success: boolean; error?: string }> => {
-      const found = MOCK_CREDENTIALS.find(
-        (u) =>
-          u.email.toLowerCase() === email.trim().toLowerCase() &&
-          u.password === password
-      );
-      if (!found) {
-        return { success: false, error: "Invalid email or password." };
+    async (email: string, password: string, remember = false) => {
+      try {
+        const payload = await apiRequest<AuthPayload>("/auth/login", {
+          body: JSON.stringify({ email, password, rememberMe: remember }),
+          method: "POST",
+        });
+        setState({
+          accessToken: payload.accessToken,
+          isImpersonating: false,
+          originalAccessToken: null,
+          originalUser: null,
+          rememberMe: remember,
+          user: payload.user,
+        });
+        if (ROLE_HIERARCHY[payload.user.role] >= ROLE_HIERARCHY.admin) {
+          await fetchManagedUsers(payload.accessToken);
+        }
+        return { success: true };
+      } catch (error) {
+        return { success: false, error: errorMessage(error, "Login failed.") };
       }
-      const { password: _pw, ...userData } = found;
-      const token = generateMockToken(userData.id, userData.role);
-
-      setUser(userData);
-      setAuthToken(token);
-      setRememberMe(remember);
-
-      const ops: Promise<void>[] = [
-        AsyncStorage.setItem(TOKEN_KEY, JSON.stringify(token)),
-        AsyncStorage.setItem(REMEMBER_KEY, String(remember)),
-      ];
-      if (remember) {
-        ops.push(AsyncStorage.setItem(AUTH_KEY, JSON.stringify(userData)));
-      } else {
-        ops.push(AsyncStorage.removeItem(AUTH_KEY));
-      }
-      await Promise.all(ops);
-      return { success: true };
     },
-    []
+    [fetchManagedUsers, setState]
   );
-
-  const logout = useCallback(async () => {
-    setUser(null);
-    setAuthToken(null);
-    setImpersonatedUser(null);
-    await Promise.all([
-      AsyncStorage.removeItem(AUTH_KEY),
-      AsyncStorage.removeItem(TOKEN_KEY),
-      AsyncStorage.removeItem(IMPERSONATION_KEY),
-    ]);
-  }, []);
 
   const register = useCallback(
     async (
       name: string,
       email: string,
-      _password: string,
+      password: string,
       role: "doctor" | "student"
-    ): Promise<{ success: boolean; error?: string }> => {
-      const initials = name
-        .split(" ")
-        .map((n) => n[0])
-        .join("")
-        .toUpperCase()
-        .slice(0, 2);
-      const newUser: User = {
-        id: `u_${Date.now()}`,
-        name,
-        email,
-        role,
-        avatarInitials: initials,
-        emailVerified: false,
-      };
-      const token = generateMockToken(newUser.id, newUser.role);
-      setUser(newUser);
-      setAuthToken(token);
-      setRememberMe(true);
-      await Promise.all([
-        AsyncStorage.setItem(AUTH_KEY, JSON.stringify(newUser)),
-        AsyncStorage.setItem(TOKEN_KEY, JSON.stringify(token)),
-        AsyncStorage.setItem(REMEMBER_KEY, "true"),
-      ]);
-      return { success: true };
+    ) => {
+      try {
+        const payload = await apiRequest<AuthPayload>("/auth/register", {
+          body: JSON.stringify({ email, name, password, role }),
+          method: "POST",
+        });
+        setState({
+          accessToken: payload.accessToken,
+          rememberMe: true,
+          user: payload.user,
+        });
+        return { success: true };
+      } catch (error) {
+        return { success: false, error: errorMessage(error, "Registration failed.") };
+      }
     },
-    []
+    [setState]
   );
 
-  const forgotPassword = useCallback(async (email: string): Promise<boolean> => {
-    const exists = MOCK_CREDENTIALS.some(
-      (u) => u.email.toLowerCase() === email.trim().toLowerCase()
-    );
-    await new Promise((r) => setTimeout(r, 800));
-    return exists;
-  }, []);
+  const logout = useCallback(async () => {
+    await apiRequest<void>("/auth/logout", { method: "POST", accessToken }).catch(() => {});
+    setState({
+      accessToken: null,
+      isImpersonating: false,
+      managedUsers: [],
+      originalAccessToken: null,
+      originalUser: null,
+      user: null,
+    });
+  }, [accessToken, setState]);
 
-  const verifyResetCode = useCallback(
-    async (_email: string, code: string): Promise<boolean> => {
-      await new Promise((r) => setTimeout(r, 600));
-      return code === "123456" || code === "000000";
-    },
-    []
-  );
-
-  const resetPassword = useCallback(
-    async (
-      _email: string,
-      _code: string,
-      _newPassword: string
-    ): Promise<boolean> => {
-      await new Promise((r) => setTimeout(r, 700));
+  const forgotPassword = useCallback(
+    async (email: string): Promise<boolean> => {
+      const payload = await apiRequest<ForgotPasswordPayload>("/auth/forgot-password", {
+        body: JSON.stringify({ email }),
+        method: "POST",
+      });
+      if (payload.resetToken) {
+        setState({
+          resetTokensByEmail: {
+            ...resetTokensByEmail,
+            [email.trim().toLowerCase()]: payload.resetToken,
+          },
+        });
+      }
       return true;
     },
-    []
+    [resetTokensByEmail, setState]
+  );
+
+  const verifyResetCode = useCallback(async (_email: string, code: string): Promise<boolean> => {
+    return code.trim().length >= 6;
+  }, []);
+
+  const resetPassword = useCallback(
+    async (email: string, code: string, newPassword: string): Promise<boolean> => {
+      const token = resetTokensByEmail[email.trim().toLowerCase()] ?? code;
+      await apiRequest<void>("/auth/reset-password", {
+        body: JSON.stringify({ email, newPassword, token }),
+        method: "POST",
+      });
+      return true;
+    },
+    [resetTokensByEmail]
   );
 
   const impersonateUser = useCallback(
     async (userId: string) => {
-      if (!user || user.role !== "super_admin") return;
-      const target = managedUsers.find((u) => u.id === userId);
-      if (!target) return;
-      const impUser: User = {
-        id: target.id,
-        name: target.name,
-        email: target.email,
-        role: target.role,
-        avatarInitials: target.avatarInitials,
-        specialization: target.specialization,
-        institution: target.institution,
-      };
-      setImpersonatedUser(impUser);
-      await AsyncStorage.setItem(IMPERSONATION_KEY, JSON.stringify(impUser));
+      if (!accessToken || !user) return;
+      const payload = await apiRequest<AuthPayload>(`/users/${userId}/impersonate`, {
+        accessToken,
+        method: "POST",
+      });
+      setState({
+        accessToken: payload.accessToken,
+        isImpersonating: true,
+        originalAccessToken: originalAccessToken ?? accessToken,
+        originalUser: originalUser ?? user,
+        user: payload.user,
+      });
     },
-    [user, managedUsers]
+    [accessToken, originalAccessToken, originalUser, setState, user]
   );
 
   const stopImpersonation = useCallback(async () => {
-    setImpersonatedUser(null);
-    await AsyncStorage.removeItem(IMPERSONATION_KEY);
-  }, []);
+    if (!originalAccessToken || !originalUser) return;
+    setState({
+      accessToken: originalAccessToken,
+      isImpersonating: false,
+      originalAccessToken: null,
+      originalUser: null,
+      user: originalUser,
+    });
+    await fetchManagedUsers(originalAccessToken).catch(() => {});
+  }, [fetchManagedUsers, originalAccessToken, originalUser, setState]);
 
-  const activateUser = useCallback((userId: string) => {
-    setManagedUsers((prev) =>
-      prev.map((u) => (u.id === userId ? { ...u, isActive: true } : u))
-    );
-  }, []);
+  const activateUser = useCallback(
+    async (userId: string) => {
+      if (!accessToken) return;
+      await apiRequest<UserPayload>(`/users/${userId}/status`, {
+        accessToken,
+        body: JSON.stringify({ isActive: true }),
+        method: "PATCH",
+      });
+      await fetchManagedUsers(accessToken);
+    },
+    [accessToken, fetchManagedUsers]
+  );
 
-  const deactivateUser = useCallback((userId: string) => {
-    setManagedUsers((prev) =>
-      prev.map((u) => (u.id === userId ? { ...u, isActive: false } : u))
-    );
-  }, []);
+  const deactivateUser = useCallback(
+    async (userId: string) => {
+      if (!accessToken) return;
+      await apiRequest<UserPayload>(`/users/${userId}/status`, {
+        accessToken,
+        body: JSON.stringify({ isActive: false }),
+        method: "PATCH",
+      });
+      await fetchManagedUsers(accessToken);
+    },
+    [accessToken, fetchManagedUsers]
+  );
 
   const createInternalAccount = useCallback(
-    (name: string, email: string, role: UserRole): ManagedUser => {
-      const initials = name
-        .split(" ")
-        .map((n) => n[0])
-        .join("")
-        .toUpperCase()
-        .slice(0, 2);
-      const newUser: ManagedUser = {
-        id: `u_internal_${Date.now()}`,
-        name,
-        email,
-        role,
-        avatarInitials: initials,
-        isActive: true,
-        emailVerified: true,
-        subscriptionTier: "enterprise",
-        caseCount: 0,
-        joinedDate: new Date().toISOString().split("T")[0],
-        lastActive: new Date().toISOString().split("T")[0],
-        institution: "ECG Insight Internal",
-      };
-      setManagedUsers((prev) => [newUser, ...prev]);
-      return newUser;
+    async (name: string, email: string, role: UserRole): Promise<ManagedUser> => {
+      if (!accessToken) throw new Error("Authentication required.");
+      const payload = await apiRequest<UserPayload>("/users/internal", {
+        accessToken,
+        body: JSON.stringify({ email, name, role }),
+        method: "POST",
+      });
+      await fetchManagedUsers(accessToken);
+      return payload.user;
     },
-    []
+    [accessToken, fetchManagedUsers]
+  );
+
+  const canAccess = useCallback(
+    (requiredRole: UserRole | UserRole[]): boolean => {
+      if (!user) return false;
+      if (originalUser?.role === "super_admin") return true;
+      const roles = Array.isArray(requiredRole) ? requiredRole : [requiredRole];
+      const userLevel = ROLE_HIERARCHY[user.role];
+      return roles.some((role) => userLevel >= ROLE_HIERARCHY[role]);
+    },
+    [originalUser, user]
   );
 
   return (
     <AuthContext.Provider
       value={{
-        user: effectiveUser,
-        authToken,
+        user,
+        authToken: tokenToAuthToken(accessToken),
         isLoading,
-        isAuthenticated: !!user,
-        isImpersonating: !!impersonatedUser,
+        isAuthenticated: !!user && !!accessToken,
+        isImpersonating,
         rememberMe,
         login,
         logout,

@@ -1,4 +1,5 @@
 import { Feather } from "@expo/vector-icons";
+import { useMutation } from "@tanstack/react-query";
 import * as Haptics from "expo-haptics";
 import { useRouter } from "expo-router";
 import React, { useRef, useState } from "react";
@@ -18,6 +19,9 @@ import { StatusBadge } from "@/components/ui/Badge";
 import { DiagnosisCard } from "@/components/ecg/DiagnosisCard";
 import { RecommendationCard } from "@/components/ecg/RecommendationCard";
 import { MOCK_CASES } from "@/data/mockData";
+import { useAuth } from "@/context/AuthContext";
+import { createCase, createPatient } from "@/services/clinical";
+import { analyzeCase } from "@/services/ai";
 
 type UploadState = "idle" | "selected" | "analyzing" | "done";
 
@@ -33,15 +37,40 @@ export default function UploadScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const { authToken } = useAuth();
 
   const [state, setState] = useState<UploadState>("idle");
   const [selectedFile, setSelectedFile] = useState<{ name: string; size: string } | null>(null);
+  const [createdCaseId, setCreatedCaseId] = useState<string | null>(null);
   const [progress, setProgress] = useState(0);
   const progressAnim = useRef(new Animated.Value(0)).current;
   const pulseAnim = useRef(new Animated.Value(1)).current;
 
   const topInset = Platform.OS === "web" ? 67 : insets.top;
   const bottomInset = Platform.OS === "web" ? 34 : insets.bottom;
+  const createCaseMutation = useMutation({
+    mutationFn: async () => {
+      const patient = await createPatient(authToken!.token, {
+        dateOfBirth: "1964-01-01",
+        firstName: "ECG",
+        gender: "unknown",
+        lastName: "Upload",
+        medicalRecordNumber: `MRN-${Date.now()}`,
+      });
+      return createCase(authToken!.token, {
+        ecgType: selectedFile?.name.toLowerCase().includes("holter") ? "Holter ECG" : "12-Lead ECG",
+        patientId: patient.patient.id,
+        priority: MOCK_RESULT.status === "critical" ? "critical" : "medium",
+      });
+    },
+    onSuccess: (payload) => {
+      setCreatedCaseId(payload.case.id);
+      if (authToken?.token) {
+        analyzeCase(authToken.token, payload.case.id).catch(() => {});
+      }
+    },
+    retry: false,
+  });
 
   const startPulse = () => {
     Animated.loop(
@@ -73,6 +102,9 @@ export default function UploadScreen() {
           pulseAnim.stopAnimation();
           pulseAnim.setValue(1);
           Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+          if (authToken?.token) {
+            createCaseMutation.mutate();
+          }
           setState("done");
         }, 400);
       }
@@ -88,6 +120,7 @@ export default function UploadScreen() {
   const handleReset = () => {
     setState("idle");
     setSelectedFile(null);
+    setCreatedCaseId(null);
     setProgress(0);
     progressAnim.setValue(0);
     pulseAnim.setValue(1);
@@ -297,7 +330,7 @@ export default function UploadScreen() {
           <View style={styles.actionRow}>
             <TouchableOpacity
               style={[styles.viewFullBtn, { backgroundColor: colors.primary }]}
-              onPress={() => router.push(`/case/${MOCK_RESULT.id}` as any)}
+              onPress={() => router.push(`/case/${createdCaseId ?? MOCK_RESULT.id}` as any)}
               activeOpacity={0.85}
             >
               <Text style={[styles.viewFullText, { color: colors.primaryForeground }]}>View Full Report</Text>
