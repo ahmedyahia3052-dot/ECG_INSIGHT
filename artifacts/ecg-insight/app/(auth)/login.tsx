@@ -3,9 +3,10 @@ import * as Haptics from "expo-haptics";
 import { useRouter } from "expo-router";
 import React, { useState } from "react";
 import {
-  Alert,
+  ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
+  Pressable,
   ScrollView,
   StyleSheet,
   Text,
@@ -17,6 +18,15 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAuth } from "@/context/AuthContext";
 import { useColors } from "@/hooks/useColors";
 
+type DemoRole = "Doctor" | "Student" | "Admin" | "Super Admin";
+
+const DEMO_ACCOUNTS: Record<DemoRole, { email: string; icon: string; color: string }> = {
+  Doctor: { email: "doctor@ecginsight.com", icon: "🩺", color: "#0D9488" },
+  Student: { email: "student@ecginsight.com", icon: "📚", color: "#8B5CF6" },
+  Admin: { email: "admin@ecginsight.com", icon: "⚙️", color: "#06B6D4" },
+  "Super Admin": { email: "super@ecginsight.com", icon: "🛡️", color: "#DC2626" },
+};
+
 export default function LoginScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
@@ -25,49 +35,40 @@ export default function LoginScreen() {
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [rememberMe, setRememberMe] = useState(true);
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [errors, setErrors] = useState<{ email?: string; password?: string }>({});
+  const [error, setError] = useState("");
+  const [emailFocused, setEmailFocused] = useState(false);
+  const [passwordFocused, setPasswordFocused] = useState(false);
 
-  const validate = () => {
-    const e: typeof errors = {};
-    if (!email.trim()) e.email = "Email is required";
-    else if (!email.includes("@")) e.email = "Enter a valid email";
-    if (!password) e.password = "Password is required";
-    setErrors(e);
-    return Object.keys(e).length === 0;
-  };
+  const topInset = Platform.OS === "web" ? 67 : insets.top;
+  const bottomInset = Platform.OS === "web" ? 34 : insets.bottom;
 
   const handleLogin = async () => {
-    if (!validate()) return;
+    setError("");
+    if (!email.trim()) { setError("Email is required."); return; }
+    if (!email.includes("@")) { setError("Enter a valid email address."); return; }
+    if (!password) { setError("Password is required."); return; }
+
     setLoading(true);
-    try {
-      const ok = await login(email.trim(), password);
-      if (ok) {
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-        router.replace("/(tabs)");
-      } else {
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-        Alert.alert("Login Failed", "Invalid email or password. Try the demo credentials below.");
-      }
-    } finally {
-      setLoading(false);
+    const result = await login(email.trim(), password, rememberMe);
+    setLoading(false);
+
+    if (!result.success) {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      setError(result.error ?? "Login failed. Please try again.");
+    } else {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     }
   };
 
-  const fillDemo = (role: "doctor" | "student" | "admin") => {
-    const map = {
-      doctor: "doctor@ecginsight.com",
-      student: "student@ecginsight.com",
-      admin: "admin@ecginsight.com",
-    };
-    setEmail(map[role]);
+  const fillDemo = (role: DemoRole) => {
+    setEmail(DEMO_ACCOUNTS[role].email);
     setPassword("password");
-    setErrors({});
+    setError("");
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
   };
-
-  const topInset = Platform.OS === "web" ? 67 : insets.top;
 
   return (
     <KeyboardAvoidingView
@@ -77,148 +78,191 @@ export default function LoginScreen() {
       <ScrollView
         contentContainerStyle={[
           styles.scroll,
-          {
-            paddingTop: topInset + 24,
-            paddingBottom: Platform.OS === "web" ? 34 : insets.bottom + 24,
-          },
+          { paddingTop: topInset + 24, paddingBottom: bottomInset + 24 },
         ]}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
+        {/* Header */}
         <View style={styles.header}>
           <View style={[styles.logo, { backgroundColor: colors.primary }]}>
-            <Feather name="activity" size={28} color="#fff" />
+            <Feather name="activity" size={30} color="#fff" />
           </View>
-          <Text style={[styles.brand, { color: colors.foreground }]}>
-            ECG Insight
-          </Text>
-          <Text style={[styles.sub, { color: colors.mutedForeground }]}>
+          <Text style={[styles.brand, { color: colors.text }]}>ECG Insight</Text>
+          <Text style={[styles.sub, { color: colors.textSecondary }]}>
             AI-Powered ECG Interpretation
           </Text>
         </View>
 
-        <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
-          <Text style={[styles.title, { color: colors.foreground }]}>Welcome back</Text>
-          <Text style={[styles.cardSub, { color: colors.mutedForeground }]}>
+        {/* Card */}
+        <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+          <Text style={[styles.title, { color: colors.text }]}>Welcome back</Text>
+          <Text style={[styles.cardSub, { color: colors.textSecondary }]}>
             Sign in to your clinical account
           </Text>
 
-          <View style={styles.form}>
-            <View style={styles.field}>
-              <Text style={[styles.label, { color: colors.foreground }]}>Email</Text>
-              <View
-                style={[
-                  styles.inputWrap,
-                  {
-                    backgroundColor: colors.muted,
-                    borderColor: errors.email ? colors.destructive : colors.border,
-                  },
-                ]}
-              >
-                <Feather name="mail" size={16} color={colors.mutedForeground} />
-                <TextInput
-                  style={[styles.input, { color: colors.foreground }]}
-                  placeholder="you@hospital.com"
-                  placeholderTextColor={colors.mutedForeground}
-                  value={email}
-                  onChangeText={setEmail}
-                  keyboardType="email-address"
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                />
-              </View>
-              {errors.email && (
-                <Text style={[styles.error, { color: colors.destructive }]}>
-                  {errors.email}
-                </Text>
-              )}
+          {error ? (
+            <View style={[styles.errorBox, { backgroundColor: colors.destructive + "15" }]}>
+              <Feather name="alert-circle" size={14} color={colors.destructive} />
+              <Text style={[styles.errorText, { color: colors.destructive }]}>{error}</Text>
             </View>
+          ) : null}
 
-            <View style={styles.field}>
-              <Text style={[styles.label, { color: colors.foreground }]}>Password</Text>
-              <View
-                style={[
-                  styles.inputWrap,
-                  {
-                    backgroundColor: colors.muted,
-                    borderColor: errors.password ? colors.destructive : colors.border,
-                  },
-                ]}
-              >
-                <Feather name="lock" size={16} color={colors.mutedForeground} />
-                <TextInput
-                  style={[styles.input, { color: colors.foreground }]}
-                  placeholder="••••••••"
-                  placeholderTextColor={colors.mutedForeground}
-                  value={password}
-                  onChangeText={setPassword}
-                  secureTextEntry={!showPassword}
-                />
-                <TouchableOpacity onPress={() => setShowPassword(!showPassword)}>
-                  <Feather
-                    name={showPassword ? "eye-off" : "eye"}
-                    size={16}
-                    color={colors.mutedForeground}
-                  />
-                </TouchableOpacity>
-              </View>
-              {errors.password && (
-                <Text style={[styles.error, { color: colors.destructive }]}>
-                  {errors.password}
-                </Text>
-              )}
-            </View>
-
-            <TouchableOpacity
+          {/* Email */}
+          <View style={styles.field}>
+            <Text style={[styles.label, { color: colors.text }]}>Email</Text>
+            <View
               style={[
-                styles.btn,
-                { backgroundColor: colors.primary, opacity: loading ? 0.7 : 1 },
+                styles.inputWrap,
+                {
+                  backgroundColor: colors.background,
+                  borderColor: emailFocused ? colors.primary : colors.border,
+                },
               ]}
-              onPress={handleLogin}
-              disabled={loading}
-              activeOpacity={0.85}
             >
-              {loading ? (
-                <Text style={[styles.btnText, { color: colors.primaryForeground }]}>
-                  Signing in...
-                </Text>
-              ) : (
-                <>
-                  <Feather name="log-in" size={16} color={colors.primaryForeground} />
-                  <Text style={[styles.btnText, { color: colors.primaryForeground }]}>
-                    Sign In
-                  </Text>
-                </>
-              )}
+              <Feather name="mail" size={16} color={colors.textSecondary} />
+              <TextInput
+                style={[styles.input, { color: colors.text }]}
+                placeholder="you@hospital.com"
+                placeholderTextColor={colors.textSecondary}
+                value={email}
+                onChangeText={setEmail}
+                keyboardType="email-address"
+                autoCapitalize="none"
+                autoCorrect={false}
+                onFocus={() => setEmailFocused(true)}
+                onBlur={() => setEmailFocused(false)}
+              />
+            </View>
+          </View>
+
+          {/* Password */}
+          <View style={styles.field}>
+            <Text style={[styles.label, { color: colors.text }]}>Password</Text>
+            <View
+              style={[
+                styles.inputWrap,
+                {
+                  backgroundColor: colors.background,
+                  borderColor: passwordFocused ? colors.primary : colors.border,
+                },
+              ]}
+            >
+              <Feather name="lock" size={16} color={colors.textSecondary} />
+              <TextInput
+                style={[styles.input, { color: colors.text }]}
+                placeholder="••••••••"
+                placeholderTextColor={colors.textSecondary}
+                value={password}
+                onChangeText={setPassword}
+                secureTextEntry={!showPassword}
+                autoCapitalize="none"
+                onFocus={() => setPasswordFocused(true)}
+                onBlur={() => setPasswordFocused(false)}
+              />
+              <TouchableOpacity onPress={() => setShowPassword((v) => !v)} hitSlop={8}>
+                <Feather
+                  name={showPassword ? "eye-off" : "eye"}
+                  size={16}
+                  color={colors.textSecondary}
+                />
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          {/* Remember me + Forgot password */}
+          <View style={styles.optionsRow}>
+            <Pressable
+              style={styles.checkRow}
+              onPress={() => {
+                setRememberMe((v) => !v);
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              }}
+            >
+              <View
+                style={[
+                  styles.checkbox,
+                  {
+                    borderColor: rememberMe ? colors.primary : colors.border,
+                    backgroundColor: rememberMe ? colors.primary : "transparent",
+                  },
+                ]}
+              >
+                {rememberMe && (
+                  <Feather name="check" size={10} color="#fff" />
+                )}
+              </View>
+              <Text style={[styles.checkLabel, { color: colors.textSecondary }]}>
+                Remember me
+              </Text>
+            </Pressable>
+
+            <TouchableOpacity onPress={() => router.push("/(auth)/forgot-password")}>
+              <Text style={[styles.forgotLink, { color: colors.primary }]}>
+                Forgot password?
+              </Text>
             </TouchableOpacity>
           </View>
+
+          {/* Sign In Button */}
+          <TouchableOpacity
+            style={[styles.btn, { backgroundColor: colors.primary, opacity: loading ? 0.8 : 1 }]}
+            onPress={handleLogin}
+            disabled={loading}
+            activeOpacity={0.85}
+          >
+            {loading ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <>
+                <Feather name="log-in" size={16} color="#fff" />
+                <Text style={styles.btnText}>Sign In</Text>
+              </>
+            )}
+          </TouchableOpacity>
         </View>
 
-        <View style={[styles.demoBox, { backgroundColor: colors.muted, borderColor: colors.border }]}>
-          <Text style={[styles.demoTitle, { color: colors.mutedForeground }]}>
-            Demo Accounts
-          </Text>
-          <View style={styles.demoRow}>
-            {(["doctor", "student", "admin"] as const).map((role) => (
-              <TouchableOpacity
-                key={role}
-                style={[styles.demoChip, { backgroundColor: colors.primary + "15", borderColor: colors.primary + "30" }]}
-                onPress={() => fillDemo(role)}
-                activeOpacity={0.7}
-              >
-                <Text style={[styles.demoChipText, { color: colors.primary }]}>
-                  {role.charAt(0).toUpperCase() + role.slice(1)}
-                </Text>
-              </TouchableOpacity>
-            ))}
+        {/* Demo accounts */}
+        <View style={[styles.demoBox, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+          <Text style={[styles.demoTitle, { color: colors.textSecondary }]}>Demo Accounts</Text>
+          <View style={styles.demoGrid}>
+            {(Object.keys(DEMO_ACCOUNTS) as DemoRole[]).map((role) => {
+              const acc = DEMO_ACCOUNTS[role];
+              const isSelected = email === acc.email;
+              return (
+                <TouchableOpacity
+                  key={role}
+                  style={[
+                    styles.demoChip,
+                    {
+                      backgroundColor: isSelected ? acc.color + "20" : colors.background,
+                      borderColor: isSelected ? acc.color : colors.border,
+                    },
+                  ]}
+                  onPress={() => fillDemo(role)}
+                  activeOpacity={0.7}
+                >
+                  <Text style={styles.demoChipIcon}>{acc.icon}</Text>
+                  <Text
+                    style={[
+                      styles.demoChipText,
+                      { color: isSelected ? acc.color : colors.textSecondary },
+                    ]}
+                  >
+                    {role}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
           </View>
-          <Text style={[styles.demoHint, { color: colors.mutedForeground }]}>
-            Password: password
+          <Text style={[styles.demoHint, { color: colors.textSecondary }]}>
+            Password for all accounts: <Text style={{ fontWeight: "700" }}>password</Text>
           </Text>
         </View>
 
+        {/* Register */}
         <View style={styles.footer}>
-          <Text style={[styles.footerText, { color: colors.mutedForeground }]}>
+          <Text style={[styles.footerText, { color: colors.textSecondary }]}>
             Don&apos;t have an account?{" "}
           </Text>
           <TouchableOpacity onPress={() => router.push("/(auth)/register")}>
@@ -232,73 +276,62 @@ export default function LoginScreen() {
 
 const styles = StyleSheet.create({
   flex: { flex: 1 },
-  scroll: {
-    paddingHorizontal: 20,
-    gap: 16,
-  },
-  header: {
-    alignItems: "center",
-    gap: 8,
-    marginBottom: 8,
-  },
+  scroll: { paddingHorizontal: 20, gap: 16 },
+  header: { alignItems: "center", gap: 8, marginBottom: 4 },
   logo: {
-    width: 60,
-    height: 60,
-    borderRadius: 18,
+    width: 68,
+    height: 68,
+    borderRadius: 20,
     alignItems: "center",
     justifyContent: "center",
+    shadowColor: "#0D9488",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 6,
   },
-  brand: {
-    fontSize: 24,
-    fontFamily: "Inter_700Bold",
+  brand: { fontSize: 26, fontFamily: "Inter_700Bold", letterSpacing: -0.5 },
+  sub: { fontSize: 13, fontFamily: "Inter_400Regular" },
+  card: { borderRadius: 18, borderWidth: 1, padding: 22, gap: 14 },
+  title: { fontSize: 20, fontFamily: "Inter_700Bold" },
+  cardSub: { fontSize: 13, fontFamily: "Inter_400Regular", marginBottom: 4 },
+  errorBox: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    padding: 12,
+    borderRadius: 10,
   },
-  sub: {
-    fontSize: 13,
-    fontFamily: "Inter_400Regular",
-  },
-  card: {
-    borderRadius: 18,
-    borderWidth: 1,
-    padding: 24,
-    gap: 4,
-  },
-  title: {
-    fontSize: 20,
-    fontFamily: "Inter_700Bold",
-  },
-  cardSub: {
-    fontSize: 13,
-    fontFamily: "Inter_400Regular",
-    marginBottom: 12,
-  },
-  form: {
-    gap: 14,
-  },
-  field: {
-    gap: 6,
-  },
-  label: {
-    fontSize: 13,
-    fontFamily: "Inter_600SemiBold",
-  },
+  errorText: { fontSize: 13, fontFamily: "Inter_400Regular", flex: 1 },
+  field: { gap: 6 },
+  label: { fontSize: 13, fontFamily: "Inter_600SemiBold" },
   inputWrap: {
     flexDirection: "row",
     alignItems: "center",
     gap: 10,
     borderRadius: 10,
-    borderWidth: 1,
+    borderWidth: 1.5,
     paddingHorizontal: 14,
-    paddingVertical: 12,
+    paddingVertical: 13,
   },
-  input: {
-    flex: 1,
-    fontSize: 14,
-    fontFamily: "Inter_400Regular",
+  input: { flex: 1, fontSize: 14, fontFamily: "Inter_400Regular" },
+  optionsRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginVertical: 2,
   },
-  error: {
-    fontSize: 11,
-    fontFamily: "Inter_400Regular",
+  checkRow: { flexDirection: "row", alignItems: "center", gap: 8 },
+  checkbox: {
+    width: 20,
+    height: 20,
+    borderRadius: 5,
+    borderWidth: 2,
+    alignItems: "center",
+    justifyContent: "center",
   },
+  checkLabel: { fontSize: 13, fontFamily: "Inter_400Regular" },
+  forgotLink: { fontSize: 13, fontFamily: "Inter_600SemiBold" },
   btn: {
     flexDirection: "row",
     alignItems: "center",
@@ -306,52 +339,31 @@ const styles = StyleSheet.create({
     gap: 8,
     paddingVertical: 14,
     borderRadius: 12,
-    marginTop: 4,
+    marginTop: 2,
   },
-  btnText: {
-    fontSize: 15,
-    fontFamily: "Inter_600SemiBold",
-  },
+  btnText: { fontSize: 15, fontFamily: "Inter_600SemiBold", color: "#fff" },
   demoBox: {
-    borderRadius: 12,
+    borderRadius: 14,
     borderWidth: 1,
     padding: 16,
-    gap: 10,
+    gap: 12,
     alignItems: "center",
   },
-  demoTitle: {
-    fontSize: 12,
-    fontFamily: "Inter_500Medium",
-  },
-  demoRow: {
-    flexDirection: "row",
-    gap: 8,
-  },
+  demoTitle: { fontSize: 12, fontFamily: "Inter_600SemiBold", textTransform: "uppercase", letterSpacing: 0.5 },
+  demoGrid: { flexDirection: "row", flexWrap: "wrap", gap: 8, justifyContent: "center" },
   demoChip: {
-    paddingHorizontal: 16,
-    paddingVertical: 7,
-    borderRadius: 20,
-    borderWidth: 1,
-  },
-  demoChipText: {
-    fontSize: 12,
-    fontFamily: "Inter_600SemiBold",
-  },
-  demoHint: {
-    fontSize: 11,
-    fontFamily: "Inter_400Regular",
-  },
-  footer: {
     flexDirection: "row",
-    justifyContent: "center",
     alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 20,
+    borderWidth: 1.5,
   },
-  footerText: {
-    fontSize: 13,
-    fontFamily: "Inter_400Regular",
-  },
-  link: {
-    fontSize: 13,
-    fontFamily: "Inter_600SemiBold",
-  },
+  demoChipIcon: { fontSize: 14 },
+  demoChipText: { fontSize: 12, fontFamily: "Inter_600SemiBold" },
+  demoHint: { fontSize: 12, fontFamily: "Inter_400Regular" },
+  footer: { flexDirection: "row", justifyContent: "center", alignItems: "center" },
+  footerText: { fontSize: 13, fontFamily: "Inter_400Regular" },
+  link: { fontSize: 13, fontFamily: "Inter_600SemiBold" },
 });

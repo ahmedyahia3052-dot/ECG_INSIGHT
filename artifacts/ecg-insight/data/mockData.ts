@@ -1,3 +1,5 @@
+import type { UserRole } from "@/context/AuthContext";
+
 export type ECGStatus = "normal" | "abnormal" | "critical";
 
 export interface ECGFinding {
@@ -25,6 +27,268 @@ export interface ECGCase {
   analyzedBy: string;
   uploadedById: string;
 }
+
+export interface ManagedUser {
+  id: string;
+  name: string;
+  email: string;
+  role: UserRole;
+  avatarInitials: string;
+  isActive: boolean;
+  emailVerified: boolean;
+  subscriptionTier: "free" | "professional" | "enterprise";
+  caseCount: number;
+  joinedDate: string;
+  lastActive: string;
+  specialization?: string;
+  institution?: string;
+}
+
+export type NotificationType = "info" | "warning" | "success" | "critical";
+
+export interface AppNotification {
+  id: string;
+  type: NotificationType;
+  title: string;
+  message: string;
+  timestamp: string;
+  read: boolean;
+  targetRole?: UserRole[];
+}
+
+export interface AccuracyDataPoint {
+  week: string;
+  accuracy: number;
+  cases: number;
+}
+
+export const MANAGED_USERS: ManagedUser[] = [
+  {
+    id: "u0",
+    name: "Dev Super Admin",
+    email: "super@ecginsight.com",
+    role: "super_admin",
+    avatarInitials: "SA",
+    isActive: true,
+    emailVerified: true,
+    subscriptionTier: "enterprise",
+    caseCount: 0,
+    joinedDate: "2024-01-01",
+    lastActive: "2026-06-23",
+    institution: "ECG Insight Dev",
+  },
+  {
+    id: "u1",
+    name: "Dr. Sarah Chen",
+    email: "doctor@ecginsight.com",
+    role: "doctor",
+    avatarInitials: "SC",
+    isActive: true,
+    emailVerified: true,
+    subscriptionTier: "professional",
+    caseCount: 8,
+    joinedDate: "2025-03-15",
+    lastActive: "2026-06-22",
+    specialization: "Cardiology",
+    institution: "Metro General Hospital",
+  },
+  {
+    id: "u2",
+    name: "James Okafor",
+    email: "student@ecginsight.com",
+    role: "student",
+    avatarInitials: "JO",
+    isActive: true,
+    emailVerified: true,
+    subscriptionTier: "free",
+    caseCount: 2,
+    joinedDate: "2025-09-01",
+    lastActive: "2026-06-20",
+    specialization: "Medical Student (Year 3)",
+    institution: "State Medical University",
+  },
+  {
+    id: "u3",
+    name: "Admin User",
+    email: "admin@ecginsight.com",
+    role: "admin",
+    avatarInitials: "AU",
+    isActive: true,
+    emailVerified: true,
+    subscriptionTier: "enterprise",
+    caseCount: 0,
+    joinedDate: "2024-06-01",
+    lastActive: "2026-06-23",
+    institution: "ECG Insight HQ",
+  },
+  {
+    id: "u4",
+    name: "Dr. Elena Petrov",
+    email: "e.petrov@cityhospital.com",
+    role: "doctor",
+    avatarInitials: "EP",
+    isActive: true,
+    emailVerified: true,
+    subscriptionTier: "professional",
+    caseCount: 34,
+    joinedDate: "2025-01-10",
+    lastActive: "2026-06-21",
+    specialization: "Emergency Medicine",
+    institution: "City General Hospital",
+  },
+  {
+    id: "u5",
+    name: "Marcus Williams",
+    email: "m.williams@medschool.edu",
+    role: "student",
+    avatarInitials: "MW",
+    isActive: true,
+    emailVerified: false,
+    subscriptionTier: "free",
+    caseCount: 7,
+    joinedDate: "2026-01-20",
+    lastActive: "2026-06-18",
+    institution: "Eastern Medical School",
+  },
+  {
+    id: "u6",
+    name: "Dr. Priya Nair",
+    email: "p.nair@heartcare.com",
+    role: "doctor",
+    avatarInitials: "PN",
+    isActive: false,
+    emailVerified: true,
+    subscriptionTier: "free",
+    caseCount: 12,
+    joinedDate: "2024-11-05",
+    lastActive: "2026-04-02",
+    specialization: "Internal Medicine",
+    institution: "Heart Care Clinic",
+  },
+  {
+    id: "u7",
+    name: "Aisha Okonkwo",
+    email: "a.okonkwo@unimed.edu",
+    role: "student",
+    avatarInitials: "AO",
+    isActive: true,
+    emailVerified: true,
+    subscriptionTier: "professional",
+    caseCount: 18,
+    joinedDate: "2025-08-12",
+    lastActive: "2026-06-23",
+    institution: "University Medical College",
+  },
+  {
+    id: "u8",
+    name: "Dr. Hans Bauer",
+    email: "h.bauer@berlinmed.de",
+    role: "doctor",
+    avatarInitials: "HB",
+    isActive: true,
+    emailVerified: true,
+    subscriptionTier: "enterprise",
+    caseCount: 89,
+    joinedDate: "2024-08-20",
+    lastActive: "2026-06-22",
+    specialization: "Cardiology",
+    institution: "Berlin Medical Center",
+  },
+  {
+    id: "u9",
+    name: "Sofia Reyes",
+    email: "s.reyes@medschool.mx",
+    role: "student",
+    avatarInitials: "SR",
+    isActive: false,
+    emailVerified: false,
+    subscriptionTier: "free",
+    caseCount: 3,
+    joinedDate: "2026-02-14",
+    lastActive: "2026-03-10",
+    institution: "National Medical School",
+  },
+  {
+    id: "u10",
+    name: "Dr. Yuki Tanaka",
+    email: "y.tanaka@tokyomed.jp",
+    role: "doctor",
+    avatarInitials: "YT",
+    isActive: true,
+    emailVerified: true,
+    subscriptionTier: "professional",
+    caseCount: 56,
+    joinedDate: "2025-02-28",
+    lastActive: "2026-06-21",
+    specialization: "Electrophysiology",
+    institution: "Tokyo Medical University",
+  },
+];
+
+export const NOTIFICATIONS: AppNotification[] = [
+  {
+    id: "n1",
+    type: "critical",
+    title: "Critical ECG Alert",
+    message: "STEMI pattern detected in case C003 — Thomas A., 51M. Immediate action required.",
+    timestamp: "2026-06-23T10:32:00",
+    read: false,
+    targetRole: ["doctor", "admin", "super_admin"],
+  },
+  {
+    id: "n2",
+    type: "success",
+    title: "Analysis Complete",
+    message: "AI analysis for Linda K. (AFib) completed with 94% confidence.",
+    timestamp: "2026-06-22T15:18:00",
+    read: false,
+    targetRole: ["doctor", "admin", "super_admin"],
+  },
+  {
+    id: "n3",
+    type: "info",
+    title: "New AI Model Update",
+    message: "ECG Insight AI v2.4 is now available with improved LBBB detection accuracy.",
+    timestamp: "2026-06-21T09:00:00",
+    read: true,
+  },
+  {
+    id: "n4",
+    type: "warning",
+    title: "Account Verification Needed",
+    message: "2 users have not verified their email addresses. Review in User Management.",
+    timestamp: "2026-06-20T14:45:00",
+    read: false,
+    targetRole: ["admin", "super_admin"],
+  },
+  {
+    id: "n5",
+    type: "info",
+    title: "Monthly Report Ready",
+    message: "Your June 2026 analysis summary is ready for review.",
+    timestamp: "2026-06-20T08:00:00",
+    read: true,
+  },
+  {
+    id: "n6",
+    type: "success",
+    title: "Subscription Renewed",
+    message: "Your Professional subscription has been renewed for the next 12 months.",
+    timestamp: "2026-06-15T12:00:00",
+    read: true,
+  },
+];
+
+export const ACCURACY_TREND: AccuracyDataPoint[] = [
+  { week: "W1", accuracy: 89, cases: 12 },
+  { week: "W2", accuracy: 91, cases: 15 },
+  { week: "W3", accuracy: 88, cases: 9 },
+  { week: "W4", accuracy: 93, cases: 18 },
+  { week: "W5", accuracy: 95, cases: 22 },
+  { week: "W6", accuracy: 94, cases: 19 },
+  { week: "W7", accuracy: 96, cases: 25 },
+  { week: "W8", accuracy: 95, cases: 21 },
+];
 
 export const MOCK_CASES: ECGCase[] = [
   {
@@ -358,20 +622,56 @@ export interface DashboardStats {
   thisWeek: number;
   accuracyRate: number;
   criticalAlerts: number;
+  normalCount: number;
+  abnormalCount: number;
 }
 
 export function getDashboardStats(userId: string): DashboardStats {
   const userCases = getCasesByUser(userId);
   const weekAgo = new Date();
   weekAgo.setDate(weekAgo.getDate() - 7);
-  const thisWeek = userCases.filter(
-    (c) => new Date(c.date) >= weekAgo
-  ).length;
+  const thisWeek = userCases.filter((c) => new Date(c.date) >= weekAgo).length;
   const criticalAlerts = userCases.filter((c) => c.status === "critical").length;
+  const normalCount = userCases.filter((c) => c.status === "normal").length;
+  const abnormalCount = userCases.filter(
+    (c) => c.status === "abnormal" || c.status === "critical"
+  ).length;
   return {
     totalCases: userCases.length,
     thisWeek,
     accuracyRate: 95,
     criticalAlerts,
+    normalCount,
+    abnormalCount,
+  };
+}
+
+export function getSystemStats() {
+  const total = MANAGED_USERS.length;
+  const active = MANAGED_USERS.filter((u) => u.isActive).length;
+  const doctors = MANAGED_USERS.filter((u) => u.role === "doctor").length;
+  const students = MANAGED_USERS.filter((u) => u.role === "student").length;
+  const admins = MANAGED_USERS.filter(
+    (u) => u.role === "admin" || u.role === "super_admin"
+  ).length;
+  const unverified = MANAGED_USERS.filter((u) => !u.emailVerified).length;
+  const totalCases = MOCK_CASES.length;
+  const professional = MANAGED_USERS.filter(
+    (u) => u.subscriptionTier === "professional"
+  ).length;
+  const enterprise = MANAGED_USERS.filter(
+    (u) => u.subscriptionTier === "enterprise"
+  ).length;
+  return {
+    total,
+    active,
+    inactive: total - active,
+    doctors,
+    students,
+    admins,
+    unverified,
+    totalCases,
+    professional,
+    enterprise,
   };
 }

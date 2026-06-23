@@ -1,0 +1,3 @@
+- [ECG Insight Color Tokens](ecg-insight-colors.md) — colors.ts uses both old (foreground/mutedForeground/card) and new (text/textSecondary/surface/primaryLight) tokens; radius is now an object {sm,md,lg,xl,full}
+- [ECG Insight Route Typing](ecg-insight-routes.md) — expo-router typed routes don't include /admin/ paths; always cast admin/dynamic routes with `as any`
+- [ECG Insight Auth Architecture](ecg-insight-auth.md) — JWT-ready mock auth in AuthContext; effectiveUser = impersonatedUser ?? user; canAccess() uses ROLE_HIERARCHY map; super_admin email is super@ecginsight.com
