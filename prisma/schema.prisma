@@ -164,6 +164,54 @@ enum KnowledgeCategoryName {
   OCCUPATIONAL_FITNESS
 }
 
+enum ECGFileType {
+  DICOM_ECG
+  SCP_ECG
+  EDF
+  XML_ECG
+  HL7_ECG
+  PHILIPS_XML
+  GE_MUSE_XML
+  IMAGE
+  PDF_REPORT
+  WAVEFORM
+  UNKNOWN
+}
+
+enum ECGAnnotationType {
+  P_WAVE
+  QRS_COMPLEX
+  T_WAVE
+  R_PEAK
+}
+
+enum PACSModality {
+  ECG
+  WAVEFORM
+  SR
+  OT
+}
+
+enum HospitalIntegrationProtocol {
+  HL7
+  FHIR
+}
+
+enum TelecardiologyReviewStatus {
+  REQUESTED
+  IN_REVIEW
+  SIGNED_OFF
+  CANCELLED
+}
+
+enum ClinicalAlertType {
+  STEMI
+  VENTRICULAR_TACHYCARDIA
+  AF_RVR
+  COMPLETE_HEART_BLOCK
+  EXTREME_BRADYCARDIA
+}
+
 enum SmokingStatus {
   NEVER
   FORMER
@@ -255,6 +303,12 @@ enum TimelineEventType {
   RETURN_TO_WORK_DECISION_ADDED
   DOCUMENT_EXTRACTED
   DOCUMENT_INDEXED
+  ECG_FILE_PARSED
+  ECG_MEASURED
+  ECG_COMPARISON_COMPLETED
+  CLINICAL_ALERT_CREATED
+  TELECARDIOLOGY_REVIEW_REQUESTED
+  TELECARDIOLOGY_REVIEW_SIGNED
 }
 
 enum FitnessDecisionValue {
@@ -295,6 +349,14 @@ enum AuditAction {
   DOCUMENT_EXTRACTED
   DOCUMENT_INDEXED
   KNOWLEDGE_ARTICLE_CREATED
+  ECG_FILE_PARSED
+  ECG_MEASURED
+  ECG_COMPARISON_COMPLETED
+  CLINICAL_ALERT_CREATED
+  PACS_OPERATION
+  FHIR_OPERATION
+  TELECARDIOLOGY_REVIEW_REQUESTED
+  TELECARDIOLOGY_REVIEW_SIGNED
   REPORT_CREATED
   REPORT_UPDATED
   REPORT_FINALIZED
@@ -307,40 +369,45 @@ enum AuditAction {
 }
 
 model User {
-  id                          String                 @id @default(cuid())
+  id                          String                   @id @default(cuid())
   name                        String
-  email                       String                 @unique
+  email                       String                   @unique
   passwordHash                String
-  role                        Role                   @default(STUDENT)
+  role                        Role                     @default(STUDENT)
   specialization              String?
   licenseNumber               String?
   institution                 String?
   avatarInitials              String
-  isActive                    Boolean                @default(true)
-  emailVerified               Boolean                @default(false)
+  isActive                    Boolean                  @default(true)
+  emailVerified               Boolean                  @default(false)
   emailVerificationTokenHash  String?
   emailVerificationExpiresAt  DateTime?
   passwordResetTokenHash      String?
   passwordResetExpiresAt      DateTime?
-  createdAt                   DateTime               @default(now())
-  updatedAt                   DateTime               @updatedAt
+  createdAt                   DateTime                 @default(now())
+  updatedAt                   DateTime                 @updatedAt
   sessions                    Session[]
   subscription                Subscription?
   notifications               Notification[]
-  uploadedCases               ECGCase[]              @relation("UploadedCases")
-  assignedCases               ECGCase[]              @relation("AssignedCases")
+  uploadedCases               ECGCase[]                @relation("UploadedCases")
+  assignedCases               ECGCase[]                @relation("AssignedCases")
   auditLogs                   AuditLog[]
   fitnessDecisions            FitnessDecision[]
-  authoredReports             ClinicalReport[]       @relation("AuthoredReports")
-  finalizedReports            ClinicalReport[]       @relation("FinalizedReports")
-  signedReports               ClinicalReport[]       @relation("SignedReports")
+  authoredReports             ClinicalReport[]         @relation("AuthoredReports")
+  finalizedReports            ClinicalReport[]         @relation("FinalizedReports")
+  signedReports               ClinicalReport[]         @relation("SignedReports")
   reportVersions              ReportVersion[]
   reportSignatures            ReportSignature[]
-  sentEmails                  EmailLog[]             @relation("SentReportEmails")
-  fitnessAssessments          FitnessAssessment[]    @relation("FitnessAssessmentPhysician")
-  returnToWorkDecisions       ReturnToWorkDecision[] @relation("ReturnToWorkPhysician")
-  reviewedDocumentExtractions DocumentExtraction[]   @relation("ReviewedDocumentExtractions")
+  sentEmails                  EmailLog[]               @relation("SentReportEmails")
+  fitnessAssessments          FitnessAssessment[]      @relation("FitnessAssessmentPhysician")
+  returnToWorkDecisions       ReturnToWorkDecision[]   @relation("ReturnToWorkPhysician")
+  reviewedDocumentExtractions DocumentExtraction[]     @relation("ReviewedDocumentExtractions")
   knowledgeArticles           KnowledgeArticle[]
+  pacsConnections             PACSConnection[]
+  hospitalIntegrationLogs     HospitalIntegrationLog[]
+  requestedTelecardiology     TelecardiologyReview[]   @relation("TelecardiologyRequestedBy")
+  assignedTelecardiology      TelecardiologyReview[]   @relation("TelecardiologyAssignedTo")
+  signedTelecardiology        TelecardiologyReview[]   @relation("TelecardiologySignedBy")
 
   @@index([role])
   @@index([isActive])
@@ -399,6 +466,9 @@ model Patient {
   returnToWorkDecisions ReturnToWorkDecision[]
   documentExtractions   DocumentExtraction[]
   documentIndexes       DocumentSearchIndex[]
+  clinicalEcgFiles      ECGFile[]              @relation("PatientECGFiles")
+  clinicalAlerts        ECGClinicalAlert[]
+  telecardiologyReviews TelecardiologyReview[]
   auditLogs             AuditLog[]
 
   @@unique([organizationId, employeeId])
@@ -413,15 +483,15 @@ model Patient {
 }
 
 model Organization {
-  id                  String                @id @default(cuid())
+  id                  String                   @id @default(cuid())
   name                String
-  type                OrganizationType      @default(COMPANY)
+  type                OrganizationType         @default(COMPANY)
   address             String?
   phone               String?
   email               String?
   logo                String?
-  status              OrganizationStatus    @default(ACTIVE)
-  createdAt           DateTime              @default(now())
+  status              OrganizationStatus       @default(ACTIVE)
+  createdAt           DateTime                 @default(now())
   departments         Department[]
   contractors         Contractor[]
   contractorCompanies ContractorCompany[]
@@ -429,6 +499,10 @@ model Organization {
   patients            Patient[]
   documentExtractions DocumentExtraction[]
   documentIndexes     DocumentSearchIndex[]
+  clinicalEcgFiles    ECGFile[]                @relation("OrganizationECGFiles")
+  pacsConnections     PACSConnection[]
+  integrationLogs     HospitalIntegrationLog[]
+  clinicalAlerts      ECGClinicalAlert[]
 
   @@index([name])
   @@index([status])
@@ -853,31 +927,33 @@ model FitnessDecision {
 }
 
 model ECGCase {
-  id               String             @id @default(cuid())
-  caseId           String             @unique
-  patientId        String
-  uploadedById     String
-  assignedDoctorId String?
-  uploadDate       DateTime           @default(now())
-  ecgType          String
-  status           ECGCaseStatus      @default(PENDING)
-  priority         ECGPriority        @default(MEDIUM)
-  aiStatus         AIStatus           @default(QUEUED)
-  finalDiagnosis   String?
-  clinicalNotes    String?
-  createdAt        DateTime           @default(now())
-  updatedAt        DateTime           @updatedAt
-  patient          Patient            @relation(fields: [patientId], references: [id])
-  uploadedBy       User               @relation("UploadedCases", fields: [uploadedById], references: [id])
-  assignedDoctor   User?              @relation("AssignedCases", fields: [assignedDoctorId], references: [id])
-  files            ECGFile[]
-  analyses         AIAnalysis[]
-  measurements     ECGMeasurement[]
-  auditLogs        AuditLog[]
-  notifications    Notification[]
-  documents        ClinicalDocument[]
-  timelineEvents   TimelineEvent[]
-  reports          ClinicalReport[]
+  id                    String                 @id @default(cuid())
+  caseId                String                 @unique
+  patientId             String
+  uploadedById          String
+  assignedDoctorId      String?
+  uploadDate            DateTime               @default(now())
+  ecgType               String
+  status                ECGCaseStatus          @default(PENDING)
+  priority              ECGPriority            @default(MEDIUM)
+  aiStatus              AIStatus               @default(QUEUED)
+  finalDiagnosis        String?
+  clinicalNotes         String?
+  createdAt             DateTime               @default(now())
+  updatedAt             DateTime               @updatedAt
+  patient               Patient                @relation(fields: [patientId], references: [id])
+  uploadedBy            User                   @relation("UploadedCases", fields: [uploadedById], references: [id])
+  assignedDoctor        User?                  @relation("AssignedCases", fields: [assignedDoctorId], references: [id])
+  files                 ECGFile[]
+  analyses              AIAnalysis[]
+  measurements          ECGMeasurement[]
+  auditLogs             AuditLog[]
+  notifications         Notification[]
+  documents             ClinicalDocument[]
+  timelineEvents        TimelineEvent[]
+  reports               ClinicalReport[]
+  clinicalAlerts        ECGClinicalAlert[]
+  telecardiologyReviews TelecardiologyReview[]
 
   @@index([patientId])
   @@index([uploadedById])
@@ -989,6 +1065,9 @@ model ECGMeasurement {
   qrsDuration      Int
   qtInterval       Int
   qtcInterval      Int
+  rrInterval       Int?
+  pDuration        Int?
+  electricalAxis   Float?
   stDeviation      Float
   rhythmRegularity Float
   signalQuality    SignalQuality
@@ -1025,19 +1104,161 @@ model AIAnalysis {
 }
 
 model ECGFile {
-  id           String   @id @default(cuid())
-  caseId       String
-  originalName String
-  storedName   String
-  mimeType     String
-  sizeBytes    Int
-  storagePath  String
-  uploadedById String
-  createdAt    DateTime @default(now())
-  case         ECGCase  @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  id                    String                 @id @default(cuid())
+  caseId                String?
+  patientId             String?
+  organizationId        String?
+  originalName          String
+  storedName            String
+  fileName              String?
+  fileType              ECGFileType            @default(UNKNOWN)
+  mimeType              String
+  sizeBytes             Int
+  storagePath           String
+  storedPath            String?
+  uploadedById          String
+  manufacturer          String?
+  deviceModel           String?
+  samplingRate          Int?
+  duration              Float?
+  numberOfLeads         Int?
+  acquisitionDate       DateTime?
+  metadataJson          Json?
+  createdAt             DateTime               @default(now())
+  case                  ECGCase?               @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  patient               Patient?               @relation("PatientECGFiles", fields: [patientId], references: [id], onDelete: SetNull)
+  organization          Organization?          @relation("OrganizationECGFiles", fields: [organizationId], references: [id], onDelete: SetNull)
+  leadSignals           ECGLeadSignal[]
+  annotations           ECGAnnotation[]
+  clinicalAlerts        ECGClinicalAlert[]
+  telecardiologyReviews TelecardiologyReview[]
 
   @@index([caseId])
+  @@index([patientId])
+  @@index([organizationId])
+  @@index([fileType])
   @@index([uploadedById])
+}
+
+model ECGLeadSignal {
+  id           String   @id @default(cuid())
+  ecgFileId    String
+  leadName     String
+  signalData   Float[]
+  samplingRate Int
+  duration     Float
+  createdAt    DateTime @default(now())
+  ecgFile      ECGFile  @relation(fields: [ecgFileId], references: [id], onDelete: Cascade)
+
+  @@unique([ecgFileId, leadName])
+  @@index([ecgFileId])
+  @@index([leadName])
+}
+
+model ECGAnnotation {
+  id             String            @id @default(cuid())
+  ecgFileId      String
+  leadName       String
+  annotationType ECGAnnotationType
+  startIndex     Int
+  peakIndex      Int
+  endIndex       Int
+  createdAt      DateTime          @default(now())
+  ecgFile        ECGFile           @relation(fields: [ecgFileId], references: [id], onDelete: Cascade)
+
+  @@index([ecgFileId])
+  @@index([leadName])
+  @@index([annotationType])
+}
+
+model PACSConnection {
+  id             String        @id @default(cuid())
+  organizationId String?
+  aeTitle        String
+  host           String
+  port           Int
+  modality       PACSModality  @default(ECG)
+  createdById    String
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+  organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+  createdBy      User          @relation(fields: [createdById], references: [id])
+
+  @@index([organizationId])
+  @@index([aeTitle])
+  @@index([modality])
+}
+
+model HospitalIntegrationLog {
+  id             String                      @id @default(cuid())
+  organizationId String?
+  protocol       HospitalIntegrationProtocol
+  resourceType   String
+  direction      String
+  payloadJson    Json
+  status         String
+  createdById    String
+  createdAt      DateTime                    @default(now())
+  organization   Organization?               @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+  createdBy      User                        @relation(fields: [createdById], references: [id])
+
+  @@index([organizationId])
+  @@index([protocol])
+  @@index([resourceType])
+  @@index([createdAt])
+}
+
+model TelecardiologyReview {
+  id                String                     @id @default(cuid())
+  caseId            String
+  patientId         String
+  ecgFileId         String?
+  requestedById     String
+  assignedDoctorId  String?
+  signedById        String?
+  status            TelecardiologyReviewStatus @default(REQUESTED)
+  secondOpinion     String?
+  consultationNotes String?
+  remoteSignoff     Boolean                    @default(false)
+  signedAt          DateTime?
+  createdAt         DateTime                   @default(now())
+  updatedAt         DateTime                   @updatedAt
+  case              ECGCase                    @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  patient           Patient                    @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  ecgFile           ECGFile?                   @relation(fields: [ecgFileId], references: [id], onDelete: SetNull)
+  requestedBy       User                       @relation("TelecardiologyRequestedBy", fields: [requestedById], references: [id])
+  assignedDoctor    User?                      @relation("TelecardiologyAssignedTo", fields: [assignedDoctorId], references: [id])
+  signedBy          User?                      @relation("TelecardiologySignedBy", fields: [signedById], references: [id])
+
+  @@index([caseId])
+  @@index([patientId])
+  @@index([ecgFileId])
+  @@index([status])
+}
+
+model ECGClinicalAlert {
+  id              String            @id @default(cuid())
+  caseId          String?
+  patientId       String
+  organizationId  String?
+  ecgFileId       String?
+  alertType       ClinicalAlertType
+  severity        AISeverity        @default(CRITICAL)
+  message         String
+  confidenceScore Float
+  acknowledgedAt  DateTime?
+  createdAt       DateTime          @default(now())
+  case            ECGCase?          @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  patient         Patient           @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  organization    Organization?     @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+  ecgFile         ECGFile?          @relation(fields: [ecgFileId], references: [id], onDelete: SetNull)
+
+  @@index([caseId])
+  @@index([patientId])
+  @@index([organizationId])
+  @@index([ecgFileId])
+  @@index([alertType])
+  @@index([createdAt])
 }
 
 model AuditLog {

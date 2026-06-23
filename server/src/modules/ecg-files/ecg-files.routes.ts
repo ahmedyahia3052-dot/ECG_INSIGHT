@@ -1,0 +1,190 @@
+import fs from "node:fs";
+import path from "node:path";
+import { randomUUID } from "node:crypto";
+import multer from "multer";
+import { Router } from "express";
+import { z } from "zod";
+import { prisma } from "../../config/prisma";
+import { requireAuth, requireRole } from "../../middleware/auth";
+import { AppError } from "../../middleware/error";
+import {
+  compareEcgFile,
+  measureEcgFile,
+  parseAndPersistEcgFile,
+  serializeEcgFile,
+} from "./ecg-clinical.service";
+
+const uploadRoot = path.resolve(process.cwd(), "uploads", "clinical-ecg");
+fs.mkdirSync(uploadRoot, { recursive: true });
+
+const allowedMimeTypes = new Set([
+  "application/dicom",
+  "application/edf",
+  "application/hl7-v2",
+  "application/json",
+  "application/octet-stream",
+  "application/pdf",
+  "application/xml",
+  "image/jpeg",
+  "image/jpg",
+  "image/png",
+  "text/csv",
+  "text/plain",
+  "text/xml",
+]);
+const allowedExtensions = new Set([
+  ".csv",
+  ".dcm",
+  ".dicom",
+  ".edf",
+  ".hl7",
+  ".jpeg",
+  ".jpg",
+  ".json",
+  ".pdf",
+  ".png",
+  ".scp",
+  ".txt",
+  ".xml",
+]);
+
+const uploadSchema = z.object({
+  caseId: z.string().trim().optional(),
+  patientId: z.string().trim().min(1),
+});
+
+function safeStoredName(originalName: string) {
+  const ext = path.extname(originalName).toLowerCase();
+  if (!allowedExtensions.has(ext)) {
+    throw new AppError(400, "Unsupported ECG clinical file extension.", "INVALID_ECG_FILE_EXTENSION");
+  }
+  return `${Date.now()}-${randomUUID()}${ext}`;
+}
+
+const storage = multer.diskStorage({
+  destination: (_req, _file, cb) => cb(null, uploadRoot),
+  filename: (_req, file, cb) => {
+    try {
+      cb(null, safeStoredName(file.originalname));
+    } catch (error) {
+      cb(error as Error, "");
+    }
+  },
+});
+
+const upload = multer({
+  fileFilter: (_req, file, cb) => {
+    const ext = path.extname(file.originalname).toLowerCase();
+    if (!allowedMimeTypes.has(file.mimetype) && !allowedExtensions.has(ext)) {
+      cb(new AppError(400, "Unsupported ECG clinical file type.", "INVALID_ECG_FILE_TYPE"));
+      return;
+    }
+    cb(null, true);
+  },
+  limits: { fileSize: 50 * 1024 * 1024 },
+  storage,
+});
+
+export const ecgFilesRouter = Router();
+
+ecgFilesRouter.use(requireAuth);
+
+ecgFilesRouter.post("/files/upload", requireRole("DOCTOR"), upload.single("file"), async (req, res, next) => {
+  try {
+    if (!req.file) throw new AppError(400, "ECG file is required.", "FILE_REQUIRED");
+    const body = uploadSchema.parse(req.body);
+    const patient = await prisma.patient.findUnique({ where: { id: body.patientId } });
+    if (!patient) {
+      fs.rmSync(req.file.path, { force: true });
+      throw new AppError(404, "Patient not found.", "PATIENT_NOT_FOUND");
+    }
+    if (body.caseId) {
+      const ecgCase = await prisma.eCGCase.findUnique({ where: { id: body.caseId } });
+      if (!ecgCase || ecgCase.patientId !== patient.id) {
+        fs.rmSync(req.file.path, { force: true });
+        throw new AppError(404, "Linked ECG case not found for this patient.", "CASE_NOT_FOUND");
+      }
+    }
+    const file = await prisma.eCGFile.create({
+      data: {
+        caseId: body.caseId,
+        fileName: req.file.originalname,
+        mimeType: req.file.mimetype,
+        organizationId: patient.organizationId,
+        originalName: req.file.originalname,
+        patientId: patient.id,
+        sizeBytes: req.file.size,
+        storagePath: req.file.path,
+        storedName: req.file.filename,
+        storedPath: req.file.path,
+        uploadedById: req.auth!.id,
+      },
+    });
+    await prisma.timelineEvent.create({
+      data: {
+        caseId: body.caseId,
+        metadata: { ecgFileId: file.id, originalName: file.originalName },
+        patientId: patient.id,
+        title: "Clinical ECG file uploaded",
+        type: "ECG_UPLOADED",
+      },
+    });
+    await prisma.auditLog.create({
+      data: {
+        action: "ECG_UPLOADED",
+        actorId: req.auth!.id,
+        caseId: body.caseId,
+        message: `Clinical ECG file ${file.originalName} uploaded.`,
+        metadata: { ecgFileId: file.id, sizeBytes: file.sizeBytes },
+        patientId: patient.id,
+      },
+    });
+    res.status(201).json({ file: serializeEcgFile(file) });
+  } catch (error) {
+    next(error);
+  }
+});
+
+ecgFilesRouter.get("/files/list", async (req, res, next) => {
+  try {
+    const patientId = typeof req.query.patientId === "string" ? req.query.patientId : undefined;
+    const files = await prisma.eCGFile.findMany({
+      orderBy: { createdAt: "desc" },
+      take: 100,
+      where: { patientId },
+    });
+    res.json({ files: files.map(serializeEcgFile) });
+  } catch (error) {
+    next(error);
+  }
+});
+
+ecgFilesRouter.post("/files/parse", requireRole("DOCTOR"), async (req, res, next) => {
+  try {
+    const body = z.object({ ecgFileId: z.string().trim().min(1) }).parse(req.body);
+    const parsed = await parseAndPersistEcgFile(body.ecgFileId, req.auth!.id);
+    res.json({ parsed: { duration: parsed.duration, metadata: parsed.metadata, numberOfLeads: parsed.leads.length } });
+  } catch (error) {
+    next(error);
+  }
+});
+
+ecgFilesRouter.post("/files/measure", requireRole("DOCTOR"), async (req, res, next) => {
+  try {
+    const body = z.object({ ecgFileId: z.string().trim().min(1) }).parse(req.body);
+    const result = await measureEcgFile(body.ecgFileId, req.auth!.id);
+    res.json(result);
+  } catch (error) {
+    next(error);
+  }
+});
+
+ecgFilesRouter.post("/files/compare", requireRole("DOCTOR"), async (req, res, next) => {
+  try {
+    const body = z.object({ ecgFileId: z.string().trim().min(1) }).parse(req.body);
+    const comparison = await compareEcgFile(body.ecgFileId, req.auth!.id);
+    res.json({ comparison });
+  } catch (error) {
+    next(error);
+  }
+});

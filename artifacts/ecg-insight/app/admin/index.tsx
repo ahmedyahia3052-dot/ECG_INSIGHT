@@ -269,6 +269,46 @@ export default function AdminDashboard() {
           badgeColor="#7C3AED"
           onPress={() => router.push("/knowledge-library")}
         />
+        <MenuItem
+          icon="〽️"
+          title="ECG Waveform Viewer"
+          description="Multi-lead ECG parsing, measurements, and annotations"
+          badge="DICOM"
+          badgeColor="#0D9488"
+          onPress={() => router.push("/ecg-waveform")}
+        />
+        <MenuItem
+          icon="🖼️"
+          title="DICOM Viewer"
+          description="Zoom, pan, overlay measurements, and multi-lead display"
+          badge="Viewer"
+          badgeColor="#2563EB"
+          onPress={() => router.push("/dicom-viewer")}
+        />
+        <MenuItem
+          icon="🔁"
+          title="ECG Comparison"
+          description="Compare serial ECGs for ST, rhythm, rate, and interval changes"
+          badge="Serial"
+          badgeColor="#F59E0B"
+          onPress={() => router.push("/ecg-comparison")}
+        />
+        <MenuItem
+          icon="🏥"
+          title="PACS Browser"
+          description="DICOM Query/Retrieve and ECG study store"
+          badge="PACS"
+          badgeColor="#DC2626"
+          onPress={() => router.push("/pacs-browser")}
+        />
+        <MenuItem
+          icon="🔌"
+          title="Hospital Integration"
+          description="HL7/FHIR export, import, and integration logs"
+          badge="FHIR"
+          badgeColor="#7C3AED"
+          onPress={() => router.push("/hospital-integration")}
+        />
         {user?.role === "super_admin" && (
           <MenuItem
             icon="🛡️"

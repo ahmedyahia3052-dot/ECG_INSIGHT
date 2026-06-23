@@ -124,6 +124,11 @@ function ClassicTabLayout() {
       <Tabs.Screen name="advanced-search" options={{ href: null, title: "Advanced Search" }} />
       <Tabs.Screen name="clinical-extraction" options={{ href: null, title: "Clinical Extraction" }} />
       <Tabs.Screen name="ai-summary" options={{ href: null, title: "AI Summary" }} />
+      <Tabs.Screen name="ecg-waveform" options={{ href: null, title: "ECG Waveform Viewer" }} />
+      <Tabs.Screen name="dicom-viewer" options={{ href: null, title: "DICOM Viewer" }} />
+      <Tabs.Screen name="ecg-comparison" options={{ href: null, title: "ECG Comparison" }} />
+      <Tabs.Screen name="pacs-browser" options={{ href: null, title: "PACS Browser" }} />
+      <Tabs.Screen name="hospital-integration" options={{ href: null, title: "Hospital Integration" }} />
     </Tabs>
   );
 }
