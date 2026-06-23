@@ -1,4 +1,4 @@
-import { PrismaClient, type Role, type SubscriptionTier } from "@prisma/client";
+import { PrismaClient, type KnowledgeCategoryName, type Role, type SubscriptionTier } from "@prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
 import bcrypt from "bcryptjs";
 import "dotenv/config";
@@ -56,6 +56,20 @@ const users: Array<{
 ];
 
 const demoOrganizations = ["Khalda Petroleum", "Petrojet", "ENPPI"] as const;
+const knowledgeCategories: Array<{ name: KnowledgeCategoryName; title: string }> = [
+  { name: "HYPERTENSION", title: "Hypertension" },
+  { name: "ISCHEMIC_HEART_DISEASE", title: "Ischemic Heart Disease" },
+  { name: "HEART_FAILURE", title: "Heart Failure" },
+  { name: "ARRHYTHMIAS", title: "Arrhythmias" },
+  { name: "VALVULAR_DISEASE", title: "Valvular Disease" },
+  { name: "CONGENITAL_DISEASE", title: "Congenital Disease" },
+  { name: "CABG", title: "CABG" },
+  { name: "PCI", title: "PCI" },
+  { name: "PACEMAKERS", title: "Pacemakers" },
+  { name: "ICD", title: "ICD" },
+  { name: "ANTICOAGULATION", title: "Anticoagulation" },
+  { name: "OCCUPATIONAL_FITNESS", title: "Occupational Fitness" },
+];
 
 async function main() {
   const passwordHash = await bcrypt.hash("password", 12);
@@ -266,6 +280,35 @@ async function main() {
           type: "FITNESS_ASSESSMENT_COMPLETED",
         },
       });
+    }
+  }
+
+  const author = doctor ?? (await prisma.user.findUnique({ where: { email: "admin@ecginsight.com" } }));
+  if (author) {
+    for (const category of knowledgeCategories) {
+      await prisma.knowledgeCategory.upsert({
+        create: category,
+        update: { title: category.title },
+        where: { name: category.name },
+      });
+    }
+    const occupationalCategory = await prisma.knowledgeCategory.findUnique({ where: { name: "OCCUPATIONAL_FITNESS" } });
+    if (occupationalCategory) {
+      const existing = await prisma.knowledgeArticle.findFirst({
+        where: { categoryId: occupationalCategory.id, title: "Safety-sensitive cardiac fitness standard" },
+      });
+      if (!existing) {
+        await prisma.knowledgeArticle.create({
+          data: {
+            authorId: author.id,
+            body: "Workers with active ischemia, EF below 40%, unstable arrhythmia, or recent revascularization require occupational cardiology review before safety-sensitive deployment.",
+            categoryId: occupationalCategory.id,
+            references: ["Internal occupational cardiology protocol"],
+            tags: ["fitness", "ischemia", "ef", "restrictions"],
+            title: "Safety-sensitive cardiac fitness standard",
+          },
+        });
+      }
     }
   }
 }

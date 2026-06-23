@@ -245,6 +245,30 @@ export default function AdminDashboard() {
           badgeColor="#7C3AED"
           onPress={() => router.push("/admin/subscriptions")}
         />
+        <MenuItem
+          icon="📄"
+          title="Document Center"
+          description="OCR, extraction, indexing, and AI clinical summaries"
+          badge="AI"
+          badgeColor="#0D9488"
+          onPress={() => router.push("/document-center")}
+        />
+        <MenuItem
+          icon="🔎"
+          title="Advanced Search"
+          description="Search patients, documents, employees, and knowledge"
+          badge="Global"
+          badgeColor="#2563EB"
+          onPress={() => router.push("/advanced-search")}
+        />
+        <MenuItem
+          icon="📚"
+          title="Knowledge Library"
+          description="Guidelines, policies, fitness standards, and references"
+          badge="KB"
+          badgeColor="#7C3AED"
+          onPress={() => router.push("/knowledge-library")}
+        />
         {user?.role === "super_admin" && (
           <MenuItem
             icon="🛡️"
