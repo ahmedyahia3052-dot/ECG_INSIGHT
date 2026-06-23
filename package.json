@@ -8,6 +8,7 @@
     "db:seed": "tsx prisma/seed.ts",
     "lint": "eslint server/src prisma artifacts/ecg-insight/app artifacts/ecg-insight/components artifacts/ecg-insight/context artifacts/ecg-insight/data artifacts/ecg-insight/hooks artifacts/ecg-insight/services --no-error-on-unmatched-pattern",
     "prisma:generate": "prisma generate",
+    "test": "npm run typecheck",
     "typecheck": "tsc -p server/tsconfig.json --noEmit && tsc -p artifacts/ecg-insight/tsconfig.json --noEmit"
   },
   "private": true,
@@ -66,6 +67,7 @@
     "@types/multer": "^2.1.0",
     "@types/node": "^26.0.0",
     "@types/pg": "^8.20.0",
+    "babel-preset-expo": "^56.0.15",
     "eslint": "^10.5.0",
     "prettier": "^3.8.3",
     "prisma": "^7.8.0",

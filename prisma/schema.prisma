@@ -97,6 +97,23 @@ enum OrganizationStatus {
   INACTIVE
 }
 
+enum EmploymentStatus {
+  ACTIVE
+  INACTIVE
+  RETIRED
+  TERMINATED
+  ON_LEAVE
+}
+
+enum MedicalFitnessStatus {
+  FIT
+  FIT_WITH_RESTRICTIONS
+  TEMPORARILY_UNFIT
+  PERMANENTLY_UNFIT
+  REFER_TO_CARDIOLOGIST
+  UNKNOWN
+}
+
 enum SmokingStatus {
   NEVER
   FORMER
@@ -271,6 +288,7 @@ model Patient {
   gender              Gender    @default(UNKNOWN)
   dateOfBirth         DateTime
   employeeId          String?
+  employeeProfileId   String?   @unique
   phone               String?
   email               String?
   medicalRecordNumber String    @unique
@@ -278,6 +296,7 @@ model Patient {
   organizationId      String?
   departmentId        String?
   contractorId        String?
+  contractorCompanyId String?
   occupation          String?
   hireDate            DateTime?
   smokingStatus       SmokingStatus @default(UNKNOWN)
@@ -298,6 +317,8 @@ model Patient {
   organization        Organization? @relation(fields: [organizationId], references: [id])
   department          Department?   @relation(fields: [departmentId], references: [id])
   contractor          Contractor?   @relation(fields: [contractorId], references: [id])
+  contractorCompany   ContractorCompany? @relation(fields: [contractorCompanyId], references: [id])
+  employeeProfile     Employee?     @relation(fields: [employeeProfileId], references: [id])
   cases               ECGCase[]
   cardiacHistory      CardiacHistory?
   procedureHistories  ProcedureHistory[]
@@ -316,6 +337,7 @@ model Patient {
   @@index([organizationId])
   @@index([departmentId])
   @@index([contractorId])
+  @@index([contractorCompanyId])
   @@index([archivedAt])
   @@unique([organizationId, employeeId])
 }
@@ -332,6 +354,8 @@ model Organization {
   createdAt   DateTime           @default(now())
   departments Department[]
   contractors Contractor[]
+  contractorCompanies ContractorCompany[]
+  employees   Employee[]
   patients    Patient[]
 
   @@index([name])
@@ -344,10 +368,63 @@ model Department {
   organizationId String
   name           String
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  employees      Employee[]
   patients       Patient[]
 
   @@index([organizationId])
   @@unique([organizationId, name])
+}
+
+model ContractorCompany {
+  id             String       @id @default(cuid())
+  organizationId String
+  name           String
+  address        String?
+  phone          String?
+  email          String?
+  status         OrganizationStatus @default(ACTIVE)
+  createdAt      DateTime     @default(now())
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  employees      Employee[]
+  patients       Patient[]
+
+  @@index([organizationId])
+  @@index([status])
+  @@unique([organizationId, name])
+}
+
+model Employee {
+  id                   String               @id @default(cuid())
+  organizationId       String
+  departmentId         String
+  contractorCompanyId  String?
+  employeeId           String
+  nationalId           String
+  fullName             String
+  gender               Gender               @default(UNKNOWN)
+  dateOfBirth          DateTime
+  phone                String?
+  email                String?
+  jobTitle             String?
+  employmentStatus     EmploymentStatus     @default(ACTIVE)
+  hiringDate           DateTime?
+  retirementDate       DateTime?
+  medicalFitnessStatus MedicalFitnessStatus  @default(UNKNOWN)
+  createdAt            DateTime             @default(now())
+  updatedAt            DateTime             @updatedAt
+  organization         Organization         @relation(fields: [organizationId], references: [id])
+  department           Department           @relation(fields: [departmentId], references: [id])
+  contractorCompany    ContractorCompany?   @relation(fields: [contractorCompanyId], references: [id])
+  patient              Patient?
+
+  @@index([organizationId])
+  @@index([departmentId])
+  @@index([contractorCompanyId])
+  @@index([employmentStatus])
+  @@index([medicalFitnessStatus])
+  @@index([nationalId])
+  @@unique([organizationId, employeeId])
+  @@unique([nationalId])
 }
 
 model Contractor {

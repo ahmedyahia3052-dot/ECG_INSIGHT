@@ -55,6 +55,8 @@ const users: Array<{
   },
 ];
 
+const demoOrganizations = ["Khalda Petroleum", "Petrojet", "ENPPI"] as const;
+
 async function main() {
   const passwordHash = await bcrypt.hash("password", 12);
 
@@ -99,6 +101,25 @@ async function main() {
         },
       },
       where: { email: user.email },
+    });
+  }
+
+  for (const name of demoOrganizations) {
+    const existing = await prisma.organization.findFirst({ where: { name } });
+    if (existing) {
+      await prisma.organization.update({
+        data: { status: "ACTIVE", type: "COMPANY" },
+        where: { id: existing.id },
+      });
+      continue;
+    }
+
+    await prisma.organization.create({
+      data: {
+        name,
+        status: "ACTIVE",
+        type: "COMPANY",
+      },
     });
   }
 }

@@ -12,6 +12,12 @@ import { reportsRouter } from "./reports/reports.routes";
 import { subscriptionsRouter } from "../subscriptions/subscriptions.routes";
 import { uploadsRouter } from "../uploads/uploads.routes";
 import { usersRouter } from "../users/users.routes";
+import {
+  contractorsRouter,
+  departmentsRouter,
+  employeesRouter,
+  organizationsRouter,
+} from "./workforce/workforce.routes";
 
 export const modulesRouter = Router();
 
@@ -23,12 +29,16 @@ modulesRouter.use("/auth", authRouter);
 modulesRouter.use("/ai", aiRouter);
 modulesRouter.use("/cases", casesRouter);
 modulesRouter.use("/documents", documentsRouter);
+modulesRouter.use("/departments", departmentsRouter);
 modulesRouter.use("/ecg", ecgProcessingRouter);
+modulesRouter.use("/employees", employeesRouter);
 modulesRouter.use("/emr", emrRouter);
 modulesRouter.use("/enterprise", enterpriseRouter);
 modulesRouter.use("/notifications", notificationsRouter);
+modulesRouter.use("/organizations", organizationsRouter);
 modulesRouter.use("/patients", patientsRouter);
 modulesRouter.use("/reports", reportsRouter);
 modulesRouter.use("/users", usersRouter);
 modulesRouter.use("/subscriptions", subscriptionsRouter);
+modulesRouter.use("/contractors", contractorsRouter);
 modulesRouter.use("/uploads", uploadsRouter);
