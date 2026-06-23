@@ -1,0 +1,8 @@
+uploads = []
+outputs = []
+
+[[generated]]
+id = "9s0msKILigKza80RESlxH"
+uri = "file://artifacts/ecg-insight/assets/images/icon.png"
+type = "image"
+title = "ecg-insight-app-icon"

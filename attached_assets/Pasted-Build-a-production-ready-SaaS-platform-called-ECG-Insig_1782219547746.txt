@@ -1,0 +1,102 @@
+Build a production-ready SaaS platform called "ECG Insight".
+
+Project Goal:
+ECG Insight is an AI-powered ECG interpretation and clinical decision support platform designed for doctors, cardiology residents, medical students, and healthcare organizations.
+
+Tech Stack:
+- Frontend: React + TypeScript + Vite
+- Styling: Tailwind CSS + Shadcn UI
+- State Management: Zustand
+- Data Fetching: TanStack React Query
+- Forms: React Hook Form + Zod
+- Routing: React Router DOM
+- Icons: Lucide React
+- Charts: Recharts
+- Backend-ready architecture
+- Fully responsive design
+- Dark and Light Mode
+
+Design Requirements:
+- Premium modern medical SaaS UI
+- Professional healthcare color palette (teal, cyan, white, dark gray)
+- Enterprise-grade design
+- Smooth animations and transitions
+- Mobile-first responsive layout
+
+Create the following architecture:
+
+1. Public Pages:
+- Landing Page
+- Login Page
+- Register Page
+- Forgot Password Page
+- Pricing Page
+- Contact Page
+
+2. Private Pages:
+- Dashboard
+- Upload ECG Page
+- ECG History Page
+- ECG Case Details Page
+- User Profile Page
+- Settings Page
+
+3. Admin Pages:
+- Admin Dashboard
+- User Management
+- Subscription Management
+- Analytics Dashboard
+- System Settings
+
+4. User Roles:
+- Super Admin (Developer)
+- Admin
+- Doctor
+- Student
+
+Requirements:
+- Implement role-based access control (RBAC)
+- Protected routes
+- Authentication architecture with mock JWT support
+- Persistent authentication using Zustand persist middleware
+- Sidebar navigation
+- Top navigation bar
+- Notification system
+- Global search component
+- Reusable UI components
+
+ECG Features (UI + Mock Logic):
+- Upload ECG image or PDF
+- Drag and drop uploader
+- ECG preview viewer
+- AI Analysis Result screen
+- Confidence score display
+- Diagnosis cards
+- Clinical recommendations panel
+- ECG case history table
+- Search and filter history
+
+Dashboard Widgets:
+- Total ECG Analyses
+- Recent Cases
+- Accuracy Metrics
+- User Activity
+- Subscription Status
+
+Developer Requirements:
+- Clean folder structure
+- Scalable architecture
+- Reusable components
+- Strong TypeScript typing
+- Zero TypeScript errors
+- Zero lint errors
+- Create realistic mock data
+- Generate all folders, components, pages, hooks, stores, utilities and routing structure
+
+Important:
+The application must compile and run successfully using:
+
+npm install
+npm run dev
+
+Create a complete MVP foundation ready for future AI integration.
