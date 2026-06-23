@@ -1,5 +1,6 @@
 import type { NotificationType, Role } from "@prisma/client";
 import { prisma } from "../config/prisma";
+import { emitRealtime } from "../realtime/realtime.service";
 
 export async function createNotification(input: {
   caseId?: string;
@@ -9,7 +10,7 @@ export async function createNotification(input: {
   type?: NotificationType;
   userId?: string;
 }) {
-  return prisma.notification.create({
+  const notification = await prisma.notification.create({
     data: {
       caseId: input.caseId,
       message: input.message,
@@ -19,4 +20,6 @@ export async function createNotification(input: {
       userId: input.userId,
     },
   });
+  emitRealtime("notification.created", notification, input.userId ? [`user:${input.userId}`] : []);
+  return notification;
 }

@@ -43,11 +43,11 @@ export async function getPopulationAnalytics(accessToken: string) {
 }
 
 export async function listClinicalAlerts(accessToken: string) {
-  return apiRequest<{ alerts: unknown[] }>("/alerts", { accessToken });
+  return apiRequest<{ alerts: unknown[] }>("/clinical-alerts", { accessToken });
 }
 
 export async function generateClinicalAlerts(accessToken: string, patientId?: string) {
-  return apiRequest<{ alerts: unknown[] }>("/alerts", {
+  return apiRequest<{ alerts: unknown[] }>("/clinical-alerts", {
     accessToken,
     body: JSON.stringify({ patientId }),
     method: "POST",

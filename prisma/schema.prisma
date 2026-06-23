@@ -298,6 +298,41 @@ enum BackupJobStatus {
   RESTORED
 }
 
+enum SyncStatus {
+  PENDING
+  SYNCING
+  COMPLETED
+  FAILED
+}
+
+enum TaskStatus {
+  OPEN
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum TaskPriority {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum AlertCategory {
+  CRITICAL_ECG
+  HIGH_RISK_WORKER
+  PENDING_REVIEW
+  EXPIRING_CERTIFICATE
+  SECURITY_INCIDENT
+}
+
+enum AlertStatus {
+  OPEN
+  ACKNOWLEDGED
+  RESOLVED
+}
+
 enum SmokingStatus {
   NEVER
   FORMER
@@ -401,6 +436,10 @@ enum TimelineEventType {
   SECURITY_EVENT_CREATED
   COMPLIANCE_REQUEST_CREATED
   BACKUP_JOB_CREATED
+  SYNC_COMPLETED
+  TASK_ASSIGNED
+  MESSAGE_SENT
+  ALERT_CREATED
 }
 
 enum FitnessDecisionValue {
@@ -462,6 +501,12 @@ enum AuditAction {
   COMPLIANCE_REQUEST_CREATED
   BACKUP_JOB_CREATED
   PERMISSION_CHANGED
+  SYNC_ITEM_CREATED
+  TASK_CREATED
+  TASK_ASSIGNED
+  MESSAGE_SENT
+  TEAM_CREATED
+  ALERT_CREATED
   REPORT_CREATED
   REPORT_UPDATED
   REPORT_FINALIZED
@@ -474,53 +519,53 @@ enum AuditAction {
 }
 
 model User {
-  id                          String                   @id @default(cuid())
+  id                          String                    @id @default(cuid())
   name                        String
-  email                       String                   @unique
+  email                       String                    @unique
   passwordHash                String
-  role                        Role                     @default(STUDENT)
+  role                        Role                      @default(STUDENT)
   specialization              String?
   licenseNumber               String?
   institution                 String?
   avatarInitials              String
-  isActive                    Boolean                  @default(true)
-  emailVerified               Boolean                  @default(false)
+  isActive                    Boolean                   @default(true)
+  emailVerified               Boolean                   @default(false)
   emailVerificationTokenHash  String?
   emailVerificationExpiresAt  DateTime?
   passwordResetTokenHash      String?
   passwordResetExpiresAt      DateTime?
-  failedLoginAttempts         Int                      @default(0)
+  failedLoginAttempts         Int                       @default(0)
   lockedUntil                 DateTime?
-  forcePasswordReset          Boolean                  @default(false)
-  passwordChangedAt           DateTime                 @default(now())
-  createdAt                   DateTime                 @default(now())
-  updatedAt                   DateTime                 @updatedAt
+  forcePasswordReset          Boolean                   @default(false)
+  passwordChangedAt           DateTime                  @default(now())
+  createdAt                   DateTime                  @default(now())
+  updatedAt                   DateTime                  @updatedAt
   sessions                    Session[]
   subscription                Subscription?
   notifications               Notification[]
-  uploadedCases               ECGCase[]                @relation("UploadedCases")
-  assignedCases               ECGCase[]                @relation("AssignedCases")
+  uploadedCases               ECGCase[]                 @relation("UploadedCases")
+  assignedCases               ECGCase[]                 @relation("AssignedCases")
   auditLogs                   AuditLog[]
   fitnessDecisions            FitnessDecision[]
-  authoredReports             ClinicalReport[]         @relation("AuthoredReports")
-  finalizedReports            ClinicalReport[]         @relation("FinalizedReports")
-  signedReports               ClinicalReport[]         @relation("SignedReports")
+  authoredReports             ClinicalReport[]          @relation("AuthoredReports")
+  finalizedReports            ClinicalReport[]          @relation("FinalizedReports")
+  signedReports               ClinicalReport[]          @relation("SignedReports")
   reportVersions              ReportVersion[]
   reportSignatures            ReportSignature[]
-  sentEmails                  EmailLog[]               @relation("SentReportEmails")
-  fitnessAssessments          FitnessAssessment[]      @relation("FitnessAssessmentPhysician")
-  returnToWorkDecisions       ReturnToWorkDecision[]   @relation("ReturnToWorkPhysician")
-  reviewedDocumentExtractions DocumentExtraction[]     @relation("ReviewedDocumentExtractions")
+  sentEmails                  EmailLog[]                @relation("SentReportEmails")
+  fitnessAssessments          FitnessAssessment[]       @relation("FitnessAssessmentPhysician")
+  returnToWorkDecisions       ReturnToWorkDecision[]    @relation("ReturnToWorkPhysician")
+  reviewedDocumentExtractions DocumentExtraction[]      @relation("ReviewedDocumentExtractions")
   knowledgeArticles           KnowledgeArticle[]
   pacsConnections             PACSConnection[]
   hospitalIntegrationLogs     HospitalIntegrationLog[]
-  requestedTelecardiology     TelecardiologyReview[]   @relation("TelecardiologyRequestedBy")
-  assignedTelecardiology      TelecardiologyReview[]   @relation("TelecardiologyAssignedTo")
-  signedTelecardiology        TelecardiologyReview[]   @relation("TelecardiologySignedBy")
+  requestedTelecardiology     TelecardiologyReview[]    @relation("TelecardiologyRequestedBy")
+  assignedTelecardiology      TelecardiologyReview[]    @relation("TelecardiologyAssignedTo")
+  signedTelecardiology        TelecardiologyReview[]    @relation("TelecardiologySignedBy")
   clinicalConversations       ClinicalConversation[]
   riskAssessments             RiskAssessment[]
-  createdClinicalAlerts       ClinicalAlert[]          @relation("ClinicalAlertCreatedBy")
-  acknowledgedClinicalAlerts  ClinicalAlert[]          @relation("ClinicalAlertAcknowledgedBy")
+  createdClinicalAlerts       ClinicalAlert[]           @relation("ClinicalAlertCreatedBy")
+  acknowledgedClinicalAlerts  ClinicalAlert[]           @relation("ClinicalAlertAcknowledgedBy")
   enterpriseSessions          UserSession[]
   mfaMethods                  UserMFA[]
   passwordHistory             PasswordHistory[]
@@ -530,6 +575,17 @@ model User {
   patientConsents             PatientConsent[]
   dataRequests                DataRequest[]
   backupJobs                  BackupJob[]
+  syncQueueItems              SyncQueue[]
+  offlineCaches               OfflineCache[]
+  createdTasks                Task[]                    @relation("TaskCreatedBy")
+  assignedTaskLinks           TaskAssignment[]
+  taskComments                TaskComment[]
+  teamMemberships             TeamMember[]
+  createdTeams                Team[]                    @relation("TeamCreatedBy")
+  conversationMemberships     ConversationParticipant[]
+  sentMessages                Message[]                 @relation("MessageSender")
+  readReceipts                MessageReadReceipt[]
+  collaborationAlerts         Alert[]
 
   @@index([role])
   @@index([isActive])
@@ -597,6 +653,11 @@ model Patient {
   clinicalDecisionAlerts ClinicalAlert[]
   patientConsents        PatientConsent[]
   dataRequests           DataRequest[]
+  syncQueueItems         SyncQueue[]
+  offlineCaches          OfflineCache[]
+  tasks                  Task[]
+  conversations          Conversation[]
+  collaborationAlerts    Alert[]
   auditLogs              AuditLog[]
 
   @@unique([organizationId, employeeId])
@@ -636,6 +697,10 @@ model Organization {
   patientConsents        PatientConsent[]
   dataRequests           DataRequest[]
   backupJobs             BackupJob[]
+  teams                  Team[]
+  tasks                  Task[]
+  conversations          Conversation[]
+  collaborationAlerts    Alert[]
 
   @@index([name])
   @@index([status])
@@ -650,6 +715,8 @@ model Department {
   employees              Employee[]
   patients               Patient[]
   clinicalDecisionAlerts ClinicalAlert[]
+  teams                  Team[]
+  tasks                  Task[]
 
   @@unique([organizationId, name])
   @@index([organizationId])
@@ -668,6 +735,7 @@ model ContractorCompany {
   employees              Employee[]
   patients               Patient[]
   clinicalDecisionAlerts ClinicalAlert[]
+  tasks                  Task[]
 
   @@unique([organizationId, name])
   @@index([organizationId])
@@ -1089,6 +1157,9 @@ model ECGCase {
   reports               ClinicalReport[]
   clinicalAlerts        ECGClinicalAlert[]
   telecardiologyReviews TelecardiologyReview[]
+  tasks                 Task[]
+  conversations         Conversation[]
+  collaborationAlerts   Alert[]
 
   @@index([patientId])
   @@index([uploadedById])
@@ -1489,6 +1560,240 @@ model ClinicalAlert {
   @@index([createdAt])
 }
 
+model SyncQueue {
+  id           String     @id @default(cuid())
+  userId       String
+  patientId    String?
+  entityType   String
+  entityId     String?
+  operation    String
+  payloadJson  Json
+  status       SyncStatus @default(PENDING)
+  retryCount   Int        @default(0)
+  conflictJson Json?
+  lastError    String?
+  scheduledAt  DateTime   @default(now())
+  syncedAt     DateTime?
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+  user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  patient      Patient?   @relation(fields: [patientId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([patientId])
+  @@index([status])
+  @@index([entityType])
+  @@index([scheduledAt])
+}
+
+model OfflineCache {
+  id             String    @id @default(cuid())
+  userId         String
+  patientId      String?
+  cacheKey       String
+  entityType     String
+  encryptedBlob  String
+  encryptionMeta Json
+  checksum       String
+  expiresAt      DateTime?
+  lastAccessedAt DateTime  @default(now())
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  patient        Patient?  @relation(fields: [patientId], references: [id], onDelete: SetNull)
+
+  @@unique([userId, cacheKey])
+  @@index([userId])
+  @@index([patientId])
+  @@index([entityType])
+  @@index([expiresAt])
+}
+
+model Task {
+  id                  String             @id @default(cuid())
+  title               String
+  description         String?
+  status              TaskStatus         @default(OPEN)
+  priority            TaskPriority       @default(MEDIUM)
+  patientId           String?
+  caseId              String?
+  organizationId      String?
+  departmentId        String?
+  contractorCompanyId String?
+  dueAt               DateTime?
+  createdById         String
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime           @updatedAt
+  patient             Patient?           @relation(fields: [patientId], references: [id], onDelete: SetNull)
+  case                ECGCase?           @relation(fields: [caseId], references: [id], onDelete: SetNull)
+  organization        Organization?      @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+  department          Department?        @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+  contractorCompany   ContractorCompany? @relation(fields: [contractorCompanyId], references: [id], onDelete: SetNull)
+  createdBy           User               @relation("TaskCreatedBy", fields: [createdById], references: [id])
+  comments            TaskComment[]
+  assignments         TaskAssignment[]
+
+  @@index([patientId])
+  @@index([caseId])
+  @@index([organizationId])
+  @@index([departmentId])
+  @@index([status])
+  @@index([priority])
+  @@index([dueAt])
+}
+
+model TaskComment {
+  id        String   @id @default(cuid())
+  taskId    String
+  userId    String
+  body      String
+  createdAt DateTime @default(now())
+  task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([taskId])
+  @@index([userId])
+  @@index([createdAt])
+}
+
+model TaskAssignment {
+  id         String   @id @default(cuid())
+  taskId     String
+  userId     String
+  assignedAt DateTime @default(now())
+  task       Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([taskId, userId])
+  @@index([taskId])
+  @@index([userId])
+}
+
+model Team {
+  id             String        @id @default(cuid())
+  organizationId String?
+  departmentId   String?
+  name           String
+  description    String?
+  createdById    String
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+  organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+  department     Department?   @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+  createdBy      User          @relation("TeamCreatedBy", fields: [createdById], references: [id])
+  members        TeamMember[]
+
+  @@index([organizationId])
+  @@index([departmentId])
+  @@index([name])
+}
+
+model TeamMember {
+  id       String   @id @default(cuid())
+  teamId   String
+  userId   String
+  role     String
+  joinedAt DateTime @default(now())
+  team     Team     @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([teamId, userId])
+  @@index([teamId])
+  @@index([userId])
+}
+
+model Conversation {
+  id             String                    @id @default(cuid())
+  patientId      String?
+  caseId         String?
+  organizationId String?
+  title          String
+  createdAt      DateTime                  @default(now())
+  updatedAt      DateTime                  @updatedAt
+  patient        Patient?                  @relation(fields: [patientId], references: [id], onDelete: SetNull)
+  case           ECGCase?                  @relation(fields: [caseId], references: [id], onDelete: SetNull)
+  organization   Organization?             @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+  participants   ConversationParticipant[]
+  messages       Message[]
+
+  @@index([patientId])
+  @@index([caseId])
+  @@index([organizationId])
+}
+
+model ConversationParticipant {
+  id             String       @id @default(cuid())
+  conversationId String
+  userId         String
+  joinedAt       DateTime     @default(now())
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([conversationId, userId])
+  @@index([conversationId])
+  @@index([userId])
+}
+
+model Message {
+  id             String               @id @default(cuid())
+  conversationId String
+  senderId       String
+  body           String
+  attachments    String[]
+  createdAt      DateTime             @default(now())
+  conversation   Conversation         @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  sender         User                 @relation("MessageSender", fields: [senderId], references: [id])
+  readReceipts   MessageReadReceipt[]
+
+  @@index([conversationId])
+  @@index([senderId])
+  @@index([createdAt])
+}
+
+model MessageReadReceipt {
+  id        String   @id @default(cuid())
+  messageId String
+  userId    String
+  readAt    DateTime @default(now())
+  message   Message  @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([messageId, userId])
+  @@index([messageId])
+  @@index([userId])
+}
+
+model Alert {
+  id             String        @id @default(cuid())
+  userId         String?
+  patientId      String?
+  caseId         String?
+  organizationId String?
+  category       AlertCategory
+  status         AlertStatus   @default(OPEN)
+  priority       TaskPriority  @default(HIGH)
+  title          String
+  message        String
+  metadata       Json?
+  acknowledgedAt DateTime?
+  resolvedAt     DateTime?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+  user           User?         @relation(fields: [userId], references: [id], onDelete: SetNull)
+  patient        Patient?      @relation(fields: [patientId], references: [id], onDelete: SetNull)
+  case           ECGCase?      @relation(fields: [caseId], references: [id], onDelete: SetNull)
+  organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([patientId])
+  @@index([caseId])
+  @@index([organizationId])
+  @@index([category])
+  @@index([status])
+  @@index([priority])
+  @@index([createdAt])
+}
+
 model UserSession {
   id                String    @id @default(cuid())
   userId            String
@@ -1736,17 +2041,20 @@ model Subscription {
 }
 
 model Notification {
-  id         String           @id @default(cuid())
-  userId     String?
-  caseId     String?
-  targetRole Role?
-  type       NotificationType @default(INFO)
-  title      String
-  message    String
-  read       Boolean          @default(false)
-  createdAt  DateTime         @default(now())
-  user       User?            @relation(fields: [userId], references: [id], onDelete: Cascade)
-  case       ECGCase?         @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  id          String           @id @default(cuid())
+  userId      String?
+  caseId      String?
+  targetRole  Role?
+  type        NotificationType @default(INFO)
+  title       String
+  message     String
+  read        Boolean          @default(false)
+  priority    TaskPriority     @default(MEDIUM)
+  pushToken   String?
+  preferences Json?
+  createdAt   DateTime         @default(now())
+  user        User?            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  case        ECGCase?         @relation(fields: [caseId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@index([caseId])

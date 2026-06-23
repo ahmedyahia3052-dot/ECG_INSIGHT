@@ -1,10 +1,14 @@
+import { createServer } from "node:http";
 import { createApp } from "./app";
 import { env } from "./config/env";
 import { prisma } from "./config/prisma";
+import { initializeRealtime } from "./realtime/realtime.service";
 
 const app = createApp();
+const httpServer = createServer(app);
+initializeRealtime(httpServer);
 
-const server = app.listen(env.PORT, () => {
+const server = httpServer.listen(env.PORT, () => {
   console.log(`ECG Insight API listening on http://localhost:${env.PORT}`);
 });
 

@@ -389,6 +389,46 @@ export default function AdminDashboard() {
           badgeColor="#F59E0B"
           onPress={() => router.push("/session-dashboard")}
         />
+        <MenuItem
+          icon="🔔"
+          title="Notification Center"
+          description="Push abstraction, realtime notifications, and preferences"
+          badge="Push"
+          badgeColor="#0D9488"
+          onPress={() => router.push("/notification-center")}
+        />
+        <MenuItem
+          icon="🔄"
+          title="Sync Dashboard"
+          description="Offline queue, encrypted cache, retry, and conflict status"
+          badge="Offline"
+          badgeColor="#2563EB"
+          onPress={() => router.push("/sync-dashboard")}
+        />
+        <MenuItem
+          icon="👥"
+          title="Collaboration Dashboard"
+          description="Teams, department groups, messaging, and case collaboration"
+          badge="Teams"
+          badgeColor="#7C3AED"
+          onPress={() => router.push("/collaboration-dashboard")}
+        />
+        <MenuItem
+          icon="✅"
+          title="Task Dashboard"
+          description="Assigned ECG reviews, consultations, due dates, and comments"
+          badge="Tasks"
+          badgeColor="#F59E0B"
+          onPress={() => router.push("/task-dashboard")}
+        />
+        <MenuItem
+          icon="🚦"
+          title="Alert Dashboard"
+          description="Critical ECG, worker risk, certificate, and security alerts"
+          badge="Alerts"
+          badgeColor="#DC2626"
+          onPress={() => router.push("/alert-dashboard")}
+        />
         {user?.role === "super_admin" && (
           <MenuItem
             icon="🛡️"
