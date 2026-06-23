@@ -114,6 +114,35 @@ enum MedicalFitnessStatus {
   UNKNOWN
 }
 
+enum WorkCategory {
+  ADMINISTRATIVE
+  LIGHT
+  MODERATE
+  HEAVY
+  SAFETY_CRITICAL
+  OFFSHORE
+  EMERGENCY_RESPONSE
+}
+
+enum OccupationalFitnessDecision {
+  FIT_FOR_WORK
+  FIT_WITH_RESTRICTIONS
+  TEMPORARILY_UNFIT
+  PERMANENTLY_UNFIT
+  SPECIALIST_REVIEW_REQUIRED
+}
+
+enum RestrictionType {
+  NO_WORK_AT_HEIGHT
+  NO_DRIVING
+  NO_CONFINED_SPACE
+  NO_NIGHT_SHIFTS
+  NO_OFFSHORE_DUTY
+  SEDENTARY_WORK_ONLY
+  NO_HEAVY_EQUIPMENT
+  NO_EMERGENCY_RESPONSE
+}
+
 enum SmokingStatus {
   NEVER
   FORMER
@@ -200,6 +229,9 @@ enum TimelineEventType {
   MEDICATION_ADDED
   MEDICATION_UPDATED
   HOSPITALIZATION_ADDED
+  FITNESS_ASSESSMENT_COMPLETED
+  WORK_RESTRICTION_ADDED
+  RETURN_TO_WORK_DECISION_ADDED
 }
 
 enum FitnessDecisionValue {
@@ -234,6 +266,9 @@ enum AuditAction {
   CARDIAC_IMAGING_UPLOADED
   MEDICATION_ADDED
   MEDICATION_UPDATED
+  FITNESS_ASSESSMENT_COMPLETED
+  WORK_RESTRICTION_ADDED
+  RETURN_TO_WORK_DECISION_ADDED
   REPORT_CREATED
   REPORT_UPDATED
   REPORT_FINALIZED
@@ -276,6 +311,8 @@ model User {
   reportVersions             ReportVersion[]
   reportSignatures           ReportSignature[]
   sentEmails                 EmailLog[]        @relation("SentReportEmails")
+  fitnessAssessments         FitnessAssessment[] @relation("FitnessAssessmentPhysician")
+  returnToWorkDecisions      ReturnToWorkDecision[] @relation("ReturnToWorkPhysician")
 
   @@index([role])
   @@index([isActive])
@@ -329,6 +366,9 @@ model Patient {
   fitnessDecisions    FitnessDecision[]
   timelineEvents      TimelineEvent[]
   reports             ClinicalReport[]
+  fitnessAssessments  FitnessAssessment[]
+  workRestrictions    WorkRestriction[]
+  returnToWorkDecisions ReturnToWorkDecision[]
   auditLogs           AuditLog[]
 
   @@index([lastName, firstName])
@@ -410,21 +450,128 @@ model Employee {
   hiringDate           DateTime?
   retirementDate       DateTime?
   medicalFitnessStatus MedicalFitnessStatus  @default(UNKNOWN)
+  workCategory         WorkCategory          @default(MODERATE)
+  criticalJob          Boolean               @default(false)
+  shiftWorker          Boolean               @default(false)
+  drivingDuty          Boolean               @default(false)
+  workAtHeight         Boolean               @default(false)
+  confinedSpace        Boolean               @default(false)
+  heavyEquipmentOperator Boolean             @default(false)
+  offshoreWorker       Boolean               @default(false)
+  firefighter          Boolean               @default(false)
+  emergencyResponder   Boolean               @default(false)
   createdAt            DateTime             @default(now())
   updatedAt            DateTime             @updatedAt
   organization         Organization         @relation(fields: [organizationId], references: [id])
   department           Department           @relation(fields: [departmentId], references: [id])
   contractorCompany    ContractorCompany?   @relation(fields: [contractorCompanyId], references: [id])
   patient              Patient?
+  occupationalRiskProfile OccupationalRiskProfile?
+  fitnessAssessments   FitnessAssessment[]
+  workRestrictions     WorkRestriction[]
+  returnToWorkDecisions ReturnToWorkDecision[]
 
   @@index([organizationId])
   @@index([departmentId])
   @@index([contractorCompanyId])
   @@index([employmentStatus])
   @@index([medicalFitnessStatus])
+  @@index([workCategory])
+  @@index([criticalJob])
   @@index([nationalId])
   @@unique([organizationId, employeeId])
   @@unique([nationalId])
+}
+
+model OccupationalRiskProfile {
+  id                     String   @id @default(cuid())
+  employeeId             String   @unique
+  smoking                Boolean  @default(false)
+  diabetes               Boolean  @default(false)
+  hypertension           Boolean  @default(false)
+  dyslipidemia           Boolean  @default(false)
+  obesity                Boolean  @default(false)
+  familyHistory          Boolean  @default(false)
+  previousMI             Boolean  @default(false)
+  previousStroke         Boolean  @default(false)
+  occupationalExposure   Json?
+  riskScore              Int      @default(0)
+  highRisk               Boolean  @default(false)
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+  employee               Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@index([highRisk])
+  @@index([riskScore])
+}
+
+model FitnessAssessment {
+  id                         String                      @id @default(cuid())
+  employeeId                 String
+  patientId                  String?
+  assessedById               String
+  finalDecision              OccupationalFitnessDecision
+  recommendation             OccupationalFitnessDecision
+  reviewDate                 DateTime?
+  physicianJustification     String
+  occupationalReportSection  Json
+  inputSummary               Json
+  createdAt                  DateTime                    @default(now())
+  updatedAt                  DateTime                    @updatedAt
+  employee                   Employee                    @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  patient                    Patient?                    @relation(fields: [patientId], references: [id], onDelete: SetNull)
+  assessedBy                 User                        @relation("FitnessAssessmentPhysician", fields: [assessedById], references: [id])
+  restrictions               WorkRestriction[]
+  returnToWorkDecisions      ReturnToWorkDecision[]
+
+  @@index([employeeId])
+  @@index([patientId])
+  @@index([finalDecision])
+  @@index([createdAt])
+}
+
+model WorkRestriction {
+  id           String         @id @default(cuid())
+  employeeId   String
+  patientId    String?
+  assessmentId String?
+  type         RestrictionType
+  description  String
+  active       Boolean        @default(true)
+  startsAt     DateTime       @default(now())
+  endsAt       DateTime?
+  createdAt    DateTime       @default(now())
+  employee     Employee       @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  patient      Patient?       @relation(fields: [patientId], references: [id], onDelete: SetNull)
+  assessment   FitnessAssessment? @relation(fields: [assessmentId], references: [id], onDelete: SetNull)
+
+  @@index([employeeId])
+  @@index([patientId])
+  @@index([assessmentId])
+  @@index([type])
+  @@index([active])
+}
+
+model ReturnToWorkDecision {
+  id                     String                      @id @default(cuid())
+  employeeId             String
+  patientId              String?
+  assessmentId           String?
+  decision               OccupationalFitnessDecision
+  reviewDate             DateTime?
+  physicianJustification String
+  decidedById            String
+  createdAt              DateTime                    @default(now())
+  employee               Employee                    @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  patient                Patient?                    @relation(fields: [patientId], references: [id], onDelete: SetNull)
+  assessment             FitnessAssessment?          @relation(fields: [assessmentId], references: [id], onDelete: SetNull)
+  decidedBy              User                        @relation("ReturnToWorkPhysician", fields: [decidedById], references: [id])
+
+  @@index([employeeId])
+  @@index([patientId])
+  @@index([assessmentId])
+  @@index([decision])
+  @@index([createdAt])
 }
 
 model Contractor {
@@ -653,6 +800,7 @@ model ClinicalReport {
   recommendations            String[]
   urgentActions              String[]
   finalPhysicianImpression   String?
+  occupationalReportSection  Json?
   physicianName              String
   physicianSpecialty         String?
   physicianLicenseNumber     String?

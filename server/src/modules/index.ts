@@ -8,6 +8,11 @@ import { emrRouter } from "./emr/emr.routes";
 import { enterpriseRouter } from "./enterprise/enterprise.routes";
 import { notificationsRouter } from "../notifications/notifications.routes";
 import { patientsRouter } from "../patients/patients.routes";
+import {
+  fitnessAssessmentsRouter,
+  occupationalRiskRouter,
+  workRestrictionsRouter,
+} from "./occupational/occupational.routes";
 import { reportsRouter } from "./reports/reports.routes";
 import { subscriptionsRouter } from "../subscriptions/subscriptions.routes";
 import { uploadsRouter } from "../uploads/uploads.routes";
@@ -34,7 +39,9 @@ modulesRouter.use("/ecg", ecgProcessingRouter);
 modulesRouter.use("/employees", employeesRouter);
 modulesRouter.use("/emr", emrRouter);
 modulesRouter.use("/enterprise", enterpriseRouter);
+modulesRouter.use("/fitness-assessments", fitnessAssessmentsRouter);
 modulesRouter.use("/notifications", notificationsRouter);
+modulesRouter.use("/occupational-risk", occupationalRiskRouter);
 modulesRouter.use("/organizations", organizationsRouter);
 modulesRouter.use("/patients", patientsRouter);
 modulesRouter.use("/reports", reportsRouter);
@@ -42,3 +49,4 @@ modulesRouter.use("/users", usersRouter);
 modulesRouter.use("/subscriptions", subscriptionsRouter);
 modulesRouter.use("/contractors", contractorsRouter);
 modulesRouter.use("/uploads", uploadsRouter);
+modulesRouter.use("/work-restrictions", workRestrictionsRouter);

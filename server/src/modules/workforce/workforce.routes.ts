@@ -6,6 +6,7 @@ import type {
   OrganizationStatus,
   OrganizationType,
   Prisma,
+  WorkCategory,
 } from "@prisma/client";
 import { Router } from "express";
 import { prisma } from "../../config/prisma";
@@ -59,6 +60,16 @@ const fitnessStatusMap: Record<string, MedicalFitnessStatus> = {
   unknown: "UNKNOWN",
 };
 
+const workCategoryMap: Record<string, WorkCategory> = {
+  administrative: "ADMINISTRATIVE",
+  emergency_response: "EMERGENCY_RESPONSE",
+  heavy: "HEAVY",
+  light: "LIGHT",
+  moderate: "MODERATE",
+  offshore: "OFFSHORE",
+  safety_critical: "SAFETY_CRITICAL",
+};
+
 function organizationType(value: string): OrganizationType {
   return value.toUpperCase() as OrganizationType;
 }
@@ -70,23 +81,33 @@ function organizationStatus(value: string): OrganizationStatus {
 function serializeEmployee(employee: Employee) {
   return {
     contractorCompanyId: employee.contractorCompanyId ?? undefined,
+    confinedSpace: employee.confinedSpace,
     createdAt: employee.createdAt.toISOString(),
+    criticalJob: employee.criticalJob,
     dateOfBirth: employee.dateOfBirth.toISOString().slice(0, 10),
     departmentId: employee.departmentId,
+    drivingDuty: employee.drivingDuty,
     email: employee.email ?? undefined,
     employeeId: employee.employeeId,
     employmentStatus: employee.employmentStatus.toLowerCase(),
+    emergencyResponder: employee.emergencyResponder,
+    firefighter: employee.firefighter,
     fullName: employee.fullName,
     gender: employee.gender.toLowerCase(),
+    heavyEquipmentOperator: employee.heavyEquipmentOperator,
     hiringDate: employee.hiringDate?.toISOString().slice(0, 10),
     id: employee.id,
     jobTitle: employee.jobTitle ?? undefined,
     medicalFitnessStatus: employee.medicalFitnessStatus.toLowerCase(),
     nationalId: employee.nationalId,
+    offshoreWorker: employee.offshoreWorker,
     organizationId: employee.organizationId,
     phone: employee.phone ?? undefined,
     retirementDate: employee.retirementDate?.toISOString().slice(0, 10),
+    shiftWorker: employee.shiftWorker,
     updatedAt: employee.updatedAt.toISOString(),
+    workAtHeight: employee.workAtHeight,
+    workCategory: employee.workCategory.toLowerCase(),
   };
 }
 
@@ -107,41 +128,61 @@ async function assertContractorBelongsToOrganization(contractorCompanyId: string
 
 function employeeCreateData(body: EmployeeBody) {
   return {
+    confinedSpace: body.confinedSpace,
     contractorCompanyId: body.contractorCompanyId,
+    criticalJob: body.criticalJob,
     dateOfBirth: body.dateOfBirth,
     departmentId: body.departmentId,
+    drivingDuty: body.drivingDuty,
     email: body.email,
     employeeId: body.employeeId,
     employmentStatus: employmentStatusMap[body.employmentStatus],
+    emergencyResponder: body.emergencyResponder,
+    firefighter: body.firefighter,
     fullName: body.fullName,
     gender: genderMap[body.gender],
+    heavyEquipmentOperator: body.heavyEquipmentOperator,
     hiringDate: body.hiringDate,
     jobTitle: body.jobTitle,
     medicalFitnessStatus: fitnessStatusMap[body.medicalFitnessStatus],
     nationalId: body.nationalId,
+    offshoreWorker: body.offshoreWorker,
     organizationId: body.organizationId,
     phone: body.phone,
     retirementDate: body.retirementDate,
+    shiftWorker: body.shiftWorker,
+    workAtHeight: body.workAtHeight,
+    workCategory: workCategoryMap[body.workCategory],
   };
 }
 
 function employeeUpdateData(body: EmployeeUpdateBody) {
   return {
+    confinedSpace: body.confinedSpace,
     contractorCompanyId: body.contractorCompanyId,
+    criticalJob: body.criticalJob,
     dateOfBirth: body.dateOfBirth,
     departmentId: body.departmentId,
+    drivingDuty: body.drivingDuty,
     email: body.email,
     employeeId: body.employeeId,
     employmentStatus: body.employmentStatus ? employmentStatusMap[body.employmentStatus] : undefined,
+    emergencyResponder: body.emergencyResponder,
+    firefighter: body.firefighter,
     fullName: body.fullName,
     gender: body.gender ? genderMap[body.gender] : undefined,
+    heavyEquipmentOperator: body.heavyEquipmentOperator,
     hiringDate: body.hiringDate,
     jobTitle: body.jobTitle,
     medicalFitnessStatus: body.medicalFitnessStatus ? fitnessStatusMap[body.medicalFitnessStatus] : undefined,
     nationalId: body.nationalId,
+    offshoreWorker: body.offshoreWorker,
     organizationId: body.organizationId,
     phone: body.phone,
     retirementDate: body.retirementDate,
+    shiftWorker: body.shiftWorker,
+    workAtHeight: body.workAtHeight,
+    workCategory: body.workCategory ? workCategoryMap[body.workCategory] : undefined,
   };
 }
 

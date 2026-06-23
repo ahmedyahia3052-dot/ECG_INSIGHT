@@ -73,7 +73,13 @@ export async function generateClinicalReport(caseId: string, authorId: string) {
       include: {
         analyses: { orderBy: { createdAt: "desc" }, take: 1 },
         measurements: { orderBy: { createdAt: "desc" }, take: 1 },
-        patient: { include: { contractor: true, organization: true } },
+        patient: {
+          include: {
+            contractor: true,
+            fitnessAssessments: { orderBy: { createdAt: "desc" }, take: 1 },
+            organization: true,
+          },
+        },
       },
       where: { id: caseId },
     }),
@@ -84,6 +90,7 @@ export async function generateClinicalReport(caseId: string, authorId: string) {
 
   const analysis = ecgCase.analyses[0];
   const measurement = ecgCase.measurements[0];
+  const occupationalAssessment = ecgCase.patient.fitnessAssessments[0];
   const report = await prisma.clinicalReport.create({
     data: {
       acquisitionDate: ecgCase.uploadDate,
@@ -107,6 +114,10 @@ export async function generateClinicalReport(caseId: string, authorId: string) {
         : undefined,
       finalPhysicianImpression: ecgCase.finalDiagnosis,
       organizationName: ecgCase.patient.organization?.name,
+      occupationalReportSection:
+        occupationalAssessment?.occupationalReportSection === null
+          ? undefined
+          : (occupationalAssessment?.occupationalReportSection as Prisma.InputJsonValue | undefined),
       patientId: ecgCase.patientId,
       physicianLicenseNumber: author.licenseNumber,
       physicianName: author.name,
@@ -158,6 +169,7 @@ export function serializeReport(report: ReportWithRelations | ClinicalReport) {
     generatedAt: report.generatedAt.toISOString(),
     id: report.id,
     organizationName: report.organizationName ?? undefined,
+    occupationalReportSection: report.occupationalReportSection,
     patientId: report.patientId,
     physicianLicenseNumber: report.physicianLicenseNumber ?? undefined,
     physicianName: report.physicianName,
@@ -213,6 +225,7 @@ export function buildReportPdf(report: ClinicalReport, watermark = "ECG Insight"
     `Recommendations: ${report.recommendations.join("; ") || "N/A"}`,
     `Urgent Actions: ${report.urgentActions.join("; ") || "N/A"}`,
     `Final Impression: ${report.finalPhysicianImpression ?? "N/A"}`,
+    `Occupational Fitness: ${report.occupationalReportSection ? JSON.stringify(report.occupationalReportSection).slice(0, 100) : "N/A"}`,
     `Electronic Signature: ${report.electronicSignaturePath ? "Applied" : "Not applied"}`,
     "Page 1 of 1",
   ];
