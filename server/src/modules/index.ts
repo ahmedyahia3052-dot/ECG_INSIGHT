@@ -2,6 +2,13 @@ import { Router } from "express";
 import { aiRouter } from "../ai/ai.routes";
 import { authRouter } from "../auth/auth.routes";
 import { casesRouter } from "../cases/cases.routes";
+import {
+  assistantRouter,
+  clinicalAlertsRouter,
+  populationAnalyticsRouter,
+  riskRouter,
+  trendsRouter,
+} from "./clinical-intelligence/clinical-intelligence.routes";
 import { documentsRouter } from "./documents/documents.routes";
 import { ecgFilesRouter } from "./ecg-files/ecg-files.routes";
 import { ecgProcessingRouter } from "./ecg-processing/ecg-processing.routes";
@@ -36,7 +43,10 @@ modulesRouter.get("/healthz", (_req, res) => {
 });
 
 modulesRouter.use("/auth", authRouter);
+modulesRouter.use("/assistant", assistantRouter);
 modulesRouter.use("/ai", aiRouter);
+modulesRouter.use("/alerts", clinicalAlertsRouter);
+modulesRouter.use("/analytics", populationAnalyticsRouter);
 modulesRouter.use("/cases", casesRouter);
 modulesRouter.use("/documents", documentsRouter);
 modulesRouter.use("/departments", departmentsRouter);
@@ -55,10 +65,12 @@ modulesRouter.use("/patients", patientsRouter);
 modulesRouter.use("/pacs", pacsRouter);
 modulesRouter.use("/fhir", fhirRouter);
 modulesRouter.use("/reports", reportsRouter);
+modulesRouter.use("/risk", riskRouter);
 modulesRouter.use("/search", searchRouter);
 modulesRouter.use("/users", usersRouter);
 modulesRouter.use("/subscriptions", subscriptionsRouter);
 modulesRouter.use("/contractors", contractorsRouter);
 modulesRouter.use("/uploads", uploadsRouter);
 modulesRouter.use("/telecardiology", telecardiologyRouter);
+modulesRouter.use("/trends", trendsRouter);
 modulesRouter.use("/work-restrictions", workRestrictionsRouter);

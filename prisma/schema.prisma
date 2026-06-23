@@ -212,6 +212,35 @@ enum ClinicalAlertType {
   EXTREME_BRADYCARDIA
 }
 
+enum TrendMetric {
+  EF
+  HEART_RATE
+  QTC
+  BLOOD_PRESSURE
+  WEIGHT
+}
+
+enum RiskAssessmentType {
+  SUDDEN_CARDIAC_DEATH
+  MAJOR_CARDIAC_EVENT
+  OCCUPATIONAL_UNFITNESS
+  ARRHYTHMIA
+}
+
+enum ClinicalDecisionAlertType {
+  EF_BELOW_35
+  NEW_STEMI
+  LONG_QT
+  CRITICAL_ARRHYTHMIA
+  EXPIRING_CERTIFICATE
+}
+
+enum ClinicalDecisionAlertStatus {
+  OPEN
+  ACKNOWLEDGED
+  RESOLVED
+}
+
 enum SmokingStatus {
   NEVER
   FORMER
@@ -309,6 +338,9 @@ enum TimelineEventType {
   CLINICAL_ALERT_CREATED
   TELECARDIOLOGY_REVIEW_REQUESTED
   TELECARDIOLOGY_REVIEW_SIGNED
+  CLINICAL_CONVERSATION_CREATED
+  PATIENT_TREND_RECORDED
+  RISK_ASSESSMENT_COMPLETED
 }
 
 enum FitnessDecisionValue {
@@ -357,6 +389,10 @@ enum AuditAction {
   FHIR_OPERATION
   TELECARDIOLOGY_REVIEW_REQUESTED
   TELECARDIOLOGY_REVIEW_SIGNED
+  CLINICAL_CONVERSATION_CREATED
+  PATIENT_TREND_RECORDED
+  RISK_ASSESSMENT_COMPLETED
+  CLINICAL_DECISION_ALERT_CREATED
   REPORT_CREATED
   REPORT_UPDATED
   REPORT_FINALIZED
@@ -408,68 +444,76 @@ model User {
   requestedTelecardiology     TelecardiologyReview[]   @relation("TelecardiologyRequestedBy")
   assignedTelecardiology      TelecardiologyReview[]   @relation("TelecardiologyAssignedTo")
   signedTelecardiology        TelecardiologyReview[]   @relation("TelecardiologySignedBy")
+  clinicalConversations       ClinicalConversation[]
+  riskAssessments             RiskAssessment[]
+  createdClinicalAlerts       ClinicalAlert[]          @relation("ClinicalAlertCreatedBy")
+  acknowledgedClinicalAlerts  ClinicalAlert[]          @relation("ClinicalAlertAcknowledgedBy")
 
   @@index([role])
   @@index([isActive])
 }
 
 model Patient {
-  id                    String                 @id @default(cuid())
-  firstName             String
-  lastName              String
-  gender                Gender                 @default(UNKNOWN)
-  dateOfBirth           DateTime
-  employeeId            String?
-  employeeProfileId     String?                @unique
-  phone                 String?
-  email                 String?
-  medicalRecordNumber   String                 @unique
-  nationalId            String?                @unique
-  organizationId        String?
-  departmentId          String?
-  contractorId          String?
-  contractorCompanyId   String?
-  occupation            String?
-  hireDate              DateTime?
-  smokingStatus         SmokingStatus          @default(UNKNOWN)
-  hypertension          Boolean                @default(false)
-  diabetes              Boolean                @default(false)
-  dyslipidemia          Boolean                @default(false)
-  obesity               Boolean                @default(false)
-  familyHistory         String?
-  address               String?
-  emergencyContact      String?
-  allergies             String?
-  medicalHistory        String?
-  medications           String?
-  notes                 String?
-  archivedAt            DateTime?
-  createdAt             DateTime               @default(now())
-  updatedAt             DateTime               @updatedAt
-  organization          Organization?          @relation(fields: [organizationId], references: [id])
-  department            Department?            @relation(fields: [departmentId], references: [id])
-  contractor            Contractor?            @relation(fields: [contractorId], references: [id])
-  contractorCompany     ContractorCompany?     @relation(fields: [contractorCompanyId], references: [id])
-  employeeProfile       Employee?              @relation(fields: [employeeProfileId], references: [id])
-  cases                 ECGCase[]
-  cardiacHistory        CardiacHistory?
-  procedureHistories    ProcedureHistory[]
-  cardiacProcedures     CardiacProcedure[]
-  cardiacImaging        CardiacImaging[]
-  medicationHistories   MedicationHistory[]
-  documents             ClinicalDocument[]
-  fitnessDecisions      FitnessDecision[]
-  timelineEvents        TimelineEvent[]
-  reports               ClinicalReport[]
-  fitnessAssessments    FitnessAssessment[]
-  workRestrictions      WorkRestriction[]
-  returnToWorkDecisions ReturnToWorkDecision[]
-  documentExtractions   DocumentExtraction[]
-  documentIndexes       DocumentSearchIndex[]
-  clinicalEcgFiles      ECGFile[]              @relation("PatientECGFiles")
-  clinicalAlerts        ECGClinicalAlert[]
-  telecardiologyReviews TelecardiologyReview[]
-  auditLogs             AuditLog[]
+  id                     String                 @id @default(cuid())
+  firstName              String
+  lastName               String
+  gender                 Gender                 @default(UNKNOWN)
+  dateOfBirth            DateTime
+  employeeId             String?
+  employeeProfileId      String?                @unique
+  phone                  String?
+  email                  String?
+  medicalRecordNumber    String                 @unique
+  nationalId             String?                @unique
+  organizationId         String?
+  departmentId           String?
+  contractorId           String?
+  contractorCompanyId    String?
+  occupation             String?
+  hireDate               DateTime?
+  smokingStatus          SmokingStatus          @default(UNKNOWN)
+  hypertension           Boolean                @default(false)
+  diabetes               Boolean                @default(false)
+  dyslipidemia           Boolean                @default(false)
+  obesity                Boolean                @default(false)
+  familyHistory          String?
+  address                String?
+  emergencyContact       String?
+  allergies              String?
+  medicalHistory         String?
+  medications            String?
+  notes                  String?
+  archivedAt             DateTime?
+  createdAt              DateTime               @default(now())
+  updatedAt              DateTime               @updatedAt
+  organization           Organization?          @relation(fields: [organizationId], references: [id])
+  department             Department?            @relation(fields: [departmentId], references: [id])
+  contractor             Contractor?            @relation(fields: [contractorId], references: [id])
+  contractorCompany      ContractorCompany?     @relation(fields: [contractorCompanyId], references: [id])
+  employeeProfile        Employee?              @relation(fields: [employeeProfileId], references: [id])
+  cases                  ECGCase[]
+  cardiacHistory         CardiacHistory?
+  procedureHistories     ProcedureHistory[]
+  cardiacProcedures      CardiacProcedure[]
+  cardiacImaging         CardiacImaging[]
+  medicationHistories    MedicationHistory[]
+  documents              ClinicalDocument[]
+  fitnessDecisions       FitnessDecision[]
+  timelineEvents         TimelineEvent[]
+  reports                ClinicalReport[]
+  fitnessAssessments     FitnessAssessment[]
+  workRestrictions       WorkRestriction[]
+  returnToWorkDecisions  ReturnToWorkDecision[]
+  documentExtractions    DocumentExtraction[]
+  documentIndexes        DocumentSearchIndex[]
+  clinicalEcgFiles       ECGFile[]              @relation("PatientECGFiles")
+  clinicalAlerts         ECGClinicalAlert[]
+  telecardiologyReviews  TelecardiologyReview[]
+  clinicalConversations  ClinicalConversation[]
+  patientTrends          PatientTrend[]
+  riskAssessments        RiskAssessment[]
+  clinicalDecisionAlerts ClinicalAlert[]
+  auditLogs              AuditLog[]
 
   @@unique([organizationId, employeeId])
   @@index([lastName, firstName])
@@ -483,26 +527,27 @@ model Patient {
 }
 
 model Organization {
-  id                  String                   @id @default(cuid())
-  name                String
-  type                OrganizationType         @default(COMPANY)
-  address             String?
-  phone               String?
-  email               String?
-  logo                String?
-  status              OrganizationStatus       @default(ACTIVE)
-  createdAt           DateTime                 @default(now())
-  departments         Department[]
-  contractors         Contractor[]
-  contractorCompanies ContractorCompany[]
-  employees           Employee[]
-  patients            Patient[]
-  documentExtractions DocumentExtraction[]
-  documentIndexes     DocumentSearchIndex[]
-  clinicalEcgFiles    ECGFile[]                @relation("OrganizationECGFiles")
-  pacsConnections     PACSConnection[]
-  integrationLogs     HospitalIntegrationLog[]
-  clinicalAlerts      ECGClinicalAlert[]
+  id                     String                   @id @default(cuid())
+  name                   String
+  type                   OrganizationType         @default(COMPANY)
+  address                String?
+  phone                  String?
+  email                  String?
+  logo                   String?
+  status                 OrganizationStatus       @default(ACTIVE)
+  createdAt              DateTime                 @default(now())
+  departments            Department[]
+  contractors            Contractor[]
+  contractorCompanies    ContractorCompany[]
+  employees              Employee[]
+  patients               Patient[]
+  documentExtractions    DocumentExtraction[]
+  documentIndexes        DocumentSearchIndex[]
+  clinicalEcgFiles       ECGFile[]                @relation("OrganizationECGFiles")
+  pacsConnections        PACSConnection[]
+  integrationLogs        HospitalIntegrationLog[]
+  clinicalAlerts         ECGClinicalAlert[]
+  clinicalDecisionAlerts ClinicalAlert[]
 
   @@index([name])
   @@index([status])
@@ -510,29 +555,31 @@ model Organization {
 }
 
 model Department {
-  id             String       @id @default(cuid())
-  organizationId String
-  name           String
-  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  employees      Employee[]
-  patients       Patient[]
+  id                     String          @id @default(cuid())
+  organizationId         String
+  name                   String
+  organization           Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  employees              Employee[]
+  patients               Patient[]
+  clinicalDecisionAlerts ClinicalAlert[]
 
   @@unique([organizationId, name])
   @@index([organizationId])
 }
 
 model ContractorCompany {
-  id             String             @id @default(cuid())
-  organizationId String
-  name           String
-  address        String?
-  phone          String?
-  email          String?
-  status         OrganizationStatus @default(ACTIVE)
-  createdAt      DateTime           @default(now())
-  organization   Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  employees      Employee[]
-  patients       Patient[]
+  id                     String             @id @default(cuid())
+  organizationId         String
+  name                   String
+  address                String?
+  phone                  String?
+  email                  String?
+  status                 OrganizationStatus @default(ACTIVE)
+  createdAt              DateTime           @default(now())
+  organization           Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  employees              Employee[]
+  patients               Patient[]
+  clinicalDecisionAlerts ClinicalAlert[]
 
   @@unique([organizationId, name])
   @@index([organizationId])
@@ -1258,6 +1305,99 @@ model ECGClinicalAlert {
   @@index([organizationId])
   @@index([ecgFileId])
   @@index([alertType])
+  @@index([createdAt])
+}
+
+model ClinicalConversation {
+  id              String   @id @default(cuid())
+  patientId       String
+  userId          String
+  question        String
+  answer          String
+  confidenceScore Float
+  createdAt       DateTime @default(now())
+  patient         Patient  @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([patientId])
+  @@index([userId])
+  @@index([createdAt])
+}
+
+model PatientTrend {
+  id         String      @id @default(cuid())
+  patientId  String
+  metric     TrendMetric
+  value      Float
+  unit       String
+  measuredAt DateTime
+  source     String
+  evidence   Json?
+  createdAt  DateTime    @default(now())
+  patient    Patient     @relation(fields: [patientId], references: [id], onDelete: Cascade)
+
+  @@index([patientId])
+  @@index([metric])
+  @@index([measuredAt])
+}
+
+model RiskAssessment {
+  id              String             @id @default(cuid())
+  patientId       String
+  userId          String
+  riskType        RiskAssessmentType
+  score           Float
+  riskLevel       AISeverity
+  reasoning       String
+  evidence        Json
+  references      String[]
+  confidenceScore Float
+  createdAt       DateTime           @default(now())
+  patient         Patient            @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  user            User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([patientId])
+  @@index([userId])
+  @@index([riskType])
+  @@index([riskLevel])
+  @@index([createdAt])
+}
+
+model ClinicalAlert {
+  id                  String                      @id @default(cuid())
+  patientId           String
+  organizationId      String?
+  departmentId        String?
+  contractorCompanyId String?
+  alertType           ClinicalDecisionAlertType
+  status              ClinicalDecisionAlertStatus @default(OPEN)
+  severity            AISeverity                  @default(SEVERE)
+  title               String
+  message             String
+  reasoning           String
+  evidence            Json
+  references          String[]
+  confidenceScore     Float
+  createdById         String
+  acknowledgedById    String?
+  acknowledgedAt      DateTime?
+  dueAt               DateTime?
+  createdAt           DateTime                    @default(now())
+  updatedAt           DateTime                    @updatedAt
+  patient             Patient                     @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  organization        Organization?               @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+  department          Department?                 @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+  contractorCompany   ContractorCompany?          @relation(fields: [contractorCompanyId], references: [id], onDelete: SetNull)
+  createdBy           User                        @relation("ClinicalAlertCreatedBy", fields: [createdById], references: [id])
+  acknowledgedBy      User?                       @relation("ClinicalAlertAcknowledgedBy", fields: [acknowledgedById], references: [id])
+
+  @@index([patientId])
+  @@index([organizationId])
+  @@index([departmentId])
+  @@index([contractorCompanyId])
+  @@index([alertType])
+  @@index([status])
+  @@index([severity])
   @@index([createdAt])
 }
 

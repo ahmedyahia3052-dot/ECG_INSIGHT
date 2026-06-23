@@ -309,6 +309,46 @@ export default function AdminDashboard() {
           badgeColor="#7C3AED"
           onPress={() => router.push("/hospital-integration")}
         />
+        <MenuItem
+          icon="🤖"
+          title="AI Clinical Assistant"
+          description="Patient summaries, explanations, ECG comparisons, and Q&A"
+          badge="AI"
+          badgeColor="#0D9488"
+          onPress={() => router.push("/ai-assistant")}
+        />
+        <MenuItem
+          icon="📈"
+          title="Risk Dashboard"
+          description="Predictive SCD, MACE, occupational unfitness, and arrhythmia risk"
+          badge="Risk"
+          badgeColor="#DC2626"
+          onPress={() => router.push("/risk-dashboard")}
+        />
+        <MenuItem
+          icon="📉"
+          title="Trend Dashboard"
+          description="EF, heart rate, QTc, blood pressure, and weight trends"
+          badge="Trends"
+          badgeColor="#2563EB"
+          onPress={() => router.push("/trend-dashboard")}
+        />
+        <MenuItem
+          icon="🏭"
+          title="Population Analytics"
+          description="Organization, department, and contractor cardiology KPIs"
+          badge="KPIs"
+          badgeColor="#7C3AED"
+          onPress={() => router.push("/population-analytics")}
+        />
+        <MenuItem
+          icon="🚨"
+          title="Clinical Alerts"
+          description="EF, STEMI, long QT, arrhythmia, and certificate alerts"
+          badge="Alerts"
+          badgeColor="#F59E0B"
+          onPress={() => router.push("/clinical-alerts")}
+        />
         {user?.role === "super_admin" && (
           <MenuItem
             icon="🛡️"
