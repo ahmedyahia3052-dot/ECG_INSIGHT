@@ -16,6 +16,25 @@ const REFRESH_COOKIE = "ecg_refresh_token";
 const NORMAL_SESSION_SECONDS = 60 * 60 * 24;
 const REMEMBER_SESSION_SECONDS = 60 * 60 * 24 * 30;
 const TOKEN_VERSION = 1;
+const MAX_FAILED_LOGIN_ATTEMPTS = 5;
+const PASSWORD_MAX_AGE_DAYS = 90;
+const MAX_CONCURRENT_SESSIONS = 5;
+
+function assertPasswordPolicy(password: string) {
+  const strongEnough =
+    password.length >= 10 &&
+    /[A-Z]/.test(password) &&
+    /[a-z]/.test(password) &&
+    /\d/.test(password) &&
+    /[^A-Za-z0-9]/.test(password);
+  if (!strongEnough) {
+    throw new AppError(
+      400,
+      "Password must be at least 10 characters and include upper, lower, number, and symbol characters.",
+      "PASSWORD_WEAK",
+    );
+  }
+}
 
 export function clearRefreshCookie(res: Response) {
   res.clearCookie(REFRESH_COOKIE, cookieOptions());
@@ -68,6 +87,27 @@ async function createSession(userId: string, rememberMe: boolean, req: Request, 
     data: { refreshTokenHash: hashToken(refreshToken) },
     where: { id: session.id },
   });
+  await prisma.userSession.create({
+    data: {
+      active: true,
+      expiresAt,
+      ipAddress: req.ip,
+      sessionId: session.id,
+      userAgent: req.get("user-agent"),
+      userId,
+    },
+  });
+  const staleSessions = await prisma.userSession.findMany({
+    orderBy: { lastActivityAt: "desc" },
+    skip: MAX_CONCURRENT_SESSIONS,
+    where: { active: true, userId },
+  });
+  if (staleSessions.length) {
+    await prisma.userSession.updateMany({
+      data: { active: false, revokedAt: new Date() },
+      where: { id: { in: staleSessions.map((sessionRecord) => sessionRecord.id) } },
+    });
+  }
 
   setRefreshCookie(res, refreshToken, expiresInSeconds);
   return session;
@@ -116,6 +156,7 @@ export async function registerUser(
   req: Request,
   res: Response,
 ) {
+  assertPasswordPolicy(body.password);
   const email = body.email.trim().toLowerCase();
   const existing = await prisma.user.findUnique({ where: { email } });
   if (existing) {
@@ -143,6 +184,13 @@ export async function registerUser(
     },
     include: { subscription: true },
   });
+  await prisma.passwordHistory.create({
+    data: {
+      expiresAt: new Date(Date.now() + PASSWORD_MAX_AGE_DAYS * 24 * 60 * 60 * 1000),
+      passwordHash: user.passwordHash,
+      userId: user.id,
+    },
+  });
 
   const session = await createSession(user.id, true, req, res);
   return {
@@ -165,12 +213,56 @@ export async function loginUser(
     where: { email: body.email.trim().toLowerCase() },
     include: { subscription: true },
   });
+  if (user?.lockedUntil && user.lockedUntil > new Date()) {
+    throw new AppError(423, "Account is temporarily locked after failed login attempts.", "ACCOUNT_LOCKED");
+  }
   if (!user || !(await verifyPassword(body.password, user.passwordHash))) {
+    if (user) {
+      const failedLoginAttempts = user.failedLoginAttempts + 1;
+      const lockedUntil =
+        failedLoginAttempts >= MAX_FAILED_LOGIN_ATTEMPTS ? new Date(Date.now() + 15 * 60 * 1000) : null;
+      await prisma.user.update({
+        data: { failedLoginAttempts, lockedUntil },
+        where: { id: user.id },
+      });
+      if (lockedUntil) {
+        await prisma.securityEvent.create({
+          data: {
+            eventType: "MULTIPLE_FAILED_LOGINS",
+            ipAddress: req.ip,
+            message: "Account locked after repeated failed login attempts.",
+            severity: "HIGH",
+            userAgent: req.get("user-agent"),
+            userId: user.id,
+          },
+        });
+      }
+    }
     throw new AppError(401, "Invalid email or password.", "INVALID_CREDENTIALS");
   }
   if (!user.isActive) {
     throw new AppError(403, "User account is deactivated.", "USER_INACTIVE");
   }
+  if (user.forcePasswordReset) {
+    throw new AppError(403, "Password reset is required before login.", "PASSWORD_RESET_REQUIRED");
+  }
+  if (user.passwordChangedAt < new Date(Date.now() - PASSWORD_MAX_AGE_DAYS * 24 * 60 * 60 * 1000)) {
+    await prisma.user.update({ data: { forcePasswordReset: true }, where: { id: user.id } });
+    throw new AppError(403, "Password has expired and must be reset.", "PASSWORD_EXPIRED");
+  }
+  await prisma.user.update({
+    data: { failedLoginAttempts: 0, lockedUntil: null },
+    where: { id: user.id },
+  });
+  await prisma.auditLog.create({
+    data: {
+      action: "LOGIN",
+      actorId: user.id,
+      ipAddress: req.ip,
+      message: "User logged in.",
+      userAgent: req.get("user-agent"),
+    },
+  });
 
   const session = await createSession(user.id, body.rememberMe, req, res);
   return {
@@ -251,6 +343,19 @@ export async function logoutSession(req: Request, res: Response) {
         data: { revokedAt: new Date() },
         where: { id: claims.sessionId },
       });
+      await prisma.userSession.updateMany({
+        data: { active: false, revokedAt: new Date() },
+        where: { sessionId: claims.sessionId },
+      });
+      await prisma.auditLog.create({
+        data: {
+          action: "LOGOUT",
+          actorId: claims.sub,
+          ipAddress: req.ip,
+          message: "User logged out.",
+          userAgent: req.get("user-agent"),
+        },
+      });
     } catch {
       // Invalid refresh cookies are cleared below.
     }
@@ -280,6 +385,7 @@ export async function resetPassword(body: {
   newPassword: string;
   token: string;
 }) {
+  assertPasswordPolicy(body.newPassword);
   const user = await prisma.user.findUnique({
     where: { email: body.email.trim().toLowerCase() },
   });
@@ -296,6 +402,10 @@ export async function resetPassword(body: {
 
   await prisma.user.update({
     data: {
+      failedLoginAttempts: 0,
+      forcePasswordReset: false,
+      lockedUntil: null,
+      passwordChangedAt: new Date(),
       passwordHash: await hashPassword(body.newPassword),
       passwordResetExpiresAt: null,
       passwordResetTokenHash: null,
@@ -308,6 +418,16 @@ export async function resetPassword(body: {
     },
     where: { id: user.id },
   });
+  const updated = await prisma.user.findUnique({ where: { id: user.id } });
+  if (updated) {
+    await prisma.passwordHistory.create({
+      data: {
+        expiresAt: new Date(Date.now() + PASSWORD_MAX_AGE_DAYS * 24 * 60 * 60 * 1000),
+        passwordHash: updated.passwordHash,
+        userId: updated.id,
+      },
+    });
+  }
 }
 
 export async function verifyEmail(body: { email: string; token: string }) {

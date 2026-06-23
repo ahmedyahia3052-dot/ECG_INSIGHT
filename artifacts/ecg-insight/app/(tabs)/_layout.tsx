@@ -134,6 +134,11 @@ function ClassicTabLayout() {
       <Tabs.Screen name="trend-dashboard" options={{ href: null, title: "Trend Dashboard" }} />
       <Tabs.Screen name="population-analytics" options={{ href: null, title: "Population Analytics" }} />
       <Tabs.Screen name="clinical-alerts" options={{ href: null, title: "Clinical Alerts" }} />
+      <Tabs.Screen name="security-dashboard" options={{ href: null, title: "Security Dashboard" }} />
+      <Tabs.Screen name="audit-dashboard" options={{ href: null, title: "Audit Dashboard" }} />
+      <Tabs.Screen name="compliance-dashboard" options={{ href: null, title: "Compliance Dashboard" }} />
+      <Tabs.Screen name="backup-dashboard" options={{ href: null, title: "Backup Dashboard" }} />
+      <Tabs.Screen name="session-dashboard" options={{ href: null, title: "Session Dashboard" }} />
     </Tabs>
   );
 }

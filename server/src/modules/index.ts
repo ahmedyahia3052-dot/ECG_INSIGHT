@@ -9,6 +9,9 @@ import {
   riskRouter,
   trendsRouter,
 } from "./clinical-intelligence/clinical-intelligence.routes";
+import { auditRouter } from "./audit/audit.routes";
+import { backupRouter } from "./backup/backup.routes";
+import { complianceRouter } from "./compliance/compliance.routes";
 import { documentsRouter } from "./documents/documents.routes";
 import { ecgFilesRouter } from "./ecg-files/ecg-files.routes";
 import { ecgProcessingRouter } from "./ecg-processing/ecg-processing.routes";
@@ -26,6 +29,7 @@ import {
 } from "./occupational/occupational.routes";
 import { reportsRouter } from "./reports/reports.routes";
 import { searchRouter } from "./search/search.routes";
+import { securityRouter } from "./security/security.routes";
 import { subscriptionsRouter } from "../subscriptions/subscriptions.routes";
 import { uploadsRouter } from "../uploads/uploads.routes";
 import { usersRouter } from "../users/users.routes";
@@ -43,11 +47,14 @@ modulesRouter.get("/healthz", (_req, res) => {
 });
 
 modulesRouter.use("/auth", authRouter);
+modulesRouter.use("/audit", auditRouter);
 modulesRouter.use("/assistant", assistantRouter);
 modulesRouter.use("/ai", aiRouter);
 modulesRouter.use("/alerts", clinicalAlertsRouter);
 modulesRouter.use("/analytics", populationAnalyticsRouter);
+modulesRouter.use("/backup", backupRouter);
 modulesRouter.use("/cases", casesRouter);
+modulesRouter.use("/compliance", complianceRouter);
 modulesRouter.use("/documents", documentsRouter);
 modulesRouter.use("/departments", departmentsRouter);
 modulesRouter.use("/ecg", ecgProcessingRouter);
@@ -67,6 +74,7 @@ modulesRouter.use("/fhir", fhirRouter);
 modulesRouter.use("/reports", reportsRouter);
 modulesRouter.use("/risk", riskRouter);
 modulesRouter.use("/search", searchRouter);
+modulesRouter.use("/security", securityRouter);
 modulesRouter.use("/users", usersRouter);
 modulesRouter.use("/subscriptions", subscriptionsRouter);
 modulesRouter.use("/contractors", contractorsRouter);

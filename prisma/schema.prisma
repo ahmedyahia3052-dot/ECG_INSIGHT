@@ -241,6 +241,63 @@ enum ClinicalDecisionAlertStatus {
   RESOLVED
 }
 
+enum MFAType {
+  EMAIL_OTP
+  TOTP
+}
+
+enum SecurityEventType {
+  MULTIPLE_FAILED_LOGINS
+  PRIVILEGE_ESCALATION
+  SUSPICIOUS_ACCESS
+  BRUTE_FORCE_ATTEMPT
+  UNUSUAL_IP_ACCESS
+  DEVICE_REVOKED
+}
+
+enum SecurityEventSeverity {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum SecurityEventStatus {
+  OPEN
+  INVESTIGATING
+  RESOLVED
+}
+
+enum ConsentType {
+  TREATMENT
+  DATA_PROCESSING
+  OCCUPATIONAL_HEALTH
+  RESEARCH
+  DATA_SHARING
+}
+
+enum DataRequestType {
+  EXPORT
+  ERASURE
+  ACCESS
+  RECTIFICATION
+}
+
+enum DataRequestStatus {
+  REQUESTED
+  IN_PROGRESS
+  COMPLETED
+  REJECTED
+}
+
+enum BackupJobStatus {
+  SCHEDULED
+  RUNNING
+  COMPLETED
+  FAILED
+  RESTORED
+}
+
 enum SmokingStatus {
   NEVER
   FORMER
@@ -341,6 +398,9 @@ enum TimelineEventType {
   CLINICAL_CONVERSATION_CREATED
   PATIENT_TREND_RECORDED
   RISK_ASSESSMENT_COMPLETED
+  SECURITY_EVENT_CREATED
+  COMPLIANCE_REQUEST_CREATED
+  BACKUP_JOB_CREATED
 }
 
 enum FitnessDecisionValue {
@@ -393,6 +453,15 @@ enum AuditAction {
   PATIENT_TREND_RECORDED
   RISK_ASSESSMENT_COMPLETED
   CLINICAL_DECISION_ALERT_CREATED
+  LOGIN
+  LOGOUT
+  PATIENT_VIEWED
+  DOCUMENT_DELETED
+  REPORT_DOWNLOADED
+  SECURITY_EVENT_CREATED
+  COMPLIANCE_REQUEST_CREATED
+  BACKUP_JOB_CREATED
+  PERMISSION_CHANGED
   REPORT_CREATED
   REPORT_UPDATED
   REPORT_FINALIZED
@@ -420,6 +489,10 @@ model User {
   emailVerificationExpiresAt  DateTime?
   passwordResetTokenHash      String?
   passwordResetExpiresAt      DateTime?
+  failedLoginAttempts         Int                      @default(0)
+  lockedUntil                 DateTime?
+  forcePasswordReset          Boolean                  @default(false)
+  passwordChangedAt           DateTime                 @default(now())
   createdAt                   DateTime                 @default(now())
   updatedAt                   DateTime                 @updatedAt
   sessions                    Session[]
@@ -448,6 +521,15 @@ model User {
   riskAssessments             RiskAssessment[]
   createdClinicalAlerts       ClinicalAlert[]          @relation("ClinicalAlertCreatedBy")
   acknowledgedClinicalAlerts  ClinicalAlert[]          @relation("ClinicalAlertAcknowledgedBy")
+  enterpriseSessions          UserSession[]
+  mfaMethods                  UserMFA[]
+  passwordHistory             PasswordHistory[]
+  trustedDevices              TrustedDevice[]
+  rolePermissions             RolePermission[]
+  securityEvents              SecurityEvent[]
+  patientConsents             PatientConsent[]
+  dataRequests                DataRequest[]
+  backupJobs                  BackupJob[]
 
   @@index([role])
   @@index([isActive])
@@ -513,6 +595,8 @@ model Patient {
   patientTrends          PatientTrend[]
   riskAssessments        RiskAssessment[]
   clinicalDecisionAlerts ClinicalAlert[]
+  patientConsents        PatientConsent[]
+  dataRequests           DataRequest[]
   auditLogs              AuditLog[]
 
   @@unique([organizationId, employeeId])
@@ -548,6 +632,10 @@ model Organization {
   integrationLogs        HospitalIntegrationLog[]
   clinicalAlerts         ECGClinicalAlert[]
   clinicalDecisionAlerts ClinicalAlert[]
+  securityEvents         SecurityEvent[]
+  patientConsents        PatientConsent[]
+  dataRequests           DataRequest[]
+  backupJobs             BackupJob[]
 
   @@index([name])
   @@index([status])
@@ -1401,20 +1489,212 @@ model ClinicalAlert {
   @@index([createdAt])
 }
 
+model UserSession {
+  id                String    @id @default(cuid())
+  userId            String
+  sessionId         String?
+  ipAddress         String?
+  userAgent         String?
+  deviceFingerprint String?
+  active            Boolean   @default(true)
+  lastActivityAt    DateTime  @default(now())
+  expiresAt         DateTime
+  revokedAt         DateTime?
+  createdAt         DateTime  @default(now())
+  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([sessionId])
+  @@index([active])
+  @@index([expiresAt])
+}
+
+model UserMFA {
+  id           String    @id @default(cuid())
+  userId       String
+  type         MFAType
+  secretHash   String?
+  emailOtpHash String?
+  enabled      Boolean   @default(false)
+  verifiedAt   DateTime?
+  lastUsedAt   DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([type])
+  @@index([enabled])
+}
+
+model PasswordHistory {
+  id           String    @id @default(cuid())
+  userId       String
+  passwordHash String
+  createdAt    DateTime  @default(now())
+  expiresAt    DateTime?
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([createdAt])
+}
+
+model TrustedDevice {
+  id                String   @id @default(cuid())
+  userId            String
+  deviceName        String
+  deviceFingerprint String
+  ipAddress         String?
+  lastSeenAt        DateTime @default(now())
+  trusted           Boolean  @default(false)
+  createdAt         DateTime @default(now())
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, deviceFingerprint])
+  @@index([userId])
+  @@index([trusted])
+  @@index([lastSeenAt])
+}
+
+model Permission {
+  id              String           @id @default(cuid())
+  key             String           @unique
+  description     String
+  createdAt       DateTime         @default(now())
+  rolePermissions RolePermission[]
+
+  @@index([key])
+}
+
+model RolePermission {
+  id           String     @id @default(cuid())
+  role         String
+  permissionId String
+  assignedById String
+  createdAt    DateTime   @default(now())
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+  assignedBy   User       @relation(fields: [assignedById], references: [id])
+
+  @@unique([role, permissionId])
+  @@index([role])
+  @@index([permissionId])
+}
+
+model PatientConsent {
+  id             String        @id @default(cuid())
+  patientId      String
+  organizationId String?
+  userId         String
+  consentType    ConsentType
+  granted        Boolean       @default(true)
+  expiresAt      DateTime?
+  revokedAt      DateTime?
+  metadata       Json?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+  patient        Patient       @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+  user           User          @relation(fields: [userId], references: [id])
+
+  @@index([patientId])
+  @@index([organizationId])
+  @@index([consentType])
+  @@index([granted])
+}
+
+model DataRequest {
+  id             String            @id @default(cuid())
+  patientId      String
+  organizationId String?
+  userId         String
+  requestType    DataRequestType
+  status         DataRequestStatus @default(REQUESTED)
+  reason         String?
+  responseJson   Json?
+  completedAt    DateTime?
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+  patient        Patient           @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  organization   Organization?     @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+  user           User              @relation(fields: [userId], references: [id])
+
+  @@index([patientId])
+  @@index([organizationId])
+  @@index([requestType])
+  @@index([status])
+}
+
+model SecurityEvent {
+  id             String                @id @default(cuid())
+  userId         String?
+  organizationId String?
+  eventType      SecurityEventType
+  severity       SecurityEventSeverity
+  status         SecurityEventStatus   @default(OPEN)
+  message        String
+  metadata       Json?
+  ipAddress      String?
+  userAgent      String?
+  createdAt      DateTime              @default(now())
+  resolvedAt     DateTime?
+  user           User?                 @relation(fields: [userId], references: [id], onDelete: SetNull)
+  organization   Organization?         @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([organizationId])
+  @@index([eventType])
+  @@index([severity])
+  @@index([status])
+  @@index([createdAt])
+}
+
+model BackupJob {
+  id              String          @id @default(cuid())
+  organizationId  String?
+  userId          String
+  status          BackupJobStatus @default(SCHEDULED)
+  backupType      String
+  retentionDays   Int             @default(30)
+  storageLocation String?
+  checksum        String?
+  startedAt       DateTime?
+  completedAt     DateTime?
+  errorMessage    String?
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+  organization    Organization?   @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+  user            User            @relation(fields: [userId], references: [id])
+
+  @@index([organizationId])
+  @@index([userId])
+  @@index([status])
+  @@index([createdAt])
+}
+
 model AuditLog {
-  id        String      @id @default(cuid())
-  action    AuditAction
-  actorId   String
-  caseId    String?
-  patientId String?
-  message   String
-  metadata  Json?
-  createdAt DateTime    @default(now())
-  actor     User        @relation(fields: [actorId], references: [id])
-  case      ECGCase?    @relation(fields: [caseId], references: [id], onDelete: Cascade)
-  patient   Patient?    @relation(fields: [patientId], references: [id])
+  id             String      @id @default(cuid())
+  action         AuditAction
+  actorId        String
+  organizationId String?
+  entityType     String?
+  entityId       String?
+  caseId         String?
+  patientId      String?
+  message        String
+  metadata       Json?
+  oldValue       Json?
+  newValue       Json?
+  ipAddress      String?
+  userAgent      String?
+  createdAt      DateTime    @default(now())
+  actor          User        @relation(fields: [actorId], references: [id])
+  case           ECGCase?    @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  patient        Patient?    @relation(fields: [patientId], references: [id])
 
   @@index([actorId])
+  @@index([organizationId])
+  @@index([entityType])
+  @@index([entityId])
   @@index([caseId])
   @@index([patientId])
   @@index([createdAt])

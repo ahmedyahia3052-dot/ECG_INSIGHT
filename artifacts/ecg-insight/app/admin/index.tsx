@@ -349,6 +349,46 @@ export default function AdminDashboard() {
           badgeColor="#F59E0B"
           onPress={() => router.push("/clinical-alerts")}
         />
+        <MenuItem
+          icon="🔐"
+          title="Security Dashboard"
+          description="MFA, suspicious access, failed logins, and security events"
+          badge="SOC"
+          badgeColor="#DC2626"
+          onPress={() => router.push("/security-dashboard")}
+        />
+        <MenuItem
+          icon="🧾"
+          title="Audit Dashboard"
+          description="Enterprise audit trail for clinical and administrative actions"
+          badge="Audit"
+          badgeColor="#2563EB"
+          onPress={() => router.push("/audit-dashboard")}
+        />
+        <MenuItem
+          icon="⚖️"
+          title="Compliance Dashboard"
+          description="HIPAA/GDPR consent, export, erasure, and access workflows"
+          badge="GDPR"
+          badgeColor="#7C3AED"
+          onPress={() => router.push("/compliance-dashboard")}
+        />
+        <MenuItem
+          icon="💾"
+          title="Backup Dashboard"
+          description="Backup status, restore readiness, retention, and checksums"
+          badge="DR"
+          badgeColor="#0D9488"
+          onPress={() => router.push("/backup-dashboard")}
+        />
+        <MenuItem
+          icon="🖥️"
+          title="Session Dashboard"
+          description="Active sessions, MFA state, trusted devices, and timeouts"
+          badge="MFA"
+          badgeColor="#F59E0B"
+          onPress={() => router.push("/session-dashboard")}
+        />
         {user?.role === "super_admin" && (
           <MenuItem
             icon="🛡️"
