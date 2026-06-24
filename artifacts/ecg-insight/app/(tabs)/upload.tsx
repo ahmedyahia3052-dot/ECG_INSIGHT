@@ -1,14 +1,14 @@
 import { Feather } from "@expo/vector-icons";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import * as ImagePicker from "expo-image-picker";
 import { useRouter } from "expo-router";
-import React, { useState } from "react";
-import { Image, StyleSheet, Text, View } from "react-native";
+import React, { useEffect, useState } from "react";
+import { Image, Platform, Pressable, StyleSheet, Text, View } from "react-native";
 import { useAuth } from "@/context/AuthContext";
 import { useColors } from "@/hooks/useColors";
 import { analyzeCase, type AIAnalysisResult } from "@/services/ai";
 import { createCase, createPatient } from "@/services/clinical";
-import { uploadClinicalEcgFile } from "@/services/ecgFiles";
+import { listClinicalEcgFiles, uploadClinicalEcgFile } from "@/services/ecgFiles";
 import {
   processEcgImage,
   type AcquisitionMethod,
@@ -40,6 +40,14 @@ export default function UploadScreen() {
   const [analysisResult, setAnalysisResult] = useState<AIAnalysisResult | null>(null);
   const [caseId, setCaseId] = useState<string | null>(null);
   const [error, setError] = useState("");
+  const [progress, setProgress] = useState(0);
+
+  const uploadHistoryQuery = useQuery({
+    enabled: !!authToken?.token,
+    queryFn: async () => listClinicalEcgFiles(authToken!.token, new URLSearchParams({ pageSize: "5" })),
+    queryKey: ["premium-upload-history", authToken?.token],
+    retry: false,
+  });
 
   const mutation = useMutation({
     mutationFn: async () => {
@@ -73,14 +81,27 @@ export default function UploadScreen() {
       const analysis = await analyzeCase(authToken.token, ecgCase.case.id);
       return { analysis: analysis.analysis, caseId: ecgCase.case.id };
     },
-    onError: (loadError) => setError(loadError instanceof Error ? loadError.message : "Upload failed."),
+    onError: (loadError) => {
+      setProgress(0);
+      setError(loadError instanceof Error ? loadError.message : "Upload failed.");
+    },
     onSuccess: (payload) => {
       setAnalysisResult(payload.analysis);
       setCaseId(payload.caseId);
+      setProgress(100);
       setError("");
     },
     retry: false,
   });
+
+  useEffect(() => {
+    if (!mutation.isPending) return;
+    setProgress(8);
+    const timer = setInterval(() => {
+      setProgress((value) => Math.min(value + 13, 88));
+    }, 420);
+    return () => clearInterval(timer);
+  }, [mutation.isPending]);
 
   async function pickAsset(method: AcquisitionMethod) {
     setError("");
@@ -133,13 +154,16 @@ export default function UploadScreen() {
   return (
     <BoltScreen>
       <BoltHero
-        eyebrow="Upload, camera, or smart paper scan"
-        subtitle="Bolt-style acquisition connected to the existing ECG image processor, clinical case API, file upload endpoint, and AI analysis engine."
+        eyebrow="Premium ECG acquisition"
+        subtitle="Drag, preview, quality-check, upload, and analyze ECG records through the existing clinical APIs and AI engine."
         title="Upload ECG"
       />
 
       <BoltCard style={styles.form}>
-        <Text style={[styles.sectionTitle, { color: colors.text }]}>ECG Image</Text>
+        <View style={styles.headerRow}>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>ECG Image</Text>
+          <BoltBadge icon="shield" label="Quality validation" tone={processedImage ? "success" : "primary"} />
+        </View>
         <View style={styles.actionRow}>
           <View style={styles.actionButton}>
             <BoltButton icon="folder" label="Upload ECG" onPress={() => capture("upload")} variant="outline" />
@@ -157,19 +181,22 @@ export default function UploadScreen() {
             <View style={styles.previewMeta}>
               <BoltBadge icon="check-circle" label={selectedFile.name} tone="success" />
               {processedImage ? (
-                <Text style={[styles.muted, { color: colors.textSecondary }]}>
-                  Quality {processedImage.quality.score}/100 · {processedImage.quality.classification}
-                </Text>
+                <View style={styles.qualityGrid}>
+                  <QualityPill label="Quality" value={`${processedImage.quality.score}/100`} tone="success" />
+                  <QualityPill label="Classification" value={processedImage.quality.classification} tone="primary" />
+                  <QualityPill label="Ready" value={processedImage.quality.canAnalyze ? "Analyze" : "Review"} tone={processedImage.quality.canAnalyze ? "success" : "warning"} />
+                </View>
               ) : null}
             </View>
           </View>
         ) : (
-          <View style={styles.dropzone}>
+          <Pressable onPress={() => capture("upload")} style={[styles.dropzone, { borderColor: colors.primary + "55" }]}>
             <Feather name="upload-cloud" size={34} color={colors.primary} />
+            <Text style={[styles.dropTitle, { color: colors.text }]}>Drag & Drop ECG File</Text>
             <Text style={[styles.muted, { color: colors.textSecondary }]}>
-              Select an ECG image to preview, enhance, upload, and analyze.
+              {Platform.OS === "web" ? "Drop an ECG image here or tap to browse." : "Tap to select, capture, preview, enhance, upload, and analyze."}
             </Text>
-          </View>
+          </Pressable>
         )}
       </BoltCard>
 
@@ -201,6 +228,23 @@ export default function UploadScreen() {
 
       {error ? <Text style={[styles.error, { color: colors.destructive }]}>{error}</Text> : null}
 
+      {mutation.isPending || progress === 100 ? (
+        <BoltCard style={styles.progressCard}>
+          <View style={styles.headerRow}>
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>
+              {progress === 100 ? "Upload Complete" : "Clinical Processing"}
+            </Text>
+            <BoltBadge icon={progress === 100 ? "check-circle" : "activity"} label={`${progress}%`} tone={progress === 100 ? "success" : "primary"} />
+          </View>
+          <View style={[styles.progressTrack, { backgroundColor: colors.border }]}>
+            <View style={[styles.progressFill, { backgroundColor: colors.primary, width: `${progress}%` }]} />
+          </View>
+          <Text style={[styles.muted, { color: colors.textSecondary }]}>
+            {progress === 100 ? "ECG uploaded, analyzed, and ready for clinical review." : "Creating patient record, uploading ECG file, and running AI analysis."}
+          </Text>
+        </BoltCard>
+      ) : null}
+
       <BoltButton
         disabled={!canAnalyze}
         icon="activity"
@@ -220,21 +264,77 @@ export default function UploadScreen() {
           <BoltButton icon="arrow-right" label="Open Analysis Results" onPress={() => router.push(`/case/${caseId}` as never)} />
         </BoltCard>
       ) : null}
+
+      <BoltCard style={styles.form}>
+        <View style={styles.headerRow}>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>Upload History</Text>
+          <BoltBadge icon="clock" label={`${uploadHistoryQuery.data?.files.length ?? 0} recent`} />
+        </View>
+        {(uploadHistoryQuery.data?.files ?? []).length ? (
+          uploadHistoryQuery.data!.files.map((file) => (
+            <View key={file.id} style={[styles.historyRow, { borderColor: colors.border }]}>
+              <Feather name="file" size={16} color={colors.primary} />
+              <View style={styles.historyMain}>
+                <Text style={[styles.historyName, { color: colors.text }]} numberOfLines={1}>{file.originalName}</Text>
+                <Text style={[styles.muted, { color: colors.textSecondary }]}>
+                  {(file.sizeBytes / 1024).toFixed(1)} KB · {new Date(file.createdAt).toLocaleDateString()}
+                </Text>
+              </View>
+              <BoltBadge label={file.fileType} tone="primary" />
+            </View>
+          ))
+        ) : (
+          <Text style={[styles.muted, { color: colors.textSecondary }]}>
+            No uploaded ECG files yet. Live upload history will appear from the ECG files API.
+          </Text>
+        )}
+      </BoltCard>
     </BoltScreen>
+  );
+}
+
+function QualityPill({
+  label,
+  tone,
+  value,
+}: {
+  label: string;
+  tone: "primary" | "success" | "warning";
+  value: string;
+}) {
+  const colors = useColors();
+  const color = tone === "success" ? colors.success : tone === "warning" ? colors.warning : colors.primary;
+  return (
+    <View style={[styles.qualityPill, { borderColor: color + "55" }]}>
+      <Text style={[styles.qualityLabel, { color: colors.textSecondary }]}>{label}</Text>
+      <Text style={[styles.qualityValue, { color }]}>{value}</Text>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   actionButton: { flex: 1, minWidth: 142 },
   actionRow: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
-  dropzone: { alignItems: "center", gap: 10, padding: 28 },
+  dropTitle: { fontFamily: "Inter_700Bold", fontSize: 18 },
+  dropzone: { alignItems: "center", borderRadius: 24, borderStyle: "dashed", borderWidth: 1, gap: 10, padding: 34 },
   error: { fontFamily: "Inter_700Bold", fontSize: 13 },
   form: { gap: 12 },
+  headerRow: { alignItems: "center", flexDirection: "row", gap: 10, justifyContent: "space-between" },
+  historyMain: { flex: 1 },
+  historyName: { fontFamily: "Inter_700Bold", fontSize: 13 },
+  historyRow: { alignItems: "center", borderRadius: 16, borderWidth: 1, flexDirection: "row", gap: 10, padding: 12 },
   image: { height: 230, width: "100%" },
   muted: { fontFamily: "Inter_400Regular", fontSize: 13, lineHeight: 19 },
   optionButton: { minWidth: 92 },
   preview: { borderRadius: 16, overflow: "hidden" },
   previewMeta: { gap: 8, paddingTop: 10 },
+  progressCard: { gap: 12 },
+  progressFill: { borderRadius: 999, height: "100%" },
+  progressTrack: { borderRadius: 999, height: 10, overflow: "hidden" },
+  qualityGrid: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+  qualityLabel: { fontFamily: "Inter_600SemiBold", fontSize: 10, textTransform: "uppercase" },
+  qualityPill: { borderRadius: 14, borderWidth: 1, gap: 3, paddingHorizontal: 10, paddingVertical: 8 },
+  qualityValue: { fontFamily: "Inter_700Bold", fontSize: 12 },
   resultCard: { gap: 10 },
   resultTitle: { fontFamily: "Inter_700Bold", fontSize: 20 },
   sectionTitle: { fontFamily: "Inter_700Bold", fontSize: 18 },

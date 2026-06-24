@@ -7,10 +7,11 @@ import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { LinearGradient } from "expo-linear-gradient";
 import React, { useState } from "react";
-import { Platform, StyleSheet, Text, TouchableOpacity, View, useColorScheme } from "react-native";
+import { Platform, Pressable, StyleSheet, Text, TouchableOpacity, View, useColorScheme, useWindowDimensions } from "react-native";
 import { useAuth } from "@/context/AuthContext";
 import { useColors } from "@/hooks/useColors";
 import { useRouter } from "expo-router";
+import { EnterpriseSidebar } from "@/components/bolt/EnterpriseSidebar";
 
 function NativeTabLayout() {
   return (
@@ -44,9 +45,13 @@ function ClassicTabLayout() {
   const colorScheme = useColorScheme();
   const router = useRouter();
   const [quickOpen, setQuickOpen] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+  const { width } = useWindowDimensions();
   const isDark = colorScheme === "dark";
   const isIOS = Platform.OS === "ios";
   const isWeb = Platform.OS === "web";
+  const desktopSidebar = isWeb && width >= 1024;
 
   const runQuickAction = (route: string) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
@@ -63,6 +68,31 @@ function ClassicTabLayout() {
 
   return (
     <>
+      {desktopSidebar ? (
+        <EnterpriseSidebar
+          collapsed={sidebarCollapsed}
+          onToggleCollapse={() => setSidebarCollapsed((value) => !value)}
+        />
+      ) : mobileSidebarOpen ? (
+        <>
+          <Pressable style={styles.drawerBackdrop} onPress={() => setMobileSidebarOpen(false)} />
+          <EnterpriseSidebar collapsed={false} onClose={() => setMobileSidebarOpen(false)} />
+        </>
+      ) : null}
+      {!desktopSidebar ? (
+        <TouchableOpacity
+          accessibilityRole="button"
+          accessibilityLabel="Open navigation"
+          activeOpacity={0.8}
+          onPress={() => {
+            Haptics.selectionAsync().catch(() => {});
+            setMobileSidebarOpen(true);
+          }}
+          style={[styles.menuButton, { backgroundColor: colors.glass, borderColor: colors.gradientBorder }]}
+        >
+          <Feather name="menu" size={20} color={colors.primary} />
+        </TouchableOpacity>
+      ) : null}
       <Tabs
         screenOptions={{
           tabBarActiveTintColor: colors.primary,
@@ -284,6 +314,11 @@ const styles = StyleSheet.create({
   },
   fabText: { color: "#fff", fontFamily: "Inter_700Bold", fontSize: 13 },
   activeDot: { borderRadius: 999, bottom: -6, height: 4, position: "absolute", width: 18 },
+  drawerBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(0,0,0,0.42)",
+    zIndex: 40,
+  },
   quickItem: {
     alignItems: "center",
     borderRadius: 999,
@@ -305,6 +340,18 @@ const styles = StyleSheet.create({
     right: 22,
   },
   quickText: { fontFamily: "Inter_700Bold", fontSize: 12 },
+  menuButton: {
+    alignItems: "center",
+    borderRadius: 16,
+    borderWidth: 1,
+    height: 46,
+    justifyContent: "center",
+    left: 16,
+    position: "absolute",
+    top: Platform.OS === "web" ? 18 : 48,
+    width: 46,
+    zIndex: 35,
+  },
   tabIconWrap: { alignItems: "center", justifyContent: "center", minHeight: 30, minWidth: 34 },
   tabBlur: { borderRadius: 26, overflow: "hidden" },
 });

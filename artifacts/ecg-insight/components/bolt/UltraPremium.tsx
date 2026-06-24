@@ -1,7 +1,7 @@
 import { Feather } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { Animated, Easing, Pressable, StyleProp, StyleSheet, Text, View, ViewStyle } from "react-native";
+import { Animated, Easing, Platform, Pressable, StyleProp, StyleSheet, Text, View, ViewStyle } from "react-native";
 import Svg, { Circle, Defs, LinearGradient as SvgGradient, Polyline, Stop } from "react-native-svg";
 import { useColors } from "@/hooks/useColors";
 import { BoltBadge, type BoltIcon } from "./BoltUI";
@@ -165,7 +165,74 @@ export function ShimmerBlock({ style }: { style?: StyleProp<ViewStyle> }) {
   return <Animated.View style={[styles.shimmer, { backgroundColor: colors.primary + "22", opacity }, style]} />;
 }
 
+export function EcgMonitorWidget({
+  heartRate,
+  rhythm,
+  status = "AI monitoring active",
+}: {
+  heartRate: number;
+  rhythm: string;
+  status?: string;
+}) {
+  const colors = useColors();
+  return (
+    <View style={[styles.monitorCard, { borderColor: colors.gradientBorder, shadowColor: colors.primary }]}>
+      <LinearGradient colors={["rgba(0,229,255,0.16)", "rgba(20,184,166,0.05)"]} style={StyleSheet.absoluteFill} />
+      <View style={styles.monitorHeader}>
+        <View>
+          <Text style={[styles.monitorKicker, { color: colors.primary }]}>Real-Time ECG Monitor</Text>
+          <Text style={[styles.monitorRhythm, { color: colors.text }]}>{rhythm}</Text>
+        </View>
+        <BoltBadge icon="radio" label={status} tone="success" />
+      </View>
+      <LiveEcgWave height={96} />
+      <View style={styles.monitorFooter}>
+        <Text style={[styles.bpm, { color: colors.primary }]}>{heartRate}</Text>
+        <Text style={[styles.bpmLabel, { color: colors.textSecondary }]}>BPM</Text>
+        <Text style={[styles.monitorMeta, { color: colors.textSecondary }]}>
+          Continuous waveform visualization · mobile optimized
+        </Text>
+      </View>
+    </View>
+  );
+}
+
+export function AnalyticsChartCard({
+  data,
+  icon,
+  title,
+  tone,
+}: {
+  data: number[];
+  icon: BoltIcon;
+  title: string;
+  tone?: string;
+}) {
+  const colors = useColors();
+  return (
+    <View style={[styles.analyticsCard, { borderColor: colors.border }]}>
+      <View style={styles.analyticsHeader}>
+        <Text style={[styles.analyticsTitle, { color: colors.text }]}>{title}</Text>
+        <Feather name={icon} size={16} color={tone ?? colors.primary} />
+      </View>
+      <Sparkline data={data} tone={tone ?? colors.primary} />
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
+  analyticsCard: {
+    borderRadius: 18,
+    borderWidth: 1,
+    flex: 1,
+    gap: 10,
+    minWidth: "47%",
+    padding: 14,
+  },
+  analyticsHeader: { alignItems: "center", flexDirection: "row", justifyContent: "space-between" },
+  analyticsTitle: { fontFamily: "Inter_700Bold", fontSize: 13 },
+  bpm: { fontFamily: "Inter_700Bold", fontSize: 42, letterSpacing: -1.2 },
+  bpmLabel: { fontFamily: "Inter_700Bold", fontSize: 12, marginTop: Platform.OS === "web" ? 21 : 20 },
   metricCard: {
     borderRadius: 22,
     borderWidth: 1,
@@ -183,6 +250,22 @@ const styles = StyleSheet.create({
   metricLabel: { fontFamily: "Inter_600SemiBold", fontSize: 12 },
   metricTop: { alignItems: "center", flexDirection: "row", justifyContent: "space-between" },
   metricValue: { fontFamily: "Inter_700Bold", fontSize: 28, letterSpacing: -0.8 },
+  monitorCard: {
+    borderRadius: 26,
+    borderWidth: 1,
+    elevation: 12,
+    gap: 12,
+    overflow: "hidden",
+    padding: 18,
+    shadowOffset: { height: 18, width: 0 },
+    shadowOpacity: 0.22,
+    shadowRadius: 30,
+  },
+  monitorFooter: { alignItems: "flex-start", flexDirection: "row", gap: 8 },
+  monitorHeader: { alignItems: "flex-start", flexDirection: "row", gap: 12, justifyContent: "space-between" },
+  monitorKicker: { fontFamily: "Inter_700Bold", fontSize: 11, letterSpacing: 1, textTransform: "uppercase" },
+  monitorMeta: { flex: 1, fontFamily: "Inter_400Regular", fontSize: 12, lineHeight: 18, marginTop: 16 },
+  monitorRhythm: { fontFamily: "Inter_700Bold", fontSize: 20, marginTop: 2 },
   shimmer: { borderRadius: 16, height: 18 },
   waveTrack: { flexDirection: "row", width: 1686 },
   waveWrap: { overflow: "hidden", width: "100%" },
