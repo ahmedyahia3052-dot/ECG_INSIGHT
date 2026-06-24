@@ -258,6 +258,14 @@ async function main() {
   expectStatus(await request(`/notifications/${notification.id}/read`, { method: "POST", token: doctor.token }), 200, "notification read");
   expectStatus(await request(`/notifications/${notification.id}`, { method: "DELETE", token: doctor.token }), 204, "notification delete");
 
+  expectStatus(await request(`/reports?q=${encodeURIComponent("Workflow")}&status=draft&page=1&pageSize=5`, { token: doctor.token }), 200, "report search pagination");
+  expectStatus(await request(`/ecg/files/list?patientId=${patient.id}&fileType=PDF_REPORT&page=1&pageSize=5`, { token: doctor.token }), 200, "ecg file filter pagination");
+  expectStatus(await request(`/tasks?q=${encodeURIComponent("Workflow Task")}&status=COMPLETED&page=1&pageSize=5`, { token: doctor.token }), 200, "task search filter pagination");
+  expectStatus(await request(`/teams?q=${encodeURIComponent("Workflow Team")}&page=1&pageSize=5`, { token: doctor.token }), 200, "team search pagination");
+  expectStatus(await request(`/messages?q=${encodeURIComponent("Workflow message")}&patientId=${patient.id}&page=1&pageSize=5`, { token: doctor.token }), 200, "message search pagination");
+  expectStatus(await request(`/alerts?q=${encodeURIComponent("Workflow Alert")}&status=RESOLVED&page=1&pageSize=5`, { token: doctor.token }), 200, "alert search filter pagination");
+  expectStatus(await request(`/notifications?q=${encodeURIComponent("Workflow")}&read=true&page=1&pageSize=5`, { token: doctor.token }), 200, "notification search filter pagination");
+
   expectStatus(await request(`/documents/${document.id}`, { method: "DELETE", token: doctor.token }), 204, "document delete");
   expectStatus(await request(`/ecg/files/${ecgFile.id}`, { method: "DELETE", token: doctor.token }), 204, "ecg file delete");
   expectStatus(await request(`/tasks/${task.id}`, { method: "DELETE", token: doctor.token }), 204, "task delete");

@@ -3,6 +3,7 @@ import path from "node:path";
 import { randomUUID } from "node:crypto";
 import multer from "multer";
 import { Router } from "express";
+import type { Prisma } from "@prisma/client";
 import { z } from "zod";
 import { prisma } from "../../config/prisma";
 import { requireAuth, requireRole } from "../../middleware/auth";
@@ -161,25 +162,60 @@ ecgFilesRouter.post("/files/upload", requireRole("DOCTOR"), upload.single("file"
 
 ecgFilesRouter.get("/files/list", async (req, res, next) => {
   try {
-    const patientId = typeof req.query.patientId === "string" ? req.query.patientId : undefined;
-    if (patientId) assertResourceAccess(await canAccessPatient(patientId, req.auth!));
-    const files = await prisma.eCGFile.findMany({
-      orderBy: { createdAt: "desc" },
-      take: 100,
-      where: {
-        patientId,
+    const query = z
+      .object({
+        caseId: z.string().trim().optional(),
+        fileType: z
+          .enum(["DICOM_ECG", "SCP_ECG", "EDF", "XML_ECG", "HL7_ECG", "PHILIPS_XML", "GE_MUSE_XML", "IMAGE", "PDF_REPORT", "WAVEFORM", "UNKNOWN"])
+          .optional(),
+        page: z.coerce.number().int().min(1).default(1),
+        pageSize: z.coerce.number().int().min(1).max(100).default(50),
+        patientId: z.string().trim().optional(),
+        q: z.string().trim().optional(),
+      })
+      .parse(req.query);
+    if (query.patientId) assertResourceAccess(await canAccessPatient(query.patientId, req.auth!));
+    if (query.caseId) assertResourceAccess(await canAccessCase(query.caseId, req.auth!));
+    const where: Prisma.ECGFileWhereInput = {
+      caseId: query.caseId,
+      fileType: query.fileType,
+      patientId: query.patientId,
+      AND: [
+        ...(query.q
+          ? [
+              {
+                OR: [
+                  { originalName: { contains: query.q } },
+                  { fileName: { contains: query.q } },
+                  { patientId: query.q },
+                  { caseId: query.q },
+                ],
+              },
+            ]
+          : []),
         ...(req.auth!.role === "SUPER_ADMIN" || req.auth!.role === "ADMIN"
-          ? {}
-          : {
-              OR: [
-                { uploadedById: req.auth!.id },
-                { case: { OR: [{ assignedDoctorId: req.auth!.id }, { uploadedById: req.auth!.id }] } },
-                { patient: { auditLogs: { some: { action: "PATIENT_CREATED", actorId: req.auth!.id } } } },
-              ],
-            }),
-      },
-    });
-    res.json({ files: files.map(serializeEcgFile) });
+          ? []
+          : [
+              {
+                OR: [
+                  { uploadedById: req.auth!.id },
+                  { case: { OR: [{ assignedDoctorId: req.auth!.id }, { uploadedById: req.auth!.id }] } },
+                  { patient: { auditLogs: { some: { action: "PATIENT_CREATED" as const, actorId: req.auth!.id } } } },
+                ],
+              },
+            ]),
+      ],
+    };
+    const [total, files] = await Promise.all([
+      prisma.eCGFile.count({ where }),
+      prisma.eCGFile.findMany({
+        orderBy: { createdAt: "desc" },
+        skip: (query.page - 1) * query.pageSize,
+        take: query.pageSize,
+        where,
+      }),
+    ]);
+    res.json({ files: files.map(serializeEcgFile), page: query.page, pageSize: query.pageSize, total, totalPages: Math.ceil(total / query.pageSize) });
   } catch (error) {
     next(error);
   }

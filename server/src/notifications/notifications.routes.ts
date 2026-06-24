@@ -16,12 +16,25 @@ notificationsRouter.get("/", async (req, res, next) => {
       .object({
         page: z.coerce.number().int().min(1).default(1),
         pageSize: z.coerce.number().int().min(1).max(100).default(50),
+        q: z.string().trim().optional(),
         read: z.enum(["true", "false"]).optional(),
         type: z.enum(["INFO", "WARNING", "SUCCESS", "CRITICAL"]).optional(),
       })
       .parse(req.query);
     const where: Prisma.NotificationWhereInput = {
-      OR: [{ userId: req.auth!.id }, { targetRole: req.auth!.role }, { targetRole: null, userId: null }],
+      AND: [
+        { OR: [{ userId: req.auth!.id }, { targetRole: req.auth!.role }, { targetRole: null, userId: null }] },
+        ...(query.q
+          ? [
+              {
+                OR: [
+                  { title: { contains: query.q } },
+                  { message: { contains: query.q } },
+                ],
+              },
+            ]
+          : []),
+      ],
       ...(query.read ? { read: query.read === "true" } : {}),
       ...(query.type ? { type: query.type } : {}),
     };

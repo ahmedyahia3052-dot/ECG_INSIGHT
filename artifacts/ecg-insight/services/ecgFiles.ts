@@ -20,8 +20,8 @@ export async function uploadClinicalEcgFile(accessToken: string, formData: FormD
   });
 }
 
-export async function listClinicalEcgFiles(accessToken: string, patientId?: string) {
-  const suffix = patientId ? `?patientId=${encodeURIComponent(patientId)}` : "";
+export async function listClinicalEcgFiles(accessToken: string, params = new URLSearchParams()) {
+  const suffix = params.toString() ? `?${params.toString()}` : "";
   return apiRequest<{ files: ClinicalEcgFile[] }>(`/ecg/files/list${suffix}`, { accessToken });
 }
 

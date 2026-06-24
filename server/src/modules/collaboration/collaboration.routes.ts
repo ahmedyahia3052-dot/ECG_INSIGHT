@@ -23,6 +23,12 @@ alertsRouter.use(requireAuth);
 
 const jsonBody = z.record(z.string(), z.unknown()).default({});
 
+const listQuerySchema = z.object({
+  page: z.coerce.number().int().min(1).default(1),
+  pageSize: z.coerce.number().int().min(1).max(100).default(50),
+  q: z.string().trim().optional(),
+});
+
 async function loadAccessibleTask(taskId: string, auth: Express.AuthUser) {
   const task = await prisma.task.findFirst({
     include: { assignments: true, comments: true },
@@ -186,15 +192,44 @@ syncRouter.post("/cache", async (req, res, next) => {
 
 tasksRouter.get("/", async (req, res, next) => {
   try {
-    const tasks = await prisma.task.findMany({
-      include: { assignments: true, comments: true },
-      orderBy: { createdAt: "desc" },
-      take: 100,
-      where: {
-        OR: [{ createdById: req.auth!.id }, { assignments: { some: { userId: req.auth!.id } } }],
-      },
-    });
-    res.json({ tasks });
+    const query = listQuerySchema
+      .extend({
+        priority: z.enum(["LOW", "MEDIUM", "HIGH", "CRITICAL"]).optional(),
+        status: z.enum(["OPEN", "IN_PROGRESS", "COMPLETED", "CANCELLED"]).optional(),
+      })
+      .parse(req.query);
+    const where: Prisma.TaskWhereInput = {
+      ...(query.priority ? { priority: query.priority } : {}),
+      ...(query.status ? { status: query.status } : {}),
+      AND: [
+        ...(query.q
+          ? [
+              {
+                OR: [
+                  { title: { contains: query.q } },
+                  { description: { contains: query.q } },
+                  { patientId: query.q },
+                  { caseId: query.q },
+                ],
+              },
+            ]
+          : []),
+        ...(req.auth!.role === "SUPER_ADMIN" || req.auth!.role === "ADMIN"
+          ? []
+          : [{ OR: [{ createdById: req.auth!.id }, { assignments: { some: { userId: req.auth!.id } } }] }]),
+      ],
+    };
+    const [total, tasks] = await Promise.all([
+      prisma.task.count({ where }),
+      prisma.task.findMany({
+        include: { assignments: true, comments: true },
+        orderBy: { createdAt: "desc" },
+        skip: (query.page - 1) * query.pageSize,
+        take: query.pageSize,
+        where,
+      }),
+    ]);
+    res.json({ page: query.page, pageSize: query.pageSize, tasks, total, totalPages: Math.ceil(total / query.pageSize) });
   } catch (error) {
     next(error);
   }
@@ -329,10 +364,38 @@ tasksRouter.post("/:taskId/comments", async (req, res, next) => {
   }
 });
 
-teamsRouter.get("/", async (_req, res, next) => {
+teamsRouter.get("/", async (req, res, next) => {
   try {
-    const teams = await prisma.team.findMany({ include: { members: true }, orderBy: { createdAt: "desc" }, take: 100 });
-    res.json({ teams });
+    const query = listQuerySchema.extend({ organizationId: z.string().trim().optional() }).parse(req.query);
+    const where: Prisma.TeamWhereInput = {
+      ...(query.organizationId ? { organizationId: query.organizationId } : {}),
+      AND: [
+        ...(query.q
+          ? [
+              {
+                OR: [
+                  { name: { contains: query.q } },
+                  { description: { contains: query.q } },
+                ],
+              },
+            ]
+          : []),
+        ...(req.auth!.role === "SUPER_ADMIN" || req.auth!.role === "ADMIN"
+          ? []
+          : [{ OR: [{ createdById: req.auth!.id }, { members: { some: { userId: req.auth!.id } } }] }]),
+      ],
+    };
+    const [total, teams] = await Promise.all([
+      prisma.team.count({ where }),
+      prisma.team.findMany({
+        include: { members: true },
+        orderBy: { createdAt: "desc" },
+        skip: (query.page - 1) * query.pageSize,
+        take: query.pageSize,
+        where,
+      }),
+    ]);
+    res.json({ page: query.page, pageSize: query.pageSize, teams, total, totalPages: Math.ceil(total / query.pageSize) });
   } catch (error) {
     next(error);
   }
@@ -433,13 +496,38 @@ teamsRouter.delete("/:teamId", async (req, res, next) => {
 
 messagesRouter.get("/", async (req, res, next) => {
   try {
-    const conversations = await prisma.conversation.findMany({
-      include: { messages: { orderBy: { createdAt: "desc" }, take: 20 }, participants: true },
-      orderBy: { updatedAt: "desc" },
-      take: 50,
-      where: { participants: { some: { userId: req.auth!.id } } },
-    });
-    res.json({ conversations });
+    const query = listQuerySchema
+      .extend({
+        caseId: z.string().trim().optional(),
+        patientId: z.string().trim().optional(),
+      })
+      .parse(req.query);
+    const where: Prisma.ConversationWhereInput = {
+      ...(query.caseId ? { caseId: query.caseId } : {}),
+      ...(query.patientId ? { patientId: query.patientId } : {}),
+      ...(query.q
+        ? {
+            OR: [
+              { title: { contains: query.q } },
+              { messages: { some: { body: { contains: query.q } } } },
+            ],
+          }
+        : {}),
+      ...(req.auth!.role === "SUPER_ADMIN" || req.auth!.role === "ADMIN"
+        ? {}
+        : { participants: { some: { userId: req.auth!.id } } }),
+    };
+    const [total, conversations] = await Promise.all([
+      prisma.conversation.count({ where }),
+      prisma.conversation.findMany({
+        include: { messages: { orderBy: { createdAt: "desc" }, take: 20 }, participants: true },
+        orderBy: { updatedAt: "desc" },
+        skip: (query.page - 1) * query.pageSize,
+        take: query.pageSize,
+        where,
+      }),
+    ]);
+    res.json({ conversations, page: query.page, pageSize: query.pageSize, total, totalPages: Math.ceil(total / query.pageSize) });
   } catch (error) {
     next(error);
   }
@@ -546,12 +634,43 @@ messagesRouter.delete("/:conversationId", async (req, res, next) => {
 
 alertsRouter.get("/", async (req, res, next) => {
   try {
-    const alerts = await prisma.alert.findMany({
-      orderBy: { createdAt: "desc" },
-      take: 100,
-      where: { OR: [{ userId: req.auth!.id }, { userId: null }] },
-    });
-    res.json({ alerts });
+    const query = listQuerySchema
+      .extend({
+        category: z.enum(["CRITICAL_ECG", "HIGH_RISK_WORKER", "PENDING_REVIEW", "EXPIRING_CERTIFICATE", "SECURITY_INCIDENT"]).optional(),
+        priority: z.enum(["LOW", "MEDIUM", "HIGH", "CRITICAL"]).optional(),
+        status: z.enum(["OPEN", "ACKNOWLEDGED", "RESOLVED"]).optional(),
+      })
+      .parse(req.query);
+    const where: Prisma.AlertWhereInput = {
+      ...(query.category ? { category: query.category } : {}),
+      ...(query.priority ? { priority: query.priority } : {}),
+      ...(query.status ? { status: query.status } : {}),
+      AND: [
+        ...(query.q
+          ? [
+              {
+                OR: [
+                  { title: { contains: query.q } },
+                  { message: { contains: query.q } },
+                  { patientId: query.q },
+                  { caseId: query.q },
+                ],
+              },
+            ]
+          : []),
+        ...(req.auth!.role === "SUPER_ADMIN" || req.auth!.role === "ADMIN" ? [] : [{ OR: [{ userId: req.auth!.id }, { userId: null }] }]),
+      ],
+    };
+    const [total, alerts] = await Promise.all([
+      prisma.alert.count({ where }),
+      prisma.alert.findMany({
+        orderBy: { createdAt: "desc" },
+        skip: (query.page - 1) * query.pageSize,
+        take: query.pageSize,
+        where,
+      }),
+    ]);
+    res.json({ alerts, page: query.page, pageSize: query.pageSize, total, totalPages: Math.ceil(total / query.pageSize) });
   } catch (error) {
     next(error);
   }

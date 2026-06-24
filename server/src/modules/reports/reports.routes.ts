@@ -4,6 +4,7 @@ import { randomUUID } from "node:crypto";
 import multer from "multer";
 import { Router } from "express";
 import type { Prisma } from "@prisma/client";
+import { z } from "zod";
 import { prisma } from "../../config/prisma";
 import { requireAuth, requireRole } from "../../middleware/auth";
 import { AppError } from "../../middleware/error";
@@ -31,6 +32,14 @@ const reportRoot = path.resolve(process.cwd(), "uploads", "reports");
 const signatureRoot = path.resolve(process.cwd(), "uploads", "signatures");
 fs.mkdirSync(reportRoot, { recursive: true });
 fs.mkdirSync(signatureRoot, { recursive: true });
+
+const reportStatusQueryMap = {
+  archived: "ARCHIVED",
+  draft: "DRAFT",
+  finalized: "FINALIZED",
+  signed: "SIGNED",
+  under_review: "UNDER_REVIEW",
+} as const;
 
 const signatureMimeTypes = new Set(["image/jpeg", "image/jpg", "image/png"]);
 const signatureExtensions = new Set([".jpeg", ".jpg", ".png"]);
@@ -88,29 +97,70 @@ async function reportForAccess(reportId: string, auth: { id: string; role: "SUPE
 
 reportsRouter.get("/", async (req, res, next) => {
   try {
-    const caseId = typeof req.query.caseId === "string" ? req.query.caseId : undefined;
-    const patientId = typeof req.query.patientId === "string" ? req.query.patientId : undefined;
+    const query = z
+      .object({
+        caseId: z.string().trim().optional(),
+        page: z.coerce.number().int().min(1).default(1),
+        pageSize: z.coerce.number().int().min(1).max(100).default(50),
+        patientId: z.string().trim().optional(),
+        q: z.string().trim().optional(),
+        status: z.enum(["draft", "under_review", "finalized", "signed", "archived"]).optional(),
+      })
+      .parse(req.query);
     const where: Prisma.ClinicalReportWhereInput = {
-      caseId,
-      patientId,
-      ...(req.auth!.role === "SUPER_ADMIN" || req.auth!.role === "ADMIN"
-        ? {}
-        : {
-            OR: [
-              { authorId: req.auth!.id },
-              { finalizedById: req.auth!.id },
-              { signedById: req.auth!.id },
-              { case: { OR: [{ assignedDoctorId: req.auth!.id }, { uploadedById: req.auth!.id }] } },
-              { patient: { auditLogs: { some: { action: "PATIENT_CREATED", actorId: req.auth!.id } } } },
-            ],
-          }),
+      caseId: query.caseId,
+      patientId: query.patientId,
+      ...(query.status
+        ? {
+            status: reportStatusQueryMap[query.status],
+          }
+        : {}),
+      AND: [
+        ...(query.q
+          ? [
+              {
+                OR: [
+                  { reportNumber: { contains: query.q } },
+                  { physicianName: { contains: query.q } },
+                  { finalPhysicianImpression: { contains: query.q } },
+                  { caseId: query.q },
+                  { patientId: query.q },
+                ],
+              },
+            ]
+          : []),
+        ...(req.auth!.role === "SUPER_ADMIN" || req.auth!.role === "ADMIN"
+          ? []
+          : [
+              {
+                OR: [
+                  { authorId: req.auth!.id },
+                  { finalizedById: req.auth!.id },
+                  { signedById: req.auth!.id },
+                  { case: { OR: [{ assignedDoctorId: req.auth!.id }, { uploadedById: req.auth!.id }] } },
+                  { patient: { auditLogs: { some: { action: "PATIENT_CREATED" as const, actorId: req.auth!.id } } } },
+                ],
+              },
+            ]),
+      ],
     };
-    const reports = await prisma.clinicalReport.findMany({
-      include: reportInclude(),
-      orderBy: { updatedAt: "desc" },
-      where,
+    const [total, reports] = await Promise.all([
+      prisma.clinicalReport.count({ where }),
+      prisma.clinicalReport.findMany({
+        include: reportInclude(),
+        orderBy: { updatedAt: "desc" },
+        skip: (query.page - 1) * query.pageSize,
+        take: query.pageSize,
+        where,
+      }),
+    ]);
+    res.json({
+      page: query.page,
+      pageSize: query.pageSize,
+      reports: reports.map(serializeReport),
+      total,
+      totalPages: Math.ceil(total / query.pageSize),
     });
-    res.json({ reports: reports.map(serializeReport) });
   } catch (error) {
     next(error);
   }

@@ -120,6 +120,8 @@ function ClassicTabLayout() {
         }}
       />
       <Tabs.Screen name="document-center" options={{ href: null, title: "Document Center" }} />
+      <Tabs.Screen name="reports-dashboard" options={{ href: null, title: "Reports Dashboard" }} />
+      <Tabs.Screen name="workforce-dashboard" options={{ href: null, title: "Workforce Dashboard" }} />
       <Tabs.Screen name="knowledge-library" options={{ href: null, title: "Knowledge Library" }} />
       <Tabs.Screen name="advanced-search" options={{ href: null, title: "Advanced Search" }} />
       <Tabs.Screen name="clinical-extraction" options={{ href: null, title: "Clinical Extraction" }} />

@@ -254,6 +254,22 @@ export default function AdminDashboard() {
           onPress={() => router.push("/document-center")}
         />
         <MenuItem
+          icon="🧾"
+          title="Reports Dashboard"
+          description="Generate, edit, retrieve, and archive physician reports"
+          badge="Reports"
+          badgeColor="#2563EB"
+          onPress={() => router.push("/reports-dashboard")}
+        />
+        <MenuItem
+          icon="🏢"
+          title="Workforce Dashboard"
+          description="Organizations, departments, contractors, and employees"
+          badge="EMR"
+          badgeColor="#7C3AED"
+          onPress={() => router.push("/workforce-dashboard")}
+        />
+        <MenuItem
           icon="🔎"
           title="Advanced Search"
           description="Search patients, documents, employees, and knowledge"

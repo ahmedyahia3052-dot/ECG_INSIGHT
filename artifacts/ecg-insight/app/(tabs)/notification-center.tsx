@@ -1,38 +1,45 @@
-import { useQuery } from "@tanstack/react-query";
-import { ScrollView, StyleSheet, Text, View } from "react-native";
+import { ScrollView, StyleSheet, Text } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { WorkflowCrudPanel } from "@/components/workflows/WorkflowCrudPanel";
 import { useAuth } from "@/context/AuthContext";
 import { useColors } from "@/hooks/useColors";
-import { listNotifications } from "@/services/collaboration";
+import { deleteNotification, listNotifications, markNotificationRead } from "@/services/collaboration";
+
+type NotificationItem = Record<string, unknown> & { id: string; message?: string; read?: boolean; title?: string; type?: string };
 
 export default function NotificationCenterScreen() {
   const colors = useColors();
   const { authToken } = useAuth();
-  const query = useQuery({
-    enabled: !!authToken?.token,
-    queryFn: async () => listNotifications(authToken!.token),
-    queryKey: ["notification-center", authToken?.token],
-    retry: false,
-  });
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
       <ScrollView contentContainerStyle={styles.content}>
         <Text style={[styles.title, { color: colors.text }]}>Notification Center</Text>
         <Text style={[styles.subtitle, { color: colors.textSecondary }]}>Browser/mobile push abstraction and priority notification feed.</Text>
-        <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-          <Text style={[styles.cardTitle, { color: colors.text }]}>Notifications</Text>
-          <Text style={[styles.cardText, { color: colors.textSecondary }]}>{JSON.stringify(query.data?.notifications ?? []).slice(0, 900)}</Text>
-        </View>
+        <WorkflowCrudPanel<NotificationItem>
+          deleteItem={(id) => deleteNotification(authToken!.token, id)}
+          detailText={(notification) => `${notification.type ?? "INFO"} · ${notification.read ? "Read" : "Unread"} · ${notification.message ?? ""}`}
+          emptyText="No notifications match the current search and filters."
+          filters={[{ key: "read", label: "Read state", options: [
+            { label: "Unread", value: "false" },
+            { label: "Read", value: "true" },
+          ] }]}
+          itemsFromResponse={(response) => (response as { notifications?: NotificationItem[] } | undefined)?.notifications ?? []}
+          listItems={(params) => listNotifications(authToken!.token, params)}
+          queryKey={["notification-center", authToken?.token]}
+          searchPlaceholder="Search notifications by title, type, or message"
+          subtitle="Inspect notifications, mark them read, and delete stale records."
+          title="Notifications"
+          titleForItem={(notification) => notification.title ?? "Notification"}
+          updateFields={[]}
+          updateItem={(id) => markNotificationRead(authToken!.token, id)}
+        />
       </ScrollView>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  card: { borderRadius: 18, borderWidth: 1, gap: 8, padding: 16 },
-  cardText: { fontSize: 12, lineHeight: 18 },
-  cardTitle: { fontSize: 16, fontWeight: "700" },
   container: { flex: 1 },
   content: { gap: 14, padding: 20, paddingBottom: 120 },
   subtitle: { fontSize: 14, lineHeight: 20 },

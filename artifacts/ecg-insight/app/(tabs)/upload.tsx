@@ -1,6 +1,7 @@
 import { Feather } from "@expo/vector-icons";
 import { useMutation } from "@tanstack/react-query";
 import * as Haptics from "expo-haptics";
+import * as ImagePicker from "expo-image-picker";
 import { useRouter } from "expo-router";
 import React, { useRef, useState } from "react";
 import {
@@ -18,20 +19,20 @@ import { ConfidenceBar } from "@/components/ui/ConfidenceBar";
 import { StatusBadge } from "@/components/ui/Badge";
 import { DiagnosisCard } from "@/components/ecg/DiagnosisCard";
 import { RecommendationCard } from "@/components/ecg/RecommendationCard";
-import { MOCK_CASES } from "@/data/mockData";
 import { useAuth } from "@/context/AuthContext";
 import { createCase, createPatient } from "@/services/clinical";
-import { analyzeCase } from "@/services/ai";
+import { analyzeCase, type AIAnalysisResult } from "@/services/ai";
+import { uploadClinicalEcgFile } from "@/services/ecgFiles";
 
 type UploadState = "idle" | "selected" | "analyzing" | "done";
 
-const MOCK_RESULT = MOCK_CASES[1];
-
-const MOCK_FILES = [
-  { name: "ECG_12Lead_Resting.pdf", size: "2.4 MB" },
-  { name: "ECG_Holter_24h.png", size: "1.1 MB" },
-  { name: "ECG_Stress_Test.jpg", size: "3.7 MB" },
-];
+interface SelectedEcgFile {
+  file?: Blob;
+  mimeType: string;
+  name: string;
+  size?: number;
+  uri: string;
+}
 
 export default function UploadScreen() {
   const colors = useColors();
@@ -40,16 +41,18 @@ export default function UploadScreen() {
   const { authToken } = useAuth();
 
   const [state, setState] = useState<UploadState>("idle");
-  const [selectedFile, setSelectedFile] = useState<{ name: string; size: string } | null>(null);
+  const [selectedFile, setSelectedFile] = useState<SelectedEcgFile | null>(null);
   const [createdCaseId, setCreatedCaseId] = useState<string | null>(null);
+  const [analysisResult, setAnalysisResult] = useState<AIAnalysisResult | null>(null);
   const [progress, setProgress] = useState(0);
   const progressAnim = useRef(new Animated.Value(0)).current;
   const pulseAnim = useRef(new Animated.Value(1)).current;
 
   const topInset = Platform.OS === "web" ? 67 : insets.top;
   const bottomInset = Platform.OS === "web" ? 34 : insets.bottom;
-  const createCaseMutation = useMutation({
+  const analysisMutation = useMutation({
     mutationFn: async () => {
+      if (!selectedFile) throw new Error("Select an ECG file before analysis.");
       const patient = await createPatient(authToken!.token, {
         dateOfBirth: "1964-01-01",
         firstName: "ECG",
@@ -57,17 +60,31 @@ export default function UploadScreen() {
         lastName: "Upload",
         medicalRecordNumber: `MRN-${Date.now()}`,
       });
-      return createCase(authToken!.token, {
-        ecgType: selectedFile?.name.toLowerCase().includes("holter") ? "Holter ECG" : "12-Lead ECG",
+      const ecgCase = await createCase(authToken!.token, {
+        ecgType: selectedFile.name.toLowerCase().includes("holter") ? "Holter ECG" : "12-Lead ECG",
         patientId: patient.patient.id,
-        priority: MOCK_RESULT.status === "critical" ? "critical" : "medium",
+        priority: "medium",
       });
+      const formData = new FormData();
+      formData.append("patientId", patient.patient.id);
+      formData.append("caseId", ecgCase.case.id);
+      formData.append(
+        "file",
+        selectedFile.file ?? ({
+          name: selectedFile.name,
+          type: selectedFile.mimeType,
+          uri: selectedFile.uri,
+        } as unknown as Blob),
+      );
+      await uploadClinicalEcgFile(authToken!.token, formData);
+      const analysis = await analyzeCase(authToken!.token, ecgCase.case.id);
+      return { analysis: analysis.analysis, caseId: ecgCase.case.id };
     },
     onSuccess: (payload) => {
-      setCreatedCaseId(payload.case.id);
-      if (authToken?.token) {
-        analyzeCase(authToken.token, payload.case.id).catch(() => {});
-      }
+      setCreatedCaseId(payload.caseId);
+      setAnalysisResult(payload.analysis);
+      setProgress(100);
+      setState("done");
     },
     retry: false,
   });
@@ -81,46 +98,49 @@ export default function UploadScreen() {
     ).start();
   };
 
-  const handleSelectFile = (file: { name: string; size: string }) => {
+  const handleSelectFile = async () => {
+    const result = await ImagePicker.launchImageLibraryAsync({
+      allowsEditing: false,
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      quality: 1,
+    });
+    if (result.canceled) return;
+    const asset = result.assets[0];
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    setSelectedFile(file);
+    setSelectedFile({
+      file: "file" in asset ? (asset.file as Blob | undefined) : undefined,
+      mimeType: asset.mimeType ?? "image/jpeg",
+      name: asset.fileName ?? `ecg-${Date.now()}.jpg`,
+      size: asset.fileSize,
+      uri: asset.uri,
+    });
     setState("selected");
   };
 
   const handleAnalyze = () => {
+    if (!selectedFile || !authToken?.token) return;
     setState("analyzing");
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
     startPulse();
-
-    let p = 0;
-    const interval = setInterval(() => {
-      p += Math.random() * 18 + 7;
-      if (p >= 100) {
-        p = 100;
-        clearInterval(interval);
-        setTimeout(() => {
-          pulseAnim.stopAnimation();
-          pulseAnim.setValue(1);
-          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-          if (authToken?.token) {
-            createCaseMutation.mutate();
-          }
-          setState("done");
-        }, 400);
-      }
-      setProgress(Math.min(Math.round(p), 100));
-      Animated.timing(progressAnim, {
-        toValue: Math.min(p / 100, 1),
-        duration: 200,
-        useNativeDriver: false,
-      }).start();
-    }, 220);
+    setProgress(25);
+    Animated.timing(progressAnim, { toValue: 0.25, duration: 200, useNativeDriver: false }).start();
+    analysisMutation.mutate(undefined, {
+      onSettled: () => {
+        pulseAnim.stopAnimation();
+        pulseAnim.setValue(1);
+      },
+      onSuccess: () => {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        Animated.timing(progressAnim, { toValue: 1, duration: 200, useNativeDriver: false }).start();
+      },
+    });
   };
 
   const handleReset = () => {
     setState("idle");
     setSelectedFile(null);
     setCreatedCaseId(null);
+    setAnalysisResult(null);
     setProgress(0);
     progressAnim.setValue(0);
     pulseAnim.setValue(1);
@@ -154,33 +174,16 @@ export default function UploadScreen() {
               Select ECG File
             </Text>
             <Text style={[styles.uploadSub, { color: colors.mutedForeground }]}>
-              PDF, PNG, JPG supported — up to 25 MB
+              PNG and JPG ECG images supported — up to 25 MB
             </Text>
-          </View>
-
-          <View style={styles.section}>
-            <Text style={[styles.sectionLabel, { color: colors.mutedForeground }]}>
-              Sample Files (tap to select)
-            </Text>
-            <View style={styles.fileList}>
-              {MOCK_FILES.map((f) => (
-                <TouchableOpacity
-                  key={f.name}
-                  style={[styles.fileRow, { backgroundColor: colors.card, borderColor: colors.border }]}
-                  onPress={() => handleSelectFile(f)}
-                  activeOpacity={0.7}
-                >
-                  <View style={[styles.fileIcon, { backgroundColor: colors.primary + "15" }]}>
-                    <Feather name="file-text" size={18} color={colors.primary} />
-                  </View>
-                  <View style={styles.fileInfo}>
-                    <Text style={[styles.fileName, { color: colors.foreground }]}>{f.name}</Text>
-                    <Text style={[styles.fileSize, { color: colors.mutedForeground }]}>{f.size}</Text>
-                  </View>
-                  <Feather name="plus-circle" size={20} color={colors.primary} />
-                </TouchableOpacity>
-              ))}
-            </View>
+            <TouchableOpacity
+              style={[styles.analyzeBtn, { backgroundColor: colors.primary, marginTop: 8 }]}
+              onPress={handleSelectFile}
+              activeOpacity={0.85}
+            >
+              <Feather name="folder" size={18} color="#fff" />
+              <Text style={styles.analyzeBtnText}>Choose ECG Image</Text>
+            </TouchableOpacity>
           </View>
         </>
       )}
@@ -193,7 +196,9 @@ export default function UploadScreen() {
             </View>
             <View style={styles.fileInfo}>
               <Text style={[styles.fileName, { color: colors.foreground }]}>{selectedFile.name}</Text>
-              <Text style={[styles.fileSize, { color: colors.mutedForeground }]}>{selectedFile.size} · Ready to analyze</Text>
+                <Text style={[styles.fileSize, { color: colors.mutedForeground }]}>
+                  {selectedFile.size ? `${Math.round(selectedFile.size / 1024)} KB` : selectedFile.mimeType} · Ready to upload and analyze
+                </Text>
             </View>
             <TouchableOpacity onPress={handleReset}>
               <Feather name="x" size={18} color={colors.mutedForeground} />
@@ -258,10 +263,10 @@ export default function UploadScreen() {
 
           <View style={styles.stepList}>
             {[
-              { label: "Loading ECG image", done: progress > 15 },
-              { label: "Detecting waveform features", done: progress > 40 },
-              { label: "Measuring intervals & amplitudes", done: progress > 65 },
-              { label: "Generating clinical report", done: progress > 90 },
+              { label: "Creating patient and ECG case", done: progress >= 25 },
+              { label: "Uploading selected ECG file", done: analysisMutation.isSuccess },
+              { label: "Running AI analysis", done: analysisMutation.isSuccess },
+              { label: "Persisting clinical result", done: analysisMutation.isSuccess },
             ].map((step) => (
               <View key={step.label} style={styles.stepRow}>
                 <Feather
@@ -275,10 +280,18 @@ export default function UploadScreen() {
               </View>
             ))}
           </View>
+          {analysisMutation.isError && (
+            <View style={[styles.infoBox, { backgroundColor: "#FEF2F2", borderColor: "#FECACA" }]}>
+              <Feather name="alert-triangle" size={14} color="#DC2626" />
+              <Text style={[styles.infoText, { color: "#DC2626" }]}>
+                {analysisMutation.error instanceof Error ? analysisMutation.error.message : "ECG upload or analysis failed."}
+              </Text>
+            </View>
+          )}
         </View>
       )}
 
-      {state === "done" && (
+      {state === "done" && analysisResult && (
         <>
           <View style={[styles.resultHeader, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <View style={styles.resultTop}>
@@ -287,19 +300,19 @@ export default function UploadScreen() {
               </View>
               <View style={styles.resultTitle}>
                 <Text style={[styles.diagnosisTitle, { color: colors.foreground }]}>
-                  {MOCK_RESULT.diagnosis}
+                  {analysisResult.diagnosis}
                 </Text>
-                <StatusBadge status={MOCK_RESULT.status} />
+                <StatusBadge status={analysisResult.severity === "critical" ? "critical" : analysisResult.severity === "normal" ? "normal" : "abnormal"} />
               </View>
             </View>
 
-            <ConfidenceBar value={MOCK_RESULT.confidence} />
+            <ConfidenceBar value={analysisResult.confidenceScore} />
 
             <View style={styles.vitalsRow}>
               {[
-                { label: "Heart Rate", value: `${MOCK_RESULT.heartRate} bpm` },
-                { label: "Rhythm", value: MOCK_RESULT.rhythm },
-                { label: "QRS", value: `${MOCK_RESULT.qrsDuration} ms` },
+                { label: "Heart Rate", value: `${analysisResult.heartRate} bpm` },
+                { label: "Rhythm", value: analysisResult.rhythm },
+                { label: "AI Status", value: analysisResult.status },
               ].map((v) => (
                 <View key={v.label} style={[styles.vitalChip, { backgroundColor: colors.muted }]}>
                   <Text style={[styles.vitalLabel, { color: colors.mutedForeground }]}>{v.label}</Text>
@@ -312,25 +325,33 @@ export default function UploadScreen() {
           <View style={styles.section}>
             <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Key Findings</Text>
             <View style={styles.findingsList}>
-              {MOCK_RESULT.findings.slice(0, 3).map((f, i) => (
-                <DiagnosisCard key={f.label} finding={f} index={i} />
-              ))}
+              <DiagnosisCard
+                finding={{ label: "Interpretation", severity: analysisResult.severity === "normal" ? "normal" : "mild", value: analysisResult.interpretation }}
+                index={0}
+              />
+              <DiagnosisCard
+                finding={{ label: "AI Version", severity: "normal", value: analysisResult.aiVersion }}
+                index={1}
+              />
             </View>
           </View>
 
           <View style={styles.section}>
             <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Recommendations</Text>
             <View style={styles.recList}>
-              {MOCK_RESULT.recommendations.slice(0, 3).map((r, i) => (
+              {analysisResult.recommendations.slice(0, 3).map((r, i) => (
                 <RecommendationCard key={i} text={r} index={i} />
               ))}
+              {analysisResult.recommendations.length === 0 && (
+                <Text style={[styles.infoText, { color: colors.mutedForeground }]}>No AI recommendations were generated for this analysis.</Text>
+              )}
             </View>
           </View>
 
           <View style={styles.actionRow}>
             <TouchableOpacity
               style={[styles.viewFullBtn, { backgroundColor: colors.primary }]}
-              onPress={() => router.push(`/case/${createdCaseId ?? MOCK_RESULT.id}` as any)}
+              onPress={() => router.push(`/case/${createdCaseId}` as any)}
               activeOpacity={0.85}
             >
               <Text style={[styles.viewFullText, { color: colors.primaryForeground }]}>View Full Report</Text>

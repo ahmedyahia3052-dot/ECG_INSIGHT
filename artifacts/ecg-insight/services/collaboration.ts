@@ -1,7 +1,8 @@
 import { apiRequest } from "./api";
 
-export async function listNotifications(accessToken: string) {
-  return apiRequest<{ notifications: unknown[] }>("/notifications", { accessToken });
+export async function listNotifications(accessToken: string, params = new URLSearchParams()) {
+  const suffix = params.toString() ? `?${params.toString()}` : "";
+  return apiRequest<{ notifications: unknown[] }>(`/notifications${suffix}`, { accessToken });
 }
 
 export async function markNotificationRead(accessToken: string, notificationId: string) {
@@ -23,8 +24,9 @@ export async function processSyncQueue(accessToken: string) {
   return apiRequest<{ completed: unknown[] }>("/sync/process", { accessToken, method: "POST" });
 }
 
-export async function listTasks(accessToken: string) {
-  return apiRequest<{ tasks: unknown[] }>("/tasks", { accessToken });
+export async function listTasks(accessToken: string, params = new URLSearchParams()) {
+  const suffix = params.toString() ? `?${params.toString()}` : "";
+  return apiRequest<{ tasks: unknown[] }>(`/tasks${suffix}`, { accessToken });
 }
 
 export async function getTask(accessToken: string, taskId: string) {
@@ -51,8 +53,9 @@ export async function deleteTask(accessToken: string, taskId: string) {
   return apiRequest<void>(`/tasks/${taskId}`, { accessToken, method: "DELETE" });
 }
 
-export async function listConversations(accessToken: string) {
-  return apiRequest<{ conversations: unknown[] }>("/messages", { accessToken });
+export async function listConversations(accessToken: string, params = new URLSearchParams()) {
+  const suffix = params.toString() ? `?${params.toString()}` : "";
+  return apiRequest<{ conversations: unknown[] }>(`/messages${suffix}`, { accessToken });
 }
 
 export async function getConversation(accessToken: string, conversationId: string) {
@@ -75,8 +78,9 @@ export async function deleteConversation(accessToken: string, conversationId: st
   return apiRequest<void>(`/messages/${conversationId}`, { accessToken, method: "DELETE" });
 }
 
-export async function listTeams(accessToken: string) {
-  return apiRequest<{ teams: unknown[] }>("/teams", { accessToken });
+export async function listTeams(accessToken: string, params = new URLSearchParams()) {
+  const suffix = params.toString() ? `?${params.toString()}` : "";
+  return apiRequest<{ teams: unknown[] }>(`/teams${suffix}`, { accessToken });
 }
 
 export async function getTeam(accessToken: string, teamId: string) {
@@ -103,8 +107,9 @@ export async function deleteTeam(accessToken: string, teamId: string) {
   return apiRequest<void>(`/teams/${teamId}`, { accessToken, method: "DELETE" });
 }
 
-export async function listAlerts(accessToken: string) {
-  return apiRequest<{ alerts: unknown[] }>("/alerts", { accessToken });
+export async function listAlerts(accessToken: string, params = new URLSearchParams()) {
+  const suffix = params.toString() ? `?${params.toString()}` : "";
+  return apiRequest<{ alerts: unknown[] }>(`/alerts${suffix}`, { accessToken });
 }
 
 export async function getAlert(accessToken: string, alertId: string) {
