@@ -1,4 +1,3 @@
-import "dotenv/config";
 import path from "node:path";
 import dotenv from "dotenv";
 import { defineConfig } from "prisma/config";
@@ -6,8 +5,8 @@ import { defineConfig } from "prisma/config";
 const nodeEnv = process.env["NODE_ENV"] ?? "development";
 const workspaceRoot = process.cwd();
 
-dotenv.config({ path: path.join(workspaceRoot, `.env.${nodeEnv}`) });
 dotenv.config({ path: path.join(workspaceRoot, ".env") });
+dotenv.config({ path: path.join(workspaceRoot, `.env.${nodeEnv}`), override: nodeEnv !== "production" });
 
 export default defineConfig({
   datasource: {

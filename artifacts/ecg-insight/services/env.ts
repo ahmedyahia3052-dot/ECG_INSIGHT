@@ -19,5 +19,5 @@ export function requiredApiUrl() {
     throw new Error("EXPO_PUBLIC_API_URL must be configured for staging and production builds.");
   }
 
-  return "http://localhost:3001/api";
+  return "http://localhost:3002/api";
 }

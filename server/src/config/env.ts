@@ -5,20 +5,20 @@ import { z } from "zod";
 const nodeEnv = process.env["NODE_ENV"] ?? "development";
 const workspaceRoot = path.resolve(__dirname, "../../..");
 
-dotenv.config({ path: path.join(workspaceRoot, `.env.${nodeEnv}`) });
 dotenv.config({ path: path.join(workspaceRoot, ".env") });
+dotenv.config({ path: path.join(workspaceRoot, `.env.${nodeEnv}`), override: nodeEnv !== "production" });
 
 const developmentDefaults = {
   CLIENT_ORIGIN: "http://localhost:8081",
   DATABASE_URL: "postgresql://postgres:postgres@localhost:5432/ecg_insight",
-  EXPO_PUBLIC_API_URL: "http://localhost:3001/api",
+  EXPO_PUBLIC_API_URL: "http://localhost:3002/api",
   LOG_LEVEL: "info",
   JWT_REFRESH_SECRET:
     "dev-refresh-938cfdc355358b3b4d1879f159a0252b7b7fe3b08bcb0979d98b8ec4b82d684d",
   JWT_SECRET:
     "dev-access-bf05c9530d0e5b0cb6261389e7d95e1eda5202327d09cae39d2be38ef3d4a8a6",
   NODE_ENV: "development",
-  PORT: "3001",
+  PORT: "3002",
   RATE_LIMIT_MAX: "600",
   RATE_LIMIT_WINDOW_MS: String(15 * 60 * 1000),
   TRUST_PROXY: "false",
