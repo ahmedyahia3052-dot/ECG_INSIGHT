@@ -3,6 +3,7 @@ import { z } from "zod";
 export const patientBodySchema = z.object({
   address: z.string().trim().max(500).optional(),
   allergies: z.string().trim().max(1000).optional(),
+  contractorCompanyId: z.string().trim().optional(),
   contractorId: z.string().trim().optional(),
   dateOfBirth: z.coerce.date(),
   departmentId: z.string().trim().optional(),

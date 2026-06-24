@@ -105,6 +105,7 @@ export function serializePatient(patient: Patient) {
     allergies: patient.allergies ?? undefined,
     archivedAt: patient.archivedAt?.toISOString(),
     dateOfBirth: patient.dateOfBirth.toISOString().slice(0, 10),
+    contractorCompanyId: patient.contractorCompanyId ?? undefined,
     contractorId: patient.contractorId ?? undefined,
     departmentId: patient.departmentId ?? undefined,
     diabetes: patient.diabetes,

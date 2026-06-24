@@ -1,6 +1,8 @@
 import cookieParser from "cookie-parser";
 import cors from "cors";
 import express from "express";
+import rateLimit from "express-rate-limit";
+import helmet from "helmet";
 import { env } from "./config/env";
 import { prisma } from "./config/prisma";
 import { errorHandler, notFoundHandler } from "./middleware/error";
@@ -24,6 +26,11 @@ export function createApp() {
   const corsOrigins = allowedOrigins();
 
   app.use(
+    helmet({
+      contentSecurityPolicy: false,
+    }),
+  );
+  app.use(
     cors({
       credentials: true,
       origin(origin, callback) {
@@ -34,6 +41,14 @@ export function createApp() {
 
         callback(null, false);
       },
+    }),
+  );
+  app.use(
+    rateLimit({
+      legacyHeaders: false,
+      limit: 600,
+      standardHeaders: "draft-8",
+      windowMs: 15 * 60 * 1000,
     }),
   );
   app.use(cookieParser());
