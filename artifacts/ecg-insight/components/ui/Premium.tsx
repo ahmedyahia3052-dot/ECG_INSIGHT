@@ -4,6 +4,7 @@ import React, { useEffect, useRef } from "react";
 import {
   Animated,
   Easing,
+  Pressable,
   StyleProp,
   StyleSheet,
   Text,
@@ -130,6 +131,41 @@ export function PremiumButton({
   );
 }
 
+export function AnimatedPressable({
+  accessibilityLabel,
+  children,
+  onPress,
+  style,
+}: {
+  accessibilityLabel?: string;
+  children: React.ReactNode;
+  onPress?: () => void;
+  style?: StyleProp<ViewStyle>;
+}) {
+  const scale = useRef(new Animated.Value(1)).current;
+
+  const animateTo = (value: number) => {
+    Animated.spring(scale, {
+      friction: 7,
+      tension: 140,
+      toValue: value,
+      useNativeDriver: true,
+    }).start();
+  };
+
+  return (
+    <Pressable
+      accessibilityLabel={accessibilityLabel}
+      accessibilityRole="button"
+      onPress={onPress}
+      onPressIn={() => animateTo(0.97)}
+      onPressOut={() => animateTo(1)}
+    >
+      <Animated.View style={[{ transform: [{ scale }] }, style]}>{children}</Animated.View>
+    </Pressable>
+  );
+}
+
 export function SkeletonBlock({ height = 18, style }: { height?: number; style?: StyleProp<ViewStyle> }) {
   const colors = useColors();
   const opacity = useRef(new Animated.Value(0.35)).current;
@@ -146,6 +182,27 @@ export function SkeletonBlock({ height = 18, style }: { height?: number; style?:
   }, [opacity]);
 
   return <Animated.View style={[styles.skeleton, { backgroundColor: colors.primaryLight, height, opacity }, style]} />;
+}
+
+export function ShimmerCard() {
+  return (
+    <PremiumCard style={styles.shimmerCard}>
+      <SkeletonBlock height={18} style={{ width: "42%" }} />
+      <SkeletonBlock height={48} style={{ width: "100%" }} />
+      <SkeletonBlock height={12} style={{ width: "72%" }} />
+      <SkeletonBlock height={12} style={{ width: "55%" }} />
+    </PremiumCard>
+  );
+}
+
+export function MetricPill({ label, value }: { label: string; value: string | number }) {
+  const colors = useColors();
+  return (
+    <View style={[styles.metricPill, { backgroundColor: colors.primary + "14", borderColor: colors.gradientBorder }]}>
+      <Text style={[styles.metricValue, { color: colors.text }]}>{value}</Text>
+      <Text style={[styles.metricLabel, { color: colors.textSecondary }]}>{label}</Text>
+    </View>
+  );
 }
 
 export function PremiumScreenBackground({ children }: { children: React.ReactNode }) {
@@ -203,6 +260,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 18,
     paddingVertical: 14,
   },
+  metricLabel: { fontFamily: "Inter_600SemiBold", fontSize: 10, letterSpacing: 0.5, textTransform: "uppercase" },
+  metricPill: { borderRadius: 18, borderWidth: 1, flex: 1, gap: 2, paddingHorizontal: 12, paddingVertical: 10 },
+  metricValue: { fontFamily: "Inter_700Bold", fontSize: 16 },
+  shimmerCard: { gap: 12 },
   skeleton: { borderRadius: 999 },
   traceSegment: { borderRadius: 999, height: 3, position: "absolute", width: 52 },
   traceSpike: { borderRadius: 999, height: 38, position: "absolute", top: 9, transform: [{ rotate: "24deg" }], width: 3 },

@@ -299,7 +299,7 @@ export default function LoginScreen() {
 
           {phoneOtpSent ? (
             <View style={styles.field}>
-              <Text style={[styles.label, { color: colors.text }]}>One-time code</Text>
+              <Text style={[styles.label, { color: colors.text }]}>OTP Verification</Text>
               <View style={[styles.inputWrap, { backgroundColor: colors.background, borderColor: colors.border }]}>
                 <Feather name="key" size={16} color={colors.textSecondary} />
                 <TextInput

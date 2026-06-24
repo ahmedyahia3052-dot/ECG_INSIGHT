@@ -20,7 +20,7 @@ import { ConfidenceBar } from "@/components/ui/ConfidenceBar";
 import { StatusBadge } from "@/components/ui/Badge";
 import { DiagnosisCard } from "@/components/ecg/DiagnosisCard";
 import { RecommendationCard } from "@/components/ecg/RecommendationCard";
-import { BrandLogo, PremiumCard, PremiumScreenBackground } from "@/components/ui/Premium";
+import { AnimatedPressable, BrandLogo, PremiumCard, PremiumScreenBackground } from "@/components/ui/Premium";
 import { useAuth } from "@/context/AuthContext";
 import { createCase, createPatient } from "@/services/clinical";
 import { analyzeCase, type AIAnalysisResult } from "@/services/ai";
@@ -250,30 +250,29 @@ export default function UploadScreen() {
             <Text style={[styles.uploadSub, { color: colors.mutedForeground }]}>
               PNG and JPG ECG images supported — up to 25 MB, optimized toward {Math.round(TARGET_ECG_UPLOAD_BYTES / 1024 / 1024)} MB
             </Text>
-            <TouchableOpacity
-              style={[styles.analyzeBtn, { backgroundColor: colors.primary, marginTop: 8 }]}
-              onPress={handleSelectFile}
-              activeOpacity={0.85}
-            >
-              <Feather name="folder" size={18} color="#fff" />
-              <Text style={styles.analyzeBtnText}>Choose ECG Image</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.secondaryAction, { borderColor: colors.border, backgroundColor: colors.card }]}
-              onPress={handleCapturePhoto}
-              activeOpacity={0.85}
-            >
-              <Feather name="camera" size={18} color={colors.foreground} />
-              <Text style={[styles.secondaryActionText, { color: colors.foreground }]}>Capture ECG Photo</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.secondaryAction, { borderColor: colors.border, backgroundColor: colors.card }]}
-              onPress={handleScanPaper}
-              activeOpacity={0.85}
-            >
-              <Feather name="crop" size={18} color={colors.foreground} />
-              <Text style={[styles.secondaryActionText, { color: colors.foreground }]}>Scan ECG Paper</Text>
-            </TouchableOpacity>
+            <View style={styles.acquisitionGrid}>
+              {[
+                { icon: "folder" as const, label: "Upload ECG", onPress: handleSelectFile, sub: "Gallery or file picker" },
+                { icon: "camera" as const, label: "Capture Photo", onPress: handleCapturePhoto, sub: "Native mobile camera" },
+                { icon: "crop" as const, label: "Scan ECG Paper", onPress: handleScanPaper, sub: "Smart image enhancement" },
+              ].map((action) => (
+                <AnimatedPressable
+                  key={action.label}
+                  accessibilityLabel={action.label}
+                  onPress={action.onPress}
+                  style={[styles.acquisitionCard, { backgroundColor: colors.glass, borderColor: colors.gradientBorder }]}
+                >
+                  <View style={[styles.acquisitionIcon, { backgroundColor: colors.primary + "18" }]}>
+                    <Feather name={action.icon} size={22} color={colors.primary} />
+                  </View>
+                  <View style={styles.acquisitionText}>
+                    <Text style={[styles.acquisitionTitle, { color: colors.foreground }]}>{action.label}</Text>
+                    <Text style={[styles.acquisitionSub, { color: colors.mutedForeground }]}>{action.sub}</Text>
+                  </View>
+                  <Feather name="chevron-right" size={16} color={colors.mutedForeground} />
+                </AnimatedPressable>
+              ))}
+            </View>
           </PremiumCard>
           {workflowError && (
             <View style={[styles.infoBox, { backgroundColor: "#FEF2F2", borderColor: "#FECACA" }]}>
@@ -625,6 +624,12 @@ const styles = StyleSheet.create({
     borderRadius: 14,
   },
   analyzeBtnText: { fontSize: 16, fontFamily: "Inter_600SemiBold", color: "#fff" },
+  acquisitionCard: { alignItems: "center", borderRadius: 20, borderWidth: 1, flexDirection: "row", gap: 12, padding: 14, width: "100%" },
+  acquisitionGrid: { gap: 10, marginTop: 10, width: "100%" },
+  acquisitionIcon: { alignItems: "center", borderRadius: 16, height: 48, justifyContent: "center", width: 48 },
+  acquisitionSub: { fontFamily: "Inter_400Regular", fontSize: 12 },
+  acquisitionText: { flex: 1, gap: 2 },
+  acquisitionTitle: { fontFamily: "Inter_700Bold", fontSize: 15 },
   secondaryAction: {
     alignItems: "center",
     borderRadius: 14,

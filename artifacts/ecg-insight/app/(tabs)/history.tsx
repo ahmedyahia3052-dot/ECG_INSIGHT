@@ -76,10 +76,10 @@ export default function HistoryScreen() {
         ]}
       >
         <Text style={[styles.title, { color: colors.foreground }]}>
-          ECG History
+          Patients
         </Text>
         <Text style={[styles.sub, { color: colors.mutedForeground }]}>
-          {casesQuery.isLoading ? "Loading cases..." : `${filtered.length} case${filtered.length !== 1 ? "s" : ""} · Digital ECG viewer enabled`}
+          {casesQuery.isLoading ? "Loading patients..." : `${filtered.length} ECG record${filtered.length !== 1 ? "s" : ""} · Search, filters, and digital ECG viewer enabled`}
         </Text>
         {casesQuery.isError && (
           <Text style={[styles.sub, { color: colors.destructive }]}>

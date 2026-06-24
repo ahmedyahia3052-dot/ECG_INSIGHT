@@ -1,21 +1,32 @@
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Redirect } from "expo-router";
 import React, { useEffect, useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import { useAuth } from "@/context/AuthContext";
 import { useColors } from "@/hooks/useColors";
 import { BrandLogo, HeartbeatLine, PremiumScreenBackground, SkeletonBlock } from "@/components/ui/Premium";
+import { ONBOARDING_STORAGE_KEY } from "@/app/onboarding";
 
 export default function Index() {
   const { isAuthenticated, isLoading } = useAuth();
   const colors = useColors();
   const [splashDone, setSplashDone] = useState(false);
+  const [onboardingChecked, setOnboardingChecked] = useState(false);
+  const [onboardingComplete, setOnboardingComplete] = useState(false);
 
   useEffect(() => {
     const timeout = setTimeout(() => setSplashDone(true), 1400);
     return () => clearTimeout(timeout);
   }, []);
 
-  if (isLoading || !splashDone) {
+  useEffect(() => {
+    AsyncStorage.getItem(ONBOARDING_STORAGE_KEY)
+      .then((value) => setOnboardingComplete(value === "true"))
+      .catch(() => setOnboardingComplete(false))
+      .finally(() => setOnboardingChecked(true));
+  }, []);
+
+  if (isLoading || !splashDone || !onboardingChecked) {
     return (
       <PremiumScreenBackground>
         <View style={styles.center}>
@@ -37,6 +48,10 @@ export default function Index() {
 
   if (isAuthenticated) {
     return <Redirect href="/(tabs)" />;
+  }
+
+  if (!onboardingComplete) {
+    return <Redirect href="/onboarding" />;
   }
 
   return <Redirect href="/(auth)/login" />;

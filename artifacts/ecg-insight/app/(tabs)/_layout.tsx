@@ -18,13 +18,13 @@ function NativeTabLayout() {
         <Icon sf={{ default: "house", selected: "house.fill" }} />
         <Label>Home</Label>
       </NativeTabs.Trigger>
+      <NativeTabs.Trigger name="history">
+        <Icon sf={{ default: "person.2", selected: "person.2.fill" }} />
+        <Label>Patients</Label>
+      </NativeTabs.Trigger>
       <NativeTabs.Trigger name="upload">
         <Icon sf={{ default: "square.and.arrow.up", selected: "square.and.arrow.up.fill" }} />
         <Label>Upload</Label>
-      </NativeTabs.Trigger>
-      <NativeTabs.Trigger name="history">
-        <Icon sf={{ default: "list.bullet.clipboard", selected: "list.bullet.clipboard.fill" }} />
-        <Label>History</Label>
       </NativeTabs.Trigger>
       <NativeTabs.Trigger name="reports-dashboard">
         <Icon sf={{ default: "doc.richtext", selected: "doc.richtext.fill" }} />
@@ -102,6 +102,18 @@ function ClassicTabLayout() {
         }}
       />
       <Tabs.Screen
+        name="history"
+        options={{
+          title: "Patients",
+          tabBarIcon: ({ color }) =>
+            isIOS ? (
+              <SymbolView name="person.2" tintColor={color} size={22} />
+            ) : (
+              <Feather name="users" size={22} color={color} />
+            ),
+        }}
+      />
+      <Tabs.Screen
         name="upload"
         options={{
           title: "Upload",
@@ -110,18 +122,6 @@ function ClassicTabLayout() {
               <SymbolView name="square.and.arrow.up" tintColor={color} size={22} />
             ) : (
               <Feather name="upload-cloud" size={22} color={color} />
-            ),
-        }}
-      />
-      <Tabs.Screen
-        name="history"
-        options={{
-          title: "History",
-          tabBarIcon: ({ color }) =>
-            isIOS ? (
-              <SymbolView name="list.bullet" tintColor={color} size={22} />
-            ) : (
-              <Feather name="list" size={22} color={color} />
             ),
         }}
       />

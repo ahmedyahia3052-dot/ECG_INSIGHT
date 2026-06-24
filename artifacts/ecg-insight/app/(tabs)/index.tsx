@@ -20,7 +20,7 @@ import { RecentCaseCard } from "@/components/dashboard/RecentCaseCard";
 import AccuracyChart from "@/components/dashboard/AccuracyChart";
 import NotificationsPanel from "@/components/dashboard/NotificationsPanel";
 import { EmptyState } from "@/components/ui/EmptyState";
-import { BrandLogo, HeartbeatLine, PremiumCard, PremiumScreenBackground } from "@/components/ui/Premium";
+import { AnimatedPressable, BrandLogo, HeartbeatLine, MetricPill, PremiumCard, PremiumScreenBackground, ShimmerCard } from "@/components/ui/Premium";
 import {
   getCasesByUser,
   getDashboardStats,
@@ -134,6 +134,10 @@ export default function DashboardScreen() {
           </View>
         </PremiumCard>
 
+        <View style={styles.sectionHeader}>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>Quick Scan</Text>
+          <Text style={[styles.seeAll, { color: colors.primary }]}>Mobile first</Text>
+        </View>
         <View style={styles.quickGrid}>
           {[
             { icon: "upload-cloud" as const, label: "Upload ECG", route: "/(tabs)/upload" },
@@ -141,11 +145,9 @@ export default function DashboardScreen() {
             { icon: "crop" as const, label: "Smart Scan", route: "/(tabs)/upload" },
             { icon: "user-plus" as const, label: "New Patient", route: "/(tabs)/history" },
           ].map((action) => (
-            <TouchableOpacity
+            <AnimatedPressable
               key={action.label}
-              accessibilityRole="button"
               accessibilityLabel={action.label}
-              activeOpacity={0.84}
               onPress={() => router.push(action.route as any)}
               style={[styles.quickAction, { backgroundColor: colors.glass, borderColor: colors.gradientBorder }]}
             >
@@ -153,8 +155,41 @@ export default function DashboardScreen() {
                 <Feather name={action.icon} size={18} color={colors.primary} />
               </View>
               <Text style={[styles.quickLabel, { color: colors.text }]}>{action.label}</Text>
-            </TouchableOpacity>
+            </AnimatedPressable>
           ))}
+        </View>
+
+        <PremiumCard style={styles.analyticsCard}>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>Analytics</Text>
+          <View style={styles.metricRow}>
+            <MetricPill label="Accuracy" value={`${aiStats?.averageConfidence ?? stats.accuracyRate}%`} />
+            <MetricPill label="Patients" value={cases.length} />
+            <MetricPill label="Alerts" value={stats.criticalAlerts} />
+          </View>
+          {aiStatsQuery.isLoading ? (
+            <ShimmerCard />
+          ) : (
+            <Text style={[styles.heroSub, { color: colors.textSecondary }]}>
+              {aiStats?.totalAnalyses ?? stats.totalCases} analyses tracked with {stats.normalCount} normal and {stats.abnormalCount} abnormal ECGs.
+            </Text>
+          )}
+        </PremiumCard>
+
+        <View style={styles.dualCards}>
+          <PremiumCard style={styles.miniCard}>
+            <Feather name="credit-card" size={18} color={colors.primary} />
+            <Text style={[styles.miniTitle, { color: colors.text }]}>Subscription Status</Text>
+            <Text style={[styles.miniSub, { color: colors.textSecondary }]}>
+              {(user?.subscriptionTier ?? "free").toUpperCase()} · usage visible in Profile
+            </Text>
+          </PremiumCard>
+          <PremiumCard style={styles.miniCard}>
+            <Feather name="users" size={18} color={colors.success} />
+            <Text style={[styles.miniTitle, { color: colors.text }]}>Patient Statistics</Text>
+            <Text style={[styles.miniSub, { color: colors.textSecondary }]}>
+              {cases.length} recent patient ECG records available
+            </Text>
+          </PremiumCard>
         </View>
 
         {/* Top Bar */}
@@ -230,6 +265,10 @@ export default function DashboardScreen() {
                   ? "⚙️ Admin"
                   : user.role === "doctor"
                   ? "🩺 " + (user.specialization ?? "Doctor")
+                  : user.role === "corporate_client"
+                  ? "🏢 Corporate Client"
+                  : user.role === "user"
+                  ? "👤 User"
                   : "📚 Medical Student"}
               </Text>
             </View>
@@ -306,13 +345,18 @@ export default function DashboardScreen() {
         {/* Recent Cases */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
-            <Text style={[styles.sectionTitle, { color: colors.text }]}>Recent Cases</Text>
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>Recent ECGs</Text>
             <TouchableOpacity onPress={() => router.push("/(tabs)/history" as any)}>
               <Text style={[styles.seeAll, { color: colors.primary }]}>See all</Text>
             </TouchableOpacity>
           </View>
 
-          {recentCases.length === 0 ? (
+          {aiStatsQuery.isLoading ? (
+            <View style={styles.caseList}>
+              <ShimmerCard />
+              <ShimmerCard />
+            </View>
+          ) : recentCases.length === 0 ? (
             <EmptyState
               icon="inbox"
               title="No cases yet"
@@ -365,6 +409,12 @@ const styles = StyleSheet.create({
   heroSub: { fontFamily: "Inter_400Regular", fontSize: 14, lineHeight: 21 },
   heroTitle: { fontFamily: "Inter_700Bold", fontSize: 28, letterSpacing: -0.8, lineHeight: 34 },
   heroTop: { alignItems: "center", flexDirection: "row", justifyContent: "space-between" },
+  analyticsCard: { gap: 12 },
+  dualCards: { flexDirection: "row", gap: 10 },
+  metricRow: { flexDirection: "row", gap: 8 },
+  miniCard: { flex: 1, gap: 8, padding: 14 },
+  miniSub: { fontFamily: "Inter_400Regular", fontSize: 11, lineHeight: 16 },
+  miniTitle: { fontFamily: "Inter_700Bold", fontSize: 13 },
   quickAction: { alignItems: "center", borderRadius: 20, borderWidth: 1, flex: 1, gap: 8, minWidth: "47%", padding: 14 },
   quickGrid: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
   quickIcon: { alignItems: "center", borderRadius: 14, height: 42, justifyContent: "center", width: 42 },
