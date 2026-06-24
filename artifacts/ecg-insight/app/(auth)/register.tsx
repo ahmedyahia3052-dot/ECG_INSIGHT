@@ -1,315 +1,135 @@
-import { Feather } from "@expo/vector-icons";
-import * as Haptics from "expo-haptics";
 import { useRouter } from "expo-router";
 import React, { useState } from "react";
-import {
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
-} from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useAuth } from "@/context/AuthContext";
+import { StyleSheet, Text, View } from "react-native";
+import { UserRole, useAuth } from "@/context/AuthContext";
 import { useColors } from "@/hooks/useColors";
-import { BrandLogo, PremiumCard, PremiumScreenBackground } from "@/components/ui/Premium";
+import { BoltBadge, BoltButton, BoltCard, BoltField, BoltHero, BoltScreen } from "@/components/bolt/BoltUI";
 
-type Role = "corporate_client" | "doctor" | "user";
+type RegisterRole = Extract<UserRole, "corporate_client" | "doctor" | "user">;
 
 export default function RegisterScreen() {
   const colors = useColors();
-  const insets = useSafeAreaInsets();
   const router = useRouter();
   const { register } = useAuth();
-
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [phoneNumber, setPhoneNumber] = useState("");
   const [password, setPassword] = useState("");
-  const [role, setRole] = useState<Role>("user");
-  const [showPassword, setShowPassword] = useState(false);
+  const [role, setRole] = useState<RegisterRole>("user");
   const [loading, setLoading] = useState(false);
-  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [error, setError] = useState("");
 
-  const validate = () => {
-    const e: Record<string, string> = {};
-    if (!name.trim()) e.name = "Full name is required";
-    if (!email.trim() && !phoneNumber.trim()) e.email = "Email or mobile phone is required";
-    else if (email.trim() && !email.includes("@")) e.email = "Enter a valid email";
-    if (email.trim() && !password) e.password = "Password is required for email registration";
-    else if (password && passwordStrength(password).score < 4) e.password = "Use 12+ chars with upper, lower, number, and symbol";
-    setErrors(e);
-    return Object.keys(e).length === 0;
-  };
-
-  const handleRegister = async () => {
-    if (!validate()) return;
-    setLoading(true);
-    try {
-      const result = await register(name.trim(), email.trim(), password, role, phoneNumber.trim() || undefined);
-      if (result.success) {
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-        router.replace(email.trim() ? `/(auth)/verify-email?email=${encodeURIComponent(email.trim())}` : "/(auth)/login");
-      } else {
-        setErrors({ form: result.error ?? "Registration failed." });
-      }
-    } finally {
-      setLoading(false);
+  async function handleRegister() {
+    setError("");
+    if (!name.trim()) {
+      setError("Full name is required.");
+      return;
     }
-  };
+    if (!email.trim() && !phoneNumber.trim()) {
+      setError("Email or mobile phone is required.");
+      return;
+    }
+    if (email.trim() && (!password || passwordScore(password) < 4)) {
+      setError("Use a strong password with 12+ characters, mixed case, number, and symbol.");
+      return;
+    }
+    setLoading(true);
+    const result = await register(name.trim(), email.trim(), password, role, phoneNumber.trim() || undefined);
+    setLoading(false);
+    if (!result.success) {
+      setError(result.error ?? "Registration failed.");
+      return;
+    }
+    router.replace(email.trim() ? `/(auth)/verify-email?email=${encodeURIComponent(email.trim())}` : "/(auth)/login");
+  }
 
-  const topInset = Platform.OS === "web" ? 67 : insets.top;
-  const strength = passwordStrength(password);
+  const score = passwordScore(password);
 
   return (
-    <KeyboardAvoidingView
-      style={styles.flex}
-      behavior={Platform.OS === "ios" ? "padding" : "height"}
-    >
-      <PremiumScreenBackground>
-      <ScrollView
-        contentContainerStyle={[
-          styles.scroll,
-          {
-            paddingTop: topInset + 24,
-            paddingBottom: Platform.OS === "web" ? 34 : insets.bottom + 24,
-          },
-        ]}
-        keyboardShouldPersistTaps="handled"
-        showsVerticalScrollIndicator={false}
-      >
-        <TouchableOpacity
-          style={styles.back}
-          onPress={() => router.back()}
-          activeOpacity={0.7}
-        >
-          <Feather name="arrow-left" size={20} color={colors.foreground} />
-          <Text style={[styles.backText, { color: colors.foreground }]}>Back to Login</Text>
-        </TouchableOpacity>
-
-        <View style={styles.topSection}>
-          <BrandLogo />
-          <Text style={[styles.title, { color: colors.foreground }]}>Create Account</Text>
-          <Text style={[styles.sub, { color: colors.mutedForeground }]}>
-            Join ECG Insight with email or mobile phone and start on the FREE plan.
-          </Text>
+    <BoltScreen>
+      <BoltHero
+        eyebrow="Start on the FREE plan"
+        subtitle="Create a real ECG Insight account using the existing authentication API. Subscription assignment, verification, quota, and security policies remain backend controlled."
+        title="Create your account"
+      />
+      <BoltCard style={styles.form}>
+        {error ? <Text style={[styles.error, { color: colors.destructive }]}>{error}</Text> : null}
+        <Text style={[styles.label, { color: colors.text }]}>Full Name</Text>
+        <BoltField icon="user" onChangeText={setName} placeholder="Dr. Jane Smith" value={name} />
+        <Text style={[styles.label, { color: colors.text }]}>Email Address</Text>
+        <BoltField icon="mail" keyboardType="email-address" onChangeText={setEmail} placeholder="you@hospital.com" value={email} />
+        <Text style={[styles.label, { color: colors.text }]}>Mobile Phone</Text>
+        <BoltField icon="phone" keyboardType="phone-pad" onChangeText={setPhoneNumber} placeholder="+201000000000" value={phoneNumber} />
+        <Text style={[styles.label, { color: colors.text }]}>Password</Text>
+        <BoltField icon="lock" onChangeText={setPassword} placeholder="12+ chars, mixed complexity" secureTextEntry value={password} />
+        <View style={styles.strengthRow}>
+          {[0, 1, 2, 3, 4].map((item) => (
+            <View
+              key={item}
+              style={[
+                styles.strengthBar,
+                { backgroundColor: item < score ? strengthColor(score) : colors.border },
+              ]}
+            />
+          ))}
         </View>
+        <Text style={[styles.hint, { color: colors.textSecondary }]}>
+          Password policy is enforced by the existing backend security platform.
+        </Text>
+      </BoltCard>
 
-        <PremiumCard style={styles.card}>
-          <View style={styles.form}>
-            {errors.form && <Text style={[styles.error, { color: colors.destructive }]}>{errors.form}</Text>}
-            <View style={styles.field}>
-              <Text style={[styles.label, { color: colors.foreground }]}>Full Name</Text>
-              <View style={[styles.inputWrap, { backgroundColor: colors.muted, borderColor: errors.name ? colors.destructive : colors.border }]}>
-                <Feather name="user" size={16} color={colors.mutedForeground} />
-                <TextInput
-                  style={[styles.input, { color: colors.foreground }]}
-                  placeholder="Dr. Jane Smith"
-                  placeholderTextColor={colors.mutedForeground}
-                  value={name}
-                  onChangeText={setName}
-                  autoCapitalize="words"
-                />
-              </View>
-              {errors.name && <Text style={[styles.error, { color: colors.destructive }]}>{errors.name}</Text>}
+      <BoltCard style={styles.form}>
+        <Text style={[styles.label, { color: colors.text }]}>Account Type</Text>
+        {([
+          ["user", "Individual User", "Personal ECG analysis workspace"],
+          ["doctor", "Doctor / Clinician", "Clinical review and reporting"],
+          ["corporate_client", "Corporate Client", "Team and enterprise access"],
+        ] as const).map(([value, title, description]) => {
+          const active = role === value;
+          return (
+            <View key={value} style={styles.roleWrapper}>
+              <BoltButton
+                icon={value === "doctor" ? "briefcase" : value === "corporate_client" ? "users" : "user"}
+                label={title}
+                onPress={() => setRole(value)}
+                variant={active ? "primary" : "outline"}
+              />
+              <Text style={[styles.roleDescription, { color: colors.textSecondary }]}>{description}</Text>
             </View>
+          );
+        })}
+        <BoltBadge icon="shield" label="Owner and admin privileges cannot be self-assigned" tone="warning" />
+      </BoltCard>
 
-            <View style={styles.field}>
-              <Text style={[styles.label, { color: colors.foreground }]}>Email</Text>
-              <View style={[styles.inputWrap, { backgroundColor: colors.muted, borderColor: errors.email ? colors.destructive : colors.border }]}>
-                <Feather name="mail" size={16} color={colors.mutedForeground} />
-                <TextInput
-                  style={[styles.input, { color: colors.foreground }]}
-                  placeholder="you@hospital.com"
-                  placeholderTextColor={colors.mutedForeground}
-                  value={email}
-                  onChangeText={setEmail}
-                  keyboardType="email-address"
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                />
-              </View>
-              {errors.email && <Text style={[styles.error, { color: colors.destructive }]}>{errors.email}</Text>}
-            </View>
-
-            <View style={styles.field}>
-              <Text style={[styles.label, { color: colors.foreground }]}>Mobile Phone</Text>
-              <View style={[styles.inputWrap, { backgroundColor: colors.muted, borderColor: colors.border }]}>
-                <Feather name="smartphone" size={16} color={colors.mutedForeground} />
-                <TextInput
-                  style={[styles.input, { color: colors.foreground }]}
-                  placeholder="+201000000000"
-                  placeholderTextColor={colors.mutedForeground}
-                  value={phoneNumber}
-                  onChangeText={setPhoneNumber}
-                  keyboardType="phone-pad"
-                />
-              </View>
-            </View>
-
-            <View style={styles.field}>
-              <Text style={[styles.label, { color: colors.foreground }]}>Password</Text>
-              <View style={[styles.inputWrap, { backgroundColor: colors.muted, borderColor: errors.password ? colors.destructive : colors.border }]}>
-                <Feather name="lock" size={16} color={colors.mutedForeground} />
-                <TextInput
-                  style={[styles.input, { color: colors.foreground }]}
-                  placeholder="12+ chars, mixed complexity"
-                  placeholderTextColor={colors.mutedForeground}
-                  value={password}
-                  onChangeText={setPassword}
-                  secureTextEntry={!showPassword}
-                />
-                <TouchableOpacity onPress={() => setShowPassword(!showPassword)}>
-                  <Feather name={showPassword ? "eye-off" : "eye"} size={16} color={colors.mutedForeground} />
-                </TouchableOpacity>
-              </View>
-              <View style={styles.strengthRow}>
-                {[0, 1, 2, 3, 4].map((slot) => (
-                  <View
-                    key={slot}
-                    style={[
-                      styles.strengthBar,
-                      { backgroundColor: slot < strength.score ? strength.color : colors.border },
-                    ]}
-                  />
-                ))}
-              </View>
-              <Text style={[styles.strengthText, { color: strength.color }]}>{strength.label}</Text>
-              {errors.password && <Text style={[styles.error, { color: colors.destructive }]}>{errors.password}</Text>}
-            </View>
-
-            <View style={styles.field}>
-              <Text style={[styles.label, { color: colors.foreground }]}>I am a...</Text>
-              <View style={styles.roleRow}>
-                {(["user", "doctor", "corporate_client"] as Role[]).map((r) => (
-                  <TouchableOpacity
-                    key={r}
-                    style={[
-                      styles.roleBtn,
-                      {
-                        backgroundColor: role === r ? colors.primary : colors.muted,
-                        borderColor: role === r ? colors.primary : colors.border,
-                      },
-                    ]}
-                    onPress={() => {
-                      setRole(r);
-                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                    }}
-                    activeOpacity={0.8}
-                  >
-                    <Feather
-                      name={r === "doctor" ? "briefcase" : r === "corporate_client" ? "users" : "user"}
-                      size={16}
-                      color={role === r ? colors.primaryForeground : colors.mutedForeground}
-                    />
-                    <Text
-                      style={[
-                        styles.roleText,
-                        { color: role === r ? colors.primaryForeground : colors.mutedForeground },
-                      ]}
-                    >
-                      {r === "doctor" ? "Doctor / Clinician" : r === "corporate_client" ? "Corporate Client" : "Individual User"}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            </View>
-
-            <TouchableOpacity
-              style={[styles.btn, { backgroundColor: colors.primary, opacity: loading ? 0.7 : 1 }]}
-              onPress={handleRegister}
-              disabled={loading}
-              activeOpacity={0.85}
-            >
-              <Feather name={loading ? "loader" : "user-plus"} size={16} color={colors.primaryForeground} />
-              <Text style={[styles.btnText, { color: colors.primaryForeground }]}>
-                {loading ? "Creating account..." : "Create Account"}
-              </Text>
-            </TouchableOpacity>
-            <Text style={[styles.planHint, { color: colors.mutedForeground }]}>
-              New accounts start on the FREE plan with 5 ECG analyses per 24 hours.
-            </Text>
-          </View>
-        </PremiumCard>
-
-        <View style={styles.footer}>
-          <Text style={[styles.footerText, { color: colors.mutedForeground }]}>Already have an account? </Text>
-          <TouchableOpacity onPress={() => router.back()}>
-            <Text style={[styles.link, { color: colors.primary }]}>Sign In</Text>
-          </TouchableOpacity>
-        </View>
-      </ScrollView>
-      </PremiumScreenBackground>
-    </KeyboardAvoidingView>
+      <BoltButton icon="user-plus" label="Create Account" loading={loading} onPress={handleRegister} />
+      <BoltButton label="Already have an account? Sign in" onPress={() => router.replace("/(auth)/login")} variant="ghost" />
+    </BoltScreen>
   );
 }
 
-const styles = StyleSheet.create({
-  flex: { flex: 1 },
-  scroll: { paddingHorizontal: 20, gap: 16 },
-  back: { flexDirection: "row", alignItems: "center", gap: 8 },
-  backText: { fontSize: 14, fontFamily: "Inter_500Medium" },
-  topSection: { gap: 6 },
-  title: { fontSize: 24, fontFamily: "Inter_700Bold" },
-  sub: { fontSize: 13, fontFamily: "Inter_400Regular", lineHeight: 19 },
-  card: { padding: 24 },
-  form: { gap: 14 },
-  field: { gap: 6 },
-  label: { fontSize: 13, fontFamily: "Inter_600SemiBold" },
-  inputWrap: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-    borderRadius: 10,
-    borderWidth: 1,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-  },
-  input: { flex: 1, fontSize: 14, fontFamily: "Inter_400Regular" },
-  error: { fontSize: 11, fontFamily: "Inter_400Regular" },
-  roleRow: { flexDirection: "column", gap: 8 },
-  roleBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-    padding: 14,
-    borderRadius: 10,
-    borderWidth: 1,
-  },
-  roleText: { fontSize: 14, fontFamily: "Inter_500Medium" },
-  btn: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
-    paddingVertical: 14,
-    borderRadius: 12,
-    marginTop: 4,
-  },
-  btnText: { fontSize: 15, fontFamily: "Inter_600SemiBold" },
-  footer: { flexDirection: "row", justifyContent: "center", alignItems: "center" },
-  footerText: { fontSize: 13, fontFamily: "Inter_400Regular" },
-  link: { fontSize: 13, fontFamily: "Inter_600SemiBold" },
-  planHint: { fontSize: 12, fontFamily: "Inter_400Regular", lineHeight: 18, textAlign: "center" },
-  strengthBar: { borderRadius: 2, flex: 1, height: 5 },
-  strengthRow: { flexDirection: "row", gap: 4 },
-  strengthText: { fontSize: 11, fontFamily: "Inter_600SemiBold" },
-});
-
-function passwordStrength(password: string) {
-  const checks = [
+function passwordScore(password: string) {
+  return [
     password.length >= 12,
     /[A-Z]/.test(password),
     /[a-z]/.test(password),
     /\d/.test(password),
     /[^A-Za-z0-9]/.test(password),
-  ];
-  const score = checks.filter(Boolean).length;
-  if (!password) return { color: "#94A3B8", label: "Password strength: not started", score };
-  if (score <= 2) return { color: "#DC2626", label: "Password strength: weak", score };
-  if (score <= 4) return { color: "#D97706", label: "Password strength: good", score };
-  return { color: "#059669", label: "Password strength: strong", score };
+  ].filter(Boolean).length;
 }
+
+function strengthColor(score: number) {
+  if (score <= 2) return "#DC2626";
+  if (score <= 4) return "#D97706";
+  return "#059669";
+}
+
+const styles = StyleSheet.create({
+  error: { fontFamily: "Inter_700Bold", fontSize: 13 },
+  form: { gap: 10 },
+  hint: { fontFamily: "Inter_400Regular", fontSize: 12, lineHeight: 18 },
+  label: { fontFamily: "Inter_700Bold", fontSize: 13 },
+  roleDescription: { fontFamily: "Inter_400Regular", fontSize: 12, lineHeight: 17, marginLeft: 2 },
+  roleWrapper: { gap: 5 },
+  strengthBar: { borderRadius: 999, flex: 1, height: 5 },
+  strengthRow: { flexDirection: "row", gap: 5 },
+});

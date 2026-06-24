@@ -1,518 +1,133 @@
-import { Feather } from "@expo/vector-icons";
-import * as Haptics from "expo-haptics";
+import { useQuery } from "@tanstack/react-query";
 import { useRouter } from "expo-router";
-import React, { useEffect, useState } from "react";
-import {
-  Alert,
-  Platform,
-  ScrollView,
-  StyleSheet,
-  Switch,
-  Text,
-  TouchableOpacity,
-  View,
-} from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
+import React from "react";
+import { StyleSheet, Text, View } from "react-native";
 import { useAuth } from "@/context/AuthContext";
 import { useColors, useThemePreference, type ThemePreference } from "@/hooks/useColors";
-import { RoleBadge } from "@/components/ui/Badge";
-import { PremiumCard, PremiumScreenBackground } from "@/components/ui/Premium";
-import { getDashboardStats } from "@/data/mockData";
-import { getMySubscription, type MySubscription } from "@/services/subscriptions";
-
-const ROLE_LABEL: Record<string, string> = {
-  super_admin: "Super Admin",
-  admin: "Admin",
-  corporate_client: "Corporate Client",
-  doctor: "Doctor",
-  student: "Student",
-  user: "User",
-};
+import { getMySubscription } from "@/services/subscriptions";
+import {
+  BoltBadge,
+  BoltButton,
+  BoltCard,
+  BoltHero,
+  BoltNavCard,
+  BoltScreen,
+  BoltStat,
+} from "@/components/bolt/BoltUI";
 
 export default function ProfileScreen() {
   const colors = useColors();
-  const { setThemePreference, themePreference } = useThemePreference();
-  const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { user, authToken, logout, isImpersonating, stopImpersonation } = useAuth();
-  const [subscription, setSubscription] = useState<MySubscription | null>(null);
-  const [notifications, setNotifications] = useState(true);
-  const [criticalAlerts, setCriticalAlerts] = useState(true);
-  const [emailDigest, setEmailDigest] = useState(false);
-
-  const topInset = Platform.OS === "web" ? 67 : insets.top;
-  const bottomInset = Platform.OS === "web" ? 34 : insets.bottom;
-
-  const stats = user
-    ? getDashboardStats(user.id)
-    : { totalCases: 0, thisWeek: 0, accuracyRate: 95, criticalAlerts: 0 };
-
-  useEffect(() => {
-    if (!authToken?.token) return;
-    getMySubscription(authToken.token).then(setSubscription).catch(() => setSubscription(null));
-  }, [authToken?.token]);
-
-  const handleLogout = () => {
-    Alert.alert("Sign Out", "Are you sure you want to sign out?", [
-      { text: "Cancel", style: "cancel" },
-      {
-        text: "Sign Out",
-        style: "destructive",
-        onPress: async () => {
-          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-          await logout();
-          router.replace("/(auth)/login");
-        },
-      },
-    ]);
-  };
+  const { setThemePreference, themePreference } = useThemePreference();
+  const { authToken, isImpersonating, logout, stopImpersonation, user } = useAuth();
+  const subscriptionQuery = useQuery({
+    enabled: !!authToken?.token,
+    queryFn: async () => getMySubscription(authToken!.token),
+    queryKey: ["bolt-profile-subscription", authToken?.token],
+    retry: false,
+  });
 
   if (!user) return null;
+  const subscription = subscriptionQuery.data;
+  const planLabel = subscription?.lifetimeAccess.granted
+    ? "Special Lifetime Access"
+    : subscription?.plan.name ?? `${(user.subscriptionTier ?? "free").toUpperCase()} Plan`;
 
-  const tierColor =
-    user.role === "super_admin"
-      ? "#7C3AED"
-      : user.role === "admin"
-      ? "#06B6D4"
-      : colors.primary;
+  async function handleLogout() {
+    await logout();
+    router.replace("/(auth)/login");
+  }
 
   return (
-    <PremiumScreenBackground>
-    <ScrollView
-      style={styles.flex}
-      contentContainerStyle={[
-        styles.scroll,
-        { paddingTop: topInset + 12, paddingBottom: bottomInset + 100 },
-      ]}
-      showsVerticalScrollIndicator={false}
-    >
-      <Text style={[styles.pageTitle, { color: colors.text }]}>Profile</Text>
+    <BoltScreen>
+      {isImpersonating ? (
+        <BoltCard style={styles.impersonation}>
+          <Text style={[styles.impersonationText, { color: "#92400E" }]}>Impersonation mode is active.</Text>
+          <BoltButton label="Stop" onPress={stopImpersonation} variant="outline" />
+        </BoltCard>
+      ) : null}
 
-      {/* Impersonation banner */}
-      {isImpersonating && (
-        <View style={[styles.impBanner]}>
-          <Text style={{ fontSize: 14 }}>👤</Text>
-          <Text style={styles.impText}>
-            Impersonating — not your real account
-          </Text>
-          <TouchableOpacity
-            style={styles.impStop}
-            onPress={stopImpersonation}
-          >
-            <Text style={styles.impStopText}>Stop</Text>
-          </TouchableOpacity>
-        </View>
-      )}
+      <BoltHero
+        eyebrow="Account and settings"
+        subtitle="Profile, subscription, security, active sessions, notifications, and theme settings remain connected to existing ECG Insight services."
+        title={user.name}
+      />
 
-      {/* Avatar card */}
-      <PremiumCard style={styles.avatarCard}>
-        <View style={[styles.avatar, { backgroundColor: tierColor }]}>
+      <BoltCard style={styles.profileCard}>
+        <View style={[styles.avatar, { backgroundColor: colors.primary }]}>
           <Text style={styles.avatarText}>{user.avatarInitials}</Text>
         </View>
-        <View style={styles.avatarInfo}>
-          <Text style={[styles.avatarName, { color: colors.text }]}>{user.name}</Text>
-          <Text style={[styles.avatarEmail, { color: colors.textSecondary }]}>{user.email}</Text>
+        <View style={styles.profileMain}>
+          <Text style={[styles.name, { color: colors.text }]}>{user.name}</Text>
+          <Text style={[styles.meta, { color: colors.textSecondary }]}>{user.email}</Text>
           <View style={styles.badgeRow}>
-            <RoleBadge role={user.role} />
-            {!user.emailVerified && (
-              <View style={[styles.unverifiedBadge]}>
-                <Text style={styles.unverifiedText}>Email unverified</Text>
-              </View>
-            )}
+            <BoltBadge icon="shield" label={user.role.replace("_", " ")} />
+            {user.emailVerified ? <BoltBadge icon="check-circle" label="Verified" tone="success" /> : <BoltBadge label="Email unverified" tone="warning" />}
           </View>
         </View>
-      </PremiumCard>
+      </BoltCard>
 
-      {/* Stats */}
       <View style={styles.statsRow}>
-        {[
-          { label: "Analyses", value: stats.totalCases, icon: "activity" as const },
-          { label: "This Week", value: stats.thisWeek, icon: "calendar" as const },
-          { label: "Accuracy", value: `${stats.accuracyRate}%`, icon: "check-circle" as const },
-        ].map((s) => (
-          <View
-            key={s.label}
-            style={[styles.statBox, { backgroundColor: colors.surface, borderColor: colors.border }]}
-          >
-            <Feather name={s.icon} size={14} color={colors.primary} />
-            <Text style={[styles.statValue, { color: colors.text }]}>{s.value}</Text>
-            <Text style={[styles.statLabel, { color: colors.textSecondary }]}>{s.label}</Text>
-          </View>
-        ))}
+        <BoltStat icon="credit-card" label="Subscription" value={subscriptionQuery.isLoading ? "..." : planLabel} />
+        <BoltStat icon="activity" label="Quota Used" value={subscription?.quota.used ?? "Live"} />
       </View>
 
-      {/* Admin panel button — admin+ only */}
-      {user.role === "super_admin" && (
-        <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>
-            Administration
-          </Text>
-          <TouchableOpacity
-            style={[styles.adminBtn, { backgroundColor: colors.surface, borderColor: tierColor + "50" }]}
-            onPress={() => router.push("/admin/" as any)}
-            activeOpacity={0.8}
-          >
-            <View style={[styles.adminBtnIcon, { backgroundColor: tierColor + "15" }]}>
-              <Feather name="shield" size={18} color={tierColor} />
-            </View>
-            <View style={styles.adminBtnText}>
-              <Text style={[styles.adminBtnTitle, { color: colors.text }]}>
-                {user.role === "super_admin" ? "Super Admin Panel" : "Admin Panel"}
-              </Text>
-              <Text style={[styles.adminBtnSub, { color: colors.textSecondary }]}>
-                {user.role === "super_admin"
-                  ? "Users, subscriptions, impersonation & system config"
-                  : "User management, subscriptions & analytics"}
-              </Text>
-            </View>
-            <Feather name="chevron-right" size={18} color={colors.textSecondary} />
-          </TouchableOpacity>
+      <BoltCard highlight style={styles.subscription}>
+        <View style={styles.cardHeader}>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>Subscription</Text>
+          <BoltBadge label={subscription?.lifetimeAccess.granted ? "Lifetime" : "Quota active"} tone={subscription?.lifetimeAccess.granted ? "success" : "primary"} />
         </View>
-      )}
+        <Text style={[styles.meta, { color: colors.textSecondary }]}>
+          {subscription?.lifetimeAccess.granted
+            ? "Unlimited ECG analyses · No expiration date · granted privately by administrator."
+            : `${subscription?.quota.remaining ?? 0} analyses remaining · resets ${subscription?.quota.nextResetAt?.slice(0, 10) ?? "soon"}.`}
+        </Text>
+      </BoltCard>
 
-      {/* Account info */}
-      <View style={styles.section}>
-        <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>Account</Text>
-        <View style={[styles.sectionCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-          {[
-            { icon: "user" as const, label: "Full Name", value: user.name },
-            { icon: "mail" as const, label: "Email", value: user.email },
-            { icon: "briefcase" as const, label: "Role", value: ROLE_LABEL[user.role] ?? user.role },
-            ...(user.specialization ? [{ icon: "award" as const, label: "Specialization", value: user.specialization }] : []),
-            ...(user.institution ? [{ icon: "home" as const, label: "Institution", value: user.institution }] : []),
-          ].map((item, idx, arr) => (
-            <View
-              key={item.label}
-              style={[
-                styles.infoRow,
-                idx < arr.length - 1 && { borderBottomWidth: 1, borderBottomColor: colors.border },
-              ]}
-            >
-              <View style={[styles.itemIcon, { backgroundColor: colors.primaryLight }]}>
-                <Feather name={item.icon} size={14} color={colors.primary} />
-              </View>
-              <View style={styles.itemText}>
-                <Text style={[styles.itemLabel, { color: colors.textSecondary }]}>{item.label}</Text>
-                <Text style={[styles.itemValue, { color: colors.text }]}>{item.value}</Text>
-              </View>
-            </View>
-          ))}
-        </View>
-      </View>
-
-      {/* Subscription */}
-      <View style={styles.section}>
-        <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>Subscription</Text>
-        <View style={[styles.subCard, { borderColor: colors.primary + "40" }]}>
-          <View style={styles.subRow}>
-            <Text style={{ fontSize: 24 }}>
-              {user.role === "super_admin" || user.role === "admin" ? "🏢" : "⭐"}
-            </Text>
-            <View style={{ flex: 1 }}>
-              <Text style={[styles.subPlan, { color: colors.text }]}>
-                {subscription?.lifetimeAccess.granted
-                  ? "Special Lifetime Access Granted by Administrator"
-                  : subscription?.plan.name ?? `${(user.subscriptionTier ?? "free").replace("_", " ")} Plan`}
-              </Text>
-              <Text style={[styles.subDetail, { color: colors.textSecondary }]}>
-                {subscription?.lifetimeAccess.granted
-                  ? "Unlimited ECG Analyses · No Expiration Date"
-                  : `${subscription?.quota.remaining ?? 0} analyses remaining · Resets ${subscription?.quota.nextResetAt?.slice(0, 10) ?? "soon"}`}
-              </Text>
-            </View>
-            {user.role === "student" && !subscription?.lifetimeAccess.granted && (
-              <TouchableOpacity
-                style={[styles.upgradeBtn, { backgroundColor: colors.primary }]}
-              >
-                <Text style={styles.upgradeBtnText}>Upgrade</Text>
-              </TouchableOpacity>
-            )}
-          </View>
-        </View>
-      </View>
-
-      {/* Settings */}
-      <View style={styles.section}>
-        <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>Settings</Text>
-        <View style={[styles.sectionCard, { backgroundColor: colors.glass, borderColor: colors.gradientBorder }]}>
-          <Text style={[styles.itemLabel, { color: colors.textSecondary }]}>Theme</Text>
-          <View style={styles.themeRow}>
-            {(["dark", "light", "system"] as ThemePreference[]).map((preference) => {
-              const active = themePreference === preference;
-              return (
-                <TouchableOpacity
-                  key={preference}
-                  accessibilityRole="button"
-                  accessibilityLabel={`Use ${preference} theme`}
-                  style={[
-                    styles.themeChip,
-                    {
-                      backgroundColor: active ? colors.primary : colors.muted,
-                      borderColor: active ? colors.primary : colors.border,
-                    },
-                  ]}
-                  onPress={() => {
-                    void setThemePreference(preference);
-                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                  }}
-                >
-                  <Text style={[styles.themeText, { color: active ? "#fff" : colors.text }]}>
-                    {preference[0].toUpperCase() + preference.slice(1)}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
-          </View>
-          {[
-            { icon: "globe" as const, label: "Language", value: "English" },
-            { icon: "lock" as const, label: "Privacy", value: "HIPAA/GDPR-ready" },
-            { icon: "shield" as const, label: "Security", value: "MFA and password controls", route: "/(tabs)/security-dashboard" },
-            { icon: "monitor" as const, label: "Active Sessions", value: "Manage trusted devices", route: "/(tabs)/session-dashboard" },
-          ].map((item) => (
-            <TouchableOpacity
-              key={item.label}
-              accessibilityRole="button"
-              activeOpacity={0.78}
-              onPress={() => item.route ? router.push(item.route as any) : Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)}
-              style={[styles.infoRow, { borderTopColor: colors.border, borderTopWidth: 1 }]}
-            >
-              <View style={[styles.itemIcon, { backgroundColor: colors.primaryLight }]}>
-                <Feather name={item.icon} size={14} color={colors.primary} />
-              </View>
-              <View style={styles.itemText}>
-                <Text style={[styles.itemLabel, { color: colors.textSecondary }]}>{item.label}</Text>
-                <Text style={[styles.itemValue, { color: colors.text }]}>{item.value}</Text>
-              </View>
-              <Feather name="chevron-right" size={14} color={colors.textSecondary} />
-            </TouchableOpacity>
-          ))}
-        </View>
-      </View>
-
-      {/* Notifications */}
-      <View style={styles.section}>
-        <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>Notifications</Text>
-        <View style={[styles.sectionCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-          {[
-            {
-              icon: "bell" as const,
-              label: "Push Notifications",
-              iconColor: colors.primary,
-              value: notifications,
-              onChange: (v: boolean) => { setNotifications(v); Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); },
-              trackTrue: colors.primary,
-              border: true,
-            },
-            {
-              icon: "alert-circle" as const,
-              label: "Critical Alerts",
-              iconColor: colors.destructive,
-              value: criticalAlerts,
-              onChange: (v: boolean) => { setCriticalAlerts(v); Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); },
-              trackTrue: colors.destructive,
-              border: true,
-            },
-            {
-              icon: "mail" as const,
-              label: "Email Digest",
-              iconColor: colors.accent,
-              value: emailDigest,
-              onChange: (v: boolean) => { setEmailDigest(v); Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); },
-              trackTrue: colors.accent,
-              border: false,
-            },
-          ].map((item) => (
-            <View
-              key={item.label}
-              style={[
-                styles.toggleRow,
-                item.border && { borderBottomWidth: 1, borderBottomColor: colors.border },
-              ]}
-            >
-              <View style={styles.toggleInfo}>
-                <Feather name={item.icon} size={16} color={item.iconColor} />
-                <Text style={[styles.toggleLabel, { color: colors.text }]}>{item.label}</Text>
-              </View>
-              <Switch
-                value={item.value}
-                onValueChange={item.onChange}
-                trackColor={{ false: colors.border, true: item.trackTrue }}
-                thumbColor="#fff"
+      <BoltCard style={styles.settings}>
+        <Text style={[styles.sectionTitle, { color: colors.text }]}>Theme</Text>
+        <View style={styles.themeRow}>
+          {(["dark", "light", "system"] as ThemePreference[]).map((preference) => (
+            <View key={preference} style={styles.themeButton}>
+              <BoltButton
+                label={preference[0].toUpperCase() + preference.slice(1)}
+                onPress={() => void setThemePreference(preference)}
+                variant={themePreference === preference ? "primary" : "outline"}
               />
             </View>
           ))}
         </View>
-      </View>
+      </BoltCard>
 
-      {/* Support */}
-      <View style={styles.section}>
-        <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>Support</Text>
-        <View style={[styles.sectionCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-          {[
-            { icon: "help-circle" as const, label: "Help & Documentation" },
-            { icon: "shield" as const, label: "Privacy Policy" },
-            { icon: "file-text" as const, label: "Terms of Service" },
-          ].map((item, idx, arr) => (
-            <TouchableOpacity
-              key={item.label}
-              style={[
-                styles.linkRow,
-                idx < arr.length - 1 && { borderBottomWidth: 1, borderBottomColor: colors.border },
-              ]}
-              activeOpacity={0.7}
-              onPress={() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)}
-            >
-              <Feather name={item.icon} size={16} color={colors.textSecondary} />
-              <Text style={[styles.linkLabel, { color: colors.text }]}>{item.label}</Text>
-              <Feather name="chevron-right" size={14} color={colors.textSecondary} />
-            </TouchableOpacity>
-          ))}
-        </View>
-      </View>
+      <BoltNavCard description="MFA, password policy, audit-aware account controls" icon="shield" route="/(tabs)/security-dashboard" title="Security" />
+      <BoltNavCard description="Theme, privacy, notification, and application preferences" icon="settings" route="/(tabs)/settings" title="Settings" />
+      <BoltNavCard description="Review and revoke active trusted devices" icon="monitor" route="/(tabs)/session-dashboard" title="Active Sessions" />
+      <BoltNavCard description="Live notification center and clinical alerts" icon="bell" route="/(tabs)/notification-center" title="Notifications" />
+      <BoltNavCard description="Subscription plans, quota, billing and license state" icon="credit-card" route="/(tabs)/subscription" title="Subscription" />
+      {user.role === "super_admin" ? (
+        <BoltNavCard description="Protected owner/admin features and revenue controls" icon="shield" route="/admin/" title="Admin Dashboard" />
+      ) : null}
 
-      {/* Sign Out */}
-      <TouchableOpacity
-        style={[styles.logoutBtn, { borderColor: colors.destructive }]}
-        onPress={handleLogout}
-        activeOpacity={0.8}
-      >
-        <Feather name="log-out" size={16} color={colors.destructive} />
-        <Text style={[styles.logoutText, { color: colors.destructive }]}>Sign Out</Text>
-      </TouchableOpacity>
-
-      <Text style={[styles.version, { color: colors.textSecondary }]}>
-        ECG Insight v1.0.0 · Sprint 1 · AI Model v2.4
-      </Text>
-    </ScrollView>
-    </PremiumScreenBackground>
+      <BoltButton icon="log-out" label="Sign Out" onPress={handleLogout} variant="danger" />
+    </BoltScreen>
   );
 }
 
 const styles = StyleSheet.create({
-  flex: { flex: 1 },
-  scroll: { paddingHorizontal: 16, gap: 14 },
-  pageTitle: { fontSize: 22, fontFamily: "Inter_700Bold" },
-  impBanner: {
-    backgroundColor: "#FEF3C7",
-    borderWidth: 1,
-    borderColor: "#FDE68A",
-    borderRadius: 12,
-    padding: 10,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-  },
-  impText: { flex: 1, fontSize: 12, color: "#92400E", fontFamily: "Inter_500Medium" },
-  impStop: { backgroundColor: "#D97706", borderRadius: 8, paddingHorizontal: 10, paddingVertical: 5 },
-  impStopText: { color: "#fff", fontSize: 12, fontFamily: "Inter_600SemiBold" },
-  avatarCard: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 14,
-    padding: 18,
-    borderRadius: 16,
-    borderWidth: 1,
-  },
-  avatar: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  avatarText: { fontSize: 22, fontFamily: "Inter_700Bold", color: "#fff" },
-  avatarInfo: { flex: 1, gap: 4 },
-  avatarName: { fontSize: 16, fontFamily: "Inter_700Bold" },
-  avatarEmail: { fontSize: 12, fontFamily: "Inter_400Regular" },
-  badgeRow: { flexDirection: "row", gap: 6, flexWrap: "wrap" },
-  unverifiedBadge: {
-    backgroundColor: "#FEF3C7",
-    borderRadius: 10,
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-  },
-  unverifiedText: { fontSize: 10, color: "#D97706", fontFamily: "Inter_600SemiBold" },
-  statsRow: { flexDirection: "row", gap: 8 },
-  statBox: {
-    flex: 1,
-    alignItems: "center",
-    padding: 12,
-    borderRadius: 12,
-    borderWidth: 1,
-    gap: 4,
-  },
-  statValue: { fontSize: 18, fontFamily: "Inter_700Bold" },
-  statLabel: { fontSize: 10, fontFamily: "Inter_400Regular", textAlign: "center" },
-  section: { gap: 8 },
-  sectionTitle: {
-    fontSize: 11,
-    fontFamily: "Inter_600SemiBold",
-    textTransform: "uppercase",
-    letterSpacing: 0.6,
-    paddingLeft: 2,
-  },
-  adminBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    padding: 16,
-    borderRadius: 14,
-    borderWidth: 1.5,
-  },
-  adminBtnIcon: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  adminBtnText: { flex: 1, gap: 3 },
-  adminBtnTitle: { fontSize: 14, fontFamily: "Inter_700Bold" },
-  adminBtnSub: { fontSize: 12, fontFamily: "Inter_400Regular" },
-  sectionCard: { borderRadius: 14, borderWidth: 1, overflow: "hidden" },
-  infoRow: { flexDirection: "row", alignItems: "center", gap: 12, padding: 14 },
-  itemIcon: { width: 30, height: 30, borderRadius: 8, alignItems: "center", justifyContent: "center" },
-  itemText: { flex: 1, gap: 1 },
-  itemLabel: { fontSize: 11, fontFamily: "Inter_400Regular" },
-  itemValue: { fontSize: 14, fontFamily: "Inter_500Medium" },
-  subCard: {
-    padding: 16,
-    borderRadius: 14,
-    borderWidth: 1.5,
-    backgroundColor: "transparent",
-  },
-  subRow: { flexDirection: "row", alignItems: "center", gap: 12 },
-  subPlan: { fontSize: 15, fontFamily: "Inter_700Bold" },
-  subDetail: { fontSize: 12, fontFamily: "Inter_400Regular", marginTop: 2 },
-  upgradeBtn: {
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 20,
-  },
-  upgradeBtnText: { color: "#fff", fontSize: 13, fontFamily: "Inter_600SemiBold" },
-  toggleRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    padding: 14,
-  },
-  toggleInfo: { flexDirection: "row", alignItems: "center", gap: 10 },
-  toggleLabel: { fontSize: 14, fontFamily: "Inter_500Medium" },
-  themeChip: { borderRadius: 999, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 8 },
-  themeRow: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 8, paddingHorizontal: 14 },
-  themeText: { fontFamily: "Inter_700Bold", fontSize: 12 },
-  linkRow: { flexDirection: "row", alignItems: "center", gap: 12, padding: 14 },
-  linkLabel: { flex: 1, fontSize: 14, fontFamily: "Inter_500Medium" },
-  logoutBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
-    paddingVertical: 14,
-    borderRadius: 12,
-    borderWidth: 1.5,
-    marginTop: 4,
-  },
-  logoutText: { fontSize: 15, fontFamily: "Inter_600SemiBold" },
-  version: { textAlign: "center", fontSize: 11, fontFamily: "Inter_400Regular" },
+  avatar: { alignItems: "center", borderRadius: 28, height: 56, justifyContent: "center", width: 56 },
+  avatarText: { color: "#fff", fontFamily: "Inter_700Bold", fontSize: 18 },
+  badgeRow: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+  cardHeader: { alignItems: "center", flexDirection: "row", justifyContent: "space-between" },
+  impersonation: { alignItems: "center", flexDirection: "row", gap: 10 },
+  impersonationText: { flex: 1, fontFamily: "Inter_700Bold", fontSize: 13 },
+  meta: { fontFamily: "Inter_400Regular", fontSize: 13, lineHeight: 20 },
+  name: { fontFamily: "Inter_700Bold", fontSize: 19 },
+  profileCard: { alignItems: "center", flexDirection: "row", gap: 14 },
+  profileMain: { flex: 1, gap: 6 },
+  sectionTitle: { fontFamily: "Inter_700Bold", fontSize: 18 },
+  settings: { gap: 10 },
+  statsRow: { flexDirection: "row", gap: 10 },
+  subscription: { gap: 8 },
+  themeButton: { minWidth: 96 },
+  themeRow: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
 });

@@ -170,6 +170,8 @@ function ClassicTabLayout() {
       <Tabs.Screen name="compliance-dashboard" options={{ href: null, title: "Compliance Dashboard" }} />
       <Tabs.Screen name="backup-dashboard" options={{ href: null, title: "Backup Dashboard" }} />
       <Tabs.Screen name="session-dashboard" options={{ href: null, title: "Session Dashboard" }} />
+      <Tabs.Screen name="settings" options={{ href: null, title: "Settings" }} />
+      <Tabs.Screen name="subscription" options={{ href: null, title: "Subscription" }} />
       <Tabs.Screen name="notification-center" options={{ href: null, title: "Notification Center" }} />
       <Tabs.Screen name="sync-dashboard" options={{ href: null, title: "Sync Dashboard" }} />
       <Tabs.Screen name="collaboration-dashboard" options={{ href: null, title: "Collaboration Dashboard" }} />

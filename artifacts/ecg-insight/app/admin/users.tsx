@@ -1,5 +1,4 @@
 import { useAuth } from "@/context/AuthContext";
-import { type ManagedUser } from "@/data/mockData";
 import { useColors } from "@/hooks/useColors";
 import {
   changeSuperAdminUserPlan,
@@ -27,6 +26,18 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 type FilterTab = "all" | "active" | "inactive" | "unverified";
 type CreateRole = "doctor" | "student" | "admin";
+interface ManagedUser {
+  avatarInitials: string;
+  caseCount: number;
+  email: string;
+  emailVerified: boolean;
+  id: string;
+  institution?: string;
+  isActive: boolean;
+  name: string;
+  role: string;
+  subscriptionTier: string;
+}
 type AdminUser = ManagedUser & { isLifetime?: boolean };
 
 function RoleBadge({ role }: { role: string }) {
