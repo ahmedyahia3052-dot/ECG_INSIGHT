@@ -3,7 +3,7 @@ import path from "node:path";
 import { randomUUID } from "node:crypto";
 import multer from "multer";
 import { Router } from "express";
-import type { Prisma } from "@prisma/client";
+import type { Prisma, Role } from "@prisma/client";
 import { z } from "zod";
 import { prisma } from "../../config/prisma";
 import { requireAuth, requireRole } from "../../middleware/auth";
@@ -80,7 +80,7 @@ function reportInclude() {
   } satisfies Prisma.ClinicalReportInclude;
 }
 
-async function reportForAccess(reportId: string, auth: { id: string; role: "SUPER_ADMIN" | "ADMIN" | "DOCTOR" | "STUDENT" }) {
+async function reportForAccess(reportId: string, auth: { id: string; role: Role }) {
   const report = await prisma.clinicalReport.findUnique({
     include: reportInclude(),
     where: { id: reportId },

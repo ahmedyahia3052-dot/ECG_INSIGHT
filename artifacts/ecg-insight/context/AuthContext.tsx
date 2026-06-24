@@ -15,7 +15,7 @@ export interface User {
   avatarInitials: string;
   emailVerified?: boolean;
   isActive?: boolean;
-  subscriptionTier?: "free" | "professional" | "enterprise";
+  subscriptionTier?: "free" | "basic" | "professional" | "unlimited" | "lifetime" | "enterprise";
 }
 
 export interface AuthToken {

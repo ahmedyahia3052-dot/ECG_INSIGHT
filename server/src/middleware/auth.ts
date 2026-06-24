@@ -7,6 +7,7 @@ import { verifyAccessToken } from "../utils/jwt";
 const roleRank: Record<Role, number> = {
   ADMIN: 3,
   DOCTOR: 2,
+  OWNER: 5,
   STUDENT: 1,
   SUPER_ADMIN: 4,
 };
@@ -61,7 +62,8 @@ export function requireRole(...roles: Role[]) {
 
     const effectiveRole = req.auth.role;
     const actorRole = req.auth.actorRole;
-    const hasSuperAdminActor = actorRole === "SUPER_ADMIN" || effectiveRole === "SUPER_ADMIN";
+    const hasSuperAdminActor =
+      actorRole === "OWNER" || actorRole === "SUPER_ADMIN" || effectiveRole === "OWNER" || effectiveRole === "SUPER_ADMIN";
     const hasRequiredRole = roles.some((role) => roleRank[effectiveRole] >= roleRank[role]);
 
     if (!hasSuperAdminActor && !hasRequiredRole) {

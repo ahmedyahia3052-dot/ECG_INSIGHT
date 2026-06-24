@@ -1,11 +1,12 @@
 import type { Role, SubscriptionTier, User } from "@prisma/client";
 
 export type ApiRole = "super_admin" | "admin" | "doctor" | "student";
-export type ApiSubscriptionTier = "free" | "professional" | "enterprise";
+export type ApiSubscriptionTier = "free" | "basic" | "professional" | "unlimited" | "lifetime" | "enterprise";
 
 const roleToApi: Record<Role, ApiRole> = {
   ADMIN: "admin",
   DOCTOR: "doctor",
+  OWNER: "super_admin",
   STUDENT: "student",
   SUPER_ADMIN: "super_admin",
 };
@@ -18,15 +19,21 @@ const roleFromApi: Record<ApiRole, Role> = {
 };
 
 const tierToApi: Record<SubscriptionTier, ApiSubscriptionTier> = {
+  BASIC: "basic",
   ENTERPRISE: "enterprise",
   FREE: "free",
+  LIFETIME: "lifetime",
   PROFESSIONAL: "professional",
+  UNLIMITED: "unlimited",
 };
 
 const tierFromApi: Record<ApiSubscriptionTier, SubscriptionTier> = {
+  basic: "BASIC",
   enterprise: "ENTERPRISE",
   free: "FREE",
+  lifetime: "LIFETIME",
   professional: "PROFESSIONAL",
+  unlimited: "UNLIMITED",
 };
 
 export function toApiRole(role: Role): ApiRole {

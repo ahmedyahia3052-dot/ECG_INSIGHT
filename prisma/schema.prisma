@@ -7,6 +7,7 @@ datasource db {
 }
 
 enum Role {
+  OWNER
   SUPER_ADMIN
   ADMIN
   DOCTOR
@@ -15,7 +16,10 @@ enum Role {
 
 enum SubscriptionTier {
   FREE
+  BASIC
   PROFESSIONAL
+  UNLIMITED
+  LIFETIME
   ENTERPRISE
 }
 
@@ -24,6 +28,57 @@ enum SubscriptionStatus {
   PAST_DUE
   CANCELED
   TRIALING
+  SUSPENDED
+  EXPIRED
+  PENDING_REVIEW
+}
+
+enum BillingCycle {
+  DAILY
+  MONTHLY
+  YEARLY
+  LIFETIME
+}
+
+enum LicenseType {
+  LIFETIME
+  ENTERPRISE_SEAT
+}
+
+enum LicenseStatus {
+  ACTIVE
+  REVOKED
+}
+
+enum PaymentProvider {
+  PAYMOB
+  INSTAPAY
+  WALLET
+  CARD
+  STRIPE
+}
+
+enum PaymentStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  FAILED
+  PAID
+  REFUNDED
+}
+
+enum BillingEventType {
+  SUBSCRIPTION_CREATED
+  SUBSCRIPTION_UPDATED
+  SUBSCRIPTION_CANCELED
+  LICENSE_GRANTED
+  LICENSE_REVOKED
+  PAYMENT_INITIATED
+  PAYMENT_APPROVED
+  PAYMENT_REJECTED
+  QUOTA_WARNING
+  QUOTA_EXHAUSTED
+  USAGE_RECORDED
 }
 
 enum NotificationType {
@@ -537,6 +592,10 @@ enum AuditAction {
   PATIENT_CREATED
   PATIENT_UPDATED
   PATIENT_ARCHIVED
+  SUBSCRIPTION_UPDATED
+  LICENSE_GRANTED
+  PAYMENT_UPDATED
+  USAGE_RECORDED
 }
 
 model User {
@@ -563,6 +622,12 @@ model User {
   updatedAt                   DateTime                  @updatedAt
   sessions                    Session[]
   subscription                Subscription?
+  commercialSubscriptions     UserSubscription[]
+  licenses                    License[]                  @relation("LicenseUser")
+  grantedLicenses             License[]                  @relation("LicenseGrantedBy")
+  payments                    Payment[]
+  usageRecords                UsageRecord[]
+  billingEvents               BillingEvent[]
   notifications               Notification[]
   uploadedCases               ECGCase[]                 @relation("UploadedCases")
   assignedCases               ECGCase[]                 @relation("AssignedCases")
@@ -2059,6 +2124,135 @@ model Subscription {
 
   @@index([tier])
   @@index([status])
+}
+
+model SubscriptionPlan {
+  id                   String             @id @default(cuid())
+  code                 SubscriptionTier   @unique
+  name                 String
+  description          String?
+  priceCents           Int                @default(0)
+  currency             String             @default("USD")
+  analysisQuota        Int?
+  quotaWindowHours     Int?
+  billingCycle         BillingCycle       @default(MONTHLY)
+  multiUser            Boolean            @default(false)
+  teamManagement       Boolean            @default(false)
+  ownerConfigurable    Boolean            @default(true)
+  active               Boolean            @default(true)
+  createdAt            DateTime           @default(now())
+  updatedAt            DateTime           @updatedAt
+  userSubscriptions    UserSubscription[]
+
+  @@index([active])
+}
+
+model UserSubscription {
+  id                 String             @id @default(cuid())
+  userId             String
+  planId             String
+  status             SubscriptionStatus @default(ACTIVE)
+  currentPeriodStart DateTime           @default(now())
+  currentPeriodEnd   DateTime?
+  renewalDate        DateTime?
+  expirationDate     DateTime?
+  cancelAtPeriodEnd  Boolean            @default(false)
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+  user               User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  plan               SubscriptionPlan   @relation(fields: [planId], references: [id])
+  payments           Payment[]
+  usageRecords       UsageRecord[]
+  billingEvents      BillingEvent[]
+
+  @@index([userId])
+  @@index([planId])
+  @@index([status])
+  @@index([renewalDate])
+  @@index([expirationDate])
+}
+
+model License {
+  id          String        @id @default(cuid())
+  userId      String
+  type        LicenseType   @default(LIFETIME)
+  status      LicenseStatus @default(ACTIVE)
+  grantedById String?
+  reason      String?
+  startsAt    DateTime      @default(now())
+  expiresAt   DateTime?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  user        User          @relation("LicenseUser", fields: [userId], references: [id], onDelete: Cascade)
+  grantedBy   User?         @relation("LicenseGrantedBy", fields: [grantedById], references: [id])
+
+  @@index([userId])
+  @@index([status])
+  @@index([type])
+}
+
+model Payment {
+  id                 String            @id @default(cuid())
+  userId             String
+  subscriptionId     String?
+  provider           PaymentProvider
+  status             PaymentStatus     @default(PENDING)
+  amountCents        Int
+  currency           String            @default("USD")
+  transactionId      String?
+  paymentMethod      String?
+  receiptUrl         String?
+  callbackPayload    Json?
+  providerPayload    Json?
+  reviewedById       String?
+  reviewedAt         DateTime?
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
+  user               User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  subscription       UserSubscription? @relation(fields: [subscriptionId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([subscriptionId])
+  @@index([provider])
+  @@index([status])
+  @@index([transactionId])
+}
+
+model UsageRecord {
+  id             String            @id @default(cuid())
+  userId         String
+  subscriptionId String?
+  action         String
+  quantity       Int               @default(1)
+  windowStart    DateTime
+  windowEnd      DateTime
+  metadata       Json?
+  createdAt      DateTime          @default(now())
+  user           User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  subscription   UserSubscription? @relation(fields: [subscriptionId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([subscriptionId])
+  @@index([action])
+  @@index([windowStart])
+  @@index([windowEnd])
+}
+
+model BillingEvent {
+  id             String            @id @default(cuid())
+  userId         String?
+  subscriptionId String?
+  type           BillingEventType
+  message        String
+  metadata       Json?
+  createdAt      DateTime          @default(now())
+  user           User?             @relation(fields: [userId], references: [id], onDelete: SetNull)
+  subscription   UserSubscription? @relation(fields: [subscriptionId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([subscriptionId])
+  @@index([type])
+  @@index([createdAt])
 }
 
 model Notification {

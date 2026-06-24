@@ -20,6 +20,14 @@ const users: Array<{
   institution?: string;
 }> = [
   {
+    avatarInitials: "OW",
+    email: "owner@ecginsight.com",
+    institution: "ECG Insight Owner",
+    name: "ECG Insight Owner",
+    role: "OWNER",
+    tier: "ENTERPRISE",
+  },
+  {
     avatarInitials: "SA",
     email: "super@ecginsight.com",
     institution: "ECG Insight Dev",
@@ -73,6 +81,39 @@ const knowledgeCategories: Array<{ name: KnowledgeCategoryName; title: string }>
 
 async function main() {
   const passwordHash = await bcrypt.hash("password", 12);
+
+  await Promise.all([
+    prisma.subscriptionPlan.upsert({
+      create: { analysisQuota: 5, billingCycle: "DAILY", code: "FREE", description: "5 ECG analyses every 24 hours.", name: "Free", priceCents: 0, quotaWindowHours: 24 },
+      update: {},
+      where: { code: "FREE" },
+    }),
+    prisma.subscriptionPlan.upsert({
+      create: { analysisQuota: 100, code: "BASIC", description: "100 ECG analyses per month.", name: "Basic", priceCents: 1900, quotaWindowHours: 720 },
+      update: {},
+      where: { code: "BASIC" },
+    }),
+    prisma.subscriptionPlan.upsert({
+      create: { analysisQuota: 500, code: "PROFESSIONAL", description: "500 ECG analyses per month.", name: "Professional", priceCents: 4900, quotaWindowHours: 720 },
+      update: {},
+      where: { code: "PROFESSIONAL" },
+    }),
+    prisma.subscriptionPlan.upsert({
+      create: { analysisQuota: null, code: "UNLIMITED", description: "Unlimited ECG analyses.", name: "Unlimited", priceCents: 9900, quotaWindowHours: 720 },
+      update: {},
+      where: { code: "UNLIMITED" },
+    }),
+    prisma.subscriptionPlan.upsert({
+      create: { analysisQuota: null, billingCycle: "LIFETIME", code: "LIFETIME", description: "Owner-granted permanent unlimited access.", name: "Lifetime", priceCents: 0, quotaWindowHours: null },
+      update: {},
+      where: { code: "LIFETIME" },
+    }),
+    prisma.subscriptionPlan.upsert({
+      create: { analysisQuota: null, code: "ENTERPRISE", description: "Unlimited analyses with team management.", multiUser: true, name: "Enterprise", priceCents: 19900, quotaWindowHours: 720, teamManagement: true },
+      update: {},
+      where: { code: "ENTERPRISE" },
+    }),
+  ]);
 
   for (const user of users) {
     await prisma.user.upsert({

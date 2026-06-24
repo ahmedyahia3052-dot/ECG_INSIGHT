@@ -1,14 +1,66 @@
 import { Router } from "express";
+import type { Prisma } from "@prisma/client";
 import { prisma } from "../config/prisma";
 import { requireAuth, requireRole } from "../middleware/auth";
 import { AppError } from "../middleware/error";
 import { validateBody } from "../middleware/validate";
 import { fromApiTier, serializeUser, toApiTier } from "../utils/users";
-import { updateSubscriptionSchema } from "./schemas";
+import {
+  activateSubscriptionSchema,
+  createPlanSchema,
+  grantLicenseSchema,
+  initiatePaymentSchema,
+  planSchema,
+  receiptSchema,
+  reviewPaymentSchema,
+  updateSubscriptionSchema,
+  verifyPaymentSchema,
+} from "./schemas";
+import {
+  activateUserPlan,
+  ensureDefaultPlans,
+  grantLifetimeLicense,
+  initiatePayment,
+  ownerAnalytics,
+  quotaSnapshot,
+  subscriptionSummary,
+} from "./monetization.service";
 
 export const subscriptionsRouter = Router();
 
 subscriptionsRouter.use(requireAuth);
+
+const ownerRole = requireRole("SUPER_ADMIN");
+
+function serializePlan(plan: {
+  active: boolean;
+  analysisQuota: number | null;
+  billingCycle: string;
+  code: Parameters<typeof toApiTier>[0];
+  currency: string;
+  description: string | null;
+  id: string;
+  multiUser: boolean;
+  name: string;
+  priceCents: number;
+  quotaWindowHours: number | null;
+  teamManagement: boolean;
+}) {
+  return {
+    active: plan.active,
+    analysisQuota: plan.analysisQuota,
+    billingCycle: plan.billingCycle,
+    code: toApiTier(plan.code),
+    currency: plan.currency,
+    description: plan.description,
+    id: plan.id,
+    multiUser: plan.multiUser,
+    name: plan.name,
+    priceCents: plan.priceCents,
+    quotaWindowHours: plan.quotaWindowHours,
+    teamManagement: plan.teamManagement,
+  };
+}
 
 subscriptionsRouter.get("/", requireRole("ADMIN"), async (_req, res, next) => {
   try {
@@ -29,6 +81,199 @@ subscriptionsRouter.get("/", requireRole("ADMIN"), async (_req, res, next) => {
         userId: subscription.userId,
       })),
     });
+  } catch (error) {
+    next(error);
+  }
+});
+
+subscriptionsRouter.get("/plans", async (_req, res, next) => {
+  try {
+    await ensureDefaultPlans();
+    const plans = await prisma.subscriptionPlan.findMany({ orderBy: { priceCents: "asc" } });
+    res.json({ plans: plans.map(serializePlan) });
+  } catch (error) {
+    next(error);
+  }
+});
+
+subscriptionsRouter.post("/plans", ownerRole, validateBody(createPlanSchema), async (req, res, next) => {
+  try {
+    const plan = await prisma.subscriptionPlan.upsert({
+      create: {
+        active: req.body.active ?? true,
+        analysisQuota: req.body.analysisQuota,
+        code: fromApiTier(req.body.code),
+        currency: req.body.currency ?? "USD",
+        description: req.body.description,
+        multiUser: req.body.multiUser ?? false,
+        name: req.body.name,
+        priceCents: req.body.priceCents ?? 0,
+        quotaWindowHours: req.body.quotaWindowHours,
+        teamManagement: req.body.teamManagement ?? false,
+      },
+      update: {
+        active: req.body.active,
+        analysisQuota: req.body.analysisQuota,
+        currency: req.body.currency,
+        description: req.body.description,
+        multiUser: req.body.multiUser,
+        name: req.body.name,
+        priceCents: req.body.priceCents,
+        quotaWindowHours: req.body.quotaWindowHours,
+        teamManagement: req.body.teamManagement,
+      },
+      where: { code: fromApiTier(req.body.code) },
+    });
+    res.status(201).json({ plan: serializePlan(plan) });
+  } catch (error) {
+    next(error);
+  }
+});
+
+subscriptionsRouter.patch("/plans/:planId", ownerRole, validateBody(planSchema), async (req, res, next) => {
+  try {
+    const plan = await prisma.subscriptionPlan.update({
+      data: req.body,
+      where: { id: String(req.params.planId) },
+    });
+    res.json({ plan: serializePlan(plan) });
+  } catch (error) {
+    next(error);
+  }
+});
+
+subscriptionsRouter.get("/me", async (req, res, next) => {
+  try {
+    const [summary, quota, billingHistory, payments] = await Promise.all([
+      subscriptionSummary(req.auth!.id),
+      quotaSnapshot(req.auth!.id),
+      prisma.billingEvent.findMany({ orderBy: { createdAt: "desc" }, take: 20, where: { userId: req.auth!.id } }),
+      prisma.payment.findMany({ orderBy: { createdAt: "desc" }, take: 20, where: { userId: req.auth!.id } }),
+    ]);
+    res.json({
+      billingHistory,
+      payments,
+      plan: serializePlan(summary.plan),
+      quota: {
+        canAnalyze: quota.canAnalyze,
+        nextResetAt: quota.nextResetAt,
+        quota: quota.quota,
+        remaining: quota.remaining,
+        used: quota.used,
+        warning: quota.warning,
+      },
+      subscription: summary.subscription,
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+subscriptionsRouter.get("/analytics", ownerRole, async (_req, res, next) => {
+  try {
+    res.json({ analytics: await ownerAnalytics() });
+  } catch (error) {
+    next(error);
+  }
+});
+
+subscriptionsRouter.post("/licenses/lifetime", ownerRole, validateBody(grantLicenseSchema), async (req, res, next) => {
+  try {
+    const user = await prisma.user.findUnique({ where: { id: req.body.userId } });
+    if (!user) throw new AppError(404, "User not found.", "USER_NOT_FOUND");
+    const license = await grantLifetimeLicense(user.id, req.auth!.id, req.body.reason);
+    await prisma.subscription.upsert({
+      create: { status: "ACTIVE", tier: "LIFETIME", userId: user.id },
+      update: { status: "ACTIVE", tier: "LIFETIME" },
+      where: { userId: user.id },
+    });
+    res.status(201).json({ license });
+  } catch (error) {
+    next(error);
+  }
+});
+
+subscriptionsRouter.get("/licenses", ownerRole, async (_req, res, next) => {
+  try {
+    const licenses = await prisma.license.findMany({ include: { user: true }, orderBy: { createdAt: "desc" } });
+    res.json({ licenses });
+  } catch (error) {
+    next(error);
+  }
+});
+
+subscriptionsRouter.post("/activate", ownerRole, validateBody(activateSubscriptionSchema), async (req, res, next) => {
+  try {
+    const subscription = await activateUserPlan(req.body.userId, fromApiTier(req.body.plan));
+    res.status(201).json({ subscription });
+  } catch (error) {
+    next(error);
+  }
+});
+
+subscriptionsRouter.post("/payments/initiate", validateBody(initiatePaymentSchema), async (req, res, next) => {
+  try {
+    const result = await initiatePayment(req.auth!.id, fromApiTier(req.body.plan), req.body.provider);
+    res.status(201).json(result);
+  } catch (error) {
+    next(error);
+  }
+});
+
+subscriptionsRouter.post("/payments/:paymentId/receipt", validateBody(receiptSchema), async (req, res, next) => {
+  try {
+    const payment = await prisma.payment.update({
+      data: { receiptUrl: req.body.receiptUrl, status: "PENDING" },
+      where: { id: String(req.params.paymentId), userId: req.auth!.id },
+    });
+    res.json({ payment });
+  } catch (error) {
+    next(error);
+  }
+});
+
+subscriptionsRouter.post("/payments/:paymentId/review", ownerRole, validateBody(reviewPaymentSchema), async (req, res, next) => {
+  try {
+    const payment = await prisma.payment.findUnique({ where: { id: String(req.params.paymentId) } });
+    if (!payment) throw new AppError(404, "Payment not found.", "PAYMENT_NOT_FOUND");
+    const approved = req.body.decision === "approve";
+    const updated = await prisma.payment.update({
+      data: {
+        callbackPayload: { decision: req.body.decision, reason: req.body.reason } as Prisma.InputJsonObject,
+        reviewedAt: new Date(),
+        reviewedById: req.auth!.id,
+        status: approved ? "APPROVED" : "REJECTED",
+      },
+      where: { id: payment.id },
+    });
+    if (approved && req.body.plan) {
+      await activateUserPlan(payment.userId, fromApiTier(req.body.plan));
+      await prisma.notification.create({
+        data: { message: "Your payment was approved and subscription is active.", title: "Payment approved", type: "SUCCESS", userId: payment.userId },
+      });
+    } else if (!approved) {
+      await prisma.notification.create({
+        data: { message: req.body.reason ?? "Your payment receipt was rejected.", title: "Payment rejected", type: "WARNING", userId: payment.userId },
+      });
+    }
+    res.json({ payment: updated });
+  } catch (error) {
+    next(error);
+  }
+});
+
+subscriptionsRouter.post("/payments/paymob/webhook", validateBody(verifyPaymentSchema), async (req, res, next) => {
+  try {
+    const transactionId = typeof req.body["transactionId"] === "string" ? req.body["transactionId"] : undefined;
+    if (!transactionId) throw new AppError(400, "Paymob transaction id is required.", "TRANSACTION_REQUIRED");
+    const payment = await prisma.payment.findFirst({ where: { transactionId } });
+    if (!payment) throw new AppError(404, "Payment not found.", "PAYMENT_NOT_FOUND");
+    const status = req.body["success"] === true || req.body["status"] === "PAID" ? "PAID" : "FAILED";
+    const updated = await prisma.payment.update({
+      data: { callbackPayload: req.body as Prisma.InputJsonObject, status },
+      where: { id: payment.id },
+    });
+    res.json({ payment: updated });
   } catch (error) {
     next(error);
   }
