@@ -1,7 +1,7 @@
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { useRouter } from "expo-router";
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   Alert,
   Platform,
@@ -17,6 +17,7 @@ import { useAuth } from "@/context/AuthContext";
 import { useColors } from "@/hooks/useColors";
 import { RoleBadge } from "@/components/ui/Badge";
 import { getDashboardStats } from "@/data/mockData";
+import { getMySubscription, type MySubscription } from "@/services/subscriptions";
 
 const ROLE_LABEL: Record<string, string> = {
   super_admin: "Super Admin",
@@ -29,7 +30,8 @@ export default function ProfileScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { user, logout, canAccess, isImpersonating, stopImpersonation } = useAuth();
+  const { user, authToken, logout, canAccess, isImpersonating, stopImpersonation } = useAuth();
+  const [subscription, setSubscription] = useState<MySubscription | null>(null);
   const [notifications, setNotifications] = useState(true);
   const [criticalAlerts, setCriticalAlerts] = useState(true);
   const [emailDigest, setEmailDigest] = useState(false);
@@ -40,6 +42,11 @@ export default function ProfileScreen() {
   const stats = user
     ? getDashboardStats(user.id)
     : { totalCases: 0, thisWeek: 0, accuracyRate: 95, criticalAlerts: 0 };
+
+  useEffect(() => {
+    if (!authToken?.token) return;
+    getMySubscription(authToken.token).then(setSubscription).catch(() => setSubscription(null));
+  }, [authToken?.token]);
 
   const handleLogout = () => {
     Alert.alert("Sign Out", "Are you sure you want to sign out?", [
@@ -198,19 +205,17 @@ export default function ProfileScreen() {
             </Text>
             <View style={{ flex: 1 }}>
               <Text style={[styles.subPlan, { color: colors.text }]}>
-                {user.role === "super_admin" || user.role === "admin"
-                  ? "Enterprise"
-                  : user.role === "doctor"
-                  ? "Professional"
-                  : "Free Plan"}
+                {subscription?.lifetimeAccess.granted
+                  ? "Special Lifetime Access Granted by Administrator"
+                  : subscription?.plan.name ?? `${(user.subscriptionTier ?? "free").replace("_", " ")} Plan`}
               </Text>
               <Text style={[styles.subDetail, { color: colors.textSecondary }]}>
-                {user.role === "student"
-                  ? "Upgrade for unlimited analyses"
-                  : "Active · Renews annually"}
+                {subscription?.lifetimeAccess.granted
+                  ? "Unlimited ECG Analyses · No Expiration Date"
+                  : `${subscription?.quota.remaining ?? 0} analyses remaining · Resets ${subscription?.quota.nextResetAt?.slice(0, 10) ?? "soon"}`}
               </Text>
             </View>
-            {user.role === "student" && (
+            {user.role === "student" && !subscription?.lifetimeAccess.granted && (
               <TouchableOpacity
                 style={[styles.upgradeBtn, { backgroundColor: colors.primary }]}
               >

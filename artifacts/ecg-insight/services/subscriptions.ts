@@ -1,6 +1,6 @@
 import { apiRequest } from "./api";
 
-export type SubscriptionPlanCode = "basic" | "enterprise" | "free" | "lifetime" | "professional" | "unlimited";
+export type SubscriptionPlanCode = "basic" | "enterprise" | "free" | "professional";
 
 export interface SubscriptionPlan {
   active: boolean;
@@ -48,8 +48,28 @@ export async function listLicenses(accessToken: string) {
   return apiRequest<{ licenses: LicenseRecord[] }>("/subscriptions/licenses", { accessToken });
 }
 
+export interface MySubscription {
+  lifetimeAccess: {
+    granted: boolean;
+    grantedAt?: string | null;
+    grantedBy?: string | null;
+    message?: string | null;
+    noExpiration: boolean;
+    unlimitedAnalyses: boolean;
+  };
+  plan: SubscriptionPlan;
+  quota: {
+    canAnalyze: boolean;
+    nextResetAt: string;
+    quota: number | null;
+    remaining: number | null;
+    used: number;
+    warning: boolean;
+  };
+}
+
 export async function getMySubscription(accessToken: string) {
-  return apiRequest<unknown>("/subscriptions/me", { accessToken });
+  return apiRequest<MySubscription>("/subscriptions/me", { accessToken });
 }
 
 export async function activateSubscription(accessToken: string, userId: string, plan: SubscriptionPlanCode) {
@@ -60,10 +80,3 @@ export async function activateSubscription(accessToken: string, userId: string, 
   });
 }
 
-export async function grantLifetimeLicense(accessToken: string, userId: string, reason?: string) {
-  return apiRequest<unknown>("/subscriptions/licenses/lifetime", {
-    accessToken,
-    body: JSON.stringify({ reason, userId }),
-    method: "POST",
-  });
-}

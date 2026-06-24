@@ -41,7 +41,7 @@ async function cleanupUsers(userIds: string[]) {
   await prisma.paymentTransaction.deleteMany({ where: { userId: { in: userIds } } });
   await prisma.billingEvent.deleteMany({ where: { userId: { in: userIds } } });
   await prisma.usageRecord.deleteMany({ where: { userId: { in: userIds } } });
-  await prisma.license.deleteMany({ where: { OR: [{ userId: { in: userIds } }, { grantedById: { in: userIds } }] } });
+  await prisma.license.deleteMany({ where: { OR: [{ userId: { in: userIds } }, { grantedById: { in: userIds } }, { revokedById: { in: userIds } }] } });
   await prisma.userSubscription.deleteMany({ where: { userId: { in: userIds } } });
   await prisma.session.deleteMany({ where: { userId: { in: userIds } } });
   await prisma.auditLog.deleteMany({ where: { OR: [{ actorId: { in: userIds } }, { entityId: { in: userIds } }] } });
@@ -76,8 +76,8 @@ async function main() {
     return { body: parsed, status: response.status };
   }
 
-  async function login(email: string): Promise<Session> {
-    const response = await request("/auth/login", { body: { email, password: "password", rememberMe: true }, method: "POST" });
+  async function login(email: string, password = "password"): Promise<Session> {
+    const response = await request("/auth/login", { body: { email, password, rememberMe: true }, method: "POST" });
     assert(response.status === 200, `Login failed for ${email}.`);
     const body = response.body as { accessToken: string; user: { id: string } };
     return { token: body.accessToken, user: body.user };
@@ -92,6 +92,29 @@ async function main() {
   response = await request("/super-admin/dashboard", { token: admin.token });
   assert(response.status === 200, "Super admin dashboard should be accessible.");
   assert((response.body as { dashboard: { totalUsers: number } }).dashboard.totalUsers >= 2, "Dashboard total users missing.");
+
+  response = await request("/subscriptions/plans", { token: doctor.token });
+  assert(response.status === 200, "Public plan list should load.");
+  assert(!(response.body as { plans: Array<{ code: string }> }).plans.some((plan) => plan.code === "lifetime"), "Lifetime must be hidden from public plans.");
+
+  response = await request("/subscriptions/plans", { token: admin.token });
+  assert(response.status === 200, "Super admin plan list should load.");
+  assert((response.body as { plans: Array<{ code: string }> }).plans.some((plan) => plan.code === "lifetime"), "Super admin should be able to inspect internal lifetime plan.");
+
+  response = await request("/subscriptions/payments/initiate", { body: { plan: "lifetime", provider: "CARD" }, method: "POST", token: doctor.token });
+  assert(response.status === 403, "Normal users must not initiate lifetime purchase attempts.");
+
+  response = await request("/subscriptions/licenses/lifetime", { body: { userId: doctorUser.id }, method: "POST", token: doctor.token });
+  assert(response.status === 403, "Normal users must not grant lifetime.");
+
+  const registeredEmail = `s20-register-${stamp}@ecg.test`;
+  response = await request("/auth/register", {
+    body: { email: registeredEmail, name: "Sprint 20 Registered Doctor", password: "Register123!", role: "doctor" },
+    method: "POST",
+  });
+  assert(response.status === 201, "Registration should succeed.");
+  const registeredUser = await prisma.user.findUniqueOrThrow({ include: { subscription: true }, where: { email: registeredEmail } });
+  assert(registeredUser.subscription?.tier === "FREE", "Newly registered users must default to FREE.");
 
   response = await request("/super-admin/plans", {
     body: { currency: "USD", features: ["Quota", "Billing"], isActive: true, monthlyQuota: 500, name: "Pro", plan: "PRO", price: 4900 },
@@ -111,6 +134,26 @@ async function main() {
   const lifetimeQuota = await quotaSnapshot(doctorUser.id);
   assert(lifetimeQuota.isUnlimited, "Lifetime user should ignore quota engine.");
 
+  response = await request("/subscriptions/me", { token: doctor.token });
+  assert(response.status === 200, "Subscription status should load.");
+  const subscriptionStatus = response.body as { lifetimeAccess: { granted: boolean; message: string | null; noExpiration: boolean; unlimitedAnalyses: boolean } };
+  assert(subscriptionStatus.lifetimeAccess.granted, "Lifetime grant should appear in account status.");
+  assert(subscriptionStatus.lifetimeAccess.unlimitedAnalyses && subscriptionStatus.lifetimeAccess.noExpiration, "Lifetime UX metadata missing.");
+
+  response = await request(`/super-admin/users/${doctorUser.id}/lifetime`, { method: "DELETE", token: admin.token });
+  assert(response.status === 200, "Lifetime revoke failed.");
+  const revokedQuota = await quotaSnapshot(doctorUser.id);
+  assert(!revokedQuota.isUnlimited, "Revoked lifetime user should no longer be unlimited.");
+
+  const registeredSession = await login(registeredEmail, "Register123!");
+  response = await request("/auth/change-password", {
+    body: { currentPassword: "Register123!", newPassword: "Changed123!" },
+    method: "POST",
+    token: registeredSession.token,
+  });
+  assert(response.status === 204, "Password change should succeed.");
+  await login(registeredEmail, "Changed123!");
+
   response = await request("/super-admin/payments", {
     body: { amount: 12000, currency: "USD", paymentMethod: "Visa", referenceNumber: `REF-${stamp}`, status: "SUCCESS", userId: doctorUser.id },
     method: "POST",
@@ -127,7 +170,7 @@ async function main() {
   assert(auditBody.logs.some((log) => log.message.includes("Super Admin action")), "Admin audit action not recorded.");
 
   await new Promise<void>((resolve, reject) => server.close((error) => (error ? reject(error) : resolve())));
-  await cleanupUsers([superUser.id, doctorUser.id]);
+  await cleanupUsers([superUser.id, doctorUser.id, registeredUser.id]);
   console.log("Super admin integration test passed.");
 }
 

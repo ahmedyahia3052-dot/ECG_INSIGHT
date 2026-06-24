@@ -56,12 +56,20 @@ export async function deleteSuperAdminUser(accessToken: string, userId: string) 
   return apiRequest<void>(`/super-admin/users/${userId}`, { accessToken, method: "DELETE" });
 }
 
-export async function changeSuperAdminUserPlan(accessToken: string, userId: string, plan: "ENTERPRISE" | "FREE" | "LIFETIME" | "PRO") {
+export async function changeSuperAdminUserPlan(accessToken: string, userId: string, plan: "BASIC" | "ENTERPRISE" | "FREE" | "PRO") {
   return apiRequest<unknown>(`/super-admin/users/${userId}/plan`, { accessToken, body: JSON.stringify({ plan }), method: "POST" });
 }
 
 export async function grantSuperAdminLifetime(accessToken: string, userId: string) {
   return apiRequest<unknown>(`/super-admin/users/${userId}/lifetime`, { accessToken, method: "POST" });
+}
+
+export async function revokeSuperAdminLifetime(accessToken: string, userId: string) {
+  return apiRequest<unknown>(`/super-admin/users/${userId}/lifetime`, { accessToken, method: "DELETE" });
+}
+
+export async function extendSuperAdminSubscription(accessToken: string, userId: string, months: number) {
+  return apiRequest<unknown>(`/super-admin/users/${userId}/subscription/extend`, { accessToken, body: JSON.stringify({ months }), method: "POST" });
 }
 
 export async function listSuperAdminPlans(accessToken: string) {
@@ -74,7 +82,7 @@ export async function upsertSuperAdminPlan(accessToken: string, plan: {
   isActive: boolean;
   monthlyQuota?: number | null;
   name: string;
-  plan: "ENTERPRISE" | "FREE" | "LIFETIME" | "PRO";
+  plan: "BASIC" | "ENTERPRISE" | "FREE" | "PRO";
   price: number;
 }) {
   return apiRequest<unknown>("/super-admin/plans", { accessToken, body: JSON.stringify(plan), method: "POST" });

@@ -217,7 +217,13 @@ export async function grantLifetimeLicense(userId: string, grantedById: string, 
     data: { grantedById, reason, status: "ACTIVE", type: "LIFETIME", userId },
   });
   await prisma.user.update({
-    data: { isLifetime: true, lifetimeGrantedAt: new Date(), lifetimeGrantedBy: grantedById },
+    data: {
+      isLifetime: true,
+      lifetimeGrantedAt: new Date(),
+      lifetimeGrantedBy: grantedById,
+      lifetimeRevokedAt: null,
+      lifetimeRevokedBy: null,
+    },
     where: { id: userId },
   });
   await createBillingEvent({
@@ -228,6 +234,31 @@ export async function grantLifetimeLicense(userId: string, grantedById: string, 
   });
   await notifyUser(userId, "Lifetime license activated", "Your ECG Insight lifetime license is now active.", "SUCCESS");
   return license;
+}
+
+export async function revokeLifetimeLicense(userId: string, revokedById: string, reason?: string) {
+  const now = new Date();
+  const result = await prisma.license.updateMany({
+    data: { revokedAt: now, revokedById, status: "REVOKED" },
+    where: { status: "ACTIVE", type: "LIFETIME", userId },
+  });
+  await prisma.user.update({
+    data: { isLifetime: false, lifetimeRevokedAt: now, lifetimeRevokedBy: revokedById },
+    where: { id: userId },
+  });
+  await prisma.subscription.upsert({
+    create: { status: "ACTIVE", tier: "FREE", userId },
+    update: { status: "ACTIVE", tier: "FREE" },
+    where: { userId },
+  });
+  await createBillingEvent({
+    message: "Lifetime license revoked.",
+    metadata: { reason, revokedById },
+    type: "LICENSE_REVOKED",
+    userId,
+  });
+  await notifyUser(userId, "Lifetime access revoked", "Your special lifetime access was revoked by an administrator.", "WARNING");
+  return { revokedCount: result.count };
 }
 
 export async function activateUserPlan(userId: string, planCode: SubscriptionTier) {

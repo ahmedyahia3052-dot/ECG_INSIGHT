@@ -15,7 +15,10 @@ export interface User {
   avatarInitials: string;
   emailVerified?: boolean;
   isActive?: boolean;
-  subscriptionTier?: "free" | "basic" | "professional" | "unlimited" | "lifetime" | "enterprise";
+  isLifetime?: boolean;
+  lifetimeGrantedAt?: string;
+  lifetimeGrantedBy?: string;
+  subscriptionTier?: "free" | "basic" | "professional" | "enterprise";
 }
 
 export interface AuthToken {

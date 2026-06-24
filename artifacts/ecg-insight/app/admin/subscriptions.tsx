@@ -67,7 +67,7 @@ export default function SubscriptionsScreen() {
           getSubscriptionAnalytics(authToken.token),
           listLicenses(authToken.token),
         ]);
-        setPlans(plansPayload.plans);
+        setPlans(plansPayload.plans.filter((plan) => String(plan.code) !== "lifetime"));
         setAnalytics(analyticsPayload.analytics);
         setLicenses(licensesPayload.licenses);
       } catch (loadError) {

@@ -609,6 +609,7 @@ enum AuditAction {
   PATIENT_ARCHIVED
   SUBSCRIPTION_UPDATED
   LICENSE_GRANTED
+  LICENSE_REVOKED
   PAYMENT_UPDATED
   USAGE_RECORDED
 }
@@ -627,6 +628,8 @@ model User {
   isLifetime                  Boolean                   @default(false)
   lifetimeGrantedAt           DateTime?
   lifetimeGrantedBy           String?
+  lifetimeRevokedAt           DateTime?
+  lifetimeRevokedBy           String?
   emailVerified               Boolean                   @default(false)
   emailVerificationTokenHash  String?
   emailVerificationExpiresAt  DateTime?
@@ -643,6 +646,7 @@ model User {
   commercialSubscriptions     UserSubscription[]
   licenses                    License[]                  @relation("LicenseUser")
   grantedLicenses             License[]                  @relation("LicenseGrantedBy")
+  revokedLicenses             License[]                  @relation("LicenseRevokedBy")
   payments                    Payment[]
   paymentTransactions         PaymentTransaction[]
   giftLicenses                GiftLicense[]             @relation("GiftLicenseUser")
@@ -2205,13 +2209,16 @@ model License {
   type        LicenseType   @default(LIFETIME)
   status      LicenseStatus @default(ACTIVE)
   grantedById String?
+  revokedById String?
   reason      String?
   startsAt    DateTime      @default(now())
   expiresAt   DateTime?
+  revokedAt   DateTime?
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt
   user        User          @relation("LicenseUser", fields: [userId], references: [id], onDelete: Cascade)
   grantedBy   User?         @relation("LicenseGrantedBy", fields: [grantedById], references: [id])
+  revokedBy   User?         @relation("LicenseRevokedBy", fields: [revokedById], references: [id])
 
   @@index([userId])
   @@index([status])

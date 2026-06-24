@@ -14,7 +14,7 @@ export default function PlanManagementScreen() {
 
   async function reload() {
     if (!authToken?.token) return;
-    setPlans((await listSuperAdminPlans(authToken.token)).plans);
+    setPlans((await listSuperAdminPlans(authToken.token)).plans.filter((plan) => plan.plan !== "lifetime"));
   }
 
   useEffect(() => {
@@ -48,7 +48,7 @@ export default function PlanManagementScreen() {
     <SafeAreaView style={styles.container} edges={["bottom"]}>
       <ScrollView contentContainerStyle={styles.content}>
         <Text style={styles.title}>Plan Management</Text>
-        <Text style={{ color: colors.textSecondary, marginBottom: 12 }}>Create, edit, activate, and deactivate FREE, PRO, ENTERPRISE, and LIFETIME plans.</Text>
+        <Text style={{ color: colors.textSecondary, marginBottom: 12 }}>Create, edit, activate, and deactivate FREE, BASIC, PRO, and ENTERPRISE plans. Lifetime access is managed privately from user details.</Text>
         {message ? <Text style={{ color: colors.primary, marginBottom: 12 }}>{message}</Text> : null}
         <TextInput style={styles.input} value={price} onChangeText={setPrice} keyboardType="number-pad" placeholder="Pro price cents" placeholderTextColor={colors.textSecondary} />
         <Pressable onPress={saveProPlan} style={{ backgroundColor: colors.primary, borderRadius: colors.radius.md, marginBottom: 16, padding: 14 }}>

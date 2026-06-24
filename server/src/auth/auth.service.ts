@@ -177,7 +177,7 @@ export async function registerUser(
       specialization: body.specialization,
       subscription: {
         create: {
-          tier: body.role === "doctor" ? "PROFESSIONAL" : "FREE",
+          tier: "FREE",
           status: "ACTIVE",
         },
       },
@@ -453,4 +453,31 @@ export async function verifyEmail(body: { email: string; token: string }) {
     },
     where: { id: user.id },
   });
+}
+
+export async function changeOwnPassword(userId: string, body: { currentPassword: string; newPassword: string }) {
+  assertPasswordPolicy(body.newPassword);
+  const user = await prisma.user.findUnique({ where: { id: userId } });
+  if (!user || !(await verifyPassword(body.currentPassword, user.passwordHash))) {
+    throw new AppError(400, "Current password is incorrect.", "CURRENT_PASSWORD_INVALID");
+  }
+  await prisma.user.update({
+    data: {
+      forcePasswordReset: false,
+      passwordChangedAt: new Date(),
+      passwordHash: await hashPassword(body.newPassword),
+      sessions: { updateMany: { data: { revokedAt: new Date() }, where: { revokedAt: null } } },
+    },
+    where: { id: userId },
+  });
+  const updated = await prisma.user.findUnique({ where: { id: userId } });
+  if (updated) {
+    await prisma.passwordHistory.create({
+      data: {
+        expiresAt: new Date(Date.now() + PASSWORD_MAX_AGE_DAYS * 24 * 60 * 60 * 1000),
+        passwordHash: updated.passwordHash,
+        userId,
+      },
+    });
+  }
 }

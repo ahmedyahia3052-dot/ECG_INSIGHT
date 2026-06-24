@@ -7,7 +7,7 @@ import { requireAuth } from "../../middleware/auth";
 import { AppError } from "../../middleware/error";
 import { hashPassword, initialsForName } from "../../utils/crypto";
 import { fromApiRole, serializeUser, toApiTier } from "../../utils/users";
-import { activateUserPlan, grantLifetimeLicense } from "../../subscriptions/monetization.service";
+import { activateUserPlan, grantLifetimeLicense, revokeLifetimeLicense } from "../../subscriptions/monetization.service";
 
 export const superAdminRouter = Router();
 
@@ -35,6 +35,8 @@ async function auditAdminAction(input: {
       action:
         input.action === "GRANT_LICENSE"
           ? "LICENSE_GRANTED"
+          : input.action === "REVOKE_LICENSE"
+            ? "LICENSE_REVOKED"
           : input.action === "CHANGE_PLAN"
             ? "SUBSCRIPTION_UPDATED"
             : input.action === "PAYMENT_UPDATED"
@@ -272,7 +274,7 @@ superAdminRouter.delete("/users/:userId", async (req, res, next) => {
   }
 });
 
-const changePlanSchema = z.object({ plan: z.enum(["FREE", "PRO", "PROFESSIONAL", "ENTERPRISE", "LIFETIME"]) });
+const changePlanSchema = z.object({ plan: z.enum(["BASIC", "FREE", "PRO", "PROFESSIONAL", "ENTERPRISE"]) });
 
 superAdminRouter.post("/users/:userId/plan", async (req, res, next) => {
   try {
@@ -295,13 +297,49 @@ superAdminRouter.post("/users/:userId/lifetime", async (req, res, next) => {
   }
 });
 
+superAdminRouter.delete("/users/:userId/lifetime", async (req, res, next) => {
+  try {
+    const result = await revokeLifetimeLicense(String(req.params.userId), req.auth!.id, "Super Admin lifetime revoke");
+    await auditAdminAction({ action: "REVOKE_LICENSE", actorId: req.auth!.id, targetId: String(req.params.userId), targetType: "User" });
+    res.json(result);
+  } catch (error) {
+    next(error);
+  }
+});
+
+const extendSubscriptionSchema = z.object({ months: z.number().int().min(1).max(36).default(1) });
+
+superAdminRouter.post("/users/:userId/subscription/extend", async (req, res, next) => {
+  try {
+    const { months } = extendSubscriptionSchema.parse(req.body);
+    const userId = String(req.params.userId);
+    const subscription = await prisma.userSubscription.findFirst({
+      include: { plan: true },
+      orderBy: { updatedAt: "desc" },
+      where: { status: "ACTIVE", userId },
+    });
+    if (!subscription) throw new AppError(404, "Active subscription not found.", "SUBSCRIPTION_NOT_FOUND");
+    if (subscription.plan.code === "LIFETIME") throw new AppError(400, "Lifetime access has no expiration date.", "LIFETIME_NO_EXPIRATION");
+    const base = subscription.expirationDate && subscription.expirationDate > new Date() ? subscription.expirationDate : new Date();
+    const expirationDate = new Date(Date.UTC(base.getUTCFullYear(), base.getUTCMonth() + months, base.getUTCDate()));
+    const updated = await prisma.userSubscription.update({
+      data: { currentPeriodEnd: expirationDate, expirationDate, renewalDate: expirationDate },
+      where: { id: subscription.id },
+    });
+    await auditAdminAction({ action: "EXTEND_SUBSCRIPTION", actorId: req.auth!.id, metadata: { months }, targetId: userId, targetType: "User" });
+    res.json({ subscription: updated });
+  } catch (error) {
+    next(error);
+  }
+});
+
 const planSchema = z.object({
   currency: z.string().min(3).max(3).default("USD"),
   features: z.array(z.string()).default([]),
   isActive: z.boolean().default(true),
   monthlyQuota: z.number().int().min(0).nullable().optional(),
   name: z.string().min(2),
-  plan: z.enum(["FREE", "PRO", "PROFESSIONAL", "ENTERPRISE", "LIFETIME"]),
+  plan: z.enum(["BASIC", "FREE", "PRO", "PROFESSIONAL", "ENTERPRISE"]),
   price: z.number().int().min(0),
 });
 
@@ -331,7 +369,7 @@ superAdminRouter.post("/plans", async (req, res, next) => {
     const plan = await prisma.subscriptionPlan.upsert({
       create: {
         active: body.isActive,
-        analysisQuota: body.plan === "ENTERPRISE" || body.plan === "LIFETIME" ? null : body.monthlyQuota,
+        analysisQuota: body.plan === "ENTERPRISE" ? null : body.monthlyQuota,
         code: planFromInput(body.plan),
         currency: body.currency,
         features: body.features,
@@ -343,7 +381,7 @@ superAdminRouter.post("/plans", async (req, res, next) => {
       },
       update: {
         active: body.isActive,
-        analysisQuota: body.plan === "ENTERPRISE" || body.plan === "LIFETIME" ? null : body.monthlyQuota,
+        analysisQuota: body.plan === "ENTERPRISE" ? null : body.monthlyQuota,
         currency: body.currency,
         features: body.features,
         isActive: body.isActive,

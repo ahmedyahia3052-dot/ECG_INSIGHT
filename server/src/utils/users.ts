@@ -52,6 +52,11 @@ export function fromApiTier(tier: ApiSubscriptionTier): SubscriptionTier {
   return tierFromApi[tier];
 }
 
+function publicUserTier(tier: SubscriptionTier): Exclude<ApiSubscriptionTier, "lifetime" | "unlimited"> {
+  if (tier === "LIFETIME" || tier === "UNLIMITED") return "enterprise";
+  return toApiTier(tier) as Exclude<ApiSubscriptionTier, "lifetime" | "unlimited">;
+}
+
 export function serializeUser(
   user: Pick<
     User,
@@ -61,6 +66,9 @@ export function serializeUser(
     | "id"
     | "institution"
     | "isActive"
+    | "isLifetime"
+    | "lifetimeGrantedAt"
+    | "lifetimeGrantedBy"
     | "licenseNumber"
     | "name"
     | "role"
@@ -79,12 +87,15 @@ export function serializeUser(
     id: user.id,
     institution: user.institution ?? undefined,
     isActive: user.isActive,
+    isLifetime: user.isLifetime,
     joinedDate: user.createdAt.toISOString().slice(0, 10),
     lastActive: user.updatedAt.toISOString().slice(0, 10),
+    lifetimeGrantedAt: user.lifetimeGrantedAt?.toISOString(),
+    lifetimeGrantedBy: user.lifetimeGrantedBy ?? undefined,
     licenseNumber: user.licenseNumber ?? undefined,
     name: user.name,
     role: toApiRole(user.role),
     specialization: user.specialization ?? undefined,
-    subscriptionTier: user.subscription ? toApiTier(user.subscription.tier) : "free",
+    subscriptionTier: user.subscription ? publicUserTier(user.subscription.tier) : "free",
   };
 }

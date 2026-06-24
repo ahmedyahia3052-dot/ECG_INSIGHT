@@ -31,6 +31,7 @@ export const subscriptionsRouter = Router();
 subscriptionsRouter.use(requireAuth);
 
 const ownerRole = requireRole("SUPER_ADMIN");
+const publicPlanCodes: Parameters<typeof toApiTier>[0][] = ["FREE", "BASIC", "PROFESSIONAL", "ENTERPRISE"];
 
 function serializePlan(plan: {
   active: boolean;
@@ -62,6 +63,16 @@ function serializePlan(plan: {
   };
 }
 
+function visiblePlanWhere(role?: string): Prisma.SubscriptionPlanWhereInput {
+  return role === "SUPER_ADMIN" ? {} : { code: { in: publicPlanCodes } };
+}
+
+function rejectPrivateLifetime(plan: string | undefined, role?: string) {
+  if (plan === "lifetime" && role !== "SUPER_ADMIN") {
+    throw new AppError(403, "Lifetime access is an internal administrator privilege.", "PRIVATE_LIFETIME_PLAN");
+  }
+}
+
 subscriptionsRouter.get("/", requireRole("ADMIN"), async (_req, res, next) => {
   try {
     const subscriptions = await prisma.subscription.findMany({
@@ -86,10 +97,10 @@ subscriptionsRouter.get("/", requireRole("ADMIN"), async (_req, res, next) => {
   }
 });
 
-subscriptionsRouter.get("/plans", async (_req, res, next) => {
+subscriptionsRouter.get("/plans", async (req, res, next) => {
   try {
     await ensureDefaultPlans();
-    const plans = await prisma.subscriptionPlan.findMany({ orderBy: { priceCents: "asc" } });
+    const plans = await prisma.subscriptionPlan.findMany({ orderBy: { priceCents: "asc" }, where: visiblePlanWhere(req.auth?.role) });
     res.json({ plans: plans.map(serializePlan) });
   } catch (error) {
     next(error);
@@ -144,14 +155,23 @@ subscriptionsRouter.patch("/plans/:planId", ownerRole, validateBody(planSchema),
 
 subscriptionsRouter.get("/me", async (req, res, next) => {
   try {
-    const [summary, quota, billingHistory, payments] = await Promise.all([
+    const [summary, quota, billingHistory, payments, user] = await Promise.all([
       subscriptionSummary(req.auth!.id),
       quotaSnapshot(req.auth!.id),
       prisma.billingEvent.findMany({ orderBy: { createdAt: "desc" }, take: 20, where: { userId: req.auth!.id } }),
       prisma.payment.findMany({ orderBy: { createdAt: "desc" }, take: 20, where: { userId: req.auth!.id } }),
+      prisma.user.findUnique({ where: { id: req.auth!.id } }),
     ]);
     res.json({
       billingHistory,
+      lifetimeAccess: {
+        granted: Boolean(user?.isLifetime),
+        grantedAt: user?.lifetimeGrantedAt,
+        grantedBy: user?.lifetimeGrantedBy,
+        message: user?.isLifetime ? "Special Lifetime Access Granted by Administrator" : null,
+        noExpiration: Boolean(user?.isLifetime),
+        unlimitedAnalyses: Boolean(user?.isLifetime),
+      },
       payments,
       plan: serializePlan(summary.plan),
       quota: {
@@ -182,11 +202,6 @@ subscriptionsRouter.post("/licenses/lifetime", ownerRole, validateBody(grantLice
     const user = await prisma.user.findUnique({ where: { id: req.body.userId } });
     if (!user) throw new AppError(404, "User not found.", "USER_NOT_FOUND");
     const license = await grantLifetimeLicense(user.id, req.auth!.id, req.body.reason);
-    await prisma.subscription.upsert({
-      create: { status: "ACTIVE", tier: "LIFETIME", userId: user.id },
-      update: { status: "ACTIVE", tier: "LIFETIME" },
-      where: { userId: user.id },
-    });
     res.status(201).json({ license });
   } catch (error) {
     next(error);
@@ -204,6 +219,9 @@ subscriptionsRouter.get("/licenses", ownerRole, async (_req, res, next) => {
 
 subscriptionsRouter.post("/activate", ownerRole, validateBody(activateSubscriptionSchema), async (req, res, next) => {
   try {
+    if (req.body.plan === "lifetime") {
+      throw new AppError(400, "Use the lifetime license endpoint instead of plan activation.", "PRIVATE_LIFETIME_PLAN");
+    }
     const subscription = await activateUserPlan(req.body.userId, fromApiTier(req.body.plan));
     res.status(201).json({ subscription });
   } catch (error) {
@@ -213,6 +231,7 @@ subscriptionsRouter.post("/activate", ownerRole, validateBody(activateSubscripti
 
 subscriptionsRouter.post("/payments/initiate", validateBody(initiatePaymentSchema), async (req, res, next) => {
   try {
+    rejectPrivateLifetime(req.body.plan, req.auth?.role);
     const result = await initiatePayment(req.auth!.id, fromApiTier(req.body.plan), req.body.provider);
     res.status(201).json(result);
   } catch (error) {
@@ -247,6 +266,7 @@ subscriptionsRouter.post("/payments/:paymentId/review", ownerRole, validateBody(
       where: { id: payment.id },
     });
     if (approved && req.body.plan) {
+      rejectPrivateLifetime(req.body.plan, req.auth?.role);
       await activateUserPlan(payment.userId, fromApiTier(req.body.plan));
       await prisma.notification.create({
         data: { message: "Your payment was approved and subscription is active.", title: "Payment approved", type: "SUCCESS", userId: payment.userId },
@@ -289,6 +309,9 @@ subscriptionsRouter.patch(
       const user = await prisma.user.findUnique({ where: { id: userId } });
       if (!user) {
         throw new AppError(404, "User not found.", "USER_NOT_FOUND");
+      }
+      if (req.body.tier === "lifetime") {
+        throw new AppError(400, "Use the lifetime license endpoint instead of subscription tier updates.", "PRIVATE_LIFETIME_PLAN");
       }
 
       const subscription = await prisma.subscription.upsert({

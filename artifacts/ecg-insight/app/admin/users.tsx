@@ -4,8 +4,10 @@ import { useColors } from "@/hooks/useColors";
 import {
   changeSuperAdminUserPlan,
   deleteSuperAdminUser,
+  extendSuperAdminSubscription,
   grantSuperAdminLifetime,
   listSuperAdminUsers,
+  revokeSuperAdminLifetime,
   superAdminUserAction,
   type SuperAdminUser,
 } from "@/services/superAdmin";
@@ -50,7 +52,7 @@ function UserCard({
   u,
   isSuperAdmin,
 }: {
-  onAdminAction: (userId: string, action: "delete" | "disable" | "enable" | "force-logout" | "grant-lifetime" | "plan-enterprise" | "plan-free" | "plan-pro" | "reset-password") => void;
+  onAdminAction: (userId: string, action: "delete" | "disable" | "enable" | "extend-subscription" | "force-logout" | "grant-lifetime" | "plan-basic" | "plan-enterprise" | "plan-free" | "plan-pro" | "reset-password" | "revoke-lifetime") => void;
   u: AdminUser;
   isSuperAdmin: boolean;
 }) {
@@ -191,14 +193,14 @@ function UserCard({
             >
               <Text style={{ fontSize: 13, fontWeight: "600", color: "#7C3AED" }}>Impersonate</Text>
             </Pressable>
-            {(["reset-password", "force-logout", "plan-free", "plan-pro", "plan-enterprise", "grant-lifetime", "delete"] as const).map((action) => (
+            {(["reset-password", "force-logout", "plan-free", "plan-basic", "plan-pro", "plan-enterprise", "extend-subscription", "grant-lifetime", "revoke-lifetime", "delete"] as const).map((action) => (
               <Pressable
                 key={action}
                 onPress={() => onAdminAction(u.id, action)}
                 style={({ pressed }) => ({ minWidth: "30%", backgroundColor: pressed ? colors.border : colors.surface, borderRadius: colors.radius.md, borderColor: colors.border, borderWidth: 1, paddingHorizontal: 10, paddingVertical: 8, alignItems: "center" })}
               >
                 <Text style={{ fontSize: 13, fontWeight: "600", color: action === "grant-lifetime" ? "#D97706" : colors.primary }}>
-                  {action === "reset-password" ? "Reset" : action === "force-logout" ? "Logout" : action === "plan-free" ? "Free" : action === "plan-pro" ? "Pro" : action === "plan-enterprise" ? "Enterprise" : action === "delete" ? "Delete" : "Lifetime"}
+                  {action === "reset-password" ? "Reset" : action === "force-logout" ? "Logout" : action === "plan-free" ? "Free" : action === "plan-basic" ? "Basic" : action === "plan-pro" ? "Pro" : action === "plan-enterprise" ? "Enterprise" : action === "extend-subscription" ? "Extend" : action === "delete" ? "Delete" : action === "revoke-lifetime" ? "Revoke Lifetime" : "Grant Lifetime"}
                 </Text>
               </Pressable>
             ))}
@@ -287,15 +289,19 @@ export default function UsersScreen() {
     }
   }
 
-  async function handleAdminAction(userId: string, action: "delete" | "disable" | "enable" | "force-logout" | "grant-lifetime" | "plan-enterprise" | "plan-free" | "plan-pro" | "reset-password") {
+  async function handleAdminAction(userId: string, action: "delete" | "disable" | "enable" | "extend-subscription" | "force-logout" | "grant-lifetime" | "plan-basic" | "plan-enterprise" | "plan-free" | "plan-pro" | "reset-password" | "revoke-lifetime") {
     if (!authToken?.token) return;
     try {
       if (action === "delete") {
         await deleteSuperAdminUser(authToken.token, userId);
       } else if (action.startsWith("plan-")) {
-        await changeSuperAdminUserPlan(authToken.token, userId, action === "plan-free" ? "FREE" : action === "plan-pro" ? "PRO" : "ENTERPRISE");
+        await changeSuperAdminUserPlan(authToken.token, userId, action === "plan-free" ? "FREE" : action === "plan-basic" ? "BASIC" : action === "plan-pro" ? "PRO" : "ENTERPRISE");
       } else if (action === "grant-lifetime") {
         await grantSuperAdminLifetime(authToken.token, userId);
+      } else if (action === "revoke-lifetime") {
+        await revokeSuperAdminLifetime(authToken.token, userId);
+      } else if (action === "extend-subscription") {
+        await extendSuperAdminSubscription(authToken.token, userId, 1);
       } else if (action === "disable" || action === "enable" || action === "force-logout" || action === "reset-password") {
         const result = await superAdminUserAction(authToken.token, userId, action);
         if (result.resetPassword) setActionMessage(`Temporary password: ${result.resetPassword}`);

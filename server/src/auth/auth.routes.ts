@@ -4,13 +4,16 @@ import { requireAuth } from "../middleware/auth";
 import { validateBody } from "../middleware/validate";
 import { serializeUser } from "../utils/users";
 import {
+  changePasswordSchema,
   forgotPasswordSchema,
   loginSchema,
   registerSchema,
   resetPasswordSchema,
+  updateProfileSchema,
   verifyEmailSchema,
 } from "./schemas";
 import {
+  changeOwnPassword,
   loginUser,
   logoutSession,
   refreshSession,
@@ -97,6 +100,32 @@ authRouter.get("/me", requireAuth, async (req, res, next) => {
       include: { subscription: true },
     });
     res.json({ user: user ? serializeUser(user) : null });
+  } catch (error) {
+    next(error);
+  }
+});
+
+authRouter.patch("/me", requireAuth, validateBody(updateProfileSchema), async (req, res, next) => {
+  try {
+    const user = await prisma.user.update({
+      data: {
+        institution: req.body.institution,
+        name: req.body.name,
+        specialization: req.body.specialization,
+      },
+      include: { subscription: true },
+      where: { id: req.auth!.id },
+    });
+    res.json({ user: serializeUser(user) });
+  } catch (error) {
+    next(error);
+  }
+});
+
+authRouter.post("/change-password", requireAuth, validateBody(changePasswordSchema), async (req, res, next) => {
+  try {
+    await changeOwnPassword(req.auth!.id, req.body);
+    res.status(204).send();
   } catch (error) {
     next(error);
   }
