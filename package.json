@@ -5,11 +5,15 @@
   "scripts": {
     "dev": "npm run prisma:generate && tsx server/src/index.ts",
     "build": "npm run prisma:generate && npm run typecheck",
+    "build:frontend": "cd artifacts/ecg-insight && npx expo export --platform web --output-dir ../../dist",
+    "build:production": "npm run build && npm run build:frontend",
     "db:seed": "tsx prisma/seed.ts",
     "lint": "eslint server/src prisma artifacts/ecg-insight/app artifacts/ecg-insight/components artifacts/ecg-insight/context artifacts/ecg-insight/data artifacts/ecg-insight/hooks artifacts/ecg-insight/services --no-error-on-unmatched-pattern",
     "prisma:generate": "prisma generate",
+    "smoke:production": "tsx scripts/production-smoke.ts",
     "test": "npm run typecheck && tsx scripts/clinical-workflow.integration.ts",
-    "typecheck": "tsc -p server/tsconfig.json --noEmit && tsc -p artifacts/ecg-insight/tsconfig.json --noEmit"
+    "typecheck": "tsc -p server/tsconfig.json --noEmit && tsc -p artifacts/ecg-insight/tsconfig.json --noEmit",
+    "validate:production": "tsx scripts/production-validation.ts"
   },
   "private": true,
   "dependencies": {

@@ -46,7 +46,7 @@ function cookieOptions(maxAgeSeconds?: number) {
     httpOnly: true,
     maxAge: maxAgeSeconds ? maxAgeSeconds * 1000 : undefined,
     path: "/",
-    sameSite: "lax" as const,
+    sameSite: isProduction ? ("none" as const) : ("lax" as const),
     secure: isProduction,
   };
 }

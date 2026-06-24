@@ -1,4 +1,5 @@
 import type { NextFunction, Request, Response } from "express";
+import { log } from "../utils/logger";
 
 const startedAt = new Date();
 const metrics = {
@@ -14,14 +15,18 @@ export function requestMetrics(req: Request, res: Response, next: NextFunction) 
     metrics.requests += 1;
     metrics.totalDurationMs += duration;
     if (res.statusCode >= 500) metrics.errors += 1;
-    console.log(
-      JSON.stringify({
+    log(
+      res.statusCode >= 500 ? "error" : "info",
+      "API request completed.",
+      {
         durationMs: duration,
         method: req.method,
         path: req.path,
+        requestId: req.requestId,
         statusCode: res.statusCode,
         type: "api_call",
-      }),
+        userAgent: req.get("user-agent"),
+      },
     );
   });
   next();

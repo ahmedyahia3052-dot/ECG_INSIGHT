@@ -1,0 +1,93 @@
+name: Production Validation
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: ecg_insight_ci
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_USER: postgres
+        options: >-
+          --health-cmd "pg_isready -U postgres -d ecg_insight_ci"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+    env:
+      CLIENT_ORIGIN: https://app.example.com
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/ecg_insight_ci
+      EXPO_PUBLIC_API_URL: https://api.example.com/api
+      JWT_REFRESH_SECRET: ci-refresh-secret-000000000000000000000000000000
+      JWT_SECRET: ci-access-secret-00000000000000000000000000000000
+      NODE_ENV: production
+      PORT: 3001
+      RATE_LIMIT_MAX: 600
+      RATE_LIMIT_WINDOW_MS: 900000
+      TRUST_PROXY: "true"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate Prisma client
+        run: npm run prisma:generate
+
+      - name: Apply database migrations
+        run: npx prisma migrate deploy
+
+      - name: Seed database
+        run: npm run db:seed
+
+      - name: Build
+        run: npm run build
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Test
+        env:
+          NODE_ENV: test
+        run: npm run test
+
+      - name: Production validation
+        run: npm run validate:production
+
+      - name: Build production Docker image
+        run: docker build -f Dockerfile.production -t ecg-insight-api:ci .
+
+      - name: Start API for smoke tests
+        run: |
+          npx prisma migrate deploy
+          npx tsx server/src/index.ts &
+          echo $! > api.pid
+          sleep 10
+
+      - name: Smoke test health endpoints
+        env:
+          PRODUCTION_BASE_URL: http://127.0.0.1:3001
+        run: npm run smoke:production
+
+      - name: Stop API
+        if: always()
+        run: |
+          if [ -f api.pid ]; then kill "$(cat api.pid)" || true; fi

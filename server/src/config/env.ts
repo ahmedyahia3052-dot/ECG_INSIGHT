@@ -12,20 +12,43 @@ const developmentDefaults = {
   CLIENT_ORIGIN: "http://localhost:8081",
   DATABASE_URL: "postgresql://postgres:postgres@localhost:5432/ecg_insight",
   EXPO_PUBLIC_API_URL: "http://localhost:3001/api",
+  LOG_LEVEL: "info",
   JWT_REFRESH_SECRET:
     "dev-refresh-938cfdc355358b3b4d1879f159a0252b7b7fe3b08bcb0979d98b8ec4b82d684d",
   JWT_SECRET:
     "dev-access-bf05c9530d0e5b0cb6261389e7d95e1eda5202327d09cae39d2be38ef3d4a8a6",
   NODE_ENV: "development",
   PORT: "3001",
+  RATE_LIMIT_MAX: "600",
+  RATE_LIMIT_WINDOW_MS: String(15 * 60 * 1000),
+  TRUST_PROXY: "false",
 };
+
+function validateOriginList(value: string) {
+  return value
+    .split(",")
+    .map((origin) => origin.trim())
+    .filter(Boolean)
+    .every((origin) => {
+      try {
+        new URL(origin);
+        return true;
+      } catch {
+        return false;
+      }
+    });
+}
 
 const envSchema = z
   .object({
-    CLIENT_ORIGIN: z.string().url({
-      message: "CLIENT_ORIGIN must be the frontend origin, for example http://localhost:8081.",
-    }),
+    CLIENT_ORIGIN: z
+      .string()
+      .min(1)
+      .refine(validateOriginList, {
+        message: "CLIENT_ORIGIN must be one or more comma-separated frontend origins.",
+      }),
     COOKIE_DOMAIN: z.string().optional(),
+    EXCEPTION_MONITORING_DSN: z.string().url().optional(),
     DATABASE_URL: z.string().url({
       message: "DATABASE_URL must be a valid PostgreSQL connection URL.",
     }),
@@ -38,10 +61,17 @@ const envSchema = z
     JWT_SECRET: z.string().min(32, {
       message: "JWT_SECRET must be at least 32 characters.",
     }),
+    LOG_LEVEL: z.enum(["debug", "info", "warn", "error"]).default("info"),
     NODE_ENV: z.enum(["development", "test", "production"]),
     PORT: z.coerce.number().int().positive({
       message: "PORT must be a positive integer.",
     }),
+    RATE_LIMIT_MAX: z.coerce.number().int().positive().default(600),
+    RATE_LIMIT_WINDOW_MS: z.coerce.number().int().positive().default(15 * 60 * 1000),
+    TRUST_PROXY: z
+      .enum(["true", "false"])
+      .default("false")
+      .transform((value) => value === "true"),
   })
   .superRefine((value, ctx) => {
     if (value.NODE_ENV !== "production") return;
@@ -60,6 +90,24 @@ const envSchema = z
           code: "custom",
           message: `${key} must be set to a real production value before starting in production.`,
           path: [key],
+        });
+      }
+    }
+
+    if (!value.EXPO_PUBLIC_API_URL.startsWith("https://")) {
+      ctx.addIssue({
+        code: "custom",
+        message: "EXPO_PUBLIC_API_URL must use HTTPS in production.",
+        path: ["EXPO_PUBLIC_API_URL"],
+      });
+    }
+
+    for (const origin of value.CLIENT_ORIGIN.split(",").map((item) => item.trim()).filter(Boolean)) {
+      if (!origin.startsWith("https://")) {
+        ctx.addIssue({
+          code: "custom",
+          message: "CLIENT_ORIGIN entries must use HTTPS in production.",
+          path: ["CLIENT_ORIGIN"],
         });
       }
     }
