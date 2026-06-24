@@ -18,7 +18,7 @@ const defaultPlans: Array<{
   { analysisQuota: 100, billingCycle: "MONTHLY", code: "BASIC", description: "100 ECG analyses per month.", name: "Basic", priceCents: 1900, quotaWindowHours: 720 },
   { analysisQuota: 500, billingCycle: "MONTHLY", code: "PROFESSIONAL", description: "500 ECG analyses per month.", name: "Professional", priceCents: 4900, quotaWindowHours: 720 },
   { analysisQuota: null, billingCycle: "MONTHLY", code: "UNLIMITED", description: "Unlimited ECG analyses.", name: "Unlimited", priceCents: 9900, quotaWindowHours: 720 },
-  { analysisQuota: null, billingCycle: "LIFETIME", code: "LIFETIME", description: "Owner-granted permanent unlimited access.", name: "Lifetime", priceCents: 0, quotaWindowHours: null },
+  { analysisQuota: null, billingCycle: "LIFETIME", code: "LIFETIME", description: "Owner-granted permanent unlimited access.", name: "Lifetime Premium", priceCents: 0, quotaWindowHours: null },
   { analysisQuota: null, billingCycle: "MONTHLY", code: "ENTERPRISE", description: "Unlimited analyses with team management.", multiUser: true, name: "Enterprise", priceCents: 19900, quotaWindowHours: 720, teamManagement: true },
 ];
 

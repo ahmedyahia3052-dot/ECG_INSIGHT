@@ -28,12 +28,16 @@ export interface SubscriptionAnalytics {
 }
 
 export interface LicenseRecord {
-  createdAt: string;
+  email: string;
+  expiryDate: string | null;
+  grantedBy: string;
   id: string;
+  startDate: string;
   status: string;
-  type: string;
-  user: { email: string; name: string };
   userId: string;
+  userName: string;
+  username: string | null;
+  subscriptionType: string;
 }
 
 export async function listSubscriptionPlans(accessToken: string) {
@@ -46,6 +50,13 @@ export async function getSubscriptionAnalytics(accessToken: string) {
 
 export async function listLicenses(accessToken: string) {
   return apiRequest<{ licenses: LicenseRecord[] }>("/subscriptions/licenses", { accessToken });
+}
+
+export async function revokeLicense(accessToken: string, userId: string) {
+  return apiRequest<{ revokedCount: number }>(`/subscriptions/licenses/${userId}`, {
+    accessToken,
+    method: "DELETE",
+  });
 }
 
 export interface MySubscription {

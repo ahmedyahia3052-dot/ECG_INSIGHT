@@ -88,10 +88,10 @@ export default function AdminSubscriptionsScreen() {
       {licenses.slice(0, 8).map((license) => (
         <BoltCard key={license.id} style={styles.card}>
           <View style={styles.cardHeader}>
-            <Text style={[styles.title, { color: colors.text }]}>{license.user.name}</Text>
+            <Text style={[styles.title, { color: colors.text }]}>{license.userName}</Text>
             <BoltBadge label={license.status} tone={license.status === "ACTIVE" ? "success" : "muted"} />
           </View>
-          <Text style={[styles.meta, { color: colors.textSecondary }]}>{license.user.email} · {license.type}</Text>
+          <Text style={[styles.meta, { color: colors.textSecondary }]}>{license.email} · {license.subscriptionType}</Text>
         </BoltCard>
       ))}
     </BoltScreen>

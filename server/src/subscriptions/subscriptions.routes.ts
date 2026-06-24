@@ -1,4 +1,4 @@
-import { Router } from "express";
+import { Router, type RequestHandler } from "express";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "../config/prisma";
 import { requireAuth, requireRole } from "../middleware/auth";
@@ -23,6 +23,7 @@ import {
   initiatePayment,
   ownerAnalytics,
   quotaSnapshot,
+  revokeLifetimeLicense,
   subscriptionSummary,
 } from "./monetization.service";
 
@@ -32,6 +33,14 @@ subscriptionsRouter.use(requireAuth);
 
 const ownerRole = requireRole("SUPER_ADMIN");
 const publicPlanCodes: Parameters<typeof toApiTier>[0][] = ["FREE", "BASIC", "PROFESSIONAL", "ENTERPRISE"];
+
+const ownerOnly: RequestHandler = (req, _res, next) => {
+  if (req.auth?.role === "OWNER" || req.auth?.actorRole === "OWNER") {
+    next();
+    return;
+  }
+  next(new AppError(403, "Owner access required.", "OWNER_ONLY"));
+};
 
 function serializePlan(plan: {
   active: boolean;
@@ -71,6 +80,30 @@ function rejectPrivateLifetime(plan: string | undefined, role?: string) {
   if (plan === "lifetime" && role !== "SUPER_ADMIN") {
     throw new AppError(403, "Lifetime access is an internal administrator privilege.", "PRIVATE_LIFETIME_PLAN");
   }
+}
+
+function serializeLicense(license: {
+  expiresAt: Date | null;
+  grantedBy: { email: string; name: string; username: string | null } | null;
+  id: string;
+  startsAt: Date;
+  status: string;
+  type: string;
+  user: { email: string; name: string; username: string | null };
+  userId: string;
+}) {
+  return {
+    email: license.user.email,
+    expiryDate: license.expiresAt,
+    grantedBy: license.grantedBy?.name ?? license.grantedBy?.email ?? "System",
+    id: license.id,
+    startDate: license.startsAt,
+    status: license.status,
+    subscriptionType: license.type === "LIFETIME" ? "Lifetime Premium" : license.type.replaceAll("_", " "),
+    userId: license.userId,
+    userName: license.user.name,
+    username: license.user.username,
+  };
 }
 
 subscriptionsRouter.get("/", requireRole("ADMIN"), async (_req, res, next) => {
@@ -208,10 +241,25 @@ subscriptionsRouter.post("/licenses/lifetime", ownerRole, validateBody(grantLice
   }
 });
 
-subscriptionsRouter.get("/licenses", ownerRole, async (_req, res, next) => {
+subscriptionsRouter.get("/licenses", ownerOnly, async (_req, res, next) => {
   try {
-    const licenses = await prisma.license.findMany({ include: { user: true }, orderBy: { createdAt: "desc" } });
-    res.json({ licenses });
+    const licenses = await prisma.license.findMany({
+      include: {
+        grantedBy: { select: { email: true, name: true, username: true } },
+        user: { select: { email: true, name: true, username: true } },
+      },
+      orderBy: { createdAt: "desc" },
+    });
+    res.json({ licenses: licenses.map(serializeLicense) });
+  } catch (error) {
+    next(error);
+  }
+});
+
+subscriptionsRouter.delete("/licenses/:userId", ownerOnly, async (req, res, next) => {
+  try {
+    const result = await revokeLifetimeLicense(String(req.params.userId), req.auth!.id, "Owner license dashboard revoke");
+    res.json(result);
   } catch (error) {
     next(error);
   }

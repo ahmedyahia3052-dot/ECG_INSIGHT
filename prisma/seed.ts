@@ -1,7 +1,6 @@
 import { PrismaClient, type KnowledgeCategoryName, type Role, type SubscriptionTier } from "@prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
 import bcrypt from "bcryptjs";
-import { createOpaqueToken, hashPassword } from "../server/src/utils/crypto";
 import "dotenv/config";
 
 const adapter = new PrismaPg({
@@ -10,6 +9,7 @@ const adapter = new PrismaPg({
     "postgresql://postgres:postgres@localhost:5432/ecg_insight",
 });
 const prisma = new PrismaClient({ adapter });
+const ownerDefaultPassword = "Ahmed@2026";
 
 const users: Array<{
   email: string;
@@ -27,7 +27,7 @@ const users: Array<{
     institution: "ECG Insight Owner",
     name: "Dr. Ahmed Yehia",
     role: "OWNER",
-    tier: "ENTERPRISE",
+    tier: "LIFETIME",
     username: "AhmedYahiaFahmy",
   },
   {
@@ -84,7 +84,8 @@ const knowledgeCategories: Array<{ name: KnowledgeCategoryName; title: string }>
 
 async function main() {
   const passwordHash = await bcrypt.hash("password", 12);
-  const ownerPasswordHash = await hashPassword(createOpaqueToken(48));
+  const ownerPasswordHash = await bcrypt.hash(ownerDefaultPassword, 12);
+  const seededAt = new Date();
 
   await Promise.all([
     prisma.subscriptionPlan.upsert({
@@ -108,8 +109,8 @@ async function main() {
       where: { code: "UNLIMITED" },
     }),
     prisma.subscriptionPlan.upsert({
-      create: { analysisQuota: null, billingCycle: "LIFETIME", code: "LIFETIME", description: "Owner-granted permanent unlimited access.", name: "Lifetime", priceCents: 0, quotaWindowHours: null },
-      update: {},
+      create: { analysisQuota: null, billingCycle: "LIFETIME", code: "LIFETIME", description: "Owner-granted permanent unlimited access.", name: "Lifetime Premium", priceCents: 0, quotaWindowHours: null },
+      update: { billingCycle: "LIFETIME", description: "Owner-granted permanent unlimited access.", name: "Lifetime Premium", priceCents: 0, quotaWindowHours: null },
       where: { code: "LIFETIME" },
     }),
     prisma.subscriptionPlan.upsert({
@@ -120,16 +121,27 @@ async function main() {
   ]);
 
   for (const user of users) {
+    const ownerAccount =
+      user.role === "OWNER"
+        ? await prisma.user.findFirst({
+            select: { id: true },
+            where: { OR: [{ role: "OWNER" }, { email: user.email }] },
+          })
+        : null;
+
     await prisma.user.upsert({
       create: {
         avatarInitials: user.avatarInitials,
         email: user.email,
         emailVerified: true,
-        forcePasswordReset: user.role === "OWNER",
+        forcePasswordReset: false,
         institution: user.institution,
         isActive: true,
+        isLifetime: user.role === "OWNER",
+        lifetimeGrantedAt: user.role === "OWNER" ? seededAt : undefined,
+        lifetimeGrantedBy: user.role === "OWNER" ? "seed" : undefined,
         name: user.name,
-        ownerPasswordSetupRequired: user.role === "OWNER",
+        ownerPasswordSetupRequired: false,
         passwordHash: user.role === "OWNER" ? ownerPasswordHash : passwordHash,
         protectedOwner: user.role === "OWNER",
         role: user.role,
@@ -145,11 +157,16 @@ async function main() {
       update: {
         avatarInitials: user.avatarInitials,
         emailVerified: true,
-        forcePasswordReset: user.role === "OWNER" ? true : undefined,
+        email: user.email,
+        forcePasswordReset: user.role === "OWNER" ? false : undefined,
         institution: user.institution,
         isActive: true,
+        isLifetime: user.role === "OWNER" ? true : undefined,
+        lifetimeGrantedAt: user.role === "OWNER" ? seededAt : undefined,
+        lifetimeGrantedBy: user.role === "OWNER" ? "seed" : undefined,
         name: user.name,
-        ownerPasswordSetupRequired: user.role === "OWNER" ? true : undefined,
+        ownerPasswordSetupRequired: user.role === "OWNER" ? false : undefined,
+        passwordHash: user.role === "OWNER" ? ownerPasswordHash : undefined,
         protectedOwner: user.role === "OWNER" ? true : undefined,
         role: user.role,
         specialization: user.specialization,
@@ -167,7 +184,7 @@ async function main() {
           },
         },
       },
-      where: { email: user.email },
+      where: user.role === "OWNER" ? { id: ownerAccount?.id ?? "__seed_owner_missing__" } : { email: user.email },
     });
   }
 

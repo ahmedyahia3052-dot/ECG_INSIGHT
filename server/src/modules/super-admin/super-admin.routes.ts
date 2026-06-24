@@ -523,10 +523,47 @@ superAdminRouter.post("/gift-licenses", async (req, res, next) => {
 superAdminRouter.get("/licenses", async (_req, res, next) => {
   try {
     const [licenses, gifts] = await Promise.all([
-      prisma.license.findMany({ include: { user: true }, orderBy: { createdAt: "desc" } }),
-      prisma.giftLicense.findMany({ include: { giftedBy: true, user: true }, orderBy: { giftedAt: "desc" } }),
+      prisma.license.findMany({
+        include: {
+          grantedBy: { select: { email: true, name: true, username: true } },
+          user: { select: { email: true, name: true, username: true } },
+        },
+        orderBy: { createdAt: "desc" },
+      }),
+      prisma.giftLicense.findMany({
+        include: {
+          giftedBy: { select: { email: true, name: true, username: true } },
+          user: { select: { email: true, name: true, username: true } },
+        },
+        orderBy: { giftedAt: "desc" },
+      }),
     ]);
-    res.json({ gifts, licenses });
+    res.json({
+      gifts: gifts.map((gift) => ({
+        email: gift.user.email,
+        expiryDate: gift.expiresAt,
+        grantedBy: gift.giftedBy.name,
+        id: gift.id,
+        startDate: gift.startsAt,
+        status: gift.expiresAt && gift.expiresAt < new Date() ? "EXPIRED" : "ACTIVE",
+        subscriptionType: gift.duration.replaceAll("_", " "),
+        userId: gift.userId,
+        userName: gift.user.name,
+        username: gift.user.username,
+      })),
+      licenses: licenses.map((license) => ({
+        email: license.user.email,
+        expiryDate: license.expiresAt,
+        grantedBy: license.grantedBy?.name ?? license.grantedBy?.email ?? "System",
+        id: license.id,
+        startDate: license.startsAt,
+        status: license.status,
+        subscriptionType: license.type === "LIFETIME" ? "Lifetime Premium" : license.type.replaceAll("_", " "),
+        userId: license.userId,
+        userName: license.user.name,
+        username: license.user.username,
+      })),
+    });
   } catch (error) {
     next(error);
   }
