@@ -71,8 +71,12 @@ export function serializeUser(
     | "lifetimeGrantedBy"
     | "licenseNumber"
     | "name"
+    | "ownerPasswordSetupRequired"
+    | "ownerTwoFactorRequired"
+    | "protectedOwner"
     | "role"
     | "specialization"
+    | "username"
     | "createdAt"
     | "updatedAt"
   > & {
@@ -87,6 +91,7 @@ export function serializeUser(
     id: user.id,
     institution: user.institution ?? undefined,
     isActive: user.isActive,
+    isOwner: user.role === "OWNER" || user.protectedOwner,
     isLifetime: user.isLifetime,
     joinedDate: user.createdAt.toISOString().slice(0, 10),
     lastActive: user.updatedAt.toISOString().slice(0, 10),
@@ -94,8 +99,12 @@ export function serializeUser(
     lifetimeGrantedBy: user.lifetimeGrantedBy ?? undefined,
     licenseNumber: user.licenseNumber ?? undefined,
     name: user.name,
+    ownerPasswordSetupRequired: user.ownerPasswordSetupRequired,
+    ownerTwoFactorRequired: user.ownerTwoFactorRequired,
+    protectedOwner: user.protectedOwner,
     role: toApiRole(user.role),
     specialization: user.specialization ?? undefined,
     subscriptionTier: user.subscription ? publicUserTier(user.subscription.tier) : "free",
+    username: user.username ?? undefined,
   };
 }

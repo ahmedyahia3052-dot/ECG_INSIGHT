@@ -22,7 +22,7 @@ const MAX_CONCURRENT_SESSIONS = 5;
 
 function assertPasswordPolicy(password: string) {
   const strongEnough =
-    password.length >= 10 &&
+    password.length >= 12 &&
     /[A-Z]/.test(password) &&
     /[a-z]/.test(password) &&
     /\d/.test(password) &&
@@ -30,10 +30,41 @@ function assertPasswordPolicy(password: string) {
   if (!strongEnough) {
     throw new AppError(
       400,
-      "Password must be at least 10 characters and include upper, lower, number, and symbol characters.",
+      "Password must be at least 12 characters and include upper, lower, number, and symbol characters.",
       "PASSWORD_WEAK",
     );
   }
+}
+
+export async function setupOwnerPassword(body: { email: string; newPassword: string; username: string }) {
+  assertPasswordPolicy(body.newPassword);
+  const owner = await prisma.user.findFirst({
+    where: {
+      email: body.email.trim().toLowerCase(),
+      protectedOwner: true,
+      role: "OWNER",
+      username: body.username.trim(),
+    },
+  });
+  if (!owner || !owner.ownerPasswordSetupRequired) {
+    throw new AppError(403, "Owner password setup is not available.", "OWNER_SETUP_FORBIDDEN");
+  }
+  await prisma.user.update({
+    data: {
+      forcePasswordReset: false,
+      ownerPasswordSetupRequired: false,
+      passwordChangedAt: new Date(),
+      passwordHash: await hashPassword(body.newPassword),
+    },
+    where: { id: owner.id },
+  });
+  await prisma.passwordHistory.create({
+    data: {
+      expiresAt: new Date(Date.now() + PASSWORD_MAX_AGE_DAYS * 24 * 60 * 60 * 1000),
+      passwordHash: await hashPassword(body.newPassword),
+      userId: owner.id,
+    },
+  });
 }
 
 export function clearRefreshCookie(res: Response) {
@@ -115,7 +146,7 @@ async function createSession(userId: string, rememberMe: boolean, req: Request, 
 
 export async function issueAuthResponse(input: {
   actorId?: string;
-  actorRole?: "SUPER_ADMIN" | "ADMIN" | "DOCTOR" | "STUDENT";
+  actorRole?: "OWNER" | "SUPER_ADMIN" | "ADMIN" | "DOCTOR" | "STUDENT";
   req: Request;
   res: Response;
   rememberMe: boolean;

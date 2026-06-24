@@ -12,6 +12,10 @@ export const usersRouter = Router();
 
 usersRouter.use(requireAuth);
 
+function protectedOwner(user: { protectedOwner: boolean; role: string }) {
+  return user.protectedOwner || user.role === "OWNER";
+}
+
 usersRouter.get("/", requireRole("ADMIN"), async (_req, res, next) => {
   try {
     const users = await prisma.user.findMany({
@@ -79,8 +83,11 @@ usersRouter.patch(
       if (!target) {
         throw new AppError(404, "User not found.", "USER_NOT_FOUND");
       }
-      if (target.role === "SUPER_ADMIN" && req.auth!.role !== "SUPER_ADMIN") {
-        throw new AppError(403, "Only Super Admin can modify Super Admin accounts.", "FORBIDDEN");
+      if (protectedOwner(target)) {
+        throw new AppError(403, "The protected owner account cannot be disabled or suspended.", "OWNER_IMMUTABLE");
+      }
+      if (target.role === "SUPER_ADMIN" && req.auth!.role !== "SUPER_ADMIN" && req.auth!.role !== "OWNER") {
+        throw new AppError(403, "Only Super Admin or Owner can modify Super Admin accounts.", "FORBIDDEN");
       }
 
       const user = await prisma.user.update({
@@ -115,6 +122,9 @@ usersRouter.post("/:userId/impersonate", requireRole("SUPER_ADMIN"), async (req,
     }
     if (!target.isActive) {
       throw new AppError(400, "Cannot impersonate an inactive user.", "USER_INACTIVE");
+    }
+    if (protectedOwner(target) && req.auth!.role !== "OWNER") {
+      throw new AppError(403, "The protected owner account cannot be impersonated by other admins.", "OWNER_IMMUTABLE");
     }
 
     const accessToken = signAccessToken({

@@ -1,6 +1,7 @@
 import { PrismaClient, type KnowledgeCategoryName, type Role, type SubscriptionTier } from "@prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
 import bcrypt from "bcryptjs";
+import { createOpaqueToken, hashPassword } from "../server/src/utils/crypto";
 import "dotenv/config";
 
 const adapter = new PrismaPg({
@@ -18,14 +19,16 @@ const users: Array<{
   avatarInitials: string;
   specialization?: string;
   institution?: string;
+  username?: string;
 }> = [
   {
-    avatarInitials: "OW",
-    email: "owner@ecginsight.com",
+    avatarInitials: "AY",
+    email: "ahmedyahia3052@gmail.com",
     institution: "ECG Insight Owner",
-    name: "ECG Insight Owner",
+    name: "Dr. Ahmed Yehia",
     role: "OWNER",
     tier: "ENTERPRISE",
+    username: "AhmedYahiaFahmy",
   },
   {
     avatarInitials: "SA",
@@ -81,6 +84,7 @@ const knowledgeCategories: Array<{ name: KnowledgeCategoryName; title: string }>
 
 async function main() {
   const passwordHash = await bcrypt.hash("password", 12);
+  const ownerPasswordHash = await hashPassword(createOpaqueToken(48));
 
   await Promise.all([
     prisma.subscriptionPlan.upsert({
@@ -121,12 +125,16 @@ async function main() {
         avatarInitials: user.avatarInitials,
         email: user.email,
         emailVerified: true,
+        forcePasswordReset: user.role === "OWNER",
         institution: user.institution,
         isActive: true,
         name: user.name,
-        passwordHash,
+        ownerPasswordSetupRequired: user.role === "OWNER",
+        passwordHash: user.role === "OWNER" ? ownerPasswordHash : passwordHash,
+        protectedOwner: user.role === "OWNER",
         role: user.role,
         specialization: user.specialization,
+        username: user.username,
         subscription: {
           create: {
             status: "ACTIVE",
@@ -137,11 +145,15 @@ async function main() {
       update: {
         avatarInitials: user.avatarInitials,
         emailVerified: true,
+        forcePasswordReset: user.role === "OWNER" ? true : undefined,
         institution: user.institution,
         isActive: true,
         name: user.name,
+        ownerPasswordSetupRequired: user.role === "OWNER" ? true : undefined,
+        protectedOwner: user.role === "OWNER" ? true : undefined,
         role: user.role,
         specialization: user.specialization,
+        username: user.username,
         subscription: {
           upsert: {
             create: {

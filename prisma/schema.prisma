@@ -618,8 +618,12 @@ model User {
   id                          String                    @id @default(cuid())
   name                        String
   email                       String                    @unique
+  username                    String?                   @unique
   passwordHash                String
   role                        Role                      @default(STUDENT)
+  protectedOwner              Boolean                   @default(false)
+  ownerPasswordSetupRequired  Boolean                   @default(false)
+  ownerTwoFactorRequired      Boolean                   @default(false)
   specialization              String?
   licenseNumber               String?
   institution                 String?

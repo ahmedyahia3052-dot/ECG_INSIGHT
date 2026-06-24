@@ -1,11 +1,19 @@
 import { createHash, randomBytes } from "node:crypto";
+import argon2 from "argon2";
 import bcrypt from "bcryptjs";
 
 export async function hashPassword(password: string): Promise<string> {
-  return bcrypt.hash(password, 12);
+  try {
+    return await argon2.hash(password, { type: argon2.argon2id });
+  } catch {
+    return bcrypt.hash(password, 12);
+  }
 }
 
 export async function verifyPassword(password: string, hash: string): Promise<boolean> {
+  if (hash.startsWith("$argon2")) {
+    return argon2.verify(hash, password);
+  }
   return bcrypt.compare(password, hash);
 }
 

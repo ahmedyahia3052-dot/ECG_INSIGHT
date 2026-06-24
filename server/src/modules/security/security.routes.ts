@@ -86,6 +86,18 @@ securityRouter.post("/mfa", async (req, res, next) => {
         userId: req.auth!.id,
       },
     });
+    if (req.auth!.role === "OWNER") {
+      await prisma.auditLog.create({
+        data: {
+          action: "SECURITY_EVENT_CREATED",
+          actorId: req.auth!.id,
+          entityId: method.id,
+          entityType: "UserMFA",
+          message: `Owner MFA method created: ${body.type}.`,
+          metadata: { type: body.type },
+        },
+      });
+    }
     res.status(201).json({ method, otp, secret });
   } catch (error) {
     next(error);
@@ -103,7 +115,48 @@ securityRouter.post("/mfa/:id/verify", async (req, res, next) => {
       data: { enabled: valid, lastUsedAt: valid ? new Date() : undefined, verifiedAt: valid ? new Date() : undefined },
       where: { id: String(req.params.id) },
     });
+    if (req.auth!.role === "OWNER" && valid) {
+      await prisma.auditLog.create({
+        data: {
+          action: "SECURITY_EVENT_CREATED",
+          actorId: req.auth!.id,
+          entityId: updated.id,
+          entityType: "UserMFA",
+          message: `Owner MFA method enabled: ${updated.type}.`,
+          metadata: { type: updated.type },
+        },
+      });
+    }
     res.json({ method: updated, valid });
+  } catch (error) {
+    next(error);
+  }
+});
+
+securityRouter.delete("/mfa/:id", async (req, res, next) => {
+  try {
+    const method = await prisma.userMFA.findUnique({ where: { id: String(req.params.id) } });
+    if (!method || method.userId !== req.auth!.id) {
+      res.status(404).json({ message: "MFA method not found." });
+      return;
+    }
+    const updated = await prisma.userMFA.update({
+      data: { enabled: false },
+      where: { id: method.id },
+    });
+    if (req.auth!.role === "OWNER") {
+      await prisma.auditLog.create({
+        data: {
+          action: "SECURITY_EVENT_CREATED",
+          actorId: req.auth!.id,
+          entityId: updated.id,
+          entityType: "UserMFA",
+          message: `Owner MFA method disabled: ${updated.type}.`,
+          metadata: { type: updated.type },
+        },
+      });
+    }
+    res.json({ method: updated });
   } catch (error) {
     next(error);
   }

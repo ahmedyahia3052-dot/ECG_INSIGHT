@@ -30,7 +30,7 @@ export default function ProfileScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { user, authToken, logout, canAccess, isImpersonating, stopImpersonation } = useAuth();
+  const { user, authToken, logout, isImpersonating, stopImpersonation } = useAuth();
   const [subscription, setSubscription] = useState<MySubscription | null>(null);
   const [notifications, setNotifications] = useState(true);
   const [criticalAlerts, setCriticalAlerts] = useState(true);
@@ -137,7 +137,7 @@ export default function ProfileScreen() {
       </View>
 
       {/* Admin panel button — admin+ only */}
-      {canAccess("admin") && (
+      {user.role === "super_admin" && (
         <View style={styles.section}>
           <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>
             Administration

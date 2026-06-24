@@ -147,12 +147,12 @@ async function main() {
 
   const registeredSession = await login(registeredEmail, "Register123!");
   response = await request("/auth/change-password", {
-    body: { currentPassword: "Register123!", newPassword: "Changed123!" },
+    body: { currentPassword: "Register123!", newPassword: "Changed123!!" },
     method: "POST",
     token: registeredSession.token,
   });
   assert(response.status === 204, "Password change should succeed.");
-  await login(registeredEmail, "Changed123!");
+  await login(registeredEmail, "Changed123!!");
 
   response = await request("/super-admin/payments", {
     body: { amount: 12000, currency: "USD", paymentMethod: "Visa", referenceNumber: `REF-${stamp}`, status: "SUCCESS", userId: doctorUser.id },

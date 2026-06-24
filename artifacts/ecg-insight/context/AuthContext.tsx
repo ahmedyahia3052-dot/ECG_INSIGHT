@@ -15,10 +15,15 @@ export interface User {
   avatarInitials: string;
   emailVerified?: boolean;
   isActive?: boolean;
+  isOwner?: boolean;
   isLifetime?: boolean;
   lifetimeGrantedAt?: string;
   lifetimeGrantedBy?: string;
+  ownerPasswordSetupRequired?: boolean;
+  ownerTwoFactorRequired?: boolean;
+  protectedOwner?: boolean;
   subscriptionTier?: "free" | "basic" | "professional" | "enterprise";
+  username?: string;
 }
 
 export interface AuthToken {

@@ -13,15 +13,43 @@ export const superAdminRouter = Router();
 
 superAdminRouter.use(requireAuth);
 superAdminRouter.use((req: Request, _res: Response, next: NextFunction) => {
-  if (req.auth?.role !== "SUPER_ADMIN") {
-    next(new AppError(403, "Super Admin access required.", "SUPER_ADMIN_ONLY"));
+  if (req.auth?.role !== "OWNER" && req.auth?.role !== "SUPER_ADMIN") {
+    next(new AppError(403, "Owner or Super Admin access required.", "SUPER_ADMIN_ONLY"));
     return;
   }
   next();
 });
 
+superAdminRouter.use((req: Request, res: Response, next: NextFunction) => {
+  res.on("finish", () => {
+    if (!req.auth || res.statusCode >= 500) return;
+    prisma.auditLog.create({
+      data: {
+        action: req.auth.role === "OWNER" ? "SECURITY_EVENT_CREATED" : "PERMISSION_CHANGED",
+        actorId: req.auth.id,
+        entityType: "ProtectedAdminEndpoint",
+        ipAddress: req.ip,
+        message: `Protected admin endpoint ${req.method} ${req.originalUrl} completed with ${res.statusCode}.`,
+        metadata: { method: req.method, path: req.originalUrl, statusCode: res.statusCode },
+        userAgent: req.get("user-agent"),
+      },
+    }).catch(() => {});
+  });
+  next();
+});
+
 const planFromInput = (plan: string): SubscriptionTier => (plan === "PRO" ? "PROFESSIONAL" : plan) as SubscriptionTier;
 const planToApi = (plan: SubscriptionTier) => (plan === "PROFESSIONAL" ? "pro" : toApiTier(plan));
+
+function isProtectedOwner(user: { protectedOwner: boolean; role: string }) {
+  return user.protectedOwner || user.role === "OWNER";
+}
+
+function assertCanModifyProtectedOwner(actorRole: string | undefined, target: { protectedOwner: boolean; role: string }) {
+  if (isProtectedOwner(target) && actorRole !== "OWNER") {
+    throw new AppError(403, "Only the Owner can modify the protected owner account.", "OWNER_IMMUTABLE");
+  }
+}
 
 async function auditAdminAction(input: {
   actorId: string;
@@ -212,6 +240,7 @@ superAdminRouter.patch("/users/:userId", async (req, res, next) => {
     const body = editUserSchema.parse(req.body);
     const target = await prisma.user.findUnique({ where: { id: String(req.params.userId) } });
     if (!target) throw new AppError(404, "User not found.", "USER_NOT_FOUND");
+    assertCanModifyProtectedOwner(req.auth!.role, target);
     if (target.role === "SUPER_ADMIN" || target.role === "OWNER") throw new AppError(403, "Protected admin accounts cannot be downgraded.", "PRIVILEGE_ESCALATION_BLOCKED");
     const user = await prisma.user.update({
       data: {
@@ -236,6 +265,10 @@ superAdminRouter.post("/users/:userId/actions/:action", async (req, res, next) =
     if (userId === req.auth!.id && action === "disable") throw new AppError(400, "You cannot disable yourself.", "SELF_STATUS");
     const target = await prisma.user.findUnique({ where: { id: userId } });
     if (!target) throw new AppError(404, "User not found.", "USER_NOT_FOUND");
+    assertCanModifyProtectedOwner(req.auth!.role, target);
+    if (isProtectedOwner(target) && action !== "reset-password") {
+      throw new AppError(403, "Protected owner account cannot be disabled or force logged out.", "OWNER_IMMUTABLE");
+    }
     if ((target.role === "SUPER_ADMIN" || target.role === "OWNER") && target.id !== req.auth!.id) {
       throw new AppError(403, "Protected admin account action blocked.", "PRIVILEGE_ESCALATION_BLOCKED");
     }
@@ -265,7 +298,7 @@ superAdminRouter.delete("/users/:userId", async (req, res, next) => {
     if (userId === req.auth!.id) throw new AppError(400, "You cannot delete yourself.", "SELF_DELETE");
     const target = await prisma.user.findUnique({ where: { id: userId } });
     if (!target) throw new AppError(404, "User not found.", "USER_NOT_FOUND");
-    if (target.role === "SUPER_ADMIN" || target.role === "OWNER") throw new AppError(403, "Super Admin and Owner accounts cannot be deleted.", "PROTECTED_ACCOUNT");
+    if (target.role === "SUPER_ADMIN" || target.role === "OWNER" || target.protectedOwner) throw new AppError(403, "Super Admin and Owner accounts cannot be deleted.", "PROTECTED_ACCOUNT");
     await prisma.user.delete({ where: { id: userId } });
     await auditAdminAction({ action: "DELETE_USER", actorId: req.auth!.id, targetId: userId, targetType: "User" });
     res.status(204).send();

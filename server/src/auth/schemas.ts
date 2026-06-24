@@ -36,6 +36,12 @@ export const updateProfileSchema = z.object({
   specialization: z.string().trim().max(120).nullable().optional(),
 });
 
+export const ownerPasswordSetupSchema = z.object({
+  email: z.string().email(),
+  newPassword: z.string().min(12).max(128),
+  username: z.string().trim().min(2).max(120),
+});
+
 export const verifyEmailSchema = z.object({
   email: z.string().email(),
   token: z.string().min(12),

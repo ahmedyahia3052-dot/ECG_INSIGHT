@@ -5,17 +5,17 @@ import { useEffect } from "react";
 
 export default function AdminLayout() {
   const colors = useColors();
-  const { user, canAccess, isLoading } = useAuth();
+  const { user, isLoading } = useAuth();
   const router = useRouter();
 
   useEffect(() => {
     if (isLoading) return;
-    if (!user || !canAccess("admin")) {
-      router.replace("/(tabs)/" as any);
+    if (!user || user.role !== "super_admin") {
+      router.replace("/unauthorized" as any);
     }
-  }, [user, isLoading, canAccess, router]);
+  }, [user, isLoading, router]);
 
-  if (!user || !canAccess("admin")) return null;
+  if (!user || user.role !== "super_admin") return null;
 
   return (
     <Stack

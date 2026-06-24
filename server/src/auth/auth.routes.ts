@@ -7,6 +7,7 @@ import {
   changePasswordSchema,
   forgotPasswordSchema,
   loginSchema,
+  ownerPasswordSetupSchema,
   registerSchema,
   resetPasswordSchema,
   updateProfileSchema,
@@ -20,6 +21,7 @@ import {
   registerUser,
   requestPasswordReset,
   resetPassword,
+  setupOwnerPassword,
   verifyEmail,
 } from "./auth.service";
 
@@ -37,6 +39,15 @@ authRouter.post("/register", validateBody(registerSchema), async (req, res, next
 authRouter.post("/login", validateBody(loginSchema), async (req, res, next) => {
   try {
     res.json(await loginUser(req.body, req, res));
+  } catch (error) {
+    next(error);
+  }
+});
+
+authRouter.post("/owner/setup-password", validateBody(ownerPasswordSetupSchema), async (req, res, next) => {
+  try {
+    await setupOwnerPassword(req.body);
+    res.status(204).send();
   } catch (error) {
     next(error);
   }
