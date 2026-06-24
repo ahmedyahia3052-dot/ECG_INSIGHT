@@ -1,14 +1,14 @@
 const colors = {
   light: {
     // Core palette
-    primary: "#2563EB",
+    primary: "#00E5FF",
     primaryForeground: "#FFFFFF",
-    primaryLight: "#DBEAFE",
-    accent: "#06B6D4",
+    primaryLight: "#CFFAFE",
+    accent: "#14B8A6",
     accentForeground: "#FFFFFF",
     accentPurple: "#8B5CF6",
-    brandBlue: "#3B82F6",
-    brandCyan: "#06B6D4",
+    brandBlue: "#0EA5E9",
+    brandCyan: "#00E5FF",
 
     // Backgrounds & surfaces
     background: "#F8FAFC",
@@ -41,25 +41,25 @@ const colors = {
     border: "#DDE7F3",
     gradientBorder: "#BFDBFE",
     input: "#E2E8F0",
-    shadow: "#1E3A8A",
+    shadow: "#0EA5E9",
   },
   dark: {
     // Core palette
-    primary: "#3B82F6",
+    primary: "#00E5FF",
     primaryForeground: "#FFFFFF",
-    primaryLight: "#1D4ED833",
-    accent: "#06B6D4",
+    primaryLight: "#00E5FF24",
+    accent: "#14B8A6",
     accentForeground: "#FFFFFF",
     accentPurple: "#A855F7",
-    brandBlue: "#2563EB",
-    brandCyan: "#06B6D4",
+    brandBlue: "#0EA5E9",
+    brandCyan: "#00E5FF",
 
     // Backgrounds & surfaces
-    background: "#020617",
-    surface: "#0F172AE6",
-    surfaceVariant: "#111827",
-    card: "#0F172ACC",
-    glass: "#111827B3",
+    background: "#050816",
+    surface: "#0B1226E6",
+    surfaceVariant: "#101833",
+    card: "#0B1226CC",
+    glass: "#0B1226B3",
     muted: "#111827",
 
     // Text
@@ -70,9 +70,9 @@ const colors = {
     cardForeground: "#F8FAFC",
 
     // Secondary
-    secondary: "#1E3A8A",
-    secondaryForeground: "#DBEAFE",
-    tint: "#3B82F6",
+    secondary: "#0EA5E933",
+    secondaryForeground: "#E0F2FE",
+    tint: "#00E5FF",
 
     // Semantic
     destructive: "#EF4444",
@@ -83,15 +83,15 @@ const colors = {
 
     // Borders & inputs
     border: "#1E3A5F",
-    gradientBorder: "#2563EB66",
+    gradientBorder: "#00E5FF66",
     input: "#1E293B",
     shadow: "#000000",
   },
   gradients: {
-    brand: ["#2563EB", "#3B82F6", "#06B6D4"],
-    purple: ["#2563EB", "#8B5CF6", "#A855F7"],
-    dark: ["#020617", "#0F172A", "#111827"],
-    health: ["#06B6D4", "#10B981"],
+    brand: ["#00E5FF", "#0EA5E9", "#14B8A6"],
+    purple: ["#00E5FF", "#0EA5E9", "#7C3AED"],
+    dark: ["#050816", "#081225", "#101833"],
+    health: ["#00E5FF", "#14B8A6"],
     danger: ["#EF4444", "#F59E0B"],
   },
   radius: {

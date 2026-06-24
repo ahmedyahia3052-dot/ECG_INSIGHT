@@ -1,10 +1,13 @@
 import { Feather } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
-import React from "react";
+import React, { useEffect, useRef } from "react";
 import {
+  Animated,
   ActivityIndicator,
+  Easing,
   Pressable,
+  RefreshControlProps,
   ScrollView,
   StyleProp,
   StyleSheet,
@@ -21,26 +24,41 @@ export type BoltIcon = keyof typeof Feather.glyphMap;
 export function BoltScreen({
   children,
   padded = true,
+  refreshControl,
 }: {
   children: React.ReactNode;
   padded?: boolean;
+  refreshControl?: React.ReactElement<RefreshControlProps>;
 }) {
   const colors = useColors();
+  const fade = useRef(new Animated.Value(0)).current;
+  const translate = useRef(new Animated.Value(12)).current;
+
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(fade, { duration: 280, easing: Easing.out(Easing.cubic), toValue: 1, useNativeDriver: true }),
+      Animated.timing(translate, { duration: 280, easing: Easing.out(Easing.cubic), toValue: 0, useNativeDriver: true }),
+    ]).start();
+  }, [fade, translate]);
+
   return (
     <LinearGradient
       colors={
         colors.resolvedScheme === "dark"
-          ? ["#020617", "#07111F", "#0F172A"]
+          ? ["#050816", "#07111F", "#101833"]
           : ["#F8FAFC", "#EFF6FF", "#FFFFFF"]
       }
       style={styles.screen}
     >
-      <ScrollView
-        contentContainerStyle={[styles.scroll, padded && styles.padded]}
-        showsVerticalScrollIndicator={false}
-      >
-        {children}
-      </ScrollView>
+      <Animated.View style={[styles.screen, { opacity: fade, transform: [{ translateY: translate }] }]}>
+        <ScrollView
+          contentContainerStyle={[styles.scroll, padded && styles.padded]}
+          refreshControl={refreshControl}
+          showsVerticalScrollIndicator={false}
+        >
+          {children}
+        </ScrollView>
+      </Animated.View>
     </LinearGradient>
   );
 }
@@ -158,6 +176,7 @@ export function BoltButton({
   return (
     <Pressable
       accessibilityRole="button"
+      android_ripple={{ color: isPrimary ? "rgba(255,255,255,0.25)" : colors.primary + "22" }}
       disabled={disabled || loading}
       onPress={onPress}
       style={({ pressed }) => [
@@ -166,6 +185,7 @@ export function BoltButton({
           backgroundColor,
           borderColor: variant === "outline" ? colors.border : backgroundColor,
           opacity: disabled ? 0.55 : pressed ? 0.78 : 1,
+          transform: [{ scale: pressed ? 0.97 : 1 }],
         },
       ]}
     >
@@ -292,13 +312,27 @@ export function BoltNavCard({
   );
 }
 
-export function BoltEmpty({ message, title }: { message: string; title: string }) {
+export function BoltEmpty({
+  actionLabel,
+  message,
+  onAction,
+  title,
+}: {
+  actionLabel?: string;
+  message: string;
+  onAction?: () => void;
+  title: string;
+}) {
   const colors = useColors();
   return (
     <BoltCard style={styles.empty}>
-      <Feather name="file-text" size={32} color={colors.textSecondary} />
+      <View style={[styles.emptyIllustration, { borderColor: colors.primary + "33" }]}>
+        <Feather name="activity" size={30} color={colors.primary} />
+        <BoltEcgLine height={34} opacity={0.36} />
+      </View>
       <Text style={[styles.emptyTitle, { color: colors.text }]}>{title}</Text>
       <Text style={[styles.emptyMessage, { color: colors.textSecondary }]}>{message}</Text>
+      {actionLabel && onAction ? <BoltButton icon="arrow-right" label={actionLabel} onPress={onAction} variant="outline" /> : null}
     </BoltCard>
   );
 }
@@ -339,7 +373,16 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 22,
   },
-  empty: { alignItems: "center", gap: 8, paddingVertical: 28 },
+  empty: { alignItems: "center", gap: 10, paddingVertical: 28 },
+  emptyIllustration: {
+    alignItems: "center",
+    borderRadius: 24,
+    borderWidth: 1,
+    gap: 4,
+    overflow: "hidden",
+    padding: 14,
+    width: "100%",
+  },
   emptyMessage: { fontFamily: "Inter_400Regular", fontSize: 13, lineHeight: 19, textAlign: "center" },
   emptyTitle: { fontFamily: "Inter_700Bold", fontSize: 16 },
   hero: { gap: 14, overflow: "hidden" },

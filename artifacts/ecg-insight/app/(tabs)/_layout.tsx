@@ -4,8 +4,9 @@ import { Redirect, Tabs } from "expo-router";
 import { Icon, Label, NativeTabs } from "expo-router/unstable-native-tabs";
 import { SymbolView } from "expo-symbols";
 import { Feather } from "@expo/vector-icons";
+import * as Haptics from "expo-haptics";
 import { LinearGradient } from "expo-linear-gradient";
-import React from "react";
+import React, { useState } from "react";
 import { Platform, StyleSheet, Text, TouchableOpacity, View, useColorScheme } from "react-native";
 import { useAuth } from "@/context/AuthContext";
 import { useColors } from "@/hooks/useColors";
@@ -42,9 +43,23 @@ function ClassicTabLayout() {
   const colors = useColors();
   const colorScheme = useColorScheme();
   const router = useRouter();
+  const [quickOpen, setQuickOpen] = useState(false);
   const isDark = colorScheme === "dark";
   const isIOS = Platform.OS === "ios";
   const isWeb = Platform.OS === "web";
+
+  const runQuickAction = (route: string) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+    setQuickOpen(false);
+    router.push(route as any);
+  };
+
+  const tabIcon = (name: keyof typeof Feather.glyphMap, color: string, focused: boolean) => (
+    <View style={[styles.tabIconWrap, { transform: [{ scale: focused ? 1.14 : 1 }] }]}>
+      <Feather name={name} size={focused ? 24 : 21} color={color} />
+      {focused ? <View style={[styles.activeDot, { backgroundColor: colors.primary }]} /> : null}
+    </View>
+  );
 
   return (
     <>
@@ -68,7 +83,7 @@ function ClassicTabLayout() {
             right: 12,
             shadowColor: colors.shadow,
             shadowOffset: { height: 12, width: 0 },
-            shadowOpacity: 0.18,
+            shadowOpacity: 0.26,
             shadowRadius: 24,
           },
           tabBarBackground: () =>
@@ -93,11 +108,13 @@ function ClassicTabLayout() {
         name="index"
         options={{
           title: "Home",
-          tabBarIcon: ({ color }) =>
+          tabBarIcon: ({ color, focused }) =>
             isIOS ? (
-              <SymbolView name="house" tintColor={color} size={22} />
+              <View style={{ transform: [{ scale: focused ? 1.12 : 1 }] }}>
+                <SymbolView name="house" tintColor={color} size={focused ? 24 : 22} />
+              </View>
             ) : (
-              <Feather name="home" size={22} color={color} />
+              tabIcon("home", color, focused)
             ),
         }}
       />
@@ -105,11 +122,13 @@ function ClassicTabLayout() {
         name="history"
         options={{
           title: "Patients",
-          tabBarIcon: ({ color }) =>
+          tabBarIcon: ({ color, focused }) =>
             isIOS ? (
-              <SymbolView name="person.2" tintColor={color} size={22} />
+              <View style={{ transform: [{ scale: focused ? 1.12 : 1 }] }}>
+                <SymbolView name="person.2" tintColor={color} size={focused ? 24 : 22} />
+              </View>
             ) : (
-              <Feather name="users" size={22} color={color} />
+              tabIcon("users", color, focused)
             ),
         }}
       />
@@ -117,11 +136,13 @@ function ClassicTabLayout() {
         name="upload"
         options={{
           title: "Upload",
-          tabBarIcon: ({ color }) =>
+          tabBarIcon: ({ color, focused }) =>
             isIOS ? (
-              <SymbolView name="square.and.arrow.up" tintColor={color} size={22} />
+              <View style={{ transform: [{ scale: focused ? 1.12 : 1 }] }}>
+                <SymbolView name="square.and.arrow.up" tintColor={color} size={focused ? 24 : 22} />
+              </View>
             ) : (
-              <Feather name="upload-cloud" size={22} color={color} />
+              tabIcon("upload-cloud", color, focused)
             ),
         }}
       />
@@ -129,11 +150,13 @@ function ClassicTabLayout() {
         name="reports-dashboard"
         options={{
           title: "Reports",
-          tabBarIcon: ({ color }) =>
+          tabBarIcon: ({ color, focused }) =>
             isIOS ? (
-              <SymbolView name="doc.richtext" tintColor={color} size={22} />
+              <View style={{ transform: [{ scale: focused ? 1.12 : 1 }] }}>
+                <SymbolView name="doc.richtext" tintColor={color} size={focused ? 24 : 22} />
+              </View>
             ) : (
-              <Feather name="file-text" size={22} color={color} />
+              tabIcon("file-text", color, focused)
             ),
         }}
       />
@@ -141,11 +164,20 @@ function ClassicTabLayout() {
         name="profile"
         options={{
           title: "Profile",
-          tabBarIcon: ({ color }) =>
+          tabBarBadge: "!",
+          tabBarBadgeStyle: {
+            backgroundColor: colors.destructive,
+            color: "#fff",
+            fontFamily: "Inter_700Bold",
+            fontSize: 10,
+          },
+          tabBarIcon: ({ color, focused }) =>
             isIOS ? (
-              <SymbolView name="person" tintColor={color} size={22} />
+              <View style={{ transform: [{ scale: focused ? 1.12 : 1 }] }}>
+                <SymbolView name="person" tintColor={color} size={focused ? 24 : 22} />
+              </View>
             ) : (
-              <Feather name="user" size={22} color={color} />
+              tabIcon("user", color, focused)
             ),
         }}
       />
@@ -178,16 +210,40 @@ function ClassicTabLayout() {
       <Tabs.Screen name="task-dashboard" options={{ href: null, title: "Task Dashboard" }} />
       <Tabs.Screen name="alert-dashboard" options={{ href: null, title: "Alert Dashboard" }} />
       </Tabs>
+      {quickOpen ? (
+        <View style={styles.quickMenu}>
+          {[
+            { icon: "upload-cloud" as const, label: "Upload ECG", route: "/(tabs)/upload" },
+            { icon: "user-plus" as const, label: "Add Patient", route: "/(tabs)/history" },
+            { icon: "file-plus" as const, label: "Generate Report", route: "/(tabs)/reports-dashboard" },
+          ].map((action) => (
+            <TouchableOpacity
+              key={action.label}
+              activeOpacity={0.85}
+              accessibilityRole="button"
+              accessibilityLabel={action.label}
+              onPress={() => runQuickAction(action.route)}
+              style={[styles.quickItem, { backgroundColor: colors.glass, borderColor: colors.gradientBorder }]}
+            >
+              <Feather name={action.icon} size={16} color={colors.primary} />
+              <Text style={[styles.quickText, { color: colors.text }]}>{action.label}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      ) : null}
       <TouchableOpacity
         accessibilityRole="button"
-        accessibilityLabel="Analyze ECG"
+        accessibilityLabel="Quick actions"
         activeOpacity={0.86}
-        onPress={() => router.push("/(tabs)/upload" as any)}
+        onPress={() => {
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+          setQuickOpen((value) => !value);
+        }}
         style={styles.fab}
       >
         <LinearGradient colors={colors.gradients.purple as [string, string, string]} style={styles.fabGradient}>
-          <Feather name="zap" size={18} color="#fff" />
-          {isWeb ? <Text style={styles.fabText}>Analyze ECG</Text> : null}
+          <Feather name={quickOpen ? "x" : "plus"} size={20} color="#fff" />
+          {isWeb ? <Text style={styles.fabText}>{quickOpen ? "Close" : "Quick Actions"}</Text> : null}
         </LinearGradient>
       </TouchableOpacity>
     </>
@@ -227,5 +283,28 @@ const styles = StyleSheet.create({
     shadowRadius: 24,
   },
   fabText: { color: "#fff", fontFamily: "Inter_700Bold", fontSize: 13 },
+  activeDot: { borderRadius: 999, bottom: -6, height: 4, position: "absolute", width: 18 },
+  quickItem: {
+    alignItems: "center",
+    borderRadius: 999,
+    borderWidth: 1,
+    flexDirection: "row",
+    gap: 8,
+    justifyContent: "center",
+    paddingHorizontal: 14,
+    paddingVertical: 11,
+    shadowColor: "#00E5FF",
+    shadowOffset: { height: 10, width: 0 },
+    shadowOpacity: 0.18,
+    shadowRadius: 18,
+  },
+  quickMenu: {
+    bottom: Platform.OS === "web" ? 184 : 158,
+    gap: 10,
+    position: "absolute",
+    right: 22,
+  },
+  quickText: { fontFamily: "Inter_700Bold", fontSize: 12 },
+  tabIconWrap: { alignItems: "center", justifyContent: "center", minHeight: 30, minWidth: 34 },
   tabBlur: { borderRadius: 26, overflow: "hidden" },
 });
