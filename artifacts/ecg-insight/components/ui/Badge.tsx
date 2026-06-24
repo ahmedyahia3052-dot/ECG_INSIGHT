@@ -53,8 +53,10 @@ export function RoleBadge({ role }: RoleBadgeProps) {
   const config: Record<UserRole, { label: string; bg: string; text: string }> = {
     super_admin: { label: "Super Admin", bg: "#7C3AED20", text: "#7C3AED" },
     admin: { label: "Admin", bg: colors.info + "20", text: colors.info },
+    corporate_client: { label: "Corporate", bg: "#0F766E20", text: "#0F766E" },
     doctor: { label: "Doctor", bg: colors.primary + "20", text: colors.primary },
     student: { label: "Student", bg: colors.accent + "20", text: colors.accent },
+    user: { label: "User", bg: colors.accent + "20", text: colors.accent },
   };
 
   const c = config[role];

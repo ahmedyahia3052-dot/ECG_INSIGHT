@@ -11,7 +11,20 @@ enum Role {
   SUPER_ADMIN
   ADMIN
   DOCTOR
+  CORPORATE_CLIENT
+  USER
   STUDENT
+}
+
+enum OAuthProvider {
+  GOOGLE
+  APPLE
+  MICROSOFT
+}
+
+enum PhoneOtpPurpose {
+  LOGIN
+  REGISTER
 }
 
 enum SubscriptionTier {
@@ -619,6 +632,8 @@ model User {
   name                        String
   email                       String                    @unique
   username                    String?                   @unique
+  phoneNumber                 String?                   @unique
+  phoneVerified               Boolean                   @default(false)
   passwordHash                String
   role                        Role                      @default(STUDENT)
   protectedOwner              Boolean                   @default(false)
@@ -646,6 +661,8 @@ model User {
   createdAt                   DateTime                  @default(now())
   updatedAt                   DateTime                  @updatedAt
   sessions                    Session[]
+  oauthIdentities             OAuthIdentity[]
+  phoneOtps                   PhoneOtp[]
   subscription                Subscription?
   commercialSubscriptions     UserSubscription[]
   licenses                    License[]                  @relation("LicenseUser")
@@ -1918,6 +1935,7 @@ model UserSession {
   sessionId         String?
   ipAddress         String?
   userAgent         String?
+  deviceName        String?
   deviceFingerprint String?
   active            Boolean   @default(true)
   lastActivityAt    DateTime  @default(now())
@@ -2138,6 +2156,38 @@ model Session {
   user             User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
+  @@index([expiresAt])
+}
+
+model OAuthIdentity {
+  id             String        @id @default(cuid())
+  userId         String
+  provider       OAuthProvider
+  providerUserId String
+  email          String?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+  user           User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerUserId])
+  @@index([userId])
+  @@index([provider])
+}
+
+model PhoneOtp {
+  id          String          @id @default(cuid())
+  userId      String?
+  phoneNumber String
+  otpHash     String
+  purpose     PhoneOtpPurpose @default(LOGIN)
+  attempts    Int             @default(0)
+  consumedAt  DateTime?
+  expiresAt   DateTime
+  createdAt   DateTime        @default(now())
+  user        User?           @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([phoneNumber])
   @@index([expiresAt])
 }
 

@@ -31,10 +31,13 @@ export default function LoginScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { login } = useAuth();
+  const { login, oauthLogin, requestPhoneOtp, verifyPhoneOtp } = useAuth();
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [phoneNumber, setPhoneNumber] = useState("");
+  const [phoneOtp, setPhoneOtp] = useState("");
+  const [phoneOtpSent, setPhoneOtpSent] = useState(false);
   const [rememberMe, setRememberMe] = useState(true);
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -69,6 +72,42 @@ export default function LoginScreen() {
     setPassword("password");
     setError("");
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+  };
+
+  const handlePhoneOtp = async () => {
+    setError("");
+    if (!phoneNumber.trim()) { setError("Phone number is required."); return; }
+    setLoading(true);
+    if (!phoneOtpSent) {
+      const result = await requestPhoneOtp(phoneNumber.trim(), "LOGIN");
+      setLoading(false);
+      if (!result.success) {
+        setError(result.error ?? "Phone sign-in failed.");
+        return;
+      }
+      setPhoneOtp(result.otp ?? "");
+      setPhoneOtpSent(true);
+      return;
+    }
+    const result = await verifyPhoneOtp(phoneNumber.trim(), phoneOtp.trim(), rememberMe);
+    setLoading(false);
+    if (!result.success) {
+      setError(result.error ?? "Phone sign-in failed.");
+      return;
+    }
+    router.replace("/(tabs)");
+  };
+
+  const handleOAuth = async (provider: "GOOGLE" | "APPLE" | "MICROSOFT") => {
+    setError("");
+    setLoading(true);
+    const result = await oauthLogin(provider, `${provider.toLowerCase()}-demo-user`, `${provider.toLowerCase()}@ecginsight.local`, `${provider} User`);
+    setLoading(false);
+    if (!result.success) {
+      setError(result.error ?? `${provider} sign-in failed.`);
+      return;
+    }
+    router.replace("/(tabs)");
   };
 
   return (
@@ -221,6 +260,67 @@ export default function LoginScreen() {
               </>
             )}
           </TouchableOpacity>
+
+          <View style={styles.dividerRow}>
+            <View style={[styles.divider, { backgroundColor: colors.border }]} />
+            <Text style={[styles.dividerText, { color: colors.textSecondary }]}>Enterprise options</Text>
+            <View style={[styles.divider, { backgroundColor: colors.border }]} />
+          </View>
+
+          <View style={styles.oauthRow}>
+            {(["GOOGLE", "APPLE", "MICROSOFT"] as const).map((provider) => (
+              <TouchableOpacity
+                key={provider}
+                style={[styles.oauthBtn, { backgroundColor: colors.background, borderColor: colors.border }]}
+                onPress={() => handleOAuth(provider)}
+                disabled={loading}
+              >
+                <Text style={[styles.oauthText, { color: colors.text }]}>{provider === "GOOGLE" ? "Google" : provider === "APPLE" ? "Apple" : "Microsoft"}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+
+          <View style={styles.field}>
+            <Text style={[styles.label, { color: colors.text }]}>Mobile Phone OTP</Text>
+            <View style={[styles.inputWrap, { backgroundColor: colors.background, borderColor: colors.border }]}>
+              <Feather name="smartphone" size={16} color={colors.textSecondary} />
+              <TextInput
+                style={[styles.input, { color: colors.text }]}
+                placeholder="+201000000000"
+                placeholderTextColor={colors.textSecondary}
+                value={phoneNumber}
+                onChangeText={setPhoneNumber}
+                keyboardType="phone-pad"
+              />
+            </View>
+          </View>
+
+          {phoneOtpSent ? (
+            <View style={styles.field}>
+              <Text style={[styles.label, { color: colors.text }]}>One-time code</Text>
+              <View style={[styles.inputWrap, { backgroundColor: colors.background, borderColor: colors.border }]}>
+                <Feather name="key" size={16} color={colors.textSecondary} />
+                <TextInput
+                  style={[styles.input, { color: colors.text }]}
+                  placeholder="6-digit code"
+                  placeholderTextColor={colors.textSecondary}
+                  value={phoneOtp}
+                  onChangeText={setPhoneOtp}
+                  keyboardType="number-pad"
+                />
+              </View>
+            </View>
+          ) : null}
+
+          <TouchableOpacity
+            style={[styles.secondaryBtn, { borderColor: colors.primary }]}
+            onPress={handlePhoneOtp}
+            disabled={loading}
+          >
+            <Text style={[styles.secondaryBtnText, { color: colors.primary }]}>
+              {phoneOtpSent ? "Verify Phone Code" : "Send Phone OTP"}
+            </Text>
+          </TouchableOpacity>
         </View>
 
         {/* Demo accounts */}
@@ -343,6 +443,14 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   btnText: { fontSize: 15, fontFamily: "Inter_600SemiBold", color: "#fff" },
+  divider: { flex: 1, height: 1 },
+  dividerRow: { alignItems: "center", flexDirection: "row", gap: 10, marginVertical: 2 },
+  dividerText: { fontSize: 11, fontFamily: "Inter_600SemiBold", textTransform: "uppercase" },
+  oauthBtn: { borderRadius: 10, borderWidth: 1, flex: 1, paddingVertical: 10, alignItems: "center" },
+  oauthRow: { flexDirection: "row", gap: 8 },
+  oauthText: { fontSize: 12, fontFamily: "Inter_600SemiBold" },
+  secondaryBtn: { alignItems: "center", borderRadius: 12, borderWidth: 1, paddingVertical: 12 },
+  secondaryBtnText: { fontSize: 14, fontFamily: "Inter_600SemiBold" },
   demoBox: {
     borderRadius: 14,
     borderWidth: 1,

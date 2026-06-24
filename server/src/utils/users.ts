@@ -1,21 +1,25 @@
 import type { Role, SubscriptionTier, User } from "@prisma/client";
 
-export type ApiRole = "super_admin" | "admin" | "doctor" | "student";
+export type ApiRole = "super_admin" | "admin" | "corporate_client" | "doctor" | "student" | "user";
 export type ApiSubscriptionTier = "free" | "basic" | "professional" | "unlimited" | "lifetime" | "enterprise";
 
 const roleToApi: Record<Role, ApiRole> = {
   ADMIN: "admin",
+  CORPORATE_CLIENT: "corporate_client",
   DOCTOR: "doctor",
   OWNER: "super_admin",
   STUDENT: "student",
   SUPER_ADMIN: "super_admin",
+  USER: "user",
 };
 
 const roleFromApi: Record<ApiRole, Role> = {
   admin: "ADMIN",
+  corporate_client: "CORPORATE_CLIENT",
   doctor: "DOCTOR",
   student: "STUDENT",
   super_admin: "SUPER_ADMIN",
+  user: "USER",
 };
 
 const tierToApi: Record<SubscriptionTier, ApiSubscriptionTier> = {
@@ -75,6 +79,8 @@ export function serializeUser(
     | "ownerTwoFactorRequired"
     | "protectedOwner"
     | "role"
+    | "phoneNumber"
+    | "phoneVerified"
     | "specialization"
     | "username"
     | "createdAt"
@@ -102,6 +108,8 @@ export function serializeUser(
     ownerPasswordSetupRequired: user.ownerPasswordSetupRequired,
     ownerTwoFactorRequired: user.ownerTwoFactorRequired,
     protectedOwner: user.protectedOwner,
+    phoneNumber: user.phoneNumber ?? undefined,
+    phoneVerified: user.phoneVerified,
     role: toApiRole(user.role),
     specialization: user.specialization ?? undefined,
     subscriptionTier: user.subscription ? publicUserTier(user.subscription.tier) : "free",

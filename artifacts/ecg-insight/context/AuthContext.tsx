@@ -3,12 +3,14 @@ import { create } from "zustand";
 import { type ManagedUser } from "@/data/mockData";
 import { apiRequest, ApiError } from "@/services/api";
 
-export type UserRole = "super_admin" | "admin" | "doctor" | "student";
+export type UserRole = "super_admin" | "admin" | "corporate_client" | "doctor" | "student" | "user";
 
 export interface User {
   id: string;
   name: string;
   email: string;
+  phoneNumber?: string;
+  phoneVerified?: boolean;
   role: UserRole;
   specialization?: string;
   institution?: string;
@@ -49,8 +51,13 @@ interface AuthContextType {
     name: string,
     email: string,
     password: string,
-    role: "doctor" | "student"
+    role: "corporate_client" | "doctor" | "student" | "user",
+    phoneNumber?: string
   ) => Promise<{ success: boolean; error?: string }>;
+  requestPhoneOtp: (phoneNumber: string, purpose?: "LOGIN" | "REGISTER", name?: string) => Promise<{ success: boolean; otp?: string; error?: string }>;
+  verifyPhoneOtp: (phoneNumber: string, otp: string, rememberMe?: boolean) => Promise<{ success: boolean; error?: string }>;
+  oauthLogin: (provider: "GOOGLE" | "APPLE" | "MICROSOFT", providerUserId: string, email?: string, name?: string) => Promise<{ success: boolean; error?: string }>;
+  resendVerification: (email: string) => Promise<{ success: boolean; token?: string; error?: string }>;
 
   forgotPassword: (email: string) => Promise<boolean>;
   verifyResetCode: (email: string, code: string) => Promise<boolean>;
@@ -109,8 +116,10 @@ interface AuthStore {
 const ROLE_HIERARCHY: Record<UserRole, number> = {
   super_admin: 4,
   admin: 3,
+  corporate_client: 2,
   doctor: 2,
   student: 1,
+  user: 1,
 };
 
 const useAuthStore = create<AuthStore>((set) => ({
@@ -136,6 +145,10 @@ const AuthContext = createContext<AuthContextType>({
   login: async () => ({ success: false }),
   logout: async () => {},
   register: async () => ({ success: false }),
+  requestPhoneOtp: async () => ({ success: false }),
+  verifyPhoneOtp: async () => ({ success: false }),
+  oauthLogin: async () => ({ success: false }),
+  resendVerification: async () => ({ success: false }),
   forgotPassword: async () => false,
   verifyResetCode: async () => false,
   resetPassword: async () => false,
@@ -235,11 +248,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       name: string,
       email: string,
       password: string,
-      role: "doctor" | "student"
+      role: "corporate_client" | "doctor" | "student" | "user",
+      phoneNumber?: string
     ) => {
       try {
         const payload = await apiRequest<AuthPayload>("/auth/register", {
-          body: JSON.stringify({ email, name, password, role }),
+          body: JSON.stringify({ email: email || undefined, name, password: password || undefined, phoneNumber, role }),
           method: "POST",
         });
         setState({
@@ -254,6 +268,62 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     },
     [setState]
   );
+
+  const requestPhoneOtp = useCallback(async (phoneNumber: string, purpose: "LOGIN" | "REGISTER" = "LOGIN", name?: string) => {
+    try {
+      const payload = await apiRequest<{ otp?: string }>("/auth/phone/request-otp", {
+        body: JSON.stringify({ name, phoneNumber, purpose }),
+        method: "POST",
+      });
+      return { success: true, otp: payload.otp };
+    } catch (error) {
+      return { success: false, error: errorMessage(error, "Unable to send phone OTP.") };
+    }
+  }, []);
+
+  const verifyPhoneOtp = useCallback(
+    async (phoneNumber: string, otp: string, remember = true) => {
+      try {
+        const payload = await apiRequest<AuthPayload>("/auth/phone/verify", {
+          body: JSON.stringify({ otp, phoneNumber, rememberMe: remember }),
+          method: "POST",
+        });
+        setState({ accessToken: payload.accessToken, rememberMe: remember, user: payload.user });
+        return { success: true };
+      } catch (error) {
+        return { success: false, error: errorMessage(error, "Phone verification failed.") };
+      }
+    },
+    [setState]
+  );
+
+  const oauthLogin = useCallback(
+    async (provider: "GOOGLE" | "APPLE" | "MICROSOFT", providerUserId: string, email?: string, name?: string) => {
+      try {
+        const payload = await apiRequest<AuthPayload>("/auth/oauth/login", {
+          body: JSON.stringify({ email, name, provider, providerUserId, rememberMe: true }),
+          method: "POST",
+        });
+        setState({ accessToken: payload.accessToken, rememberMe: true, user: payload.user });
+        return { success: true };
+      } catch (error) {
+        return { success: false, error: errorMessage(error, `${provider} sign-in failed.`) };
+      }
+    },
+    [setState]
+  );
+
+  const resendVerification = useCallback(async (email: string) => {
+    try {
+      const payload = await apiRequest<{ emailVerificationToken?: string }>("/auth/resend-verification", {
+        body: JSON.stringify({ email }),
+        method: "POST",
+      });
+      return { success: true, token: payload.emailVerificationToken };
+    } catch (error) {
+      return { success: false, error: errorMessage(error, "Unable to resend verification email.") };
+    }
+  }, []);
 
   const logout = useCallback(async () => {
     await apiRequest<void>("/auth/logout", { method: "POST", accessToken }).catch(() => {});
@@ -395,6 +465,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         login,
         logout,
         register,
+        requestPhoneOtp,
+        verifyPhoneOtp,
+        oauthLogin,
+        resendVerification,
         forgotPassword,
         verifyResetCode,
         resetPassword,

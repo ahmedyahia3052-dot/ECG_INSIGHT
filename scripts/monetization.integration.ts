@@ -7,6 +7,7 @@ import {
   ensureDefaultPlans,
   grantLifetimeLicense,
   initiatePayment,
+  ownerAnalytics,
   quotaSnapshot,
   recordAnalysisUsage,
 } from "../server/src/subscriptions/monetization.service";
@@ -52,6 +53,9 @@ async function main() {
   await ensureDefaultPlans();
   const plans = await prisma.subscriptionPlan.findMany();
   assert(plans.length >= 6, "Default subscription plans were not created.");
+  for (const code of ["FREE", "BASIC", "PROFESSIONAL", "ENTERPRISE"] as const) {
+    assert(plans.some((plan) => plan.code === code), `${code} plan should remain configured.`);
+  }
 
   const freeUser = await createUser(`quota-${Date.now()}@ecginsight.test`);
   await cleanup(freeUser.id);
@@ -79,6 +83,14 @@ async function main() {
   const basic = await quotaSnapshot(freeUser.id);
   assert(basic.quota === 100, "Basic plan should expose 100 monthly analyses.");
 
+  await activateUserPlan(freeUser.id, "PROFESSIONAL");
+  const professional = await quotaSnapshot(freeUser.id);
+  assert(professional.quota === 500, "Professional plan should expose 500 monthly analyses.");
+
+  await activateUserPlan(freeUser.id, "ENTERPRISE");
+  const enterprise = await quotaSnapshot(freeUser.id);
+  assert(enterprise.isUnlimited, "Enterprise plan should remain unlimited/configurable.");
+
   const owner = await createUser(`owner-${Date.now()}@ecginsight.test`, "OWNER");
   await grantLifetimeLicense(freeUser.id, owner.id, "Integration test lifetime grant");
   const lifetime = await quotaSnapshot(freeUser.id);
@@ -87,6 +99,9 @@ async function main() {
   const paymentResult = await initiatePayment(freeUser.id, "PROFESSIONAL", "INSTAPAY");
   assert(paymentResult.payment.status === "PENDING", "Manual payment should start pending.");
   assert(paymentResult.initiation.providerPayload["instructions"], "Manual payment instructions missing.");
+  await prisma.payment.update({ data: { status: "APPROVED" }, where: { id: paymentResult.payment.id } });
+  const analytics = await ownerAnalytics();
+  assert(analytics.monthlyRevenueCents >= paymentResult.payment.amountCents, "Owner revenue analytics should include approved payments.");
 
   await cleanup(freeUser.id);
   await cleanup(owner.id);

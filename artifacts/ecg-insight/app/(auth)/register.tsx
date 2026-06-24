@@ -16,7 +16,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAuth } from "@/context/AuthContext";
 import { useColors } from "@/hooks/useColors";
 
-type Role = "doctor" | "student";
+type Role = "corporate_client" | "doctor" | "user";
 
 export default function RegisterScreen() {
   const colors = useColors();
@@ -26,8 +26,9 @@ export default function RegisterScreen() {
 
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
+  const [phoneNumber, setPhoneNumber] = useState("");
   const [password, setPassword] = useState("");
-  const [role, setRole] = useState<Role>("doctor");
+  const [role, setRole] = useState<Role>("user");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -35,10 +36,10 @@ export default function RegisterScreen() {
   const validate = () => {
     const e: Record<string, string> = {};
     if (!name.trim()) e.name = "Full name is required";
-    if (!email.trim()) e.email = "Email is required";
-    else if (!email.includes("@")) e.email = "Enter a valid email";
-    if (!password) e.password = "Password is required";
-    else if (password.length < 6) e.password = "At least 6 characters";
+    if (!email.trim() && !phoneNumber.trim()) e.email = "Email or mobile phone is required";
+    else if (email.trim() && !email.includes("@")) e.email = "Enter a valid email";
+    if (email.trim() && !password) e.password = "Password is required for email registration";
+    else if (password && passwordStrength(password).score < 4) e.password = "Use 12+ chars with upper, lower, number, and symbol";
     setErrors(e);
     return Object.keys(e).length === 0;
   };
@@ -47,10 +48,10 @@ export default function RegisterScreen() {
     if (!validate()) return;
     setLoading(true);
     try {
-      const result = await register(name.trim(), email.trim(), password, role);
+      const result = await register(name.trim(), email.trim(), password, role, phoneNumber.trim() || undefined);
       if (result.success) {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-        router.replace("/(tabs)");
+        router.replace(email.trim() ? `/(auth)/verify-email?email=${encodeURIComponent(email.trim())}` : "/(auth)/login");
       } else {
         setErrors({ form: result.error ?? "Registration failed." });
       }
@@ -60,6 +61,7 @@ export default function RegisterScreen() {
   };
 
   const topInset = Platform.OS === "web" ? 67 : insets.top;
+  const strength = passwordStrength(password);
 
   return (
     <KeyboardAvoidingView
@@ -131,12 +133,27 @@ export default function RegisterScreen() {
             </View>
 
             <View style={styles.field}>
+              <Text style={[styles.label, { color: colors.foreground }]}>Mobile Phone</Text>
+              <View style={[styles.inputWrap, { backgroundColor: colors.muted, borderColor: colors.border }]}>
+                <Feather name="smartphone" size={16} color={colors.mutedForeground} />
+                <TextInput
+                  style={[styles.input, { color: colors.foreground }]}
+                  placeholder="+201000000000"
+                  placeholderTextColor={colors.mutedForeground}
+                  value={phoneNumber}
+                  onChangeText={setPhoneNumber}
+                  keyboardType="phone-pad"
+                />
+              </View>
+            </View>
+
+            <View style={styles.field}>
               <Text style={[styles.label, { color: colors.foreground }]}>Password</Text>
               <View style={[styles.inputWrap, { backgroundColor: colors.muted, borderColor: errors.password ? colors.destructive : colors.border }]}>
                 <Feather name="lock" size={16} color={colors.mutedForeground} />
                 <TextInput
                   style={[styles.input, { color: colors.foreground }]}
-                  placeholder="Min. 6 characters"
+                  placeholder="12+ chars, mixed complexity"
                   placeholderTextColor={colors.mutedForeground}
                   value={password}
                   onChangeText={setPassword}
@@ -146,13 +163,25 @@ export default function RegisterScreen() {
                   <Feather name={showPassword ? "eye-off" : "eye"} size={16} color={colors.mutedForeground} />
                 </TouchableOpacity>
               </View>
+              <View style={styles.strengthRow}>
+                {[0, 1, 2, 3, 4].map((slot) => (
+                  <View
+                    key={slot}
+                    style={[
+                      styles.strengthBar,
+                      { backgroundColor: slot < strength.score ? strength.color : colors.border },
+                    ]}
+                  />
+                ))}
+              </View>
+              <Text style={[styles.strengthText, { color: strength.color }]}>{strength.label}</Text>
               {errors.password && <Text style={[styles.error, { color: colors.destructive }]}>{errors.password}</Text>}
             </View>
 
             <View style={styles.field}>
               <Text style={[styles.label, { color: colors.foreground }]}>I am a...</Text>
               <View style={styles.roleRow}>
-                {(["doctor", "student"] as Role[]).map((r) => (
+                {(["user", "doctor", "corporate_client"] as Role[]).map((r) => (
                   <TouchableOpacity
                     key={r}
                     style={[
@@ -169,7 +198,7 @@ export default function RegisterScreen() {
                     activeOpacity={0.8}
                   >
                     <Feather
-                      name={r === "doctor" ? "briefcase" : "book-open"}
+                      name={r === "doctor" ? "briefcase" : r === "corporate_client" ? "users" : "user"}
                       size={16}
                       color={role === r ? colors.primaryForeground : colors.mutedForeground}
                     />
@@ -179,7 +208,7 @@ export default function RegisterScreen() {
                         { color: role === r ? colors.primaryForeground : colors.mutedForeground },
                       ]}
                     >
-                      {r === "doctor" ? "Doctor / Clinician" : "Medical Student"}
+                      {r === "doctor" ? "Doctor / Clinician" : r === "corporate_client" ? "Corporate Client" : "Individual User"}
                     </Text>
                   </TouchableOpacity>
                 ))}
@@ -197,6 +226,9 @@ export default function RegisterScreen() {
                 {loading ? "Creating account..." : "Create Account"}
               </Text>
             </TouchableOpacity>
+            <Text style={[styles.planHint, { color: colors.mutedForeground }]}>
+              New accounts start on the FREE plan with 5 ECG analyses per 24 hours.
+            </Text>
           </View>
         </View>
 
@@ -257,4 +289,23 @@ const styles = StyleSheet.create({
   footer: { flexDirection: "row", justifyContent: "center", alignItems: "center" },
   footerText: { fontSize: 13, fontFamily: "Inter_400Regular" },
   link: { fontSize: 13, fontFamily: "Inter_600SemiBold" },
+  planHint: { fontSize: 12, fontFamily: "Inter_400Regular", lineHeight: 18, textAlign: "center" },
+  strengthBar: { borderRadius: 2, flex: 1, height: 5 },
+  strengthRow: { flexDirection: "row", gap: 4 },
+  strengthText: { fontSize: 11, fontFamily: "Inter_600SemiBold" },
 });
+
+function passwordStrength(password: string) {
+  const checks = [
+    password.length >= 12,
+    /[A-Z]/.test(password),
+    /[a-z]/.test(password),
+    /\d/.test(password),
+    /[^A-Za-z0-9]/.test(password),
+  ];
+  const score = checks.filter(Boolean).length;
+  if (!password) return { color: "#94A3B8", label: "Password strength: not started", score };
+  if (score <= 2) return { color: "#DC2626", label: "Password strength: weak", score };
+  if (score <= 4) return { color: "#D97706", label: "Password strength: good", score };
+  return { color: "#059669", label: "Password strength: strong", score };
+}

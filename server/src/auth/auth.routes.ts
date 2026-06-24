@@ -7,21 +7,30 @@ import {
   changePasswordSchema,
   forgotPasswordSchema,
   loginSchema,
+  oauthLoginSchema,
   ownerPasswordSetupSchema,
+  requestPhoneOtpSchema,
   registerSchema,
+  resendVerificationSchema,
   resetPasswordSchema,
   updateProfileSchema,
+  verifyPhoneOtpSchema,
   verifyEmailSchema,
 } from "./schemas";
 import {
   changeOwnPassword,
   loginUser,
   logoutSession,
+  logoutAllSessions,
+  oauthLogin,
   refreshSession,
   registerUser,
+  requestPhoneOtp,
   requestPasswordReset,
+  resendVerificationEmail,
   resetPassword,
   setupOwnerPassword,
+  verifyPhoneOtp,
   verifyEmail,
 } from "./auth.service";
 
@@ -44,6 +53,30 @@ authRouter.post("/login", validateBody(loginSchema), async (req, res, next) => {
   }
 });
 
+authRouter.post("/phone/request-otp", validateBody(requestPhoneOtpSchema), async (req, res, next) => {
+  try {
+    res.status(201).json(await requestPhoneOtp(req.body));
+  } catch (error) {
+    next(error);
+  }
+});
+
+authRouter.post("/phone/verify", validateBody(verifyPhoneOtpSchema), async (req, res, next) => {
+  try {
+    res.json(await verifyPhoneOtp(req.body, req, res));
+  } catch (error) {
+    next(error);
+  }
+});
+
+authRouter.post("/oauth/login", validateBody(oauthLoginSchema), async (req, res, next) => {
+  try {
+    res.json(await oauthLogin(req.body, req, res));
+  } catch (error) {
+    next(error);
+  }
+});
+
 authRouter.post("/owner/setup-password", validateBody(ownerPasswordSetupSchema), async (req, res, next) => {
   try {
     await setupOwnerPassword(req.body);
@@ -56,6 +89,15 @@ authRouter.post("/owner/setup-password", validateBody(ownerPasswordSetupSchema),
 authRouter.post("/logout", async (req, res, next) => {
   try {
     await logoutSession(req, res);
+    res.status(204).send();
+  } catch (error) {
+    next(error);
+  }
+});
+
+authRouter.post("/logout-all", requireAuth, async (req, res, next) => {
+  try {
+    await logoutAllSessions(req.auth!.id, res);
     res.status(204).send();
   } catch (error) {
     next(error);
@@ -99,6 +141,14 @@ authRouter.post("/verify-email", validateBody(verifyEmailSchema), async (req, re
   try {
     await verifyEmail(req.body);
     res.status(204).send();
+  } catch (error) {
+    next(error);
+  }
+});
+
+authRouter.post("/resend-verification", validateBody(resendVerificationSchema), async (req, res, next) => {
+  try {
+    res.json(await resendVerificationEmail(req.body.email));
   } catch (error) {
     next(error);
   }

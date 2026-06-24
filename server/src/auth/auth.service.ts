@@ -19,6 +19,7 @@ const TOKEN_VERSION = 1;
 const MAX_FAILED_LOGIN_ATTEMPTS = 5;
 const PASSWORD_MAX_AGE_DAYS = 90;
 const MAX_CONCURRENT_SESSIONS = 5;
+const CAPTCHA_FAILED_ATTEMPTS = 3;
 
 function assertPasswordPolicy(password: string) {
   const strongEnough =
@@ -93,6 +94,18 @@ function sessionMeta(req: Request) {
   };
 }
 
+function normalizePhone(phoneNumber: string) {
+  return phoneNumber.replace(/[^\d+]/g, "");
+}
+
+function phoneEmail(phoneNumber: string) {
+  return `${normalizePhone(phoneNumber).replace(/\+/g, "")}@phone.ecginsight.local`;
+}
+
+function randomOtp() {
+  return String(Math.floor(100000 + Math.random() * 900000));
+}
+
 async function createSession(userId: string, rememberMe: boolean, req: Request, res: Response) {
   const expiresInSeconds = rememberMe ? REMEMBER_SESSION_SECONDS : NORMAL_SESSION_SECONDS;
   const expiresAt = new Date(Date.now() + expiresInSeconds * 1000);
@@ -121,8 +134,10 @@ async function createSession(userId: string, rememberMe: boolean, req: Request, 
   await prisma.userSession.create({
     data: {
       active: true,
+      deviceName: req.get("sec-ch-ua-platform") ?? undefined,
       expiresAt,
       ipAddress: req.ip,
+      lastActivityAt: new Date(),
       sessionId: session.id,
       userAgent: req.get("user-agent"),
       userId,
@@ -146,7 +161,7 @@ async function createSession(userId: string, rememberMe: boolean, req: Request, 
 
 export async function issueAuthResponse(input: {
   actorId?: string;
-  actorRole?: "OWNER" | "SUPER_ADMIN" | "ADMIN" | "DOCTOR" | "STUDENT";
+  actorRole?: "OWNER" | "SUPER_ADMIN" | "ADMIN" | "DOCTOR" | "CORPORATE_CLIENT" | "USER" | "STUDENT";
   req: Request;
   res: Response;
   rememberMe: boolean;
@@ -177,18 +192,20 @@ export async function issueAuthResponse(input: {
 
 export async function registerUser(
   body: {
-    email: string;
+    email?: string;
     institution?: string;
     name: string;
-    password: string;
-    role: "doctor" | "student";
+    password?: string;
+    phoneNumber?: string;
+    role: "corporate_client" | "doctor" | "student" | "user";
     specialization?: string;
   },
   req: Request,
   res: Response,
 ) {
-  assertPasswordPolicy(body.password);
-  const email = body.email.trim().toLowerCase();
+  if (body.email) assertPasswordPolicy(body.password ?? "");
+  const phoneNumber = body.phoneNumber ? normalizePhone(body.phoneNumber) : undefined;
+  const email = body.email?.trim().toLowerCase() ?? (phoneNumber ? phoneEmail(phoneNumber) : "");
   const existing = await prisma.user.findUnique({ where: { email } });
   if (existing) {
     throw new AppError(409, "An account with this email already exists.", "EMAIL_EXISTS");
@@ -203,7 +220,8 @@ export async function registerUser(
       emailVerificationTokenHash: hashToken(emailToken),
       institution: body.institution,
       name: body.name,
-      passwordHash: await hashPassword(body.password),
+      passwordHash: await hashPassword(body.password ?? createOpaqueToken(48)),
+      phoneNumber,
       role: fromApiRole(body.role),
       specialization: body.specialization,
       subscription: {
@@ -269,7 +287,11 @@ export async function loginUser(
         });
       }
     }
-    throw new AppError(401, "Invalid email or password.", "INVALID_CREDENTIALS");
+    const error = new AppError(401, "Invalid email or password.", "INVALID_CREDENTIALS");
+    if (user && user.failedLoginAttempts + 1 >= CAPTCHA_FAILED_ATTEMPTS) {
+      (error as AppError & { details?: Record<string, unknown> }).details = { captchaRequired: true };
+    }
+    throw error;
   }
   if (!user.isActive) {
     throw new AppError(403, "User account is deactivated.", "USER_INACTIVE");
@@ -304,6 +326,102 @@ export async function loginUser(
     }),
     user: serializeUser(user),
   };
+}
+
+export async function requestPhoneOtp(body: { name?: string; phoneNumber: string; purpose: "LOGIN" | "REGISTER" }) {
+  const phoneNumber = normalizePhone(body.phoneNumber);
+  let user = await prisma.user.findUnique({ where: { phoneNumber } });
+  if (!user && body.purpose === "REGISTER") {
+    user = await prisma.user.create({
+      data: {
+        avatarInitials: initialsForName(body.name ?? phoneNumber),
+        email: phoneEmail(phoneNumber),
+        name: body.name ?? `Phone User ${phoneNumber.slice(-4)}`,
+        passwordHash: await hashPassword(createOpaqueToken(48)),
+        phoneNumber,
+        role: "USER",
+        subscription: { create: { status: "ACTIVE", tier: "FREE" } },
+      },
+    });
+  }
+  if (!user) {
+    throw new AppError(404, "Phone number is not registered.", "PHONE_NOT_REGISTERED");
+  }
+  const otp = randomOtp();
+  const record = await prisma.phoneOtp.create({
+    data: {
+      expiresAt: new Date(Date.now() + 10 * 60 * 1000),
+      otpHash: hashToken(otp),
+      phoneNumber,
+      purpose: body.purpose,
+      userId: user.id,
+    },
+  });
+  return { otp, otpId: record.id };
+}
+
+export async function verifyPhoneOtp(body: { otp: string; phoneNumber: string; rememberMe: boolean }, req: Request, res: Response) {
+  const phoneNumber = normalizePhone(body.phoneNumber);
+  const otp = await prisma.phoneOtp.findFirst({
+    orderBy: { createdAt: "desc" },
+    where: { consumedAt: null, expiresAt: { gt: new Date() }, phoneNumber },
+  });
+  if (!otp || otp.otpHash !== hashToken(body.otp)) {
+    if (otp) await prisma.phoneOtp.update({ data: { attempts: otp.attempts + 1 }, where: { id: otp.id } });
+    throw new AppError(400, "Phone OTP is invalid or expired.", "PHONE_OTP_INVALID");
+  }
+  const user = await prisma.user.findUnique({ where: { id: otp.userId ?? "" }, include: { subscription: true } });
+  if (!user) throw new AppError(404, "User not found.", "USER_NOT_FOUND");
+  await prisma.phoneOtp.update({ data: { consumedAt: new Date() }, where: { id: otp.id } });
+  await prisma.user.update({ data: { phoneVerified: true }, where: { id: user.id } });
+  return issueAuthResponse({ rememberMe: body.rememberMe, req, res, userId: user.id });
+}
+
+export async function oauthLogin(
+  body: { email?: string; name?: string; provider: "GOOGLE" | "APPLE" | "MICROSOFT"; providerUserId: string; rememberMe: boolean },
+  req: Request,
+  res: Response,
+) {
+  const existingIdentity = await prisma.oAuthIdentity.findUnique({
+    include: { user: true },
+    where: { provider_providerUserId: { provider: body.provider, providerUserId: body.providerUserId } },
+  });
+  if (existingIdentity) {
+    return issueAuthResponse({ rememberMe: body.rememberMe, req, res, userId: existingIdentity.userId });
+  }
+  const email = body.email?.trim().toLowerCase() ?? `${body.provider.toLowerCase()}-${body.providerUserId}@oauth.ecginsight.local`;
+  const user = await prisma.user.upsert({
+    create: {
+      avatarInitials: initialsForName(body.name ?? email),
+      email,
+      emailVerified: Boolean(body.email),
+      name: body.name ?? email.split("@")[0] ?? "OAuth User",
+      passwordHash: await hashPassword(createOpaqueToken(48)),
+      role: "USER",
+      subscription: { create: { status: "ACTIVE", tier: "FREE" } },
+    },
+    update: {},
+    where: { email },
+  });
+  await prisma.oAuthIdentity.create({
+    data: { email: body.email, provider: body.provider, providerUserId: body.providerUserId, userId: user.id },
+  });
+  return issueAuthResponse({ rememberMe: body.rememberMe, req, res, userId: user.id });
+}
+
+export async function resendVerificationEmail(emailInput: string) {
+  const email = emailInput.trim().toLowerCase();
+  const user = await prisma.user.findUnique({ where: { email } });
+  if (!user) return { emailVerificationToken: undefined };
+  const emailVerificationToken = createOpaqueToken(32);
+  await prisma.user.update({
+    data: {
+      emailVerificationExpiresAt: new Date(Date.now() + 1000 * 60 * 60 * 24),
+      emailVerificationTokenHash: hashToken(emailVerificationToken),
+    },
+    where: { id: user.id },
+  });
+  return { emailVerificationToken };
 }
 
 export async function refreshSession(req: Request, res: Response) {
@@ -391,6 +509,12 @@ export async function logoutSession(req: Request, res: Response) {
       // Invalid refresh cookies are cleared below.
     }
   }
+  clearRefreshCookie(res);
+}
+
+export async function logoutAllSessions(userId: string, res: Response) {
+  await prisma.session.updateMany({ data: { revokedAt: new Date() }, where: { userId, revokedAt: null } });
+  await prisma.userSession.updateMany({ data: { active: false, revokedAt: new Date() }, where: { userId, active: true } });
   clearRefreshCookie(res);
 }
 

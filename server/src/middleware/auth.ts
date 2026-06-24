@@ -6,10 +6,12 @@ import { verifyAccessToken } from "../utils/jwt";
 
 const roleRank: Record<Role, number> = {
   ADMIN: 3,
+  CORPORATE_CLIENT: 2,
   DOCTOR: 2,
   OWNER: 5,
   STUDENT: 1,
   SUPER_ADMIN: 4,
+  USER: 1,
 };
 
 function bearerToken(req: Request): string | null {

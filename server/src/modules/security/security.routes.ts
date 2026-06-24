@@ -53,11 +53,32 @@ securityRouter.post("/sessions/register", async (req, res, next) => {
 
 securityRouter.post("/sessions/:id/revoke", async (req, res, next) => {
   try {
+    const existing = await prisma.userSession.findUnique({ where: { id: String(req.params.id) } });
+    if (!existing || (existing.userId !== req.auth!.id && req.auth!.role !== "OWNER" && req.auth!.role !== "SUPER_ADMIN" && req.auth!.role !== "ADMIN")) {
+      res.status(404).json({ message: "Session not found." });
+      return;
+    }
     const session = await prisma.userSession.update({
       data: { active: false, revokedAt: new Date() },
       where: { id: String(req.params.id) },
     });
+    if (session.sessionId) {
+      await prisma.session.updateMany({ data: { revokedAt: new Date() }, where: { id: session.sessionId, userId: session.userId } });
+    }
     res.json({ session });
+  } catch (error) {
+    next(error);
+  }
+});
+
+securityRouter.post("/sessions/revoke-all", async (req, res, next) => {
+  try {
+    const updated = await prisma.userSession.updateMany({
+      data: { active: false, revokedAt: new Date() },
+      where: { active: true, userId: req.auth!.id },
+    });
+    await prisma.session.updateMany({ data: { revokedAt: new Date() }, where: { revokedAt: null, userId: req.auth!.id } });
+    res.json({ revoked: updated.count });
   } catch (error) {
     next(error);
   }

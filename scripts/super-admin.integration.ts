@@ -128,6 +128,9 @@ async function main() {
   const proQuota = await quotaSnapshot(doctorUser.id);
   assert(proQuota.quota === 500, "PRO plan should map to professional monthly quota.");
 
+  response = await request(`/super-admin/users/${doctorUser.id}/subscription/extend`, { body: { months: 1 }, method: "POST", token: admin.token });
+  assert(response.status === 200, "Subscription renewal/extension flow failed.");
+
   for (let index = 0; index < 7; index += 1) await recordAnalysisUsage(doctorUser.id, { sprint20: true });
   response = await request(`/super-admin/users/${doctorUser.id}/lifetime`, { method: "POST", token: admin.token });
   assert(response.status === 201, "Lifetime grant failed.");
@@ -160,6 +163,11 @@ async function main() {
     token: admin.token,
   });
   assert(response.status === 201, "Payment transaction creation failed.");
+
+  response = await request("/super-admin/revenue", { token: admin.token });
+  assert(response.status === 200, "Revenue dashboard should remain accessible.");
+  const revenue = response.body as { revenue: { byDay: Array<{ amount: number }> } };
+  assert(revenue.revenue.byDay.some((item) => item.amount >= 12000), "Revenue dashboard should include successful payment transactions.");
 
   response = await request("/super-admin/gift-licenses", { body: { duration: "3_MONTHS", userId: doctorUser.id }, method: "POST", token: admin.token });
   assert(response.status === 201, "Gift license creation failed.");

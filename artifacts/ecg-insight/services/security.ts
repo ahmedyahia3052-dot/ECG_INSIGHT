@@ -5,7 +5,32 @@ export async function listSecurityEvents(accessToken: string) {
 }
 
 export async function listSecuritySessions(accessToken: string) {
-  return apiRequest<{ sessions: unknown[] }>("/security/sessions", { accessToken });
+  return apiRequest<{ sessions: SecuritySession[] }>("/security/sessions", { accessToken });
+}
+
+export interface SecuritySession {
+  active: boolean;
+  createdAt: string;
+  deviceName?: string | null;
+  id: string;
+  ipAddress?: string | null;
+  lastActivityAt: string;
+  revokedAt?: string | null;
+  userAgent?: string | null;
+}
+
+export async function revokeSecuritySession(accessToken: string, sessionId: string) {
+  return apiRequest<{ session: SecuritySession }>(`/security/sessions/${sessionId}/revoke`, {
+    accessToken,
+    method: "POST",
+  });
+}
+
+export async function revokeAllSecuritySessions(accessToken: string) {
+  return apiRequest<{ revoked: number }>("/security/sessions/revoke-all", {
+    accessToken,
+    method: "POST",
+  });
 }
 
 export async function listMfaMethods(accessToken: string) {
