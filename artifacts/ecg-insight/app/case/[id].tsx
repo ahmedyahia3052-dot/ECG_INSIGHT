@@ -23,7 +23,14 @@ import { useAuth } from "@/context/AuthContext";
 import { apiFileUrl } from "@/services/api";
 import { apiCaseToEcgCase, getCase } from "@/services/clinical";
 import { analyzeCase, getAIResult } from "@/services/ai";
-import { getECGMeasurement, getECGWaveform, processECGCase } from "@/services/ecgProcessing";
+import {
+  digitalECGExportUrl,
+  getDigitalECG,
+  getECGMeasurement,
+  getECGWaveform,
+  processECGCase,
+  reconstructDigitalECG,
+} from "@/services/ecgProcessing";
 
 export default function CaseDetailScreen() {
   const colors = useColors();
@@ -64,12 +71,19 @@ export default function CaseDetailScreen() {
     queryKey: ["ecg-waveform", authToken?.token, id],
     retry: false,
   });
+  const digitalEcgQuery = useQuery({
+    enabled: !!authToken?.token && !!id,
+    queryFn: async () => getDigitalECG(authToken!.token, id),
+    queryKey: ["digital-ecg", authToken?.token, id],
+    retry: false,
+  });
 
   const liveCase = caseQuery.data?.case;
   const ecgCase = liveCase ? apiCaseToEcgCase(liveCase) : getCaseById(id ?? "");
   const aiResult = aiQuery.data?.analysis;
   const measurement = measurementQuery.data?.measurement;
   const waveform = waveformQuery.data?.waveform;
+  const digitalEcg = digitalEcgQuery.data?.digitalEcg;
   const bottomInset = Platform.OS === "web" ? 34 : insets.bottom;
 
   if (!ecgCase) {
@@ -146,8 +160,8 @@ export default function CaseDetailScreen() {
       </View>
 
       <View style={[styles.ecgPreview, { backgroundColor: colors.card, borderColor: colors.border }]}>
-        {waveform ? (
-          <WaveformViewer waveform={waveform} />
+        {digitalEcg || waveform ? (
+          <WaveformViewer digitalEcg={digitalEcg} waveform={waveform} />
         ) : (
           <View
             style={[
@@ -223,14 +237,40 @@ export default function CaseDetailScreen() {
               onPress={() =>
                 authToken?.token &&
                 processECGCase(authToken.token, liveCase.id)
-                  .then(() => Promise.all([measurementQuery.refetch(), waveformQuery.refetch(), aiQuery.refetch()]))
+                  .then(() => Promise.all([measurementQuery.refetch(), waveformQuery.refetch(), digitalEcgQuery.refetch(), aiQuery.refetch()]))
                   .catch(() => {})
               }
             >
               <Text style={[styles.viewerBtnText, { color: colors.primary }]}>Process</Text>
             </TouchableOpacity>
           )}
+          {liveCase && (
+            <TouchableOpacity
+              style={[styles.viewerBtn, { borderColor: colors.border }]}
+              onPress={() =>
+                authToken?.token &&
+                reconstructDigitalECG(authToken.token, liveCase.id)
+                  .then(() => digitalEcgQuery.refetch())
+                  .catch(() => {})
+              }
+            >
+              <Text style={[styles.viewerBtnText, { color: colors.primary }]}>Reconstruct</Text>
+            </TouchableOpacity>
+          )}
+          {liveCase && (
+            <TouchableOpacity
+              style={[styles.viewerBtn, { borderColor: colors.border }]}
+              onPress={() => Linking.openURL(apiFileUrl(digitalECGExportUrl(liveCase.id, "svg")))}
+            >
+              <Text style={[styles.viewerBtnText, { color: colors.primary }]}>Export SVG</Text>
+            </TouchableOpacity>
+          )}
         </View>
+        {digitalEcg?.status === "fallback" && (
+          <Text style={[styles.footerText, { color: colors.mutedForeground }]}>
+            Digital waveform reconstruction unavailable. Normal AI analysis remains available.
+          </Text>
+        )}
       </View>
 
       <View style={[styles.diagnosisSection, { backgroundColor: colors.card, borderColor: colors.border }]}>

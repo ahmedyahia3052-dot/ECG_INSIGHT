@@ -3,6 +3,7 @@ import { Router } from "express";
 import { prisma } from "../config/prisma";
 import { requireAuth, requireRole } from "../middleware/auth";
 import { assertCanRunAnalysis, recordAnalysisUsage } from "../subscriptions/monetization.service";
+import { reconstructCaseEcg } from "../modules/ecg-processing/ecg-digitization.service";
 import { assertResourceAccess, canAccessCase } from "../utils/resource-access";
 import { aiHistorySchema } from "./schemas";
 import {
@@ -24,6 +25,7 @@ aiRouter.post("/analyze/:caseId", requireRole("DOCTOR"), async (req, res, next) 
     await assertCanRunAnalysis(req.auth!.id);
     const analysis = await queueAnalysis(String(req.params.caseId), req.auth!.id);
     await recordAnalysisUsage(req.auth!.id, { caseId: String(req.params.caseId), analysisId: analysis.id });
+    await reconstructCaseEcg(String(req.params.caseId), req.auth!.id).catch(() => null);
     res.status(202).json({ analysis: serializeAnalysis(analysis) });
   } catch (error) {
     next(error);

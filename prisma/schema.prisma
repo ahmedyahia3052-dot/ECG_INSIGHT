@@ -238,6 +238,14 @@ enum ECGAnnotationType {
   QRS_COMPLEX
   T_WAVE
   R_PEAK
+  ST_ELEVATION
+  ST_DEPRESSION
+  T_INVERSION
+  PVC
+  ATRIAL_FIBRILLATION
+  BRADYCARDIA
+  TACHYCARDIA
+  QT_PROLONGATION
 }
 
 enum PACSModality {
@@ -1439,6 +1447,9 @@ model ECGLeadSignal {
   signalData   Float[]
   samplingRate Int
   duration     Float
+  paperSpeed    Int      @default(25)
+  gain          Int      @default(10)
+  metadataJson  Json?
   createdAt    DateTime @default(now())
   ecgFile      ECGFile  @relation(fields: [ecgFileId], references: [id], onDelete: Cascade)
 

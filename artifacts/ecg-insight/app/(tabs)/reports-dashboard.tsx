@@ -14,7 +14,7 @@ export default function ReportsDashboardScreen() {
       <ScrollView contentContainerStyle={styles.content}>
         <Text style={[styles.title, { color: colors.text }]}>Reports Dashboard</Text>
         <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
-          Physician report generation, review, finalization, retrieval, and archival.
+          Physician report generation, review, finalization, retrieval, archival, and digital ECG export from linked cases.
         </Text>
         <WorkflowCrudPanel<ClinicalReport>
           createFields={[{ key: "caseId", label: "Case ID" }]}
