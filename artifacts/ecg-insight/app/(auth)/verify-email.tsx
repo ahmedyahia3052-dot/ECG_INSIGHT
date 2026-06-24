@@ -1,6 +1,7 @@
 import { useAuth } from "@/context/AuthContext";
 import { apiRequest } from "@/services/api";
 import { useColors } from "@/hooks/useColors";
+import { BrandLogo, PremiumCard, PremiumScreenBackground } from "@/components/ui/Premium";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useState } from "react";
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
@@ -44,8 +45,10 @@ export default function VerifyEmailScreen() {
   }
 
   return (
-    <ScrollView contentContainerStyle={[styles.container, { backgroundColor: colors.background }]}>
-      <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+    <PremiumScreenBackground>
+    <ScrollView contentContainerStyle={styles.container}>
+      <PremiumCard style={styles.card}>
+        <BrandLogo />
         <Text style={[styles.title, { color: colors.text }]}>Verify Email</Text>
         <Text style={[styles.subtitle, { color: colors.textSecondary }]}>{message}</Text>
         <TextInput
@@ -70,13 +73,14 @@ export default function VerifyEmailScreen() {
         <Pressable style={[styles.secondary, { borderColor: colors.primary }]} onPress={handleResend} disabled={loading}>
           <Text style={[styles.secondaryText, { color: colors.primary }]}>Resend Verification Email</Text>
         </Pressable>
-      </View>
+      </PremiumCard>
     </ScrollView>
+    </PremiumScreenBackground>
   );
 }
 
 const styles = StyleSheet.create({
-  card: { borderRadius: 18, borderWidth: 1, gap: 14, padding: 22, width: "100%" },
+  card: { gap: 14, padding: 22, width: "100%" },
   container: { flexGrow: 1, justifyContent: "center", padding: 24 },
   input: { borderRadius: 12, borderWidth: 1, fontSize: 15, padding: 14 },
   primary: { alignItems: "center", borderRadius: 12, paddingVertical: 14 },

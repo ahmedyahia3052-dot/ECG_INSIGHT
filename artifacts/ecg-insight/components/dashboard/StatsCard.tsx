@@ -2,6 +2,7 @@ import { Feather } from "@expo/vector-icons";
 import React from "react";
 import { StyleSheet, Text, View } from "react-native";
 import { useColors } from "@/hooks/useColors";
+import { PremiumCard } from "@/components/ui/Premium";
 
 interface StatsCardProps {
   icon: keyof typeof Feather.glyphMap;
@@ -35,24 +36,25 @@ export function StatsCard({
       : colors.primary;
 
   return (
-    <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
-      <View style={[styles.iconWrap, { backgroundColor: iconBg }]}>
-        <Feather name={icon} size={18} color={iconColor} />
+    <PremiumCard style={styles.card}>
+      <View style={styles.topRow}>
+        <View style={[styles.iconWrap, { backgroundColor: iconBg }]}>
+          <Feather name={icon} size={18} color={iconColor} />
+        </View>
+        <View style={[styles.signal, { backgroundColor: iconColor + "33" }]} />
       </View>
       <Text style={[styles.value, { color: colors.foreground }]}>{value}</Text>
       <Text style={[styles.label, { color: colors.mutedForeground }]}>{label}</Text>
       {sub && (
         <Text style={[styles.sub, { color: iconColor }]}>{sub}</Text>
       )}
-    </View>
+    </PremiumCard>
   );
 }
 
 const styles = StyleSheet.create({
   card: {
     flex: 1,
-    borderRadius: 14,
-    borderWidth: 1,
     padding: 14,
     gap: 4,
   },
@@ -64,6 +66,8 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     marginBottom: 6,
   },
+  signal: { borderRadius: 999, height: 6, width: 34 },
+  topRow: { alignItems: "center", flexDirection: "row", justifyContent: "space-between" },
   value: {
     fontSize: 22,
     fontFamily: "Inter_700Bold",

@@ -3,6 +3,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { WorkflowCrudPanel } from "@/components/workflows/WorkflowCrudPanel";
 import { useAuth } from "@/context/AuthContext";
 import { useColors } from "@/hooks/useColors";
+import { PremiumCard, PremiumScreenBackground } from "@/components/ui/Premium";
 import { deleteNotification, listNotifications, markNotificationRead } from "@/services/collaboration";
 
 type NotificationItem = Record<string, unknown> & { id: string; message?: string; read?: boolean; title?: string; type?: string };
@@ -12,10 +13,13 @@ export default function NotificationCenterScreen() {
   const { authToken } = useAuth();
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+    <PremiumScreenBackground>
+    <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={styles.content}>
-        <Text style={[styles.title, { color: colors.text }]}>Notification Center</Text>
-        <Text style={[styles.subtitle, { color: colors.textSecondary }]}>Browser/mobile push abstraction and priority notification feed.</Text>
+        <PremiumCard style={styles.hero}>
+          <Text style={[styles.title, { color: colors.text }]}>Notification Center</Text>
+          <Text style={[styles.subtitle, { color: colors.textSecondary }]}>Read/unread triage, priority categories, mark-as-read workflows, and push-ready notification architecture.</Text>
+        </PremiumCard>
         <WorkflowCrudPanel<NotificationItem>
           deleteItem={(id) => deleteNotification(authToken!.token, id)}
           detailText={(notification) => `${notification.type ?? "INFO"} · ${notification.read ? "Read" : "Unread"} · ${notification.message ?? ""}`}
@@ -36,12 +40,14 @@ export default function NotificationCenterScreen() {
         />
       </ScrollView>
     </SafeAreaView>
+    </PremiumScreenBackground>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
   content: { gap: 14, padding: 20, paddingBottom: 120 },
+  hero: { gap: 8 },
   subtitle: { fontSize: 14, lineHeight: 20 },
   title: { fontSize: 28, fontWeight: "800" },
 });

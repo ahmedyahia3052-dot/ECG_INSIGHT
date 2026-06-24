@@ -16,6 +16,7 @@ import { useAuth } from "@/context/AuthContext";
 import { useColors } from "@/hooks/useColors";
 import { CaseListItem } from "@/components/history/CaseListItem";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { PremiumScreenBackground } from "@/components/ui/Premium";
 import { MOCK_CASES, type ECGStatus } from "@/data/mockData";
 import { apiCaseToEcgCase, listCases } from "@/services/clinical";
 
@@ -62,14 +63,15 @@ export default function HistoryScreen() {
   });
 
   return (
-    <View style={[styles.flex, { backgroundColor: colors.background }]}>
+    <PremiumScreenBackground>
+    <View style={styles.flex}>
       <View
         style={[
           styles.header,
           {
-            backgroundColor: colors.background,
+            backgroundColor: "transparent",
             paddingTop: topInset + 12,
-            borderBottomColor: colors.border,
+            borderBottomColor: colors.gradientBorder,
           },
         ]}
       >
@@ -88,7 +90,7 @@ export default function HistoryScreen() {
         <View
           style={[
             styles.searchWrap,
-            { backgroundColor: colors.card, borderColor: colors.border },
+            { backgroundColor: colors.glass, borderColor: colors.gradientBorder },
           ]}
         >
           <Feather name="search" size={16} color={colors.mutedForeground} />
@@ -187,6 +189,7 @@ export default function HistoryScreen() {
         }
       />
     </View>
+    </PremiumScreenBackground>
   );
 }
 

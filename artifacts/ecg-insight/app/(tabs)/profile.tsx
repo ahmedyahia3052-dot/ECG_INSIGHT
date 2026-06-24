@@ -14,20 +14,24 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAuth } from "@/context/AuthContext";
-import { useColors } from "@/hooks/useColors";
+import { useColors, useThemePreference, type ThemePreference } from "@/hooks/useColors";
 import { RoleBadge } from "@/components/ui/Badge";
+import { PremiumCard, PremiumScreenBackground } from "@/components/ui/Premium";
 import { getDashboardStats } from "@/data/mockData";
 import { getMySubscription, type MySubscription } from "@/services/subscriptions";
 
 const ROLE_LABEL: Record<string, string> = {
   super_admin: "Super Admin",
   admin: "Admin",
+  corporate_client: "Corporate Client",
   doctor: "Doctor",
   student: "Student",
+  user: "User",
 };
 
 export default function ProfileScreen() {
   const colors = useColors();
+  const { setThemePreference, themePreference } = useThemePreference();
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { user, authToken, logout, isImpersonating, stopImpersonation } = useAuth();
@@ -73,8 +77,9 @@ export default function ProfileScreen() {
       : colors.primary;
 
   return (
+    <PremiumScreenBackground>
     <ScrollView
-      style={[styles.flex, { backgroundColor: colors.background }]}
+      style={styles.flex}
       contentContainerStyle={[
         styles.scroll,
         { paddingTop: topInset + 12, paddingBottom: bottomInset + 100 },
@@ -100,7 +105,7 @@ export default function ProfileScreen() {
       )}
 
       {/* Avatar card */}
-      <View style={[styles.avatarCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+      <PremiumCard style={styles.avatarCard}>
         <View style={[styles.avatar, { backgroundColor: tierColor }]}>
           <Text style={styles.avatarText}>{user.avatarInitials}</Text>
         </View>
@@ -116,7 +121,7 @@ export default function ProfileScreen() {
             )}
           </View>
         </View>
-      </View>
+      </PremiumCard>
 
       {/* Stats */}
       <View style={styles.statsRow}>
@@ -226,6 +231,64 @@ export default function ProfileScreen() {
         </View>
       </View>
 
+      {/* Settings */}
+      <View style={styles.section}>
+        <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>Settings</Text>
+        <View style={[styles.sectionCard, { backgroundColor: colors.glass, borderColor: colors.gradientBorder }]}>
+          <Text style={[styles.itemLabel, { color: colors.textSecondary }]}>Theme</Text>
+          <View style={styles.themeRow}>
+            {(["dark", "light", "system"] as ThemePreference[]).map((preference) => {
+              const active = themePreference === preference;
+              return (
+                <TouchableOpacity
+                  key={preference}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Use ${preference} theme`}
+                  style={[
+                    styles.themeChip,
+                    {
+                      backgroundColor: active ? colors.primary : colors.muted,
+                      borderColor: active ? colors.primary : colors.border,
+                    },
+                  ]}
+                  onPress={() => {
+                    void setThemePreference(preference);
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  }}
+                >
+                  <Text style={[styles.themeText, { color: active ? "#fff" : colors.text }]}>
+                    {preference[0].toUpperCase() + preference.slice(1)}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+          {[
+            { icon: "globe" as const, label: "Language", value: "English" },
+            { icon: "lock" as const, label: "Privacy", value: "HIPAA/GDPR-ready" },
+            { icon: "shield" as const, label: "Security", value: "MFA and password controls", route: "/(tabs)/security-dashboard" },
+            { icon: "monitor" as const, label: "Active Sessions", value: "Manage trusted devices", route: "/(tabs)/session-dashboard" },
+          ].map((item) => (
+            <TouchableOpacity
+              key={item.label}
+              accessibilityRole="button"
+              activeOpacity={0.78}
+              onPress={() => item.route ? router.push(item.route as any) : Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)}
+              style={[styles.infoRow, { borderTopColor: colors.border, borderTopWidth: 1 }]}
+            >
+              <View style={[styles.itemIcon, { backgroundColor: colors.primaryLight }]}>
+                <Feather name={item.icon} size={14} color={colors.primary} />
+              </View>
+              <View style={styles.itemText}>
+                <Text style={[styles.itemLabel, { color: colors.textSecondary }]}>{item.label}</Text>
+                <Text style={[styles.itemValue, { color: colors.text }]}>{item.value}</Text>
+              </View>
+              <Feather name="chevron-right" size={14} color={colors.textSecondary} />
+            </TouchableOpacity>
+          ))}
+        </View>
+      </View>
+
       {/* Notifications */}
       <View style={styles.section}>
         <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>Notifications</Text>
@@ -321,6 +384,7 @@ export default function ProfileScreen() {
         ECG Insight v1.0.0 · Sprint 1 · AI Model v2.4
       </Text>
     </ScrollView>
+    </PremiumScreenBackground>
   );
 }
 
@@ -434,6 +498,9 @@ const styles = StyleSheet.create({
   },
   toggleInfo: { flexDirection: "row", alignItems: "center", gap: 10 },
   toggleLabel: { fontSize: 14, fontFamily: "Inter_500Medium" },
+  themeChip: { borderRadius: 999, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 8 },
+  themeRow: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 8, paddingHorizontal: 14 },
+  themeText: { fontFamily: "Inter_700Bold", fontSize: 12 },
   linkRow: { flexDirection: "row", alignItems: "center", gap: 12, padding: 14 },
   linkLabel: { flex: 1, fontSize: 14, fontFamily: "Inter_500Medium" },
   logoutBtn: {

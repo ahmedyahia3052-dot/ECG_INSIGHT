@@ -4,17 +4,19 @@ import { Redirect, Tabs } from "expo-router";
 import { Icon, Label, NativeTabs } from "expo-router/unstable-native-tabs";
 import { SymbolView } from "expo-symbols";
 import { Feather } from "@expo/vector-icons";
+import { LinearGradient } from "expo-linear-gradient";
 import React from "react";
-import { Platform, StyleSheet, View, useColorScheme } from "react-native";
+import { Platform, StyleSheet, Text, TouchableOpacity, View, useColorScheme } from "react-native";
 import { useAuth } from "@/context/AuthContext";
 import { useColors } from "@/hooks/useColors";
+import { useRouter } from "expo-router";
 
 function NativeTabLayout() {
   return (
     <NativeTabs>
       <NativeTabs.Trigger name="index">
         <Icon sf={{ default: "house", selected: "house.fill" }} />
-        <Label>Dashboard</Label>
+        <Label>Home</Label>
       </NativeTabs.Trigger>
       <NativeTabs.Trigger name="upload">
         <Icon sf={{ default: "square.and.arrow.up", selected: "square.and.arrow.up.fill" }} />
@@ -23,6 +25,10 @@ function NativeTabLayout() {
       <NativeTabs.Trigger name="history">
         <Icon sf={{ default: "list.bullet.clipboard", selected: "list.bullet.clipboard.fill" }} />
         <Label>History</Label>
+      </NativeTabs.Trigger>
+      <NativeTabs.Trigger name="reports-dashboard">
+        <Icon sf={{ default: "doc.richtext", selected: "doc.richtext.fill" }} />
+        <Label>Reports</Label>
       </NativeTabs.Trigger>
       <NativeTabs.Trigger name="profile">
         <Icon sf={{ default: "person", selected: "person.fill" }} />
@@ -35,46 +41,58 @@ function NativeTabLayout() {
 function ClassicTabLayout() {
   const colors = useColors();
   const colorScheme = useColorScheme();
+  const router = useRouter();
   const isDark = colorScheme === "dark";
   const isIOS = Platform.OS === "ios";
   const isWeb = Platform.OS === "web";
 
   return (
-    <Tabs
-      screenOptions={{
-        tabBarActiveTintColor: colors.primary,
-        tabBarInactiveTintColor: colors.mutedForeground,
-        headerShown: false,
-        tabBarStyle: {
-          position: "absolute",
-          backgroundColor: isIOS ? "transparent" : colors.background,
-          borderTopWidth: 1,
-          borderTopColor: colors.border,
-          elevation: 0,
-          ...(isWeb ? { height: 84 } : {}),
-        },
-        tabBarBackground: () =>
-          isIOS ? (
-            <BlurView
-              intensity={100}
-              tint={isDark ? "dark" : "light"}
-              style={StyleSheet.absoluteFill}
-            />
-          ) : isWeb ? (
-            <View
-              style={[StyleSheet.absoluteFill, { backgroundColor: colors.background }]}
-            />
-          ) : null,
-        tabBarLabelStyle: {
-          fontFamily: "Inter_500Medium",
-          fontSize: 11,
-        },
-      }}
-    >
+    <>
+      <Tabs
+        screenOptions={{
+          tabBarActiveTintColor: colors.primary,
+          tabBarInactiveTintColor: colors.mutedForeground,
+          headerShown: false,
+          tabBarStyle: {
+            position: "absolute",
+            backgroundColor: isIOS ? "transparent" : colors.glass,
+            borderTopWidth: 1,
+            borderTopColor: colors.gradientBorder,
+            borderRadius: isWeb ? 28 : 26,
+            bottom: isWeb ? 18 : 10,
+            elevation: 0,
+            height: isWeb ? 88 : 76,
+            left: 12,
+            paddingBottom: isWeb ? 14 : 10,
+            paddingTop: 8,
+            right: 12,
+            shadowColor: colors.shadow,
+            shadowOffset: { height: 12, width: 0 },
+            shadowOpacity: 0.18,
+            shadowRadius: 24,
+          },
+          tabBarBackground: () =>
+            isIOS ? (
+              <BlurView
+                intensity={100}
+                tint={isDark ? "dark" : "light"}
+                style={[StyleSheet.absoluteFill, styles.tabBlur]}
+              />
+            ) : isWeb ? (
+              <View
+                style={[StyleSheet.absoluteFill, styles.tabBlur, { backgroundColor: colors.glass }]}
+              />
+            ) : null,
+          tabBarLabelStyle: {
+            fontFamily: "Inter_600SemiBold",
+            fontSize: 11,
+          },
+        }}
+      >
       <Tabs.Screen
         name="index"
         options={{
-          title: "Dashboard",
+          title: "Home",
           tabBarIcon: ({ color }) =>
             isIOS ? (
               <SymbolView name="house" tintColor={color} size={22} />
@@ -108,6 +126,18 @@ function ClassicTabLayout() {
         }}
       />
       <Tabs.Screen
+        name="reports-dashboard"
+        options={{
+          title: "Reports",
+          tabBarIcon: ({ color }) =>
+            isIOS ? (
+              <SymbolView name="doc.richtext" tintColor={color} size={22} />
+            ) : (
+              <Feather name="file-text" size={22} color={color} />
+            ),
+        }}
+      />
+      <Tabs.Screen
         name="profile"
         options={{
           title: "Profile",
@@ -120,7 +150,6 @@ function ClassicTabLayout() {
         }}
       />
       <Tabs.Screen name="document-center" options={{ href: null, title: "Document Center" }} />
-      <Tabs.Screen name="reports-dashboard" options={{ href: null, title: "Reports Dashboard" }} />
       <Tabs.Screen name="workforce-dashboard" options={{ href: null, title: "Workforce Dashboard" }} />
       <Tabs.Screen name="knowledge-library" options={{ href: null, title: "Knowledge Library" }} />
       <Tabs.Screen name="advanced-search" options={{ href: null, title: "Advanced Search" }} />
@@ -146,7 +175,20 @@ function ClassicTabLayout() {
       <Tabs.Screen name="collaboration-dashboard" options={{ href: null, title: "Collaboration Dashboard" }} />
       <Tabs.Screen name="task-dashboard" options={{ href: null, title: "Task Dashboard" }} />
       <Tabs.Screen name="alert-dashboard" options={{ href: null, title: "Alert Dashboard" }} />
-    </Tabs>
+      </Tabs>
+      <TouchableOpacity
+        accessibilityRole="button"
+        accessibilityLabel="Analyze ECG"
+        activeOpacity={0.86}
+        onPress={() => router.push("/(tabs)/upload" as any)}
+        style={styles.fab}
+      >
+        <LinearGradient colors={colors.gradients.purple as [string, string, string]} style={styles.fabGradient}>
+          <Feather name="zap" size={18} color="#fff" />
+          {isWeb ? <Text style={styles.fabText}>Analyze ECG</Text> : null}
+        </LinearGradient>
+      </TouchableOpacity>
+    </>
   );
 }
 
@@ -161,3 +203,27 @@ export default function TabLayout() {
   }
   return <ClassicTabLayout />;
 }
+
+const styles = StyleSheet.create({
+  fab: {
+    bottom: Platform.OS === "web" ? 118 : 96,
+    position: "absolute",
+    right: 22,
+  },
+  fabGradient: {
+    alignItems: "center",
+    borderRadius: 999,
+    flexDirection: "row",
+    gap: 8,
+    justifyContent: "center",
+    minHeight: 54,
+    minWidth: Platform.OS === "web" ? 148 : 54,
+    paddingHorizontal: 18,
+    shadowColor: "#2563EB",
+    shadowOffset: { height: 14, width: 0 },
+    shadowOpacity: 0.28,
+    shadowRadius: 24,
+  },
+  fabText: { color: "#fff", fontFamily: "Inter_700Bold", fontSize: 13 },
+  tabBlur: { borderRadius: 26, overflow: "hidden" },
+});

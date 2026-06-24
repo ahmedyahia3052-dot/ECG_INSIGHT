@@ -1,5 +1,6 @@
 import { useAuth } from "@/context/AuthContext";
 import { useColors } from "@/hooks/useColors";
+import { BrandLogo, PremiumCard, PremiumScreenBackground } from "@/components/ui/Premium";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useState } from "react";
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
@@ -29,8 +30,10 @@ export default function ResetPasswordScreen() {
   }
 
   return (
-    <ScrollView contentContainerStyle={[styles.container, { backgroundColor: colors.background }]}>
-      <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+    <PremiumScreenBackground>
+    <ScrollView contentContainerStyle={styles.container}>
+      <PremiumCard style={styles.card}>
+        <BrandLogo />
         <Text style={[styles.title, { color: colors.text }]}>Reset Password</Text>
         <Text style={[styles.subtitle, { color: colors.textSecondary }]}>{message}</Text>
         <TextInput
@@ -60,13 +63,14 @@ export default function ResetPasswordScreen() {
         <Pressable style={[styles.primary, { backgroundColor: colors.primary }]} onPress={handleReset} disabled={loading}>
           {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.primaryText}>Reset Password</Text>}
         </Pressable>
-      </View>
+      </PremiumCard>
     </ScrollView>
+    </PremiumScreenBackground>
   );
 }
 
 const styles = StyleSheet.create({
-  card: { borderRadius: 18, borderWidth: 1, gap: 14, padding: 22, width: "100%" },
+  card: { gap: 14, padding: 22, width: "100%" },
   container: { flexGrow: 1, justifyContent: "center", padding: 24 },
   input: { borderRadius: 12, borderWidth: 1, fontSize: 15, padding: 14 },
   primary: { alignItems: "center", borderRadius: 12, paddingVertical: 14 },

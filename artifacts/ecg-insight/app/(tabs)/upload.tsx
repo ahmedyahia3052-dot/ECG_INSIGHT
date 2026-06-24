@@ -20,6 +20,7 @@ import { ConfidenceBar } from "@/components/ui/ConfidenceBar";
 import { StatusBadge } from "@/components/ui/Badge";
 import { DiagnosisCard } from "@/components/ecg/DiagnosisCard";
 import { RecommendationCard } from "@/components/ecg/RecommendationCard";
+import { BrandLogo, PremiumCard, PremiumScreenBackground } from "@/components/ui/Premium";
 import { useAuth } from "@/context/AuthContext";
 import { createCase, createPatient } from "@/services/clinical";
 import { analyzeCase, type AIAnalysisResult } from "@/services/ai";
@@ -223,26 +224,23 @@ export default function UploadScreen() {
   };
 
   return (
+    <PremiumScreenBackground>
     <ScrollView
-      style={[styles.flex, { backgroundColor: colors.background }]}
+      style={styles.flex}
       contentContainerStyle={[styles.scroll, { paddingTop: topInset + 16, paddingBottom: bottomInset + 90 }]}
       showsVerticalScrollIndicator={false}
     >
       <View style={styles.pageHeader}>
+        <BrandLogo compact />
         <Text style={[styles.pageTitle, { color: colors.foreground }]}>ECG Analysis</Text>
         <Text style={[styles.pageSub, { color: colors.mutedForeground }]}>
-          Upload an ECG for instant AI interpretation
+          Upload, capture, or smart-scan ECG paper for instant AI interpretation.
         </Text>
       </View>
 
       {state === "idle" && (
         <>
-          <View
-            style={[
-              styles.uploadZone,
-              { borderColor: colors.primary, backgroundColor: colors.primary + "06" },
-            ]}
-          >
+          <PremiumCard style={[styles.uploadZone, { borderColor: colors.primary }]}>
             <View style={[styles.uploadIcon, { backgroundColor: colors.primary + "15" }]}>
               <Feather name="upload-cloud" size={36} color={colors.primary} />
             </View>
@@ -276,7 +274,7 @@ export default function UploadScreen() {
               <Feather name="crop" size={18} color={colors.foreground} />
               <Text style={[styles.secondaryActionText, { color: colors.foreground }]}>Scan ECG Paper</Text>
             </TouchableOpacity>
-          </View>
+          </PremiumCard>
           {workflowError && (
             <View style={[styles.infoBox, { backgroundColor: "#FEF2F2", borderColor: "#FECACA" }]}>
               <Feather name="alert-triangle" size={14} color="#DC2626" />
@@ -549,6 +547,7 @@ export default function UploadScreen() {
         </>
       )}
     </ScrollView>
+    </PremiumScreenBackground>
   );
 }
 

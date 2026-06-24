@@ -1,4 +1,5 @@
 import { Feather } from "@expo/vector-icons";
+import { LinearGradient } from "expo-linear-gradient";
 import { useQuery } from "@tanstack/react-query";
 import * as Haptics from "expo-haptics";
 import { useRouter } from "expo-router";
@@ -19,6 +20,7 @@ import { RecentCaseCard } from "@/components/dashboard/RecentCaseCard";
 import AccuracyChart from "@/components/dashboard/AccuracyChart";
 import NotificationsPanel from "@/components/dashboard/NotificationsPanel";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { BrandLogo, HeartbeatLine, PremiumCard, PremiumScreenBackground } from "@/components/ui/Premium";
 import {
   getCasesByUser,
   getDashboardStats,
@@ -96,9 +98,9 @@ export default function DashboardScreen() {
   const bottomInset = Platform.OS === "web" ? 34 : insets.bottom;
 
   return (
-    <>
+    <PremiumScreenBackground>
       <ScrollView
-        style={[styles.flex, { backgroundColor: colors.background }]}
+        style={styles.flex}
         contentContainerStyle={[
           styles.scroll,
           { paddingTop: topInset + 12, paddingBottom: bottomInset + 100 },
@@ -106,6 +108,54 @@ export default function DashboardScreen() {
         showsVerticalScrollIndicator={false}
       >
         <ImpersonationBanner />
+
+        <PremiumCard style={styles.hero}>
+          <View style={styles.heroTop}>
+            <BrandLogo compact />
+            <View style={[styles.aiPill, { backgroundColor: colors.primary + "18" }]}>
+              <Feather name="cpu" size={13} color={colors.primary} />
+              <Text style={[styles.aiPillText, { color: colors.primary }]}>AI live</Text>
+            </View>
+          </View>
+          <Text style={[styles.heroEyebrow, { color: colors.textSecondary }]}>{greeting()}</Text>
+          <Text style={[styles.heroTitle, { color: colors.text }]}>
+            Welcome back {user?.name ?? "Clinician"}
+          </Text>
+          <Text style={[styles.heroSub, { color: colors.textSecondary }]}>
+            Premium mobile ECG intelligence for faster triage, cleaner reports, and clinically confident decisions.
+          </Text>
+          <View style={styles.heartVisual}>
+            <LinearGradient colors={colors.gradients.purple as [string, string, string]} style={styles.heartOrb}>
+              <Feather name="heart" size={34} color="#fff" />
+            </LinearGradient>
+            <View style={styles.heartLine}>
+              <HeartbeatLine height={46} />
+            </View>
+          </View>
+        </PremiumCard>
+
+        <View style={styles.quickGrid}>
+          {[
+            { icon: "upload-cloud" as const, label: "Upload ECG", route: "/(tabs)/upload" },
+            { icon: "camera" as const, label: "Capture ECG", route: "/(tabs)/upload" },
+            { icon: "crop" as const, label: "Smart Scan", route: "/(tabs)/upload" },
+            { icon: "user-plus" as const, label: "New Patient", route: "/(tabs)/history" },
+          ].map((action) => (
+            <TouchableOpacity
+              key={action.label}
+              accessibilityRole="button"
+              accessibilityLabel={action.label}
+              activeOpacity={0.84}
+              onPress={() => router.push(action.route as any)}
+              style={[styles.quickAction, { backgroundColor: colors.glass, borderColor: colors.gradientBorder }]}
+            >
+              <View style={[styles.quickIcon, { backgroundColor: colors.primary + "18" }]}>
+                <Feather name={action.icon} size={18} color={colors.primary} />
+              </View>
+              <Text style={[styles.quickLabel, { color: colors.text }]}>{action.label}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
 
         {/* Top Bar */}
         <View style={styles.topBar}>
@@ -298,13 +348,27 @@ export default function DashboardScreen() {
         visible={showNotifications}
         onClose={() => setShowNotifications(false)}
       />
-    </>
+    </PremiumScreenBackground>
   );
 }
 
 const styles = StyleSheet.create({
   flex: { flex: 1 },
   scroll: { paddingHorizontal: 16, gap: 14 },
+  aiPill: { alignItems: "center", borderRadius: 999, flexDirection: "row", gap: 6, paddingHorizontal: 10, paddingVertical: 6 },
+  aiPillText: { fontFamily: "Inter_700Bold", fontSize: 11, textTransform: "uppercase" },
+  heartLine: { flex: 1 },
+  heartOrb: { alignItems: "center", borderRadius: 28, height: 64, justifyContent: "center", width: 64 },
+  heartVisual: { alignItems: "center", flexDirection: "row", gap: 14, marginTop: 8 },
+  hero: { gap: 10, padding: 20 },
+  heroEyebrow: { fontFamily: "Inter_600SemiBold", fontSize: 12, letterSpacing: 1.4, textTransform: "uppercase" },
+  heroSub: { fontFamily: "Inter_400Regular", fontSize: 14, lineHeight: 21 },
+  heroTitle: { fontFamily: "Inter_700Bold", fontSize: 28, letterSpacing: -0.8, lineHeight: 34 },
+  heroTop: { alignItems: "center", flexDirection: "row", justifyContent: "space-between" },
+  quickAction: { alignItems: "center", borderRadius: 20, borderWidth: 1, flex: 1, gap: 8, minWidth: "47%", padding: 14 },
+  quickGrid: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
+  quickIcon: { alignItems: "center", borderRadius: 14, height: 42, justifyContent: "center", width: 42 },
+  quickLabel: { fontFamily: "Inter_700Bold", fontSize: 12, textAlign: "center" },
   topBar: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-end" },
   greeting: { gap: 2 },
   greetText: { fontSize: 13, fontFamily: "Inter_400Regular" },

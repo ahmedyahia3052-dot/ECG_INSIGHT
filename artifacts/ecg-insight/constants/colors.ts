@@ -1,17 +1,21 @@
 const colors = {
   light: {
     // Core palette
-    primary: "#0D9488",
+    primary: "#2563EB",
     primaryForeground: "#FFFFFF",
-    primaryLight: "#CCFBF1",
+    primaryLight: "#DBEAFE",
     accent: "#06B6D4",
     accentForeground: "#FFFFFF",
+    accentPurple: "#8B5CF6",
+    brandBlue: "#3B82F6",
+    brandCyan: "#06B6D4",
 
     // Backgrounds & surfaces
-    background: "#F0FDFA",
-    surface: "#FFFFFF",
-    surfaceVariant: "#F8FAFC",
-    card: "#FFFFFF",
+    background: "#F8FAFC",
+    surface: "#FFFFFFF2",
+    surfaceVariant: "#EFF6FF",
+    card: "#FFFFFFE6",
+    glass: "#FFFFFFCC",
     muted: "#F1F5F9",
 
     // Text
@@ -34,23 +38,29 @@ const colors = {
     info: "#3B82F6",
 
     // Borders & inputs
-    border: "#E2E8F0",
+    border: "#DDE7F3",
+    gradientBorder: "#BFDBFE",
     input: "#E2E8F0",
+    shadow: "#1E3A8A",
   },
   dark: {
     // Core palette
-    primary: "#2DD4BF",
-    primaryForeground: "#0F172A",
-    primaryLight: "#134E4A",
-    accent: "#22D3EE",
-    accentForeground: "#0F172A",
+    primary: "#3B82F6",
+    primaryForeground: "#FFFFFF",
+    primaryLight: "#1D4ED833",
+    accent: "#06B6D4",
+    accentForeground: "#FFFFFF",
+    accentPurple: "#A855F7",
+    brandBlue: "#2563EB",
+    brandCyan: "#06B6D4",
 
     // Backgrounds & surfaces
-    background: "#0F172A",
-    surface: "#1E293B",
-    surfaceVariant: "#0F172A",
-    card: "#1E293B",
-    muted: "#1E293B",
+    background: "#020617",
+    surface: "#0F172AE6",
+    surfaceVariant: "#111827",
+    card: "#0F172ACC",
+    glass: "#111827B3",
+    muted: "#111827",
 
     // Text
     text: "#F8FAFC",
@@ -60,9 +70,9 @@ const colors = {
     cardForeground: "#F8FAFC",
 
     // Secondary
-    secondary: "#134E4A",
-    secondaryForeground: "#CCFBF1",
-    tint: "#2DD4BF",
+    secondary: "#1E3A8A",
+    secondaryForeground: "#DBEAFE",
+    tint: "#3B82F6",
 
     // Semantic
     destructive: "#EF4444",
@@ -72,8 +82,17 @@ const colors = {
     info: "#60A5FA",
 
     // Borders & inputs
-    border: "#334155",
-    input: "#334155",
+    border: "#1E3A5F",
+    gradientBorder: "#2563EB66",
+    input: "#1E293B",
+    shadow: "#000000",
+  },
+  gradients: {
+    brand: ["#2563EB", "#3B82F6", "#06B6D4"],
+    purple: ["#2563EB", "#8B5CF6", "#A855F7"],
+    dark: ["#020617", "#0F172A", "#111827"],
+    health: ["#06B6D4", "#10B981"],
+    danger: ["#EF4444", "#F59E0B"],
   },
   radius: {
     sm: 8,

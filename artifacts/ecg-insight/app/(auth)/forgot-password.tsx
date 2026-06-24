@@ -13,6 +13,7 @@ import {
   TextInput,
   View,
 } from "react-native";
+import { BrandLogo, PremiumCard, PremiumScreenBackground } from "@/components/ui/Premium";
 
 type Step = "email" | "code" | "password" | "success";
 
@@ -215,6 +216,7 @@ export default function ForgotPasswordScreen() {
   if (step === "success") {
     return (
       <View style={styles.container}>
+        <PremiumScreenBackground>
         <ScrollView contentContainerStyle={styles.scroll}>
           <View style={styles.successIcon}>
             <Text style={{ fontSize: 36 }}>✓</Text>
@@ -228,6 +230,7 @@ export default function ForgotPasswordScreen() {
             <Text style={styles.btnText}>Back to Sign In</Text>
           </Pressable>
         </ScrollView>
+        </PremiumScreenBackground>
       </View>
     );
   }
@@ -237,8 +240,10 @@ export default function ForgotPasswordScreen() {
       style={styles.container}
       behavior={Platform.OS === "ios" ? "padding" : undefined}
     >
+      <PremiumScreenBackground>
       <ScrollView contentContainerStyle={styles.scroll}>
         <View style={styles.header}>
+          <BrandLogo />
           <View style={styles.stepIndicator}>
             {(["email", "code", "password"] as Step[]).map((s) => (
               <View
@@ -279,7 +284,7 @@ export default function ForgotPasswordScreen() {
           </Text>
         </View>
 
-        <View style={styles.card}>
+        <PremiumCard style={styles.card}>
           {error ? (
             <View style={styles.error}>
               <Text style={styles.errorText}>{error}</Text>
@@ -390,12 +395,13 @@ export default function ForgotPasswordScreen() {
               </Pressable>
             </>
           )}
-        </View>
+        </PremiumCard>
 
         <Pressable style={styles.back} onPress={() => router.back()}>
           <Text style={styles.backText}>← Back to Sign In</Text>
         </Pressable>
       </ScrollView>
+      </PremiumScreenBackground>
     </KeyboardAvoidingView>
   );
 }

@@ -2,6 +2,7 @@ import { Feather } from "@expo/vector-icons";
 import React from "react";
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { useColors } from "@/hooks/useColors";
+import { HeartbeatLine, PremiumCard } from "@/components/ui/Premium";
 
 interface EmptyStateProps {
   icon: keyof typeof Feather.glyphMap;
@@ -21,10 +22,11 @@ export function EmptyState({
   const colors = useColors();
 
   return (
-    <View style={styles.container}>
+    <PremiumCard style={styles.container}>
       <View style={[styles.iconWrap, { backgroundColor: colors.muted }]}>
         <Feather name={icon} size={32} color={colors.mutedForeground} />
       </View>
+      <HeartbeatLine height={34} />
       <Text style={[styles.title, { color: colors.foreground }]}>{title}</Text>
       {description && (
         <Text style={[styles.desc, { color: colors.mutedForeground }]}>
@@ -33,6 +35,7 @@ export function EmptyState({
       )}
       {actionLabel && onAction && (
         <TouchableOpacity
+          accessibilityRole="button"
           style={[styles.btn, { backgroundColor: colors.primary }]}
           onPress={onAction}
           activeOpacity={0.8}
@@ -42,16 +45,15 @@ export function EmptyState({
           </Text>
         </TouchableOpacity>
       )}
-    </View>
+    </PremiumCard>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
     alignItems: "center",
     justifyContent: "center",
-    paddingHorizontal: 40,
+    paddingHorizontal: 24,
     gap: 12,
   },
   iconWrap: {

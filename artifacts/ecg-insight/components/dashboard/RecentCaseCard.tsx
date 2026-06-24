@@ -5,6 +5,7 @@ import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { useColors } from "@/hooks/useColors";
 import { StatusBadge } from "@/components/ui/Badge";
 import type { ECGCase } from "@/data/mockData";
+import { PremiumCard } from "@/components/ui/Premium";
 
 interface RecentCaseCardProps {
   ecgCase: ECGCase;
@@ -21,35 +22,38 @@ export function RecentCaseCard({ ecgCase }: RecentCaseCardProps) {
 
   return (
     <TouchableOpacity
-      style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}
+      accessibilityRole="button"
+      accessibilityLabel={`Open ECG case for ${ecgCase.patientName}`}
       onPress={() => router.push(`/case/${ecgCase.id}` as any)}
       activeOpacity={0.7}
     >
-      <View
-        style={[styles.iconWrap, { backgroundColor: colors.primary + "15" }]}
-      >
-        <Feather name="activity" size={18} color={colors.primary} />
-      </View>
-      <View style={styles.info}>
-        <Text style={[styles.patient, { color: colors.foreground }]}>
-          {ecgCase.patientName}
-        </Text>
-        <Text style={[styles.diagnosis, { color: colors.mutedForeground }]}>
-          {ecgCase.diagnosis}
-        </Text>
-        <View style={styles.row}>
-          <StatusBadge status={ecgCase.status} size="sm" />
-          <Text style={[styles.conf, { color: colors.mutedForeground }]}>
-            {ecgCase.confidence}% confidence
-          </Text>
+      <PremiumCard style={styles.card}>
+        <View
+          style={[styles.iconWrap, { backgroundColor: colors.primary + "18" }]}
+        >
+          <Feather name="activity" size={18} color={colors.primary} />
         </View>
-      </View>
-      <View style={styles.right}>
-        <Text style={[styles.date, { color: colors.mutedForeground }]}>
-          {formattedDate}
-        </Text>
-        <Feather name="chevron-right" size={16} color={colors.mutedForeground} />
-      </View>
+        <View style={styles.info}>
+          <Text style={[styles.patient, { color: colors.foreground }]}>
+            {ecgCase.patientName}
+          </Text>
+          <Text style={[styles.diagnosis, { color: colors.mutedForeground }]}>
+            {ecgCase.diagnosis}
+          </Text>
+          <View style={styles.row}>
+            <StatusBadge status={ecgCase.status} size="sm" />
+            <Text style={[styles.conf, { color: colors.mutedForeground }]}>
+              {ecgCase.confidence}% confidence
+            </Text>
+          </View>
+        </View>
+        <View style={styles.right}>
+          <Text style={[styles.date, { color: colors.mutedForeground }]}>
+            {formattedDate}
+          </Text>
+          <Feather name="chevron-right" size={16} color={colors.mutedForeground} />
+        </View>
+      </PremiumCard>
     </TouchableOpacity>
   );
 }
@@ -60,8 +64,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 12,
     padding: 14,
-    borderRadius: 12,
-    borderWidth: 1,
   },
   iconWrap: {
     width: 40,

@@ -3,6 +3,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { WorkflowCrudPanel } from "@/components/workflows/WorkflowCrudPanel";
 import { useAuth } from "@/context/AuthContext";
 import { useColors } from "@/hooks/useColors";
+import { BrandLogo, HeartbeatLine, PremiumCard, PremiumScreenBackground } from "@/components/ui/Premium";
 import { archiveReport, generateReport, listReports, updateReport, type ClinicalReport } from "@/services/reports";
 
 export default function ReportsDashboardScreen() {
@@ -10,12 +11,17 @@ export default function ReportsDashboardScreen() {
   const { authToken } = useAuth();
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+    <PremiumScreenBackground>
+    <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={styles.content}>
-        <Text style={[styles.title, { color: colors.text }]}>Reports Dashboard</Text>
-        <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
-          Physician report generation, review, finalization, retrieval, archival, and digital ECG export from linked cases.
-        </Text>
+        <PremiumCard style={styles.hero}>
+          <BrandLogo compact />
+          <Text style={[styles.title, { color: colors.text }]}>Medical Reports</Text>
+          <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
+            Professional clinical documentation with ECG images, reconstructed waveforms, AI diagnosis, measurements, recommendations, signature-ready review, PDF, print, and share-ready exports.
+          </Text>
+          <HeartbeatLine height={42} />
+        </PremiumCard>
         <WorkflowCrudPanel<ClinicalReport>
           createFields={[{ key: "caseId", label: "Case ID" }]}
           createItem={(input) => generateReport(authToken!.token, input.caseId)}
@@ -45,12 +51,14 @@ export default function ReportsDashboardScreen() {
         />
       </ScrollView>
     </SafeAreaView>
+    </PremiumScreenBackground>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
   content: { gap: 14, padding: 20, paddingBottom: 120 },
+  hero: { gap: 10 },
   subtitle: { fontSize: 14, lineHeight: 20 },
   title: { fontSize: 28, fontWeight: "800" },
 });

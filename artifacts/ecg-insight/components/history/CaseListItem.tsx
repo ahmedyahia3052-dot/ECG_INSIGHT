@@ -5,6 +5,7 @@ import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { useColors } from "@/hooks/useColors";
 import { StatusBadge } from "@/components/ui/Badge";
 import type { ECGCase } from "@/data/mockData";
+import { PremiumCard } from "@/components/ui/Premium";
 
 interface CaseListItemProps {
   ecgCase: ECGCase;
@@ -29,13 +30,12 @@ export function CaseListItem({ ecgCase }: CaseListItemProps) {
 
   return (
     <TouchableOpacity
-      style={[
-        styles.item,
-        { backgroundColor: colors.card, borderColor: colors.border },
-      ]}
+      accessibilityRole="button"
+      accessibilityLabel={`Open case for ${ecgCase.patientName}`}
       onPress={() => router.push(`/case/${ecgCase.id}` as any)}
       activeOpacity={0.7}
     >
+      <PremiumCard style={styles.item}>
       <View style={styles.left}>
         <View
           style={[styles.avatar, { backgroundColor: colors.primary + "15" }]}
@@ -82,6 +82,7 @@ export function CaseListItem({ ecgCase }: CaseListItemProps) {
           color={colors.mutedForeground}
         />
       </View>
+      </PremiumCard>
     </TouchableOpacity>
   );
 }
@@ -92,8 +93,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 12,
     padding: 14,
-    borderRadius: 12,
-    borderWidth: 1,
   },
   left: {
     flexShrink: 0,

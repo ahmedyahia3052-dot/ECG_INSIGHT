@@ -15,6 +15,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAuth } from "@/context/AuthContext";
 import { useColors } from "@/hooks/useColors";
+import { BrandLogo, PremiumCard, PremiumScreenBackground } from "@/components/ui/Premium";
 
 type Role = "corporate_client" | "doctor" | "user";
 
@@ -65,9 +66,10 @@ export default function RegisterScreen() {
 
   return (
     <KeyboardAvoidingView
-      style={[styles.flex, { backgroundColor: colors.background }]}
+      style={styles.flex}
       behavior={Platform.OS === "ios" ? "padding" : "height"}
     >
+      <PremiumScreenBackground>
       <ScrollView
         contentContainerStyle={[
           styles.scroll,
@@ -89,13 +91,14 @@ export default function RegisterScreen() {
         </TouchableOpacity>
 
         <View style={styles.topSection}>
+          <BrandLogo />
           <Text style={[styles.title, { color: colors.foreground }]}>Create Account</Text>
           <Text style={[styles.sub, { color: colors.mutedForeground }]}>
-            Join ECG Insight and start analyzing ECGs with AI
+            Join ECG Insight with email or mobile phone and start on the FREE plan.
           </Text>
         </View>
 
-        <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
+        <PremiumCard style={styles.card}>
           <View style={styles.form}>
             {errors.form && <Text style={[styles.error, { color: colors.destructive }]}>{errors.form}</Text>}
             <View style={styles.field}>
@@ -230,7 +233,7 @@ export default function RegisterScreen() {
               New accounts start on the FREE plan with 5 ECG analyses per 24 hours.
             </Text>
           </View>
-        </View>
+        </PremiumCard>
 
         <View style={styles.footer}>
           <Text style={[styles.footerText, { color: colors.mutedForeground }]}>Already have an account? </Text>
@@ -239,6 +242,7 @@ export default function RegisterScreen() {
           </TouchableOpacity>
         </View>
       </ScrollView>
+      </PremiumScreenBackground>
     </KeyboardAvoidingView>
   );
 }
@@ -251,7 +255,7 @@ const styles = StyleSheet.create({
   topSection: { gap: 6 },
   title: { fontSize: 24, fontFamily: "Inter_700Bold" },
   sub: { fontSize: 13, fontFamily: "Inter_400Regular", lineHeight: 19 },
-  card: { borderRadius: 18, borderWidth: 1, padding: 24 },
+  card: { padding: 24 },
   form: { gap: 14 },
   field: { gap: 6 },
   label: { fontSize: 13, fontFamily: "Inter_600SemiBold" },

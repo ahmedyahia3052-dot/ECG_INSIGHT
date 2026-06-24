@@ -18,6 +18,7 @@ import { ConfidenceBar } from "@/components/ui/ConfidenceBar";
 import { DiagnosisCard } from "@/components/ecg/DiagnosisCard";
 import { RecommendationCard } from "@/components/ecg/RecommendationCard";
 import { WaveformViewer } from "@/components/ecg/WaveformViewer";
+import { PremiumCard, PremiumScreenBackground } from "@/components/ui/Premium";
 import { getCaseById } from "@/data/mockData";
 import { useAuth } from "@/context/AuthContext";
 import { apiFileUrl } from "@/services/api";
@@ -132,12 +133,13 @@ export default function CaseDetailScreen() {
   const recommendations = aiResult?.recommendations ?? ecgCase.recommendations;
 
   return (
+    <PremiumScreenBackground>
     <ScrollView
-      style={[styles.flex, { backgroundColor: colors.background }]}
+      style={styles.flex}
       contentContainerStyle={[styles.scroll, { paddingBottom: bottomInset + 32 }]}
       showsVerticalScrollIndicator={false}
     >
-      <View style={[styles.topCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+      <PremiumCard style={styles.topCard}>
         <View style={styles.patientRow}>
           <View style={[styles.patAvatar, { backgroundColor: colors.primary + "15" }]}>
             <Text style={[styles.patInitial, { color: colors.primary }]}>
@@ -157,9 +159,9 @@ export default function CaseDetailScreen() {
           </View>
           <StatusBadge status={ecgCase.status} />
         </View>
-      </View>
+      </PremiumCard>
 
-      <View style={[styles.ecgPreview, { backgroundColor: colors.card, borderColor: colors.border }]}>
+      <PremiumCard style={styles.ecgPreview}>
         {digitalEcg || waveform ? (
           <WaveformViewer digitalEcg={digitalEcg} waveform={waveform} />
         ) : (
@@ -271,7 +273,7 @@ export default function CaseDetailScreen() {
             Digital waveform reconstruction unavailable. Normal AI analysis remains available.
           </Text>
         )}
-      </View>
+      </PremiumCard>
 
       <View style={[styles.diagnosisSection, { backgroundColor: colors.card, borderColor: colors.border }]}>
         <Text style={[styles.secTitle, { color: colors.foreground }]}>
@@ -375,6 +377,7 @@ export default function CaseDetailScreen() {
         </Text>
       </View>
     </ScrollView>
+    </PremiumScreenBackground>
   );
 }
 

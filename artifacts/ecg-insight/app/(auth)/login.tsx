@@ -17,6 +17,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAuth } from "@/context/AuthContext";
 import { useColors } from "@/hooks/useColors";
+import { BrandLogo, HeartbeatLine, PremiumCard, PremiumScreenBackground } from "@/components/ui/Premium";
 
 type DemoRole = "Doctor" | "Student" | "Admin" | "Super Admin";
 
@@ -112,9 +113,10 @@ export default function LoginScreen() {
 
   return (
     <KeyboardAvoidingView
-      style={[styles.flex, { backgroundColor: colors.background }]}
+      style={styles.flex}
       behavior={Platform.OS === "ios" ? "padding" : "height"}
     >
+      <PremiumScreenBackground>
       <ScrollView
         contentContainerStyle={[
           styles.scroll,
@@ -125,17 +127,17 @@ export default function LoginScreen() {
       >
         {/* Header */}
         <View style={styles.header}>
-          <View style={[styles.logo, { backgroundColor: colors.primary }]}>
-            <Feather name="activity" size={30} color="#fff" />
+          <BrandLogo />
+          <View style={styles.loginWave}>
+            <HeartbeatLine height={42} />
           </View>
-          <Text style={[styles.brand, { color: colors.text }]}>ECG Insight</Text>
           <Text style={[styles.sub, { color: colors.textSecondary }]}>
-            AI-Powered ECG Interpretation
+            Premium medical AI, optimized for mobile clinicians
           </Text>
         </View>
 
         {/* Card */}
-        <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+        <PremiumCard style={styles.card}>
           <Text style={[styles.title, { color: colors.text }]}>Welcome back</Text>
           <Text style={[styles.cardSub, { color: colors.textSecondary }]}>
             Sign in to your clinical account
@@ -321,7 +323,7 @@ export default function LoginScreen() {
               {phoneOtpSent ? "Verify Phone Code" : "Send Phone OTP"}
             </Text>
           </TouchableOpacity>
-        </View>
+        </PremiumCard>
 
         {/* Demo accounts */}
         <View style={[styles.demoBox, { backgroundColor: colors.surface, borderColor: colors.border }]}>
@@ -371,6 +373,7 @@ export default function LoginScreen() {
           </TouchableOpacity>
         </View>
       </ScrollView>
+      </PremiumScreenBackground>
     </KeyboardAvoidingView>
   );
 }
@@ -379,6 +382,7 @@ const styles = StyleSheet.create({
   flex: { flex: 1 },
   scroll: { paddingHorizontal: 20, gap: 16 },
   header: { alignItems: "center", gap: 8, marginBottom: 4 },
+  loginWave: { width: "80%" },
   logo: {
     width: 68,
     height: 68,
@@ -393,7 +397,7 @@ const styles = StyleSheet.create({
   },
   brand: { fontSize: 26, fontFamily: "Inter_700Bold", letterSpacing: -0.5 },
   sub: { fontSize: 13, fontFamily: "Inter_400Regular" },
-  card: { borderRadius: 18, borderWidth: 1, padding: 22, gap: 14 },
+  card: { padding: 22, gap: 14 },
   title: { fontSize: 20, fontFamily: "Inter_700Bold" },
   cardSub: { fontSize: 13, fontFamily: "Inter_400Regular", marginBottom: 4 },
   errorBox: {
