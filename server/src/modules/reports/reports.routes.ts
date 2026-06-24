@@ -8,6 +8,7 @@ import { prisma } from "../../config/prisma";
 import { requireAuth, requireRole } from "../../middleware/auth";
 import { AppError } from "../../middleware/error";
 import { validateBody } from "../../middleware/validate";
+import { assertResourceAccess, canAccessCase, canAccessOwnedResource, canAccessPatient } from "../../utils/resource-access";
 import {
   assertCanEditReport,
   assertCanFinalize,
@@ -76,9 +77,12 @@ async function reportForAccess(reportId: string, auth: { id: string; role: "SUPE
     where: { id: reportId },
   });
   if (!report) throw new AppError(404, "Clinical report not found.", "REPORT_NOT_FOUND");
-  if (auth.role === "DOCTOR" && !canManageReport(auth, report)) {
-    throw new AppError(403, "You can only access your own reports.", "FORBIDDEN");
-  }
+  assertResourceAccess(
+    canAccessOwnedResource(auth, [report.authorId, report.finalizedById, report.signedById]) ||
+      (await canAccessPatient(report.patientId, auth)) ||
+      (await canAccessCase(report.caseId, auth)),
+    "You do not have access to this report.",
+  );
   return report;
 }
 
@@ -89,7 +93,17 @@ reportsRouter.get("/", async (req, res, next) => {
     const where: Prisma.ClinicalReportWhereInput = {
       caseId,
       patientId,
-      ...(req.auth!.role === "DOCTOR" ? { authorId: req.auth!.id } : {}),
+      ...(req.auth!.role === "SUPER_ADMIN" || req.auth!.role === "ADMIN"
+        ? {}
+        : {
+            OR: [
+              { authorId: req.auth!.id },
+              { finalizedById: req.auth!.id },
+              { signedById: req.auth!.id },
+              { case: { OR: [{ assignedDoctorId: req.auth!.id }, { uploadedById: req.auth!.id }] } },
+              { patient: { auditLogs: { some: { action: "PATIENT_CREATED", actorId: req.auth!.id } } } },
+            ],
+          }),
     };
     const reports = await prisma.clinicalReport.findMany({
       include: reportInclude(),
@@ -104,6 +118,7 @@ reportsRouter.get("/", async (req, res, next) => {
 
 reportsRouter.post("/cases/:caseId/generate", requireRole("DOCTOR"), async (req, res, next) => {
   try {
+    assertResourceAccess(await canAccessCase(String(req.params.caseId), req.auth!));
     const report = await generateClinicalReport(String(req.params.caseId), req.auth!.id);
     res.status(201).json({ report: serializeReport(report) });
   } catch (error) {

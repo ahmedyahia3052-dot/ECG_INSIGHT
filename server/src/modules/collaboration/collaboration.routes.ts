@@ -4,8 +4,10 @@ import { Router } from "express";
 import { z } from "zod";
 import { prisma } from "../../config/prisma";
 import { requireAuth, requireRole } from "../../middleware/auth";
+import { AppError } from "../../middleware/error";
 import { emitRealtime } from "../../realtime/realtime.service";
 import { createNotification } from "../../utils/notifications";
+import { assertResourceAccess, canAccessCase, canAccessPatient } from "../../utils/resource-access";
 
 export const syncRouter = Router();
 export const tasksRouter = Router();
@@ -50,6 +52,7 @@ syncRouter.post("/queue", async (req, res, next) => {
         payloadJson: jsonBody,
       })
       .parse(req.body);
+    if (body.patientId) assertResourceAccess(await canAccessPatient(body.patientId, req.auth!));
     const item = await prisma.syncQueue.create({
       data: { ...body, payloadJson: body.payloadJson as Prisma.InputJsonObject, userId: req.auth!.id },
     });
@@ -101,6 +104,7 @@ syncRouter.post("/cache", async (req, res, next) => {
         value: z.unknown(),
       })
       .parse(req.body);
+    if (body.patientId) assertResourceAccess(await canAccessPatient(body.patientId, req.auth!));
     const encryptedBlob = Buffer.from(JSON.stringify(body.value)).toString("base64");
     const checksum = crypto.createHash("sha256").update(encryptedBlob).digest("hex");
     const cache = await prisma.offlineCache.upsert({
@@ -152,6 +156,8 @@ tasksRouter.post("/", requireRole("DOCTOR"), async (req, res, next) => {
         title: z.string().trim().min(1),
       })
       .parse(req.body);
+    if (body.patientId) assertResourceAccess(await canAccessPatient(body.patientId, req.auth!));
+    if (body.caseId) assertResourceAccess(await canAccessCase(body.caseId, req.auth!));
     const patient = body.patientId ? await prisma.patient.findUnique({ where: { id: body.patientId } }) : null;
     const task = await prisma.task.create({
       data: {
@@ -184,6 +190,15 @@ tasksRouter.post("/", requireRole("DOCTOR"), async (req, res, next) => {
 tasksRouter.post("/:taskId/comments", async (req, res, next) => {
   try {
     const body = z.object({ body: z.string().trim().min(1) }).parse(req.body);
+    const task = await prisma.task.findFirst({
+      where: {
+        id: String(req.params.taskId),
+        ...(req.auth!.role === "SUPER_ADMIN" || req.auth!.role === "ADMIN"
+          ? {}
+          : { OR: [{ createdById: req.auth!.id }, { assignments: { some: { userId: req.auth!.id } } }] }),
+      },
+    });
+    if (!task) throw new AppError(404, "Task not found.", "TASK_NOT_FOUND");
     const comment = await prisma.taskComment.create({
       data: { body: body.body, taskId: String(req.params.taskId), userId: req.auth!.id },
     });
@@ -255,8 +270,17 @@ messagesRouter.post("/", async (req, res, next) => {
         title: z.string().trim().default("Clinical discussion"),
       })
       .parse(req.body);
+    if (body.patientId) assertResourceAccess(await canAccessPatient(body.patientId, req.auth!));
+    if (body.caseId) assertResourceAccess(await canAccessCase(body.caseId, req.auth!));
     const conversation = body.conversationId
-      ? await prisma.conversation.update({ data: { updatedAt: new Date() }, where: { id: body.conversationId } })
+      ? await prisma.conversation.findFirst({
+          where: {
+            id: body.conversationId,
+            ...(req.auth!.role === "SUPER_ADMIN" || req.auth!.role === "ADMIN"
+              ? {}
+              : { participants: { some: { userId: req.auth!.id } } }),
+          },
+        })
       : await prisma.conversation.create({
           data: {
             caseId: body.caseId,
@@ -265,8 +289,23 @@ messagesRouter.post("/", async (req, res, next) => {
             participants: { create: Array.from(new Set([req.auth!.id, ...body.recipientIds])).map((userId) => ({ userId })) },
           },
         });
+    if (!conversation) throw new AppError(404, "Conversation not found.", "CONVERSATION_NOT_FOUND");
+    if (body.conversationId) {
+      await prisma.conversation.update({ data: { updatedAt: new Date() }, where: { id: conversation.id } });
+    }
     const message = await prisma.message.create({
       data: { attachments: body.attachments, body: body.body, conversationId: conversation.id, senderId: req.auth!.id },
+    });
+    await prisma.auditLog.create({
+      data: {
+        action: "MESSAGE_SENT",
+        actorId: req.auth!.id,
+        caseId: conversation.caseId,
+        entityId: message.id,
+        entityType: "Message",
+        message: "Clinical message sent.",
+        patientId: conversation.patientId,
+      },
     });
     emitRealtime("notification.created", { conversationId: conversation.id, messageId: message.id }, body.recipientIds.map((id) => `user:${id}`));
     res.status(201).json({ conversation, message });
@@ -301,7 +340,20 @@ alertsRouter.post("/", requireRole("DOCTOR"), async (req, res, next) => {
         userId: z.string().trim().optional(),
       })
       .parse(req.body);
+    if (body.patientId) assertResourceAccess(await canAccessPatient(body.patientId, req.auth!));
+    if (body.caseId) assertResourceAccess(await canAccessCase(body.caseId, req.auth!));
     const alert = await prisma.alert.create({ data: body });
+    await prisma.auditLog.create({
+      data: {
+        action: "ALERT_CREATED",
+        actorId: req.auth!.id,
+        caseId: alert.caseId,
+        entityId: alert.id,
+        entityType: "Alert",
+        message: `Alert created: ${alert.title}.`,
+        patientId: alert.patientId,
+      },
+    });
     emitRealtime("alert.created", alert, body.userId ? [`user:${body.userId}`] : []);
     res.status(201).json({ alert });
   } catch (error) {

@@ -5,6 +5,7 @@ import { requireAuth, requireRole } from "../middleware/auth";
 import { AppError } from "../middleware/error";
 import { validateBody } from "../middleware/validate";
 import { fromApiGender, fromApiSmokingStatus, serializePatient } from "../utils/clinical";
+import { assertResourceAccess, canAccessPatient } from "../utils/resource-access";
 import { patientBodySchema, patientListSchema, patientUpdateSchema } from "./schemas";
 
 export const patientsRouter = Router();
@@ -47,6 +48,19 @@ patientsRouter.get("/", async (req, res, next) => {
         { email: { contains: query.q, mode: "insensitive" } },
         { organization: { name: { contains: query.q, mode: "insensitive" } } },
         { contractor: { name: { contains: query.q, mode: "insensitive" } } },
+      ];
+    }
+    if (req.auth!.role !== "SUPER_ADMIN" && req.auth!.role !== "ADMIN") {
+      where.AND = [
+        ...(Array.isArray(where.AND) ? where.AND : where.AND ? [where.AND] : []),
+        {
+          OR: [
+            { auditLogs: { some: { action: "PATIENT_CREATED", actorId: req.auth!.id } } },
+            { cases: { some: { OR: [{ assignedDoctorId: req.auth!.id }, { uploadedById: req.auth!.id }] } } },
+            { reports: { some: { authorId: req.auth!.id } } },
+            { tasks: { some: { OR: [{ createdById: req.auth!.id }, { assignments: { some: { userId: req.auth!.id } } }] } } },
+          ],
+        },
       ];
     }
 
@@ -103,6 +117,7 @@ patientsRouter.get("/:patientId", async (req, res, next) => {
     if (!patient || patient.archivedAt) {
       throw new AppError(404, "Patient not found.", "PATIENT_NOT_FOUND");
     }
+    assertResourceAccess(await canAccessPatient(patient.id, req.auth!));
     res.json({ patient: serializePatient(patient) });
   } catch (error) {
     next(error);
@@ -120,6 +135,7 @@ patientsRouter.patch(
         ...(req.body.gender ? { gender: fromApiGender(req.body.gender) } : {}),
         ...(req.body.smokingStatus ? { smokingStatus: fromApiSmokingStatus(req.body.smokingStatus) } : {}),
       };
+      assertResourceAccess(await canAccessPatient(String(req.params.patientId), req.auth!));
       const patient = await prisma.patient.update({
         data,
         where: { id: String(req.params.patientId) },
@@ -141,6 +157,7 @@ patientsRouter.patch(
 
 patientsRouter.delete("/:patientId", requireRole("DOCTOR"), async (req, res, next) => {
   try {
+    assertResourceAccess(await canAccessPatient(String(req.params.patientId), req.auth!));
     const patient = await prisma.patient.update({
       data: { archivedAt: new Date() },
       where: { id: String(req.params.patientId) },

@@ -13,6 +13,7 @@ import { prisma } from "../../config/prisma";
 import { requireAuth, requireRole } from "../../middleware/auth";
 import { AppError } from "../../middleware/error";
 import { validateBody } from "../../middleware/validate";
+import { assertResourceAccess, canAccessEmployee } from "../../utils/resource-access";
 import {
   contractorBodySchema,
   contractorUpdateSchema,
@@ -412,6 +413,30 @@ employeesRouter.get("/", async (req, res, next) => {
           }
         : {}),
     };
+    if (req.auth!.role !== "SUPER_ADMIN" && req.auth!.role !== "ADMIN") {
+      const created = await prisma.auditLog.findMany({
+        select: { entityId: true },
+        where: { action: "EMPLOYEE_CREATED", actorId: req.auth!.id, entityType: "Employee" },
+      });
+      where.AND = [
+        ...(Array.isArray(where.AND) ? where.AND : where.AND ? [where.AND] : []),
+        {
+          OR: [
+            { id: { in: created.map((audit) => audit.entityId).filter((id): id is string => Boolean(id)) } },
+            {
+              patient: {
+                OR: [
+                  { auditLogs: { some: { action: "PATIENT_CREATED", actorId: req.auth!.id } } },
+                  { cases: { some: { OR: [{ assignedDoctorId: req.auth!.id }, { uploadedById: req.auth!.id }] } } },
+                  { reports: { some: { authorId: req.auth!.id } } },
+                  { tasks: { some: { OR: [{ createdById: req.auth!.id }, { assignments: { some: { userId: req.auth!.id } } }] } } },
+                ],
+              },
+            },
+          ],
+        },
+      ];
+    }
     const [total, employees] = await Promise.all([
       prisma.employee.count({ where }),
       prisma.employee.findMany({
@@ -438,6 +463,15 @@ employeesRouter.post("/", requireRole("DOCTOR"), validateBody(employeeBodySchema
     await assertDepartmentBelongsToOrganization(req.body.departmentId, req.body.organizationId);
     await assertContractorBelongsToOrganization(req.body.contractorCompanyId, req.body.organizationId);
     const employee = await prisma.employee.create({ data: employeeCreateData(req.body) });
+    await prisma.auditLog.create({
+      data: {
+        action: "EMPLOYEE_CREATED",
+        actorId: req.auth!.id,
+        entityId: employee.id,
+        entityType: "Employee",
+        message: `Employee ${employee.fullName} created.`,
+      },
+    });
     res.status(201).json({ employee: serializeEmployee(employee) });
   } catch (error) {
     next(error);
@@ -451,6 +485,7 @@ employeesRouter.get("/:employeeId", async (req, res, next) => {
       where: { id: String(req.params.employeeId) },
     });
     if (!employee) throw new AppError(404, "Employee not found.", "EMPLOYEE_NOT_FOUND");
+    assertResourceAccess(await canAccessEmployee(employee.id, req.auth!));
     res.json({ employee });
   } catch (error) {
     next(error);
@@ -461,6 +496,7 @@ employeesRouter.patch("/:employeeId", requireRole("DOCTOR"), validateBody(employ
   try {
     const previous = await prisma.employee.findUnique({ where: { id: String(req.params.employeeId) } });
     if (!previous) throw new AppError(404, "Employee not found.", "EMPLOYEE_NOT_FOUND");
+    assertResourceAccess(await canAccessEmployee(previous.id, req.auth!));
     const organizationId = req.body.organizationId ?? previous.organizationId;
     const departmentId = req.body.departmentId ?? previous.departmentId;
     const contractorCompanyId = req.body.contractorCompanyId ?? previous.contractorCompanyId ?? undefined;
@@ -480,6 +516,7 @@ employeesRouter.post("/:employeeId/link-patient", requireRole("DOCTOR"), async (
   try {
     const employee = await prisma.employee.findUnique({ where: { id: String(req.params.employeeId) } });
     if (!employee) throw new AppError(404, "Employee not found.", "EMPLOYEE_NOT_FOUND");
+    assertResourceAccess(await canAccessEmployee(employee.id, req.auth!));
     const names = employee.fullName.trim().split(/\s+/);
     const firstName = names[0] ?? employee.fullName;
     const lastName = names.slice(1).join(" ") || "Employee";
@@ -538,6 +575,7 @@ employeesRouter.get("/:employeeId/folders", async (req, res, next) => {
       where: { id: String(req.params.employeeId) },
     });
     if (!employee) throw new AppError(404, "Employee not found.", "EMPLOYEE_NOT_FOUND");
+    assertResourceAccess(await canAccessEmployee(employee.id, req.auth!));
     const patient = employee.patient;
     const folder = {
       contractor: employee.contractorCompany?.name ?? "Direct Employees",

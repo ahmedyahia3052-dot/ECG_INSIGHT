@@ -7,6 +7,7 @@ import { z } from "zod";
 import { prisma } from "../../config/prisma";
 import { requireAuth, requireRole } from "../../middleware/auth";
 import { AppError } from "../../middleware/error";
+import { assertResourceAccess, canAccessCase, canAccessPatient } from "../../utils/resource-access";
 import { extractAndIndexDocument, serializeExtraction } from "./document-intelligence.service";
 
 const documentRoot = path.resolve(process.cwd(), "uploads", "documents");
@@ -97,6 +98,12 @@ export const documentsRouter = Router();
 
 documentsRouter.use(requireAuth);
 
+async function assertDocumentAccess(document: { caseId: string | null; patientId: string }, auth: Express.AuthUser) {
+  assertResourceAccess(
+    (await canAccessPatient(document.patientId, auth)) || (document.caseId ? await canAccessCase(document.caseId, auth) : false),
+  );
+}
+
 function serializeDocument(document: {
   caseId: string | null;
   category: string;
@@ -127,9 +134,23 @@ documentsRouter.get("/", async (req, res, next) => {
   try {
     const patientId = typeof req.query.patientId === "string" ? req.query.patientId : undefined;
     const caseId = typeof req.query.caseId === "string" ? req.query.caseId : undefined;
+    if (patientId) assertResourceAccess(await canAccessPatient(patientId, req.auth!));
+    if (caseId) assertResourceAccess(await canAccessCase(caseId, req.auth!));
     const documents = await prisma.clinicalDocument.findMany({
       orderBy: { createdAt: "desc" },
-      where: { caseId, patientId },
+      where: {
+        caseId,
+        patientId,
+        ...(req.auth!.role === "SUPER_ADMIN" || req.auth!.role === "ADMIN"
+          ? {}
+          : {
+              OR: [
+                { uploadedById: req.auth!.id },
+                { case: { OR: [{ assignedDoctorId: req.auth!.id }, { uploadedById: req.auth!.id }] } },
+                { patient: { auditLogs: { some: { action: "PATIENT_CREATED", actorId: req.auth!.id } } } },
+              ],
+            }),
+      },
     });
     res.json({ documents: documents.map(serializeDocument) });
   } catch (error) {
@@ -141,10 +162,24 @@ documentsRouter.get("/list", async (req, res, next) => {
   try {
     const patientId = typeof req.query.patientId === "string" ? req.query.patientId : undefined;
     const caseId = typeof req.query.caseId === "string" ? req.query.caseId : undefined;
+    if (patientId) assertResourceAccess(await canAccessPatient(patientId, req.auth!));
+    if (caseId) assertResourceAccess(await canAccessCase(caseId, req.auth!));
     const documents = await prisma.clinicalDocument.findMany({
       include: { extraction: true, searchIndex: true },
       orderBy: { createdAt: "desc" },
-      where: { caseId, patientId },
+      where: {
+        caseId,
+        patientId,
+        ...(req.auth!.role === "SUPER_ADMIN" || req.auth!.role === "ADMIN"
+          ? {}
+          : {
+              OR: [
+                { uploadedById: req.auth!.id },
+                { case: { OR: [{ assignedDoctorId: req.auth!.id }, { uploadedById: req.auth!.id }] } },
+                { patient: { auditLogs: { some: { action: "PATIENT_CREATED", actorId: req.auth!.id } } } },
+              ],
+            }),
+      },
     });
     res.json({ documents: documents.map(serializeDocument) });
   } catch (error) {
@@ -163,6 +198,17 @@ documentsRouter.get("/search", async (req, res, next) => {
       where: {
         ...(organizationId ? { organizationId } : {}),
         ...(q ? { searchText: { contains: q, mode: "insensitive" } } : {}),
+        ...(req.auth!.role === "SUPER_ADMIN" || req.auth!.role === "ADMIN"
+          ? {}
+          : {
+              document: {
+                OR: [
+                  { uploadedById: req.auth!.id },
+                  { case: { OR: [{ assignedDoctorId: req.auth!.id }, { uploadedById: req.auth!.id }] } },
+                  { patient: { auditLogs: { some: { action: "PATIENT_CREATED", actorId: req.auth!.id } } } },
+                ],
+              },
+            }),
       },
     });
     res.json({
@@ -182,6 +228,9 @@ documentsRouter.get("/search", async (req, res, next) => {
 documentsRouter.post("/extract", requireRole("DOCTOR"), async (req, res, next) => {
   try {
     const body = z.object({ documentId: z.string().trim().min(1) }).parse(req.body);
+    const document = await prisma.clinicalDocument.findUnique({ where: { id: body.documentId } });
+    if (!document) throw new AppError(404, "Clinical document not found.", "DOCUMENT_NOT_FOUND");
+    await assertDocumentAccess(document, req.auth!);
     const { extraction } = await extractAndIndexDocument(body.documentId, req.auth!.id);
     res.json({ extraction: serializeExtraction(extraction) });
   } catch (error) {
@@ -191,6 +240,9 @@ documentsRouter.post("/extract", requireRole("DOCTOR"), async (req, res, next) =
 
 documentsRouter.get("/summary/:documentId", async (req, res, next) => {
   try {
+    const document = await prisma.clinicalDocument.findUnique({ where: { id: String(req.params.documentId) } });
+    if (!document) throw new AppError(404, "Clinical document not found.", "DOCUMENT_NOT_FOUND");
+    await assertDocumentAccess(document, req.auth!);
     const extraction = await prisma.documentExtraction.findUnique({
       where: { documentId: String(req.params.documentId) },
     });
@@ -203,6 +255,9 @@ documentsRouter.get("/summary/:documentId", async (req, res, next) => {
 documentsRouter.post("/index", requireRole("DOCTOR"), async (req, res, next) => {
   try {
     const body = z.object({ documentId: z.string().trim().min(1) }).parse(req.body);
+    const document = await prisma.clinicalDocument.findUnique({ where: { id: body.documentId } });
+    if (!document) throw new AppError(404, "Clinical document not found.", "DOCUMENT_NOT_FOUND");
+    await assertDocumentAccess(document, req.auth!);
     const { index } = await extractAndIndexDocument(body.documentId, req.auth!.id);
     res.json({ indexId: index.id, indexedAt: index.indexedAt.toISOString() });
   } catch (error) {
@@ -219,12 +274,14 @@ documentsRouter.post("/", requireRole("DOCTOR"), upload.single("file"), async (r
       fs.rmSync(req.file.path, { force: true });
       throw new AppError(404, "Patient not found.", "PATIENT_NOT_FOUND");
     }
+    assertResourceAccess(await canAccessPatient(patient.id, req.auth!));
     if (body.caseId) {
       const ecgCase = await prisma.eCGCase.findUnique({ where: { id: body.caseId } });
       if (!ecgCase || ecgCase.patientId !== body.patientId) {
         fs.rmSync(req.file.path, { force: true });
         throw new AppError(404, "Linked ECG case not found for this patient.", "CASE_NOT_FOUND");
       }
+      assertResourceAccess(await canAccessCase(ecgCase.id, req.auth!));
     }
 
     const document = await prisma.clinicalDocument.create({
@@ -277,6 +334,15 @@ documentsRouter.post("/upload", requireRole("DOCTOR"), upload.single("file"), as
       fs.rmSync(req.file.path, { force: true });
       throw new AppError(404, "Patient not found.", "PATIENT_NOT_FOUND");
     }
+    assertResourceAccess(await canAccessPatient(patient.id, req.auth!));
+    if (body.caseId) {
+      const ecgCase = await prisma.eCGCase.findUnique({ where: { id: body.caseId } });
+      if (!ecgCase || ecgCase.patientId !== body.patientId) {
+        fs.rmSync(req.file.path, { force: true });
+        throw new AppError(404, "Linked ECG case not found for this patient.", "CASE_NOT_FOUND");
+      }
+      assertResourceAccess(await canAccessCase(ecgCase.id, req.auth!));
+    }
     const document = await prisma.clinicalDocument.create({
       data: {
         caseId: body.caseId,
@@ -323,7 +389,31 @@ documentsRouter.get("/:storedName", async (req, res, next) => {
     const storedName = path.basename(String(req.params.storedName));
     const document = await prisma.clinicalDocument.findFirst({ where: { storedName } });
     if (!document) throw new AppError(404, "Clinical document not found.", "DOCUMENT_NOT_FOUND");
+    await assertDocumentAccess(document, req.auth!);
     res.download(document.storagePath, document.originalName);
+  } catch (error) {
+    next(error);
+  }
+});
+
+documentsRouter.delete("/:documentId", requireRole("DOCTOR"), async (req, res, next) => {
+  try {
+    const document = await prisma.clinicalDocument.findUnique({ where: { id: String(req.params.documentId) } });
+    if (!document) throw new AppError(404, "Clinical document not found.", "DOCUMENT_NOT_FOUND");
+    await assertDocumentAccess(document, req.auth!);
+    await prisma.clinicalDocument.delete({ where: { id: document.id } });
+    fs.rmSync(document.storagePath, { force: true });
+    await prisma.auditLog.create({
+      data: {
+        action: "DOCUMENT_DELETED",
+        actorId: req.auth!.id,
+        caseId: document.caseId,
+        message: `Clinical document ${document.originalName} deleted.`,
+        metadata: { category: document.category, sizeBytes: document.sizeBytes },
+        patientId: document.patientId,
+      },
+    });
+    res.status(204).send();
   } catch (error) {
     next(error);
   }

@@ -2,6 +2,7 @@ import type { Prisma } from "@prisma/client";
 import { Router } from "express";
 import { prisma } from "../config/prisma";
 import { requireAuth, requireRole } from "../middleware/auth";
+import { assertResourceAccess, canAccessCase } from "../utils/resource-access";
 import { aiHistorySchema } from "./schemas";
 import {
   fromApiAnalysisStatus,
@@ -18,6 +19,7 @@ aiRouter.use(requireAuth);
 
 aiRouter.post("/analyze/:caseId", requireRole("DOCTOR"), async (req, res, next) => {
   try {
+    assertResourceAccess(await canAccessCase(String(req.params.caseId), req.auth!));
     const analysis = await queueAnalysis(String(req.params.caseId), req.auth!.id);
     res.status(202).json({ analysis: serializeAnalysis(analysis) });
   } catch (error) {
@@ -27,6 +29,7 @@ aiRouter.post("/analyze/:caseId", requireRole("DOCTOR"), async (req, res, next) 
 
 aiRouter.get("/result/:caseId", async (req, res, next) => {
   try {
+    assertResourceAccess(await canAccessCase(String(req.params.caseId), req.auth!));
     const analysis = await getLatestAnalysis(String(req.params.caseId));
     res.json({ analysis: analysis ? serializeAnalysis(analysis) : null });
   } catch (error) {

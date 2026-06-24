@@ -7,6 +7,7 @@ import { z } from "zod";
 import { prisma } from "../../config/prisma";
 import { requireAuth, requireRole } from "../../middleware/auth";
 import { AppError } from "../../middleware/error";
+import { assertResourceAccess, canAccessCase, canAccessPatient } from "../../utils/resource-access";
 import {
   compareEcgFile,
   measureEcgFile,
@@ -89,6 +90,17 @@ export const ecgFilesRouter = Router();
 
 ecgFilesRouter.use(requireAuth);
 
+async function assertEcgFileAccess(ecgFileId: string, auth: Express.AuthUser) {
+  const file = await prisma.eCGFile.findUnique({ where: { id: ecgFileId } });
+  if (!file) throw new AppError(404, "ECG file not found.", "ECG_FILE_NOT_FOUND");
+  assertResourceAccess(
+    file.uploadedById === auth.id ||
+      (await canAccessPatient(file.patientId, auth)) ||
+      (file.caseId ? await canAccessCase(file.caseId, auth) : false),
+  );
+  return file;
+}
+
 ecgFilesRouter.post("/files/upload", requireRole("DOCTOR"), upload.single("file"), async (req, res, next) => {
   try {
     if (!req.file) throw new AppError(400, "ECG file is required.", "FILE_REQUIRED");
@@ -98,12 +110,14 @@ ecgFilesRouter.post("/files/upload", requireRole("DOCTOR"), upload.single("file"
       fs.rmSync(req.file.path, { force: true });
       throw new AppError(404, "Patient not found.", "PATIENT_NOT_FOUND");
     }
+    assertResourceAccess(await canAccessPatient(patient.id, req.auth!));
     if (body.caseId) {
       const ecgCase = await prisma.eCGCase.findUnique({ where: { id: body.caseId } });
       if (!ecgCase || ecgCase.patientId !== patient.id) {
         fs.rmSync(req.file.path, { force: true });
         throw new AppError(404, "Linked ECG case not found for this patient.", "CASE_NOT_FOUND");
       }
+      assertResourceAccess(await canAccessCase(ecgCase.id, req.auth!));
     }
     const file = await prisma.eCGFile.create({
       data: {
@@ -148,10 +162,22 @@ ecgFilesRouter.post("/files/upload", requireRole("DOCTOR"), upload.single("file"
 ecgFilesRouter.get("/files/list", async (req, res, next) => {
   try {
     const patientId = typeof req.query.patientId === "string" ? req.query.patientId : undefined;
+    if (patientId) assertResourceAccess(await canAccessPatient(patientId, req.auth!));
     const files = await prisma.eCGFile.findMany({
       orderBy: { createdAt: "desc" },
       take: 100,
-      where: { patientId },
+      where: {
+        patientId,
+        ...(req.auth!.role === "SUPER_ADMIN" || req.auth!.role === "ADMIN"
+          ? {}
+          : {
+              OR: [
+                { uploadedById: req.auth!.id },
+                { case: { OR: [{ assignedDoctorId: req.auth!.id }, { uploadedById: req.auth!.id }] } },
+                { patient: { auditLogs: { some: { action: "PATIENT_CREATED", actorId: req.auth!.id } } } },
+              ],
+            }),
+      },
     });
     res.json({ files: files.map(serializeEcgFile) });
   } catch (error) {
@@ -162,6 +188,7 @@ ecgFilesRouter.get("/files/list", async (req, res, next) => {
 ecgFilesRouter.post("/files/parse", requireRole("DOCTOR"), async (req, res, next) => {
   try {
     const body = z.object({ ecgFileId: z.string().trim().min(1) }).parse(req.body);
+    await assertEcgFileAccess(body.ecgFileId, req.auth!);
     const parsed = await parseAndPersistEcgFile(body.ecgFileId, req.auth!.id);
     res.json({ parsed: { duration: parsed.duration, metadata: parsed.metadata, numberOfLeads: parsed.leads.length } });
   } catch (error) {
@@ -172,6 +199,7 @@ ecgFilesRouter.post("/files/parse", requireRole("DOCTOR"), async (req, res, next
 ecgFilesRouter.post("/files/measure", requireRole("DOCTOR"), async (req, res, next) => {
   try {
     const body = z.object({ ecgFileId: z.string().trim().min(1) }).parse(req.body);
+    await assertEcgFileAccess(body.ecgFileId, req.auth!);
     const result = await measureEcgFile(body.ecgFileId, req.auth!.id);
     res.json(result);
   } catch (error) {
@@ -182,6 +210,7 @@ ecgFilesRouter.post("/files/measure", requireRole("DOCTOR"), async (req, res, ne
 ecgFilesRouter.post("/files/compare", requireRole("DOCTOR"), async (req, res, next) => {
   try {
     const body = z.object({ ecgFileId: z.string().trim().min(1) }).parse(req.body);
+    await assertEcgFileAccess(body.ecgFileId, req.auth!);
     const comparison = await compareEcgFile(body.ecgFileId, req.auth!.id);
     res.json({ comparison });
   } catch (error) {

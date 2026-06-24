@@ -75,7 +75,6 @@ export function createApp() {
   });
 
   app.use("/api", modulesRouter);
-  app.use(modulesRouter);
 
   app.use(notFoundHandler);
   app.use(errorHandler);

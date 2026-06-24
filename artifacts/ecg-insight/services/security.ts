@@ -1,4 +1,4 @@
-import { apiRequest } from "./api";
+import { API_ROOT_URL, apiRequest } from "./api";
 
 export async function listSecurityEvents(accessToken: string) {
   return apiRequest<{ events: unknown[] }>("/security/events", { accessToken });
@@ -29,5 +29,10 @@ export async function listBackupJobs(accessToken: string) {
 }
 
 export async function getMetrics(accessToken: string) {
-  return apiRequest<Record<string, unknown>>("/metrics", { accessToken });
+  const response = await fetch(`${API_ROOT_URL}/metrics`, {
+    credentials: "include",
+    headers: { authorization: `Bearer ${accessToken}` },
+  });
+  if (!response.ok) throw new Error("Unable to load API metrics.");
+  return (await response.json()) as Record<string, unknown>;
 }

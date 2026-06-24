@@ -14,11 +14,23 @@ import { KeyboardProvider } from "react-native-keyboard-controller";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
 import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { GlobalQueryStatus } from "@/components/GlobalQueryStatus";
 import { AuthProvider } from "@/context/AuthContext";
+import { ApiError } from "@/services/api";
 
 SplashScreen.preventAutoHideAsync();
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      retry(failureCount, error) {
+        if (error instanceof ApiError && error.status >= 400 && error.status < 500) return false;
+        return failureCount < 2;
+      },
+      staleTime: 30_000,
+    },
+  },
+});
 
 function RootLayoutNav() {
   return (
@@ -56,6 +68,7 @@ export default function RootLayout() {
             <KeyboardProvider>
               <AuthProvider>
                 <RootLayoutNav />
+                <GlobalQueryStatus />
               </AuthProvider>
             </KeyboardProvider>
           </GestureHandlerRootView>

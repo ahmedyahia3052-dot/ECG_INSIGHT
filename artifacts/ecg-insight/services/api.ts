@@ -1,5 +1,7 @@
-export const API_URL =
-  process.env.EXPO_PUBLIC_API_URL?.replace(/\/+$/, "") ?? "http://localhost:3001/api";
+import { requiredApiUrl } from "./env";
+
+export const API_URL = requiredApiUrl();
+export const API_ROOT_URL = API_URL.replace(/\/api$/i, "");
 
 export function apiFileUrl(path: string): string {
   if (/^https?:\/\//i.test(path)) return path;

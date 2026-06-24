@@ -11,6 +11,7 @@ import {
   serializeCase,
 } from "../utils/clinical";
 import { createNotification } from "../utils/notifications";
+import { assertResourceAccess, canAccessCase, canAccessPatient } from "../utils/resource-access";
 import {
   assignDoctorSchema,
   caseCreateSchema,
@@ -73,6 +74,18 @@ casesRouter.get("/", async (req, res, next) => {
         { patient: { medicalRecordNumber: { contains: query.q, mode: "insensitive" } } },
       ];
     }
+    if (req.auth!.role !== "SUPER_ADMIN" && req.auth!.role !== "ADMIN") {
+      where.AND = [
+        ...(Array.isArray(where.AND) ? where.AND : where.AND ? [where.AND] : []),
+        {
+          OR: [
+            { assignedDoctorId: req.auth!.id },
+            { uploadedById: req.auth!.id },
+            { reports: { some: { authorId: req.auth!.id } } },
+          ],
+        },
+      ];
+    }
 
     const [total, cases] = await Promise.all([
       prisma.eCGCase.count({ where }),
@@ -103,6 +116,7 @@ casesRouter.post("/", requireRole("DOCTOR"), validateBody(caseCreateSchema), asy
     if (!patient || patient.archivedAt) {
       throw new AppError(404, "Patient not found.", "PATIENT_NOT_FOUND");
     }
+    assertResourceAccess(await canAccessPatient(patient.id, req.auth!));
 
     const ecgCase = await prisma.eCGCase.create({
       data: {
@@ -161,6 +175,7 @@ casesRouter.get("/:caseId", async (req, res, next) => {
     if (!ecgCase) {
       throw new AppError(404, "ECG case not found.", "CASE_NOT_FOUND");
     }
+    assertResourceAccess(await canAccessCase(ecgCase.id, req.auth!));
     res.json({ case: serializeCase(ecgCase) });
   } catch (error) {
     next(error);
@@ -172,6 +187,7 @@ casesRouter.patch("/:caseId", requireRole("DOCTOR"), validateBody(caseUpdateSche
     const caseId = String(req.params.caseId);
     const previous = await prisma.eCGCase.findUnique({ where: { id: caseId } });
     if (!previous) throw new AppError(404, "ECG case not found.", "CASE_NOT_FOUND");
+    assertResourceAccess(await canAccessCase(previous.id, req.auth!));
 
     const ecgCase = await prisma.eCGCase.update({
       data: {
@@ -207,6 +223,7 @@ casesRouter.post(
   validateBody(assignDoctorSchema),
   async (req, res, next) => {
     try {
+      assertResourceAccess(await canAccessCase(String(req.params.caseId), req.auth!));
       const ecgCase = await prisma.eCGCase.update({
         data: { assignedDoctorId: req.body.assignedDoctorId },
         include: caseInclude,
@@ -239,6 +256,7 @@ casesRouter.post(
   validateBody(updateStatusSchema),
   async (req, res, next) => {
     try {
+      assertResourceAccess(await canAccessCase(String(req.params.caseId), req.auth!));
       const ecgCase = await prisma.eCGCase.update({
         data: { status: fromApiCaseStatus(req.body.status) },
         include: caseInclude,
@@ -269,6 +287,7 @@ casesRouter.post(
 
 casesRouter.get("/:caseId/timeline", async (req, res, next) => {
   try {
+    assertResourceAccess(await canAccessCase(String(req.params.caseId), req.auth!));
     const logs = await prisma.auditLog.findMany({
       orderBy: { createdAt: "asc" },
       where: { caseId: String(req.params.caseId) },
