@@ -32,6 +32,7 @@ import { reportsRouter } from "./reports/reports.routes";
 import { searchRouter } from "./search/search.routes";
 import { securityRouter } from "./security/security.routes";
 import { subscriptionsRouter } from "../subscriptions/subscriptions.routes";
+import { superAdminRouter } from "./super-admin/super-admin.routes";
 import { uploadsRouter } from "../uploads/uploads.routes";
 import { usersRouter } from "../users/users.routes";
 import {
@@ -83,6 +84,7 @@ modulesRouter.use("/search", searchRouter);
 modulesRouter.use("/security", securityRouter);
 modulesRouter.use("/users", usersRouter);
 modulesRouter.use("/subscriptions", subscriptionsRouter);
+modulesRouter.use("/super-admin", superAdminRouter);
 modulesRouter.use("/contractors", contractorsRouter);
 modulesRouter.use("/uploads", uploadsRouter);
 modulesRouter.use("/telecardiology", telecardiologyRouter);

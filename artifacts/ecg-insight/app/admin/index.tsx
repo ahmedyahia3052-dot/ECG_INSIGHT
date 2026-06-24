@@ -1,7 +1,9 @@
 import { useAuth } from "@/context/AuthContext";
 import { MOCK_CASES } from "@/data/mockData";
 import { useColors } from "@/hooks/useColors";
+import { getSuperAdminDashboard, type SuperAdminDashboard } from "@/services/superAdmin";
 import { useRouter } from "expo-router";
+import { useEffect, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
@@ -116,16 +118,31 @@ function MenuItem({ icon, title, description, badge, badgeColor, onPress }: Menu
 
 export default function AdminDashboard() {
   const colors = useColors();
-  const { user, isImpersonating, stopImpersonation, managedUsers } = useAuth();
+  const { user, authToken, isImpersonating, stopImpersonation, managedUsers } = useAuth();
   const router = useRouter();
+  const [dashboard, setDashboard] = useState<SuperAdminDashboard | null>(null);
+  const [dashboardError, setDashboardError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!authToken?.token || user?.role !== "super_admin") return;
+    getSuperAdminDashboard(authToken.token)
+      .then((payload) => {
+        setDashboard(payload.dashboard);
+        setDashboardError(null);
+      })
+      .catch((error) => setDashboardError(error instanceof Error ? error.message : "Super Admin dashboard unavailable."));
+  }, [authToken?.token, user?.role]);
+
   const stats = {
-    active: managedUsers.filter((u) => u.isActive).length,
+    active: dashboard?.activeUsers ?? managedUsers.filter((u) => u.isActive).length,
     doctors: managedUsers.filter((u) => u.role === "doctor").length,
-    enterprise: managedUsers.filter((u) => u.subscriptionTier === "enterprise").length,
+    enterprise: dashboard?.enterpriseUsers ?? managedUsers.filter((u) => u.subscriptionTier === "enterprise").length,
+    free: dashboard?.freeUsers ?? managedUsers.filter((u) => u.subscriptionTier === "free").length,
     inactive: managedUsers.filter((u) => !u.isActive).length,
-    professional: managedUsers.filter((u) => u.subscriptionTier === "professional").length,
+    lifetime: dashboard?.lifetimeUsers ?? 0,
+    professional: dashboard?.proUsers ?? managedUsers.filter((u) => u.subscriptionTier === "professional").length,
     students: managedUsers.filter((u) => u.role === "student").length,
-    total: managedUsers.length,
+    total: dashboard?.totalUsers ?? managedUsers.length,
     totalCases: MOCK_CASES.length,
     unverified: managedUsers.filter((u) => !u.emailVerified).length,
   };
@@ -184,6 +201,17 @@ export default function AdminDashboard() {
     sub: { fontSize: 13, color: colors.textSecondary, marginBottom: 16 },
   });
 
+  if (user?.role !== "super_admin") {
+    return (
+      <SafeAreaView style={styles.container} edges={["bottom"]}>
+        <View style={styles.content}>
+          <Text style={styles.greeting}>Super Admin Access Required</Text>
+          <Text style={styles.sub}>This enterprise administration console is restricted to SUPER_ADMIN users.</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
   return (
     <SafeAreaView style={styles.container} edges={["bottom"]}>
       <ScrollView contentContainerStyle={styles.content}>
@@ -210,24 +238,39 @@ export default function AdminDashboard() {
             </Text>
           </View>
         </View>
+        {dashboardError && (
+          <Text style={[styles.sub, { color: "#DC2626" }]}>{dashboardError}</Text>
+        )}
 
         <Text style={styles.sectionTitle}>Platform Stats</Text>
         <View style={styles.statsGrid}>
           <StatCard label="Total Users" value={stats.total} icon="👥" accent="#0D9488" />
           <StatCard label="Active Users" value={stats.active} icon="✅" accent="#10B981" />
-          <StatCard label="Doctors" value={stats.doctors} icon="🩺" accent="#06B6D4" />
-          <StatCard label="Students" value={stats.students} icon="📚" accent="#8B5CF6" />
-          <StatCard label="Total ECG Cases" value={stats.totalCases} icon="📊" accent="#F59E0B" />
-          <StatCard label="Inactive Users" value={stats.inactive} icon="⏸️" accent="#EF4444" />
+          <StatCard label="Daily ECG Analyses" value={dashboard?.dailyEcgAnalyses ?? 0} icon="〽️" accent="#06B6D4" />
+          <StatCard label="Monthly ECG Analyses" value={dashboard?.monthlyEcgAnalyses ?? stats.totalCases} icon="📊" accent="#F59E0B" />
+          <StatCard label="Revenue Today" value={`$${((dashboard?.revenueToday ?? 0) / 100).toLocaleString()}`} icon="💵" accent="#10B981" />
+          <StatCard label="Revenue This Month" value={`$${((dashboard?.revenueThisMonth ?? 0) / 100).toLocaleString()}`} icon="💰" accent="#7C3AED" />
+          <StatCard label="Revenue Total" value={`$${((dashboard?.revenueTotal ?? 0) / 100).toLocaleString()}`} icon="🏦" accent="#0D9488" />
+          <StatCard label="New Registrations" value={dashboard?.newRegistrations ?? 0} icon="🆕" accent="#2563EB" />
         </View>
 
         <Text style={styles.sectionTitle}>Subscription Tiers</Text>
         <View style={styles.statsGrid}>
-          <StatCard label="Free" value={stats.total - stats.professional - stats.enterprise} icon="🆓" accent="#6B7280" />
-          <StatCard label="Professional" value={stats.professional} icon="⭐" accent="#F59E0B" />
+          <StatCard label="Free" value={stats.free} icon="🆓" accent="#6B7280" />
+          <StatCard label="Pro" value={stats.professional} icon="⭐" accent="#F59E0B" />
           <StatCard label="Enterprise" value={stats.enterprise} icon="🏢" accent="#7C3AED" />
-          <StatCard label="Unverified Email" value={stats.unverified} icon="✉️" accent="#EF4444" />
+          <StatCard label="Lifetime" value={stats.lifetime} icon="♾️" accent="#0D9488" />
         </View>
+        {dashboard?.expiringSubscriptions.length ? (
+          <>
+            <Text style={styles.sectionTitle}>Expiring Subscriptions</Text>
+            {dashboard.expiringSubscriptions.slice(0, 5).map((subscription) => (
+              <Text key={subscription.userId} style={styles.sub}>
+                {subscription.userEmail} · {subscription.plan} · {subscription.expirationDate?.slice(0, 10)}
+              </Text>
+            ))}
+          </>
+        ) : null}
 
         <Text style={styles.sectionTitle}>Management</Text>
         <MenuItem
@@ -244,6 +287,38 @@ export default function AdminDashboard() {
           badge={String(stats.professional + stats.enterprise) + " paid"}
           badgeColor="#7C3AED"
           onPress={() => router.push("/admin/subscriptions")}
+        />
+        <MenuItem
+          icon="📦"
+          title="Plan Management"
+          description="Create, edit, activate, and deactivate SaaS plans"
+          badge="Plans"
+          badgeColor="#0D9488"
+          onPress={() => router.push("/admin/plans")}
+        />
+        <MenuItem
+          icon="📈"
+          title="Revenue Dashboard"
+          description="Revenue trend, user growth, payment status, and ECG usage"
+          badge="Revenue"
+          badgeColor="#10B981"
+          onPress={() => router.push("/admin/revenue")}
+        />
+        <MenuItem
+          icon="🎁"
+          title="License Dashboard"
+          description="Lifetime and gifted license management"
+          badge="Licenses"
+          badgeColor="#F59E0B"
+          onPress={() => router.push("/admin/licenses")}
+        />
+        <MenuItem
+          icon="📜"
+          title="Audit Log Viewer"
+          description="Super Admin actions and administrative audit trail"
+          badge="Audit"
+          badgeColor="#2563EB"
+          onPress={() => router.push("/admin/audit")}
         />
         <MenuItem
           icon="📄"

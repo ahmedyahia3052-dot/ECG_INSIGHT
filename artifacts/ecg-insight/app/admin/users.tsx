@@ -1,8 +1,16 @@
 import { useAuth } from "@/context/AuthContext";
 import { type ManagedUser } from "@/data/mockData";
 import { useColors } from "@/hooks/useColors";
+import {
+  changeSuperAdminUserPlan,
+  deleteSuperAdminUser,
+  grantSuperAdminLifetime,
+  listSuperAdminUsers,
+  superAdminUserAction,
+  type SuperAdminUser,
+} from "@/services/superAdmin";
 import { useRouter } from "expo-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Alert,
   Modal,
@@ -17,6 +25,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 type FilterTab = "all" | "active" | "inactive" | "unverified";
 type CreateRole = "doctor" | "student" | "admin";
+type AdminUser = ManagedUser & { isLifetime?: boolean };
 
 function RoleBadge({ role }: { role: string }) {
   const colors = useColors();
@@ -36,26 +45,19 @@ function RoleBadge({ role }: { role: string }) {
   );
 }
 
-function UserCard({ u, isSuperAdmin }: { u: ManagedUser; isSuperAdmin: boolean }) {
+function UserCard({
+  onAdminAction,
+  u,
+  isSuperAdmin,
+}: {
+  onAdminAction: (userId: string, action: "delete" | "disable" | "enable" | "force-logout" | "grant-lifetime" | "plan-enterprise" | "plan-free" | "plan-pro" | "reset-password") => void;
+  u: AdminUser;
+  isSuperAdmin: boolean;
+}) {
   const colors = useColors();
-  const { activateUser, deactivateUser, impersonateUser, user: currentUser } = useAuth();
+  const { impersonateUser, user: currentUser } = useAuth();
   const router = useRouter();
   const isSelf = currentUser?.id === u.id;
-
-  function handleToggle() {
-    if (u.isActive) {
-      Alert.alert(
-        "Deactivate User",
-        `Deactivate ${u.name}? They will lose access immediately.`,
-        [
-          { text: "Cancel", style: "cancel" },
-          { text: "Deactivate", style: "destructive", onPress: () => deactivateUser(u.id) },
-        ]
-      );
-    } else {
-      activateUser(u.id);
-    }
-  }
 
   async function handleImpersonate() {
     Alert.alert(
@@ -150,16 +152,16 @@ function UserCard({ u, isSuperAdmin }: { u: ManagedUser; isSuperAdmin: boolean }
           {u.emailVerified ? "✓ Verified" : "⚠ Unverified"}
         </Text>
         <Text style={{ fontSize: 12, color: colors.textSecondary }}>
-          💳 {u.subscriptionTier}
+          💳 {u.isLifetime ? "lifetime" : u.subscriptionTier}
         </Text>
       </View>
 
-      <View style={{ flexDirection: "row", gap: 8 }}>
+      <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
         {!isSelf && (
           <Pressable
-            onPress={handleToggle}
+            onPress={() => onAdminAction(u.id, u.isActive ? "disable" : "enable")}
             style={({ pressed }) => ({
-              flex: 1,
+              minWidth: "30%",
               backgroundColor: pressed
                 ? colors.border
                 : u.isActive
@@ -182,20 +184,25 @@ function UserCard({ u, isSuperAdmin }: { u: ManagedUser; isSuperAdmin: boolean }
           </Pressable>
         )}
         {isSuperAdmin && !isSelf && (
-          <Pressable
-            onPress={handleImpersonate}
-            style={({ pressed }) => ({
-              flex: 1,
-              backgroundColor: pressed ? "#7C3AED30" : "#7C3AED15",
-              borderRadius: colors.radius.md,
-              paddingVertical: 8,
-              alignItems: "center",
-            })}
-          >
-            <Text style={{ fontSize: 13, fontWeight: "600", color: "#7C3AED" }}>
-              👤 Impersonate
-            </Text>
-          </Pressable>
+          <>
+            <Pressable
+              onPress={handleImpersonate}
+              style={({ pressed }) => ({ minWidth: "30%", backgroundColor: pressed ? "#7C3AED30" : "#7C3AED15", borderRadius: colors.radius.md, paddingHorizontal: 10, paddingVertical: 8, alignItems: "center" })}
+            >
+              <Text style={{ fontSize: 13, fontWeight: "600", color: "#7C3AED" }}>Impersonate</Text>
+            </Pressable>
+            {(["reset-password", "force-logout", "plan-free", "plan-pro", "plan-enterprise", "grant-lifetime", "delete"] as const).map((action) => (
+              <Pressable
+                key={action}
+                onPress={() => onAdminAction(u.id, action)}
+                style={({ pressed }) => ({ minWidth: "30%", backgroundColor: pressed ? colors.border : colors.surface, borderRadius: colors.radius.md, borderColor: colors.border, borderWidth: 1, paddingHorizontal: 10, paddingVertical: 8, alignItems: "center" })}
+              >
+                <Text style={{ fontSize: 13, fontWeight: "600", color: action === "grant-lifetime" ? "#D97706" : colors.primary }}>
+                  {action === "reset-password" ? "Reset" : action === "force-logout" ? "Logout" : action === "plan-free" ? "Free" : action === "plan-pro" ? "Pro" : action === "plan-enterprise" ? "Enterprise" : action === "delete" ? "Delete" : "Lifetime"}
+                </Text>
+              </Pressable>
+            ))}
+          </>
         )}
       </View>
     </View>
@@ -204,8 +211,10 @@ function UserCard({ u, isSuperAdmin }: { u: ManagedUser; isSuperAdmin: boolean }
 
 export default function UsersScreen() {
   const colors = useColors();
-  const { managedUsers, user, canAccess, createInternalAccount } = useAuth();
+  const { authToken, managedUsers, user, createInternalAccount } = useAuth();
   const isSuperAdmin = user?.role === "super_admin";
+  const [liveUsers, setLiveUsers] = useState<AdminUser[]>([]);
+  const [actionMessage, setActionMessage] = useState("");
 
   const [filter, setFilter] = useState<FilterTab>("all");
   const [search, setSearch] = useState("");
@@ -216,6 +225,30 @@ export default function UsersScreen() {
   const [newRole, setNewRole] = useState<CreateRole>("doctor");
   const [createError, setCreateError] = useState("");
 
+  async function reloadUsers() {
+    if (!authToken?.token || !isSuperAdmin) return;
+    const params = new URLSearchParams({ page: "1", pageSize: "100", q: search });
+    const payload = await listSuperAdminUsers(authToken.token, params);
+    setLiveUsers(payload.users.map((u: SuperAdminUser) => ({
+      avatarInitials: u.avatarInitials,
+      caseCount: 0,
+      email: u.email,
+      emailVerified: u.emailVerified,
+      id: u.id,
+      isActive: u.isActive,
+      isLifetime: u.isLifetime,
+      joinedDate: "",
+      lastActive: "",
+      name: u.name,
+      role: u.role as AdminUser["role"],
+      subscriptionTier: (u.subscriptionTier === "pro" ? "professional" : u.subscriptionTier) as AdminUser["subscriptionTier"],
+    })));
+  }
+
+  useEffect(() => {
+    reloadUsers().catch(() => {});
+  }, [authToken?.token, isSuperAdmin, search]);
+
   const tabs: { key: FilterTab; label: string }[] = [
     { key: "all", label: "All" },
     { key: "active", label: "Active" },
@@ -223,7 +256,8 @@ export default function UsersScreen() {
     { key: "unverified", label: "Unverified" },
   ];
 
-  const filtered = managedUsers.filter((u) => {
+  const sourceUsers = liveUsers.length ? liveUsers : (managedUsers as AdminUser[]);
+  const filtered = sourceUsers.filter((u) => {
     if (filter === "active" && !u.isActive) return false;
     if (filter === "inactive" && u.isActive) return false;
     if (filter === "unverified" && u.emailVerified) return false;
@@ -245,10 +279,32 @@ export default function UsersScreen() {
     if (!isSuperAdmin) { setCreateError("Only Super Admins can create internal accounts."); return; }
     try {
       await createInternalAccount(newName.trim(), newEmail.trim(), newRole);
+      await reloadUsers().catch(() => {});
       setNewName(""); setNewEmail(""); setNewRole("doctor");
       setShowCreate(false);
     } catch (error) {
       setCreateError(error instanceof Error ? error.message : "Could not create account.");
+    }
+  }
+
+  async function handleAdminAction(userId: string, action: "delete" | "disable" | "enable" | "force-logout" | "grant-lifetime" | "plan-enterprise" | "plan-free" | "plan-pro" | "reset-password") {
+    if (!authToken?.token) return;
+    try {
+      if (action === "delete") {
+        await deleteSuperAdminUser(authToken.token, userId);
+      } else if (action.startsWith("plan-")) {
+        await changeSuperAdminUserPlan(authToken.token, userId, action === "plan-free" ? "FREE" : action === "plan-pro" ? "PRO" : "ENTERPRISE");
+      } else if (action === "grant-lifetime") {
+        await grantSuperAdminLifetime(authToken.token, userId);
+      } else if (action === "disable" || action === "enable" || action === "force-logout" || action === "reset-password") {
+        const result = await superAdminUserAction(authToken.token, userId, action);
+        if (result.resetPassword) setActionMessage(`Temporary password: ${result.resetPassword}`);
+      } else {
+        setActionMessage("Unsupported admin action.");
+      }
+      await reloadUsers();
+    } catch (error) {
+      setActionMessage(error instanceof Error ? error.message : "Admin action failed.");
     }
   }
 
@@ -364,8 +420,9 @@ export default function UsersScreen() {
         <Text style={{ fontSize: 13, color: colors.textSecondary, marginBottom: 12 }}>
           {filtered.length} user{filtered.length !== 1 ? "s" : ""} found
         </Text>
+        {actionMessage ? <Text style={{ color: colors.primary, marginBottom: 12 }}>{actionMessage}</Text> : null}
         {filtered.map((u) => (
-          <UserCard key={u.id} u={u} isSuperAdmin={isSuperAdmin} />
+          <UserCard key={u.id} u={u} isSuperAdmin={isSuperAdmin} onAdminAction={handleAdminAction} />
         ))}
       </ScrollView>
 

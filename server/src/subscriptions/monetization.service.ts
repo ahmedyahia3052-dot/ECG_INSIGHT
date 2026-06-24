@@ -92,6 +92,11 @@ async function legacySubscriptionPlan(userId: string) {
 
 export async function subscriptionSummary(userId: string) {
   await ensureDefaultPlans();
+  const user = await prisma.user.findUnique({ where: { id: userId } });
+  if (user?.isLifetime) {
+    const plan = await prisma.subscriptionPlan.findUniqueOrThrow({ where: { code: "LIFETIME" } });
+    return { license: null, plan, subscription: null };
+  }
   const license = await activeLifetimeLicense(userId);
   if (license) {
     const plan = await prisma.subscriptionPlan.findUniqueOrThrow({ where: { code: "LIFETIME" } });
@@ -210,6 +215,10 @@ export async function recordAnalysisUsage(userId: string, metadata: Prisma.Input
 export async function grantLifetimeLicense(userId: string, grantedById: string, reason?: string) {
   const license = await prisma.license.create({
     data: { grantedById, reason, status: "ACTIVE", type: "LIFETIME", userId },
+  });
+  await prisma.user.update({
+    data: { isLifetime: true, lifetimeGrantedAt: new Date(), lifetimeGrantedBy: grantedById },
+    where: { id: userId },
   });
   await createBillingEvent({
     message: "Lifetime license granted.",
