@@ -285,6 +285,26 @@ casesRouter.post(
   },
 );
 
+casesRouter.delete("/:caseId", requireRole("DOCTOR"), async (req, res, next) => {
+  try {
+    const ecgCase = await prisma.eCGCase.findUnique({ where: { id: String(req.params.caseId) } });
+    if (!ecgCase) throw new AppError(404, "ECG case not found.", "CASE_NOT_FOUND");
+    assertResourceAccess(await canAccessCase(ecgCase.id, req.auth!));
+    await prisma.eCGCase.delete({ where: { id: ecgCase.id } });
+    await audit({
+      action: "CASE_DELETED",
+      actorId: req.auth!.id,
+      caseId: undefined,
+      message: `ECG case ${ecgCase.caseId} deleted.`,
+      metadata: { deletedCaseId: ecgCase.id, publicCaseId: ecgCase.caseId },
+      patientId: ecgCase.patientId,
+    });
+    res.status(204).send();
+  } catch (error) {
+    next(error);
+  }
+});
+
 casesRouter.get("/:caseId/timeline", async (req, res, next) => {
   try {
     assertResourceAccess(await canAccessCase(String(req.params.caseId), req.auth!));

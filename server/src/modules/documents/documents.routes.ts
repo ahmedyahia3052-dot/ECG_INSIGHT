@@ -384,6 +384,37 @@ documentsRouter.post("/upload", requireRole("DOCTOR"), upload.single("file"), as
   }
 });
 
+documentsRouter.patch("/:documentId", requireRole("DOCTOR"), async (req, res, next) => {
+  try {
+    const current = await prisma.clinicalDocument.findUnique({ where: { id: String(req.params.documentId) } });
+    if (!current) throw new AppError(404, "Clinical document not found.", "DOCUMENT_NOT_FOUND");
+    await assertDocumentAccess(current, req.auth!);
+    const body = z.object({ category: categorySchema.optional(), title: z.string().trim().min(1).max(160).optional() }).parse(req.body);
+    const document = await prisma.clinicalDocument.update({
+      data: {
+        category: body.category ? categoryMap[body.category] : undefined,
+        title: body.title,
+      },
+      where: { id: current.id },
+    });
+    await prisma.auditLog.create({
+      data: {
+        action: "DOCUMENT_UPDATED",
+        actorId: req.auth!.id,
+        caseId: document.caseId,
+        entityId: document.id,
+        entityType: "ClinicalDocument",
+        message: `Clinical document ${document.originalName} updated.`,
+        metadata: { category: document.category },
+        patientId: document.patientId,
+      },
+    });
+    res.json({ document: serializeDocument(document) });
+  } catch (error) {
+    next(error);
+  }
+});
+
 documentsRouter.get("/:storedName", async (req, res, next) => {
   try {
     const storedName = path.basename(String(req.params.storedName));

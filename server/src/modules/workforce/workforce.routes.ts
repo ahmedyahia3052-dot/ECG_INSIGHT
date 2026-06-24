@@ -248,6 +248,28 @@ organizationsRouter.patch("/:organizationId", requireRole("ADMIN"), validateBody
   }
 });
 
+organizationsRouter.delete("/:organizationId", requireRole("ADMIN"), async (req, res, next) => {
+  try {
+    const organization = await prisma.organization.update({
+      data: { status: "INACTIVE" },
+      where: { id: String(req.params.organizationId) },
+    });
+    await prisma.auditLog.create({
+      data: {
+        action: "ORGANIZATION_DELETED",
+        actorId: req.auth!.id,
+        entityId: organization.id,
+        entityType: "Organization",
+        message: `Organization deactivated: ${organization.name}.`,
+        organizationId: organization.id,
+      },
+    });
+    res.json({ organization });
+  } catch (error) {
+    next(error);
+  }
+});
+
 organizationsRouter.get("/:organizationId/analytics", requireRole("ADMIN"), async (req, res, next) => {
   try {
     const organizationId = String(req.params.organizationId);
@@ -334,6 +356,25 @@ departmentsRouter.patch("/:departmentId", requireRole("ADMIN"), validateBody(dep
   }
 });
 
+departmentsRouter.delete("/:departmentId", requireRole("ADMIN"), async (req, res, next) => {
+  try {
+    const department = await prisma.department.delete({ where: { id: String(req.params.departmentId) } });
+    await prisma.auditLog.create({
+      data: {
+        action: "DEPARTMENT_DELETED",
+        actorId: req.auth!.id,
+        entityId: department.id,
+        entityType: "Department",
+        message: `Department deleted: ${department.name}.`,
+        organizationId: department.organizationId,
+      },
+    });
+    res.status(204).send();
+  } catch (error) {
+    next(error);
+  }
+});
+
 contractorsRouter.get("/", async (req, res, next) => {
   try {
     const query = listQuerySchema.parse(req.query);
@@ -386,6 +427,28 @@ contractorsRouter.patch("/:contractorId", requireRole("ADMIN"), validateBody(con
         status: req.body.status ? organizationStatus(req.body.status) : undefined,
       },
       where: { id: String(req.params.contractorId) },
+    });
+    res.json({ contractor });
+  } catch (error) {
+    next(error);
+  }
+});
+
+contractorsRouter.delete("/:contractorId", requireRole("ADMIN"), async (req, res, next) => {
+  try {
+    const contractor = await prisma.contractorCompany.update({
+      data: { status: "INACTIVE" },
+      where: { id: String(req.params.contractorId) },
+    });
+    await prisma.auditLog.create({
+      data: {
+        action: "CONTRACTOR_DELETED",
+        actorId: req.auth!.id,
+        entityId: contractor.id,
+        entityType: "ContractorCompany",
+        message: `Contractor company deactivated: ${contractor.name}.`,
+        organizationId: contractor.organizationId,
+      },
     });
     res.json({ contractor });
   } catch (error) {
@@ -505,6 +568,31 @@ employeesRouter.patch("/:employeeId", requireRole("DOCTOR"), validateBody(employ
     const employee = await prisma.employee.update({
       data: { ...employeeUpdateData(req.body), contractorCompanyId, departmentId, organizationId },
       where: { id: previous.id },
+    });
+    res.json({ employee: serializeEmployee(employee) });
+  } catch (error) {
+    next(error);
+  }
+});
+
+employeesRouter.delete("/:employeeId", requireRole("DOCTOR"), async (req, res, next) => {
+  try {
+    const previous = await prisma.employee.findUnique({ where: { id: String(req.params.employeeId) } });
+    if (!previous) throw new AppError(404, "Employee not found.", "EMPLOYEE_NOT_FOUND");
+    assertResourceAccess(await canAccessEmployee(previous.id, req.auth!));
+    const employee = await prisma.employee.update({
+      data: { employmentStatus: "TERMINATED", medicalFitnessStatus: "UNKNOWN" },
+      where: { id: previous.id },
+    });
+    await prisma.auditLog.create({
+      data: {
+        action: "EMPLOYEE_DELETED",
+        actorId: req.auth!.id,
+        entityId: employee.id,
+        entityType: "Employee",
+        message: `Employee terminated: ${employee.fullName}.`,
+        organizationId: employee.organizationId,
+      },
     });
     res.json({ employee: serializeEmployee(employee) });
   } catch (error) {

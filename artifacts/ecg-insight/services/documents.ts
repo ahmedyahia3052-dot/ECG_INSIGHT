@@ -25,3 +25,19 @@ export async function uploadClinicalDocument(accessToken: string, formData: Form
     method: "POST",
   });
 }
+
+export async function updateClinicalDocument(
+  accessToken: string,
+  documentId: string,
+  input: Partial<Pick<ClinicalDocument, "category" | "title">>,
+) {
+  return apiRequest<{ document: ClinicalDocument }>(`/documents/${documentId}`, {
+    accessToken,
+    body: JSON.stringify(input),
+    method: "PATCH",
+  });
+}
+
+export async function deleteClinicalDocument(accessToken: string, documentId: string) {
+  return apiRequest<void>(`/documents/${documentId}`, { accessToken, method: "DELETE" });
+}

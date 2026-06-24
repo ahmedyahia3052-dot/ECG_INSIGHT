@@ -185,6 +185,15 @@ ecgFilesRouter.get("/files/list", async (req, res, next) => {
   }
 });
 
+ecgFilesRouter.get("/files/:ecgFileId/download", async (req, res, next) => {
+  try {
+    const file = await assertEcgFileAccess(String(req.params.ecgFileId), req.auth!);
+    res.download(file.storagePath, file.originalName);
+  } catch (error) {
+    next(error);
+  }
+});
+
 ecgFilesRouter.post("/files/parse", requireRole("DOCTOR"), async (req, res, next) => {
   try {
     const body = z.object({ ecgFileId: z.string().trim().min(1) }).parse(req.body);
@@ -213,6 +222,29 @@ ecgFilesRouter.post("/files/compare", requireRole("DOCTOR"), async (req, res, ne
     await assertEcgFileAccess(body.ecgFileId, req.auth!);
     const comparison = await compareEcgFile(body.ecgFileId, req.auth!.id);
     res.json({ comparison });
+  } catch (error) {
+    next(error);
+  }
+});
+
+ecgFilesRouter.delete("/files/:ecgFileId", requireRole("DOCTOR"), async (req, res, next) => {
+  try {
+    const file = await assertEcgFileAccess(String(req.params.ecgFileId), req.auth!);
+    await prisma.eCGFile.delete({ where: { id: file.id } });
+    fs.rmSync(file.storagePath, { force: true });
+    await prisma.auditLog.create({
+      data: {
+        action: "ECG_FILE_DELETED",
+        actorId: req.auth!.id,
+        caseId: file.caseId,
+        entityId: file.id,
+        entityType: "ECGFile",
+        message: `Clinical ECG file ${file.originalName} deleted.`,
+        metadata: { sizeBytes: file.sizeBytes },
+        patientId: file.patientId,
+      },
+    });
+    res.status(204).send();
   } catch (error) {
     next(error);
   }

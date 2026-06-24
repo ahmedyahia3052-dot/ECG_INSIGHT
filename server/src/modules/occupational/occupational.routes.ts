@@ -1,9 +1,11 @@
 import type { Prisma } from "@prisma/client";
 import { Router } from "express";
+import { z } from "zod";
 import { prisma } from "../../config/prisma";
 import { requireAuth, requireRole } from "../../middleware/auth";
 import { AppError } from "../../middleware/error";
 import { validateBody } from "../../middleware/validate";
+import { assertResourceAccess, canAccessEmployee } from "../../utils/resource-access";
 import {
   assessmentCreateSchema,
   listQuerySchema,
@@ -39,6 +41,15 @@ fitnessAssessmentsRouter.get("/", async (req, res, next) => {
     const where: Prisma.FitnessAssessmentWhereInput = {
       ...(query.employeeId ? { employeeId: query.employeeId } : {}),
       ...(query.organizationId ? { employee: { organizationId: query.organizationId } } : {}),
+      ...(req.auth!.role === "SUPER_ADMIN" || req.auth!.role === "ADMIN"
+        ? {}
+        : {
+            OR: [
+              { assessedById: req.auth!.id },
+              { employee: { patient: { cases: { some: { OR: [{ uploadedById: req.auth!.id }, { assignedDoctorId: req.auth!.id }] } } } } },
+              { employee: { patient: { auditLogs: { some: { action: "PATIENT_CREATED", actorId: req.auth!.id } } } } },
+            ],
+          }),
     };
     const [total, assessments] = await Promise.all([
       prisma.fitnessAssessment.count({ where }),
@@ -64,6 +75,7 @@ fitnessAssessmentsRouter.get("/", async (req, res, next) => {
 
 fitnessAssessmentsRouter.post("/", requireRole("DOCTOR"), validateBody(assessmentCreateSchema), async (req, res, next) => {
   try {
+    assertResourceAccess(await canAccessEmployee(req.body.employeeId, req.auth!));
     const inputs = await getAssessmentInputs(req.body.employeeId);
     const recommendation = recommendFitness(inputs);
     const patientId = patientIdForEmployee(inputs);
@@ -133,6 +145,7 @@ fitnessAssessmentsRouter.get("/:assessmentId", async (req, res, next) => {
       where: { id: String(req.params.assessmentId) },
     });
     if (!assessment) throw new AppError(404, "Fitness assessment not found.", "ASSESSMENT_NOT_FOUND");
+    assertResourceAccess(await canAccessEmployee(assessment.employeeId, req.auth!));
     res.json({ assessment: serializeAssessment(assessment) });
   } catch (error) {
     next(error);
@@ -143,6 +156,7 @@ fitnessAssessmentsRouter.post("/:assessmentId/return-to-work", requireRole("DOCT
   try {
     const assessment = await prisma.fitnessAssessment.findUnique({ where: { id: String(req.params.assessmentId) } });
     if (!assessment) throw new AppError(404, "Fitness assessment not found.", "ASSESSMENT_NOT_FOUND");
+    assertResourceAccess(await canAccessEmployee(assessment.employeeId, req.auth!));
     if (assessment.employeeId !== req.body.employeeId) {
       throw new AppError(400, "Employee does not match this assessment.", "EMPLOYEE_MISMATCH");
     }
@@ -169,12 +183,72 @@ fitnessAssessmentsRouter.post("/:assessmentId/return-to-work", requireRole("DOCT
   }
 });
 
+fitnessAssessmentsRouter.patch("/:assessmentId", requireRole("DOCTOR"), async (req, res, next) => {
+  try {
+    const current = await prisma.fitnessAssessment.findUnique({ where: { id: String(req.params.assessmentId) } });
+    if (!current) throw new AppError(404, "Fitness assessment not found.", "ASSESSMENT_NOT_FOUND");
+    assertResourceAccess(await canAccessEmployee(current.employeeId, req.auth!));
+    const body = z.object({ physicianJustification: z.string().trim().max(3000).optional(), reviewDate: z.coerce.date().nullable().optional() }).parse(req.body);
+    const assessment = await prisma.fitnessAssessment.update({
+      data: {
+        physicianJustification: body.physicianJustification,
+        reviewDate: body.reviewDate,
+      },
+      include: { restrictions: true },
+      where: { id: current.id },
+    });
+    await prisma.auditLog.create({
+      data: {
+        action: "FITNESS_ASSESSMENT_UPDATED",
+        actorId: req.auth!.id,
+        entityId: assessment.id,
+        entityType: "FitnessAssessment",
+        message: `Fitness assessment updated: ${assessment.finalDecision}.`,
+        patientId: assessment.patientId,
+      },
+    });
+    res.json({ assessment: serializeAssessment(assessment) });
+  } catch (error) {
+    next(error);
+  }
+});
+
+fitnessAssessmentsRouter.delete("/:assessmentId", requireRole("DOCTOR"), async (req, res, next) => {
+  try {
+    const current = await prisma.fitnessAssessment.findUnique({ where: { id: String(req.params.assessmentId) } });
+    if (!current) throw new AppError(404, "Fitness assessment not found.", "ASSESSMENT_NOT_FOUND");
+    assertResourceAccess(await canAccessEmployee(current.employeeId, req.auth!));
+    await prisma.fitnessAssessment.delete({ where: { id: current.id } });
+    await prisma.auditLog.create({
+      data: {
+        action: "FITNESS_ASSESSMENT_DELETED",
+        actorId: req.auth!.id,
+        entityId: current.id,
+        entityType: "FitnessAssessment",
+        message: "Fitness assessment deleted.",
+        patientId: current.patientId,
+      },
+    });
+    res.status(204).send();
+  } catch (error) {
+    next(error);
+  }
+});
+
 workRestrictionsRouter.get("/", async (req, res, next) => {
   try {
     const query = listQuerySchema.parse(req.query);
     const where: Prisma.WorkRestrictionWhereInput = {
       ...(query.employeeId ? { employeeId: query.employeeId } : {}),
       ...(query.organizationId ? { employee: { organizationId: query.organizationId } } : {}),
+      ...(req.auth!.role === "SUPER_ADMIN" || req.auth!.role === "ADMIN"
+        ? {}
+        : {
+            OR: [
+              { employee: { patient: { cases: { some: { OR: [{ uploadedById: req.auth!.id }, { assignedDoctorId: req.auth!.id }] } } } } },
+              { employee: { patient: { auditLogs: { some: { action: "PATIENT_CREATED", actorId: req.auth!.id } } } } },
+            ],
+          }),
     };
     const restrictions = await prisma.workRestriction.findMany({ orderBy: { createdAt: "desc" }, where });
     res.json({ restrictions });
@@ -187,6 +261,7 @@ workRestrictionsRouter.post("/", requireRole("DOCTOR"), validateBody(restriction
   try {
     const employee = await prisma.employee.findUnique({ include: { patient: true }, where: { id: req.body.employeeId } });
     if (!employee) throw new AppError(404, "Employee not found.", "EMPLOYEE_NOT_FOUND");
+    assertResourceAccess(await canAccessEmployee(employee.id, req.auth!));
     const restriction = await prisma.workRestriction.create({
       data: {
         active: req.body.active,
@@ -206,6 +281,61 @@ workRestrictionsRouter.post("/", requireRole("DOCTOR"), validateBody(restriction
       type: "WORK_RESTRICTION_ADDED",
     });
     res.status(201).json({ restriction });
+  } catch (error) {
+    next(error);
+  }
+});
+
+workRestrictionsRouter.patch("/:restrictionId", requireRole("DOCTOR"), async (req, res, next) => {
+  try {
+    const current = await prisma.workRestriction.findUnique({ where: { id: String(req.params.restrictionId) } });
+    if (!current) throw new AppError(404, "Work restriction not found.", "RESTRICTION_NOT_FOUND");
+    assertResourceAccess(await canAccessEmployee(current.employeeId, req.auth!));
+    const body = restrictionSchema.partial().parse(req.body);
+    const restriction = await prisma.workRestriction.update({
+      data: {
+        active: body.active,
+        assessmentId: body.assessmentId,
+        description: body.description,
+        endsAt: body.endsAt,
+        startsAt: body.startsAt,
+        type: body.type ? restrictionMap[body.type as RestrictionInput] : undefined,
+      },
+      where: { id: current.id },
+    });
+    await prisma.auditLog.create({
+      data: {
+        action: "WORK_RESTRICTION_UPDATED",
+        actorId: req.auth!.id,
+        entityId: restriction.id,
+        entityType: "WorkRestriction",
+        message: `Work restriction updated: ${restriction.type}.`,
+        patientId: restriction.patientId,
+      },
+    });
+    res.json({ restriction });
+  } catch (error) {
+    next(error);
+  }
+});
+
+workRestrictionsRouter.delete("/:restrictionId", requireRole("DOCTOR"), async (req, res, next) => {
+  try {
+    const current = await prisma.workRestriction.findUnique({ where: { id: String(req.params.restrictionId) } });
+    if (!current) throw new AppError(404, "Work restriction not found.", "RESTRICTION_NOT_FOUND");
+    assertResourceAccess(await canAccessEmployee(current.employeeId, req.auth!));
+    await prisma.workRestriction.delete({ where: { id: current.id } });
+    await prisma.auditLog.create({
+      data: {
+        action: "WORK_RESTRICTION_DELETED",
+        actorId: req.auth!.id,
+        entityId: current.id,
+        entityType: "WorkRestriction",
+        message: `Work restriction deleted: ${current.type}.`,
+        patientId: current.patientId,
+      },
+    });
+    res.status(204).send();
   } catch (error) {
     next(error);
   }
@@ -242,6 +372,7 @@ occupationalRiskRouter.get("/:employeeId", async (req, res, next) => {
     const profile = await prisma.occupationalRiskProfile.findUnique({
       where: { employeeId: String(req.params.employeeId) },
     });
+    assertResourceAccess(await canAccessEmployee(String(req.params.employeeId), req.auth!));
     res.json({ profile: profile ? serializeRiskProfile(profile) : null });
   } catch (error) {
     next(error);
@@ -252,6 +383,7 @@ occupationalRiskRouter.put("/:employeeId", requireRole("DOCTOR"), validateBody(o
   try {
     const employee = await prisma.employee.findUnique({ where: { id: String(req.params.employeeId) } });
     if (!employee) throw new AppError(404, "Employee not found.", "EMPLOYEE_NOT_FOUND");
+    assertResourceAccess(await canAccessEmployee(employee.id, req.auth!));
     const riskScore = calculateRiskScore(req.body);
     const profile = await prisma.occupationalRiskProfile.upsert({
       create: {
@@ -267,7 +399,37 @@ occupationalRiskRouter.put("/:employeeId", requireRole("DOCTOR"), validateBody(o
       },
       where: { employeeId: employee.id },
     });
+    await prisma.auditLog.create({
+      data: {
+        action: "OCCUPATIONAL_RISK_UPDATED",
+        actorId: req.auth!.id,
+        entityId: profile.id,
+        entityType: "OccupationalRiskProfile",
+        message: `Occupational risk profile updated: score ${profile.riskScore}.`,
+      },
+    });
     res.json({ profile: serializeRiskProfile(profile) });
+  } catch (error) {
+    next(error);
+  }
+});
+
+occupationalRiskRouter.delete("/:employeeId", requireRole("DOCTOR"), async (req, res, next) => {
+  try {
+    assertResourceAccess(await canAccessEmployee(String(req.params.employeeId), req.auth!));
+    const profile = await prisma.occupationalRiskProfile.findUnique({ where: { employeeId: String(req.params.employeeId) } });
+    if (!profile) throw new AppError(404, "Occupational risk profile not found.", "RISK_PROFILE_NOT_FOUND");
+    await prisma.occupationalRiskProfile.delete({ where: { employeeId: String(req.params.employeeId) } });
+    await prisma.auditLog.create({
+      data: {
+        action: "OCCUPATIONAL_RISK_UPDATED",
+        actorId: req.auth!.id,
+        entityId: profile.id,
+        entityType: "OccupationalRiskProfile",
+        message: "Occupational risk profile deleted.",
+      },
+    });
+    res.status(204).send();
   } catch (error) {
     next(error);
   }

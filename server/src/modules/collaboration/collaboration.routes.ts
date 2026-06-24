@@ -23,6 +23,63 @@ alertsRouter.use(requireAuth);
 
 const jsonBody = z.record(z.string(), z.unknown()).default({});
 
+async function loadAccessibleTask(taskId: string, auth: Express.AuthUser) {
+  const task = await prisma.task.findFirst({
+    include: { assignments: true, comments: true },
+    where: {
+      id: taskId,
+      ...(auth.role === "SUPER_ADMIN" || auth.role === "ADMIN"
+        ? {}
+        : { OR: [{ createdById: auth.id }, { assignments: { some: { userId: auth.id } } }] }),
+    },
+  });
+  if (!task) throw new AppError(404, "Task not found.", "TASK_NOT_FOUND");
+  return task;
+}
+
+async function loadAccessibleTeam(teamId: string, auth: Express.AuthUser) {
+  const team = await prisma.team.findFirst({
+    include: { members: true },
+    where: {
+      id: teamId,
+      ...(auth.role === "SUPER_ADMIN" || auth.role === "ADMIN"
+        ? {}
+        : { OR: [{ createdById: auth.id }, { members: { some: { userId: auth.id } } }] }),
+    },
+  });
+  if (!team) throw new AppError(404, "Team not found.", "TEAM_NOT_FOUND");
+  return team;
+}
+
+async function loadAccessibleConversation(conversationId: string, auth: Express.AuthUser) {
+  const conversation = await prisma.conversation.findFirst({
+    include: { messages: { orderBy: { createdAt: "asc" } }, participants: true },
+    where: {
+      id: conversationId,
+      ...(auth.role === "SUPER_ADMIN" || auth.role === "ADMIN"
+        ? {}
+        : { participants: { some: { userId: auth.id } } }),
+    },
+  });
+  if (!conversation) throw new AppError(404, "Conversation not found.", "CONVERSATION_NOT_FOUND");
+  return conversation;
+}
+
+async function loadAccessibleAlert(alertId: string, auth: Express.AuthUser) {
+  const alert = await prisma.alert.findFirst({
+    where: {
+      id: alertId,
+      ...(auth.role === "SUPER_ADMIN" || auth.role === "ADMIN"
+        ? {}
+        : { OR: [{ userId: auth.id }, { userId: null }] }),
+    },
+  });
+  if (!alert) throw new AppError(404, "Alert not found.", "ALERT_NOT_FOUND");
+  if (alert.patientId) assertResourceAccess(await canAccessPatient(alert.patientId, auth));
+  if (alert.caseId) assertResourceAccess(await canAccessCase(alert.caseId, auth));
+  return alert;
+}
+
 syncRouter.get("/", async (req, res, next) => {
   try {
     const queue = await prisma.syncQueue.findMany({
@@ -143,6 +200,15 @@ tasksRouter.get("/", async (req, res, next) => {
   }
 });
 
+tasksRouter.get("/:taskId", async (req, res, next) => {
+  try {
+    const task = await loadAccessibleTask(String(req.params.taskId), req.auth!);
+    res.json({ task });
+  } catch (error) {
+    next(error);
+  }
+});
+
 tasksRouter.post("/", requireRole("DOCTOR"), async (req, res, next) => {
   try {
     const body = z
@@ -187,6 +253,61 @@ tasksRouter.post("/", requireRole("DOCTOR"), async (req, res, next) => {
   }
 });
 
+tasksRouter.patch("/:taskId", async (req, res, next) => {
+  try {
+    const current = await loadAccessibleTask(String(req.params.taskId), req.auth!);
+    assertResourceAccess(req.auth!.role === "SUPER_ADMIN" || req.auth!.role === "ADMIN" || current.createdById === req.auth!.id);
+    const body = z
+      .object({
+        assignedUserId: z.string().trim().nullable().optional(),
+        description: z.string().trim().nullable().optional(),
+        dueAt: z.string().datetime().nullable().optional(),
+        priority: z.enum(["LOW", "MEDIUM", "HIGH", "CRITICAL"]).optional(),
+        status: z.enum(["OPEN", "IN_PROGRESS", "COMPLETED", "CANCELLED"]).optional(),
+        title: z.string().trim().min(1).optional(),
+      })
+      .parse(req.body);
+    const task = await prisma.task.update({
+      data: {
+        description: body.description,
+        dueAt: body.dueAt === null ? null : body.dueAt ? new Date(body.dueAt) : undefined,
+        priority: body.priority,
+        status: body.status,
+        title: body.title,
+        assignments:
+          body.assignedUserId === undefined
+            ? undefined
+            : {
+                deleteMany: {},
+                ...(body.assignedUserId ? { create: { userId: body.assignedUserId } } : {}),
+              },
+      },
+      include: { assignments: true, comments: true },
+      where: { id: current.id },
+    });
+    await prisma.auditLog.create({
+      data: { action: "TASK_UPDATED", actorId: req.auth!.id, entityId: task.id, entityType: "Task", message: `Task updated: ${task.title}.`, patientId: task.patientId },
+    });
+    res.json({ task });
+  } catch (error) {
+    next(error);
+  }
+});
+
+tasksRouter.delete("/:taskId", async (req, res, next) => {
+  try {
+    const task = await loadAccessibleTask(String(req.params.taskId), req.auth!);
+    assertResourceAccess(req.auth!.role === "SUPER_ADMIN" || req.auth!.role === "ADMIN" || task.createdById === req.auth!.id);
+    await prisma.task.delete({ where: { id: task.id } });
+    await prisma.auditLog.create({
+      data: { action: "TASK_DELETED", actorId: req.auth!.id, entityId: task.id, entityType: "Task", message: `Task deleted: ${task.title}.`, patientId: task.patientId },
+    });
+    res.status(204).send();
+  } catch (error) {
+    next(error);
+  }
+});
+
 tasksRouter.post("/:taskId/comments", async (req, res, next) => {
   try {
     const body = z.object({ body: z.string().trim().min(1) }).parse(req.body);
@@ -217,6 +338,15 @@ teamsRouter.get("/", async (_req, res, next) => {
   }
 });
 
+teamsRouter.get("/:teamId", async (req, res, next) => {
+  try {
+    const team = await loadAccessibleTeam(String(req.params.teamId), req.auth!);
+    res.json({ team });
+  } catch (error) {
+    next(error);
+  }
+});
+
 teamsRouter.post("/", requireRole("DOCTOR"), async (req, res, next) => {
   try {
     const body = z
@@ -237,7 +367,65 @@ teamsRouter.post("/", requireRole("DOCTOR"), async (req, res, next) => {
       },
       include: { members: true },
     });
+    await prisma.auditLog.create({
+      data: {
+        action: "TEAM_CREATED",
+        actorId: req.auth!.id,
+        entityId: team.id,
+        entityType: "Team",
+        message: `Team created: ${team.name}.`,
+        organizationId: team.organizationId,
+      },
+    });
     res.status(201).json({ team });
+  } catch (error) {
+    next(error);
+  }
+});
+
+teamsRouter.patch("/:teamId", async (req, res, next) => {
+  try {
+    const current = await loadAccessibleTeam(String(req.params.teamId), req.auth!);
+    assertResourceAccess(req.auth!.role === "SUPER_ADMIN" || req.auth!.role === "ADMIN" || current.createdById === req.auth!.id);
+    const body = z
+      .object({
+        description: z.string().trim().nullable().optional(),
+        memberIds: z.array(z.string().trim()).optional(),
+        name: z.string().trim().min(1).optional(),
+      })
+      .parse(req.body);
+    const team = await prisma.team.update({
+      data: {
+        description: body.description,
+        name: body.name,
+        members: body.memberIds
+          ? {
+              deleteMany: {},
+              create: Array.from(new Set([current.createdById, ...body.memberIds])).map((userId) => ({ role: "member", userId })),
+            }
+          : undefined,
+      },
+      include: { members: true },
+      where: { id: current.id },
+    });
+    await prisma.auditLog.create({
+      data: { action: "TEAM_UPDATED", actorId: req.auth!.id, entityId: team.id, entityType: "Team", message: `Team updated: ${team.name}.`, organizationId: team.organizationId },
+    });
+    res.json({ team });
+  } catch (error) {
+    next(error);
+  }
+});
+
+teamsRouter.delete("/:teamId", async (req, res, next) => {
+  try {
+    const team = await loadAccessibleTeam(String(req.params.teamId), req.auth!);
+    assertResourceAccess(req.auth!.role === "SUPER_ADMIN" || req.auth!.role === "ADMIN" || team.createdById === req.auth!.id);
+    await prisma.team.delete({ where: { id: team.id } });
+    await prisma.auditLog.create({
+      data: { action: "TEAM_DELETED", actorId: req.auth!.id, entityId: team.id, entityType: "Team", message: `Team deleted: ${team.name}.`, organizationId: team.organizationId },
+    });
+    res.status(204).send();
   } catch (error) {
     next(error);
   }
@@ -252,6 +440,15 @@ messagesRouter.get("/", async (req, res, next) => {
       where: { participants: { some: { userId: req.auth!.id } } },
     });
     res.json({ conversations });
+  } catch (error) {
+    next(error);
+  }
+});
+
+messagesRouter.get("/:conversationId", async (req, res, next) => {
+  try {
+    const conversation = await loadAccessibleConversation(String(req.params.conversationId), req.auth!);
+    res.json({ conversation });
   } catch (error) {
     next(error);
   }
@@ -314,6 +511,39 @@ messagesRouter.post("/", async (req, res, next) => {
   }
 });
 
+messagesRouter.post("/:conversationId/read", async (req, res, next) => {
+  try {
+    const conversation = await loadAccessibleConversation(String(req.params.conversationId), req.auth!);
+    const receipts = await Promise.all(
+      conversation.messages.map((message) =>
+        prisma.messageReadReceipt.upsert({
+          create: { messageId: message.id, userId: req.auth!.id },
+          update: { readAt: new Date() },
+          where: { messageId_userId: { messageId: message.id, userId: req.auth!.id } },
+        }),
+      ),
+    );
+    res.json({ receipts });
+  } catch (error) {
+    next(error);
+  }
+});
+
+messagesRouter.delete("/:conversationId", async (req, res, next) => {
+  try {
+    const conversation = await loadAccessibleConversation(String(req.params.conversationId), req.auth!);
+    assertResourceAccess(
+      req.auth!.role === "SUPER_ADMIN" ||
+        req.auth!.role === "ADMIN" ||
+        conversation.participants.some((participant) => participant.userId === req.auth!.id),
+    );
+    await prisma.conversation.delete({ where: { id: conversation.id } });
+    res.status(204).send();
+  } catch (error) {
+    next(error);
+  }
+});
+
 alertsRouter.get("/", async (req, res, next) => {
   try {
     const alerts = await prisma.alert.findMany({
@@ -322,6 +552,15 @@ alertsRouter.get("/", async (req, res, next) => {
       where: { OR: [{ userId: req.auth!.id }, { userId: null }] },
     });
     res.json({ alerts });
+  } catch (error) {
+    next(error);
+  }
+});
+
+alertsRouter.get("/:alertId", async (req, res, next) => {
+  try {
+    const alert = await loadAccessibleAlert(String(req.params.alertId), req.auth!);
+    res.json({ alert });
   } catch (error) {
     next(error);
   }
@@ -356,6 +595,66 @@ alertsRouter.post("/", requireRole("DOCTOR"), async (req, res, next) => {
     });
     emitRealtime("alert.created", alert, body.userId ? [`user:${body.userId}`] : []);
     res.status(201).json({ alert });
+  } catch (error) {
+    next(error);
+  }
+});
+
+alertsRouter.patch("/:alertId", async (req, res, next) => {
+  try {
+    const current = await loadAccessibleAlert(String(req.params.alertId), req.auth!);
+    const body = z
+      .object({
+        message: z.string().trim().min(1).optional(),
+        priority: z.enum(["LOW", "MEDIUM", "HIGH", "CRITICAL"]).optional(),
+        status: z.enum(["OPEN", "ACKNOWLEDGED", "RESOLVED"]).optional(),
+        title: z.string().trim().min(1).optional(),
+      })
+      .parse(req.body);
+    const alert = await prisma.alert.update({
+      data: {
+        message: body.message,
+        priority: body.priority,
+        status: body.status,
+        title: body.title,
+        acknowledgedAt: body.status === "ACKNOWLEDGED" ? new Date() : undefined,
+        resolvedAt: body.status === "RESOLVED" ? new Date() : undefined,
+      },
+      where: { id: current.id },
+    });
+    await prisma.auditLog.create({
+      data: {
+        action: "ALERT_UPDATED",
+        actorId: req.auth!.id,
+        caseId: alert.caseId,
+        entityId: alert.id,
+        entityType: "Alert",
+        message: `Alert updated: ${alert.title}.`,
+        patientId: alert.patientId,
+      },
+    });
+    res.json({ alert });
+  } catch (error) {
+    next(error);
+  }
+});
+
+alertsRouter.delete("/:alertId", requireRole("DOCTOR"), async (req, res, next) => {
+  try {
+    const alert = await loadAccessibleAlert(String(req.params.alertId), req.auth!);
+    await prisma.alert.delete({ where: { id: alert.id } });
+    await prisma.auditLog.create({
+      data: {
+        action: "ALERT_DELETED",
+        actorId: req.auth!.id,
+        caseId: alert.caseId,
+        entityId: alert.id,
+        entityType: "Alert",
+        message: `Alert deleted: ${alert.title}.`,
+        patientId: alert.patientId,
+      },
+    });
+    res.status(204).send();
   } catch (error) {
     next(error);
   }

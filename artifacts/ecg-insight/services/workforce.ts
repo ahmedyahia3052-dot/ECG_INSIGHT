@@ -70,6 +70,13 @@ export async function createWorkforceOrganization(accessToken: string, input: Om
   });
 }
 
+export async function deleteWorkforceOrganization(accessToken: string, organizationId: string) {
+  return apiRequest<{ organization: WorkforceOrganization }>(`/organizations/${organizationId}`, {
+    accessToken,
+    method: "DELETE",
+  });
+}
+
 export async function getWorkforceAnalytics(accessToken: string, organizationId: string) {
   return apiRequest<{ analytics: WorkforceAnalytics }>(`/organizations/${organizationId}/analytics`, { accessToken });
 }
@@ -87,6 +94,10 @@ export async function createDepartment(accessToken: string, input: Omit<Workforc
   });
 }
 
+export async function deleteDepartment(accessToken: string, departmentId: string) {
+  return apiRequest<void>(`/departments/${departmentId}`, { accessToken, method: "DELETE" });
+}
+
 export async function listContractorCompanies(accessToken: string, params = new URLSearchParams()) {
   const suffix = params.toString() ? `?${params.toString()}` : "";
   return apiRequest<{ contractors: ContractorCompany[] }>(`/contractors${suffix}`, { accessToken });
@@ -97,6 +108,13 @@ export async function createContractorCompany(accessToken: string, input: Omit<C
     accessToken,
     body: JSON.stringify(input),
     method: "POST",
+  });
+}
+
+export async function deleteContractorCompany(accessToken: string, contractorId: string) {
+  return apiRequest<{ contractor: ContractorCompany }>(`/contractors/${contractorId}`, {
+    accessToken,
+    method: "DELETE",
   });
 }
 
@@ -119,6 +137,10 @@ export async function updateEmployee(accessToken: string, employeeId: string, in
     body: JSON.stringify(input),
     method: "PATCH",
   });
+}
+
+export async function deleteEmployee(accessToken: string, employeeId: string) {
+  return apiRequest<{ employee: Employee }>(`/employees/${employeeId}`, { accessToken, method: "DELETE" });
 }
 
 export async function linkEmployeePatient(accessToken: string, employeeId: string) {
