@@ -6,6 +6,7 @@ import { useRouter } from "expo-router";
 import React, { useRef, useState } from "react";
 import {
   Animated,
+  Image,
   Platform,
   ScrollView,
   StyleSheet,
@@ -23,16 +24,18 @@ import { useAuth } from "@/context/AuthContext";
 import { createCase, createPatient } from "@/services/clinical";
 import { analyzeCase, type AIAnalysisResult } from "@/services/ai";
 import { uploadClinicalEcgFile } from "@/services/ecgFiles";
+import {
+  processEcgImage,
+  TARGET_ECG_UPLOAD_BYTES,
+  type AcquisitionMethod,
+  type EcgAcquisitionAsset,
+  type ProcessedEcgImage,
+  type PreviewVariant,
+} from "@/services/ecgImageProcessor";
 
-type UploadState = "idle" | "selected" | "analyzing" | "done";
+type UploadState = "idle" | "processing" | "preview" | "analyzing" | "done";
 
-interface SelectedEcgFile {
-  file?: Blob;
-  mimeType: string;
-  name: string;
-  size?: number;
-  uri: string;
-}
+type SelectedEcgFile = EcgAcquisitionAsset;
 
 export default function UploadScreen() {
   const colors = useColors();
@@ -41,9 +44,12 @@ export default function UploadScreen() {
   const { authToken } = useAuth();
 
   const [state, setState] = useState<UploadState>("idle");
+  const [acquisitionMethod, setAcquisitionMethod] = useState<AcquisitionMethod>("upload");
+  const [processedImage, setProcessedImage] = useState<ProcessedEcgImage | null>(null);
   const [selectedFile, setSelectedFile] = useState<SelectedEcgFile | null>(null);
   const [createdCaseId, setCreatedCaseId] = useState<string | null>(null);
   const [analysisResult, setAnalysisResult] = useState<AIAnalysisResult | null>(null);
+  const [workflowError, setWorkflowError] = useState<string | null>(null);
   const [progress, setProgress] = useState(0);
   const progressAnim = useRef(new Animated.Value(0)).current;
   const pulseAnim = useRef(new Animated.Value(1)).current;
@@ -98,27 +104,84 @@ export default function UploadScreen() {
     ).start();
   };
 
+  const assetFromPicker = (asset: ImagePicker.ImagePickerAsset): EcgAcquisitionAsset => ({
+    file: "file" in asset ? (asset.file as Blob | undefined) : undefined,
+    mimeType: asset.mimeType ?? "image/jpeg",
+    name: asset.fileName ?? `ecg-${Date.now()}.jpg`,
+    size: asset.fileSize,
+    uri: asset.uri,
+  });
+
+  const handleAcquiredAsset = async (asset: EcgAcquisitionAsset, method: AcquisitionMethod) => {
+    setWorkflowError(null);
+    setAcquisitionMethod(method);
+    setState("processing");
+    setSelectedFile(asset);
+    try {
+      const processed = await processEcgImage(asset, { scannerMode: method === "scanner" });
+      setProcessedImage(processed);
+      setSelectedFile(processed.selectedVariant === "enhanced" ? processed.enhanced : processed.original);
+      setState("preview");
+    } catch (error) {
+      setWorkflowError(error instanceof Error ? error.message : "Image processing failed.");
+      setState("preview");
+    }
+  };
+
   const handleSelectFile = async () => {
+    setWorkflowError(null);
     const result = await ImagePicker.launchImageLibraryAsync({
       allowsEditing: false,
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      quality: 1,
+      quality: 0.82,
     });
     if (result.canceled) return;
-    const asset = result.assets[0];
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    setSelectedFile({
-      file: "file" in asset ? (asset.file as Blob | undefined) : undefined,
-      mimeType: asset.mimeType ?? "image/jpeg",
-      name: asset.fileName ?? `ecg-${Date.now()}.jpg`,
-      size: asset.fileSize,
-      uri: asset.uri,
+    await handleAcquiredAsset(assetFromPicker(result.assets[0]), "upload");
+  };
+
+  const handleCapturePhoto = async () => {
+    setWorkflowError(null);
+    const permission = await ImagePicker.requestCameraPermissionsAsync();
+    if (!permission.granted) {
+      setWorkflowError("Permission denied. Camera access is required to capture an ECG photo.");
+      return;
+    }
+    const result = await ImagePicker.launchCameraAsync({
+      allowsEditing: false,
+      cameraType: ImagePicker.CameraType.back,
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      quality: 0.82,
     });
-    setState("selected");
+    if (result.canceled) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    await handleAcquiredAsset(assetFromPicker(result.assets[0]), "camera");
+  };
+
+  const handleScanPaper = async () => {
+    setWorkflowError(null);
+    const permission = await ImagePicker.requestCameraPermissionsAsync();
+    if (!permission.granted) {
+      setWorkflowError("Permission denied. Camera access is required to scan ECG paper.");
+      return;
+    }
+    const result = await ImagePicker.launchCameraAsync({
+      allowsEditing: false,
+      cameraType: ImagePicker.CameraType.back,
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      quality: 0.9,
+    });
+    if (result.canceled) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    await handleAcquiredAsset(assetFromPicker(result.assets[0]), "scanner");
   };
 
   const handleAnalyze = () => {
     if (!selectedFile || !authToken?.token) return;
+    if (processedImage && !processedImage.quality.canAnalyze) {
+      setWorkflowError("Image quality is too poor for safe ECG analysis. Retake or choose a clearer ECG image.");
+      return;
+    }
     setState("analyzing");
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
     startPulse();
@@ -136,8 +199,21 @@ export default function UploadScreen() {
     });
   };
 
+  const choosePreviewVariant = (variant: PreviewVariant) => {
+    if (!processedImage) return;
+    setProcessedImage({ ...processedImage, selectedVariant: variant });
+    setSelectedFile(variant === "enhanced" ? processedImage.enhanced : processedImage.original);
+  };
+
+  const handleReprocess = async () => {
+    if (!processedImage) return;
+    await handleAcquiredAsset(processedImage.original, "scanner");
+  };
+
   const handleReset = () => {
     setState("idle");
+    setWorkflowError(null);
+    setProcessedImage(null);
     setSelectedFile(null);
     setCreatedCaseId(null);
     setAnalysisResult(null);
@@ -174,7 +250,7 @@ export default function UploadScreen() {
               Select ECG File
             </Text>
             <Text style={[styles.uploadSub, { color: colors.mutedForeground }]}>
-              PNG and JPG ECG images supported — up to 25 MB
+              PNG and JPG ECG images supported — up to 25 MB, optimized toward {Math.round(TARGET_ECG_UPLOAD_BYTES / 1024 / 1024)} MB
             </Text>
             <TouchableOpacity
               style={[styles.analyzeBtn, { backgroundColor: colors.primary, marginTop: 8 }]}
@@ -184,11 +260,51 @@ export default function UploadScreen() {
               <Feather name="folder" size={18} color="#fff" />
               <Text style={styles.analyzeBtnText}>Choose ECG Image</Text>
             </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.secondaryAction, { borderColor: colors.border, backgroundColor: colors.card }]}
+              onPress={handleCapturePhoto}
+              activeOpacity={0.85}
+            >
+              <Feather name="camera" size={18} color={colors.foreground} />
+              <Text style={[styles.secondaryActionText, { color: colors.foreground }]}>Capture ECG Photo</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.secondaryAction, { borderColor: colors.border, backgroundColor: colors.card }]}
+              onPress={handleScanPaper}
+              activeOpacity={0.85}
+            >
+              <Feather name="crop" size={18} color={colors.foreground} />
+              <Text style={[styles.secondaryActionText, { color: colors.foreground }]}>Scan ECG Paper</Text>
+            </TouchableOpacity>
           </View>
+          {workflowError && (
+            <View style={[styles.infoBox, { backgroundColor: "#FEF2F2", borderColor: "#FECACA" }]}>
+              <Feather name="alert-triangle" size={14} color="#DC2626" />
+              <Text style={[styles.infoText, { color: "#DC2626" }]}>{workflowError}</Text>
+            </View>
+          )}
         </>
       )}
 
-      {state === "selected" && selectedFile && (
+      {state === "processing" && (
+        <View style={styles.analyzingSection}>
+          <Animated.View
+            style={[
+              styles.pulseCircle,
+              { backgroundColor: colors.primary + "12", borderColor: colors.primary },
+              { transform: [{ scale: pulseAnim }] },
+            ]}
+          >
+            <Feather name="image" size={38} color={colors.primary} />
+          </Animated.View>
+          <Text style={[styles.analyzingTitle, { color: colors.foreground }]}>Preparing ECG image...</Text>
+          <Text style={[styles.analyzingSub, { color: colors.mutedForeground }]}>
+            Validating format, compressing when possible, and assessing ECG image quality.
+          </Text>
+        </View>
+      )}
+
+      {state === "preview" && processedImage && selectedFile && (
         <>
           <View style={[styles.selectedCard, { backgroundColor: colors.card, borderColor: colors.primary }]}>
             <View style={[styles.fileIcon, { backgroundColor: colors.primary + "15" }]}>
@@ -196,33 +312,97 @@ export default function UploadScreen() {
             </View>
             <View style={styles.fileInfo}>
               <Text style={[styles.fileName, { color: colors.foreground }]}>{selectedFile.name}</Text>
-                <Text style={[styles.fileSize, { color: colors.mutedForeground }]}>
-                  {selectedFile.size ? `${Math.round(selectedFile.size / 1024)} KB` : selectedFile.mimeType} · Ready to upload and analyze
-                </Text>
+              <Text style={[styles.fileSize, { color: colors.mutedForeground }]}>
+                {selectedFile.size ? `${Math.round(selectedFile.size / 1024)} KB` : selectedFile.mimeType} · {acquisitionMethod}
+              </Text>
             </View>
             <TouchableOpacity onPress={handleReset}>
               <Feather name="x" size={18} color={colors.mutedForeground} />
             </TouchableOpacity>
           </View>
 
-          <View style={[styles.infoBox, { backgroundColor: colors.primary + "08", borderColor: colors.primary + "25" }]}>
-            <Feather name="info" size={14} color={colors.primary} />
-            <Text style={[styles.infoText, { color: colors.primary }]}>
-              AI will analyze rhythm, intervals, ST-segment changes, and provide clinical recommendations.
+          <View style={[styles.resultHeader, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <Text style={[styles.sectionTitle, { color: colors.foreground }]}>ECG Image Quality</Text>
+            <View style={styles.qualityRow}>
+              <Text style={[styles.qualityScore, { color: colors.foreground }]}>{processedImage.quality.score}/100</Text>
+              <Text style={[styles.qualityClass, { color: colors.primary }]}>{processedImage.quality.classification}</Text>
+            </View>
+            <Text style={[styles.cardMeta, { color: colors.mutedForeground }]}>
+              Sharpness {processedImage.quality.metrics.sharpness} · Contrast {processedImage.quality.metrics.contrast} · Lighting {processedImage.quality.metrics.lighting} · Signal {processedImage.quality.metrics.signalVisibility} · Crop {processedImage.quality.metrics.croppingQuality}
             </Text>
           </View>
 
+          {(processedImage.errors.length > 0 || processedImage.warnings.length > 0 || workflowError) && (
+            <View style={[styles.infoBox, { backgroundColor: processedImage.errors.length ? "#FEF2F2" : "#FFFBEB", borderColor: processedImage.errors.length ? "#FECACA" : "#FDE68A" }]}>
+              <Feather name={processedImage.errors.length ? "alert-triangle" : "info"} size={14} color={processedImage.errors.length ? "#DC2626" : "#D97706"} />
+              <Text style={[styles.infoText, { color: processedImage.errors.length ? "#DC2626" : "#92400E" }]}>
+                {[workflowError, ...processedImage.errors, ...processedImage.warnings].filter(Boolean).join(" ")}
+              </Text>
+            </View>
+          )}
+
+          <View style={styles.previewGrid}>
+            {[
+              { asset: processedImage.original, label: "Original", variant: "original" as const },
+              { asset: processedImage.enhanced, label: "Enhanced", variant: "enhanced" as const },
+            ].map((preview) => {
+              const active = processedImage.selectedVariant === preview.variant;
+              return (
+                <TouchableOpacity
+                  key={preview.variant}
+                  style={[styles.previewCard, { borderColor: active ? colors.primary : colors.border, backgroundColor: colors.card }]}
+                  onPress={() => choosePreviewVariant(preview.variant)}
+                  activeOpacity={0.85}
+                >
+                  <Image source={{ uri: preview.asset.uri }} style={styles.previewImage} resizeMode="cover" />
+                  <Text style={[styles.previewLabel, { color: active ? colors.primary : colors.foreground }]}>
+                    {preview.label}{active ? " · Selected" : ""}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+
+          {processedImage.steps.length > 0 && (
+            <View style={[styles.resultHeader, { backgroundColor: colors.card, borderColor: colors.border }]}>
+              <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Smart Scanner Pipeline</Text>
+              <View style={styles.stepList}>
+                {processedImage.steps.map((step) => (
+                  <View key={step.label} style={styles.stepRow}>
+                    <Feather name={step.status === "completed" ? "check-circle" : step.status === "fallback" ? "alert-circle" : "circle"} size={14} color={step.status === "completed" ? colors.success : colors.mutedForeground} />
+                    <Text style={[styles.stepText, { color: colors.mutedForeground }]}>{step.label} · {step.status}</Text>
+                  </View>
+                ))}
+              </View>
+            </View>
+          )}
+
+          <View style={styles.actionGrid}>
+            <TouchableOpacity style={[styles.secondaryAction, { borderColor: colors.border, backgroundColor: colors.card }]} onPress={() => choosePreviewVariant("original")}>
+              <Text style={[styles.secondaryActionText, { color: colors.foreground }]}>Use Original</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={[styles.secondaryAction, { borderColor: colors.border, backgroundColor: colors.card }]} onPress={() => choosePreviewVariant("enhanced")}>
+              <Text style={[styles.secondaryActionText, { color: colors.foreground }]}>Use Enhanced</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={[styles.secondaryAction, { borderColor: colors.border, backgroundColor: colors.card }]} onPress={handleReprocess}>
+              <Text style={[styles.secondaryActionText, { color: colors.foreground }]}>Reprocess</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={[styles.secondaryAction, { borderColor: colors.border, backgroundColor: colors.card }]} onPress={acquisitionMethod === "upload" ? handleSelectFile : acquisitionMethod === "camera" ? handleCapturePhoto : handleScanPaper}>
+              <Text style={[styles.secondaryActionText, { color: colors.foreground }]}>Retake</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={[styles.secondaryAction, { borderColor: "#DC2626", backgroundColor: colors.card }]} onPress={handleReset}>
+              <Text style={[styles.secondaryActionText, { color: "#DC2626" }]}>Delete</Text>
+            </TouchableOpacity>
+          </View>
+
           <TouchableOpacity
-            style={[styles.analyzeBtn, { backgroundColor: colors.primary }]}
+            disabled={!processedImage.quality.canAnalyze || processedImage.errors.length > 0}
+            style={[styles.analyzeBtn, { backgroundColor: colors.primary, opacity: !processedImage.quality.canAnalyze || processedImage.errors.length > 0 ? 0.5 : 1 }]}
             onPress={handleAnalyze}
             activeOpacity={0.85}
           >
             <Feather name="cpu" size={18} color="#fff" />
-            <Text style={styles.analyzeBtnText}>Run AI Analysis</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity onPress={handleReset}>
-            <Text style={[styles.cancelText, { color: colors.mutedForeground }]}>Select different file</Text>
+            <Text style={styles.analyzeBtnText}>Confirm Upload & Analyze</Text>
           </TouchableOpacity>
         </>
       )}
@@ -446,6 +626,18 @@ const styles = StyleSheet.create({
     borderRadius: 14,
   },
   analyzeBtnText: { fontSize: 16, fontFamily: "Inter_600SemiBold", color: "#fff" },
+  secondaryAction: {
+    alignItems: "center",
+    borderRadius: 14,
+    borderWidth: 1,
+    flexDirection: "row",
+    gap: 10,
+    justifyContent: "center",
+    paddingHorizontal: 14,
+    paddingVertical: 14,
+    width: "100%",
+  },
+  secondaryActionText: { fontSize: 14, fontFamily: "Inter_600SemiBold" },
   cancelText: { textAlign: "center", fontSize: 13, fontFamily: "Inter_400Regular" },
   analyzingSection: { alignItems: "center", gap: 14, paddingVertical: 20 },
   pulseCircle: {
@@ -466,6 +658,15 @@ const styles = StyleSheet.create({
   stepRow: { flexDirection: "row", alignItems: "center", gap: 10 },
   stepText: { fontSize: 13, fontFamily: "Inter_400Regular" },
   resultHeader: { borderRadius: 16, borderWidth: 1, padding: 18, gap: 14 },
+  qualityRow: { alignItems: "baseline", flexDirection: "row", gap: 8 },
+  qualityScore: { fontSize: 26, fontFamily: "Inter_700Bold" },
+  qualityClass: { fontSize: 14, fontFamily: "Inter_700Bold", textTransform: "uppercase" },
+  cardMeta: { fontSize: 12, fontFamily: "Inter_400Regular", lineHeight: 18 },
+  previewGrid: { flexDirection: "row", gap: 10 },
+  previewCard: { borderRadius: 14, borderWidth: 2, flex: 1, gap: 8, overflow: "hidden", padding: 8 },
+  previewImage: { aspectRatio: 1, borderRadius: 10, width: "100%" },
+  previewLabel: { fontSize: 12, fontFamily: "Inter_700Bold", textAlign: "center" },
+  actionGrid: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
   resultTop: { flexDirection: "row", alignItems: "flex-start", gap: 12 },
   resultIcon: { width: 44, height: 44, borderRadius: 22, alignItems: "center", justifyContent: "center" },
   resultTitle: { flex: 1, gap: 6 },
