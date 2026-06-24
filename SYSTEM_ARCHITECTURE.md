@@ -35,7 +35,8 @@ ECG Insight is a multi-tenant clinical ECG platform with an Expo/React frontend,
 
 ## Deployment Model
 - `Dockerfile.production` builds a production API image.
-- `docker-compose.production.yml` runs PostgreSQL, API, and Nginx with health checks.
+- `Dockerfile.frontend.production` builds and serves the Expo web frontend with Nginx.
+- `docker-compose.production.yml` runs PostgreSQL, API, frontend, and Nginx with health checks.
 - `scripts/start-production.sh` validates production environment, applies migrations, optionally seeds, and starts the API.
 - GitHub Actions validates build, lint, tests, migrations, seed, production validation, Docker build, and smoke tests.
 

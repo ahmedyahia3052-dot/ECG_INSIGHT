@@ -75,6 +75,9 @@ jobs:
       - name: Build production Docker image
         run: docker build -f Dockerfile.production -t ecg-insight-api:ci .
 
+      - name: Build production frontend image
+        run: docker build -f Dockerfile.frontend.production -t ecg-insight-frontend:ci .
+
       - name: Start API for smoke tests
         run: |
           npx prisma migrate deploy

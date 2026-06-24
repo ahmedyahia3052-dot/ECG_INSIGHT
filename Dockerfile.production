@@ -16,17 +16,25 @@ WORKDIR /app
 
 RUN addgroup -S ecg && adduser -S ecg -G ecg
 
-COPY --from=dependencies /app/node_modules ./node_modules
+COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/package.json ./package.json
 COPY --from=build /app/package-lock.json ./package-lock.json
 COPY --from=build /app/prisma ./prisma
 COPY --from=build /app/server ./server
 COPY --from=build /app/scripts ./scripts
 COPY --from=build /app/artifacts/ecg-insight ./artifacts/ecg-insight
+COPY --from=build /app/docs ./docs
+COPY --from=build /app/Dockerfile.frontend.production ./Dockerfile.frontend.production
+COPY --from=build /app/Dockerfile.production ./Dockerfile.production
+COPY --from=build /app/PRODUCTION_DEPLOYMENT_GUIDE.md ./PRODUCTION_DEPLOYMENT_GUIDE.md
+COPY --from=build /app/RELEASE_CHECKLIST.md ./RELEASE_CHECKLIST.md
+COPY --from=build /app/SYSTEM_ARCHITECTURE.md ./SYSTEM_ARCHITECTURE.md
+COPY --from=build /app/docker-compose.production.yml ./docker-compose.production.yml
+COPY --from=build /app/nginx.conf ./nginx.conf
 COPY --from=build /app/prisma.config.ts ./prisma.config.ts
 COPY --from=build /app/tsconfig.json ./tsconfig.json
 
-RUN mkdir -p uploads logs && chown -R ecg:ecg /app
+RUN mkdir -p uploads logs && chown -R ecg:ecg uploads logs
 USER ecg
 
 EXPOSE 3001

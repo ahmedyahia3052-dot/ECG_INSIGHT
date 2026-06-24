@@ -1,0 +1,15 @@
+node_modules
+dist
+.expo
+.cache
+.git
+.cursor
+uploads
+logs
+tmp
+coverage
+*.log
+*.tsbuildinfo
+.env
+.env.*
+!.env.example

@@ -38,6 +38,7 @@ npm run test
 npm run build:frontend
 npm run validate:production
 docker build -f Dockerfile.production -t ecg-insight-api:<version> .
+docker build -f Dockerfile.frontend.production -t ecg-insight-frontend:<version> .
 ```
 
 ## Deploy With Docker Compose
@@ -51,11 +52,14 @@ The API container runs:
 - optional seed execution when `RUN_DB_SEED=true`,
 - API startup checks against the database.
 
+The frontend container exports the Expo web application and serves it through Nginx on the configured compose port.
+
 ## Health Verification
 ```bash
 curl -fsS http://localhost:3001/liveness
 curl -fsS http://localhost:3001/readiness
 curl -fsS http://localhost:3001/health
+curl -fsS http://localhost:8080
 PRODUCTION_BASE_URL=http://localhost:3001 npm run smoke:production
 ```
 

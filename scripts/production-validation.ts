@@ -18,6 +18,7 @@ const requiredVariables = [
 
 const requiredFiles = [
   "Dockerfile.production",
+  "Dockerfile.frontend.production",
   "docker-compose.production.yml",
   "nginx.conf",
   "RELEASE_CHECKLIST.md",

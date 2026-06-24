@@ -25,6 +25,7 @@ Use this checklist before promoting ECG Insight to production.
 
 ## Infrastructure
 - [ ] `docker build -f Dockerfile.production -t ecg-insight-api:<version> .` succeeds.
+- [ ] `docker build -f Dockerfile.frontend.production -t ecg-insight-frontend:<version> .` succeeds.
 - [ ] `docker compose -f docker-compose.production.yml config` succeeds.
 - [ ] Postgres persistent volume or managed database backup is enabled.
 - [ ] API upload volume or object storage backup is enabled.
@@ -34,6 +35,7 @@ Use this checklist before promoting ECG Insight to production.
 - [ ] `/liveness` returns 200.
 - [ ] `/readiness` returns 200 and reports database ready.
 - [ ] `/health` returns 200 with service metadata.
+- [ ] Frontend container returns 200 on the configured web port.
 - [ ] `npm run smoke:production` passes against the deployed base URL.
 - [ ] Centralized logs include `requestId`, method, path, status, and duration.
 - [ ] Global exception monitoring destination is configured where available.
