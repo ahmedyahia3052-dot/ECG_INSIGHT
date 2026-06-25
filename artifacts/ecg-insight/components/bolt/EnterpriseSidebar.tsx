@@ -2,7 +2,7 @@ import { Feather } from "@expo/vector-icons";
 import { BlurView } from "expo-blur";
 import { usePathname, useRouter } from "expo-router";
 import { LinearGradient } from "expo-linear-gradient";
-import React, { useEffect, useMemo, useRef } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Animated, Easing, Platform, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from "react-native";
 import { useAuth } from "@/context/AuthContext";
 import { useColors } from "@/hooks/useColors";
@@ -14,27 +14,97 @@ interface NavItem {
   label: string;
   route: string;
   adminOnly?: boolean;
+  section: "Administration" | "Clinical" | "Workspace";
 }
 
 const NAV_ITEMS: NavItem[] = [
-  { icon: "grid", label: "Dashboard", route: "/(tabs)" },
-  { icon: "activity", label: "ECG Analysis", route: "/(tabs)/ecg-waveform" },
-  { icon: "upload-cloud", label: "Upload ECG", route: "/(tabs)/upload" },
-  { icon: "users", label: "Patients", route: "/(tabs)/history" },
-  { icon: "file-text", label: "Reports", route: "/(tabs)/reports-dashboard" },
-  { icon: "bar-chart-2", label: "Analytics", route: "/(tabs)/population-analytics" },
-  { icon: "bell", label: "Notifications", route: "/(tabs)/notification-center" },
-  { icon: "credit-card", label: "Billing & Subscription", route: "/(tabs)/subscription" },
-  { icon: "briefcase", label: "Team Management", route: "/(tabs)/workforce-dashboard" },
-  { icon: "shield", label: "Admin Dashboard", route: "/admin/", adminOnly: true },
-  { icon: "award", label: "License Management", route: "/admin/licenses", adminOnly: true },
-  { icon: "settings", label: "Profile & Settings", route: "/(tabs)/profile" },
+  { icon: "grid", label: "Dashboard", route: "/(tabs)", section: "Clinical" },
+  { icon: "activity", label: "ECG Analysis", route: "/(tabs)/ecg-waveform", section: "Clinical" },
+  { icon: "upload-cloud", label: "Upload ECG", route: "/(tabs)/upload", section: "Clinical" },
+  { icon: "users", label: "Patients", route: "/(tabs)/history", section: "Clinical" },
+  { icon: "file-text", label: "Reports", route: "/(tabs)/reports-dashboard", section: "Clinical" },
+  { icon: "bar-chart-2", label: "Analytics", route: "/(tabs)/population-analytics", section: "Clinical" },
+  { icon: "bell", label: "Notifications", route: "/(tabs)/notification-center", section: "Workspace" },
+  { icon: "credit-card", label: "Billing & Subscription", route: "/(tabs)/subscription", section: "Workspace" },
+  { icon: "briefcase", label: "Team Management", route: "/(tabs)/workforce-dashboard", section: "Workspace" },
+  { icon: "shield", label: "Admin Dashboard", route: "/admin/", adminOnly: true, section: "Administration" },
+  { icon: "award", label: "License Management", route: "/admin/licenses", adminOnly: true, section: "Administration" },
+  { icon: "settings", label: "Profile & Settings", route: "/(tabs)/profile", section: "Workspace" },
 ];
+
+function SidebarNavButton({
+  active,
+  activePulse,
+  collapsed,
+  item,
+  onPress,
+}: {
+  active: boolean;
+  activePulse: Animated.Value;
+  collapsed: boolean;
+  item: NavItem;
+  onPress: () => void;
+}) {
+  const [hovered, setHovered] = useState(false);
+  const pulseScale = activePulse.interpolate({ inputRange: [0, 1], outputRange: [1, 1.08] });
+  const pulseOpacity = activePulse.interpolate({ inputRange: [0, 1], outputRange: [0.44, 0.86] });
+
+  return (
+    <View style={styles.navItemWrap}>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={item.label}
+        accessibilityHint={`Navigate to ${item.label}`}
+        focusable
+        onHoverIn={() => setHovered(true)}
+        onHoverOut={() => setHovered(false)}
+        onLongPress={() => setHovered((value) => !value)}
+        onPress={onPress}
+        style={({ pressed }) => [
+          styles.navItem,
+          {
+            borderColor: active ? "#22D3EEAA" : hovered ? "#22D3EE3A" : "transparent",
+            elevation: hovered || active ? 8 : 0,
+            justifyContent: collapsed ? "center" : "flex-start",
+            shadowColor: active || hovered ? "#00E5FF" : "transparent",
+            shadowOpacity: active ? 0.28 : hovered ? 0.18 : 0,
+            transform: [{ scale: pressed ? 0.985 : hovered ? 1.012 : 1 }],
+          },
+        ]}
+      >
+        {active ? (
+          <>
+            <LinearGradient
+              colors={["rgba(0,229,255,0.22)", "rgba(20,184,166,0.12)", "rgba(8,15,25,0)"]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={StyleSheet.absoluteFill}
+            />
+            <Animated.View style={[styles.activePulse, { opacity: pulseOpacity, transform: [{ scale: pulseScale }] }]} />
+            <Animated.View style={[styles.activeRail, { opacity: pulseOpacity, transform: [{ scaleY: pulseScale }] }]} />
+          </>
+        ) : null}
+        <Animated.View style={{ transform: [{ scale: active ? pulseScale : 1 }] }}>
+          <Feather name={item.icon} size={19} color={active ? "#67E8F9" : "#B6C7D8"} />
+        </Animated.View>
+        {!collapsed ? (
+          <Text style={[styles.navText, { color: active ? "#F8FAFC" : "#C8D7E5" }]} numberOfLines={1}>
+            {item.label}
+          </Text>
+        ) : null}
+      </Pressable>
+      {collapsed && hovered && Platform.OS === "web" ? (
+        <View pointerEvents="none" style={styles.tooltip}>
+          <Text style={styles.tooltipText}>{item.label}</Text>
+        </View>
+      ) : null}
+    </View>
+  );
+}
 
 export function EnterpriseSidebar({
   collapsed,
   onClose,
-  onToggleCollapse,
   placement = "overlay",
   visible = true,
 }: {
@@ -52,10 +122,10 @@ export function EnterpriseSidebar({
   const { width: windowWidth } = useWindowDimensions();
   const activePulse = useRef(new Animated.Value(0)).current;
   const entry = useRef(new Animated.Value(placement === "overlay" ? 0 : 1)).current;
-  const widthAnim = useRef(new Animated.Value(collapsed ? 84 : 304)).current;
+  const widthAnim = useRef(new Animated.Value(collapsed ? 76 : 312)).current;
 
   const overlayMode = placement === "overlay";
-  const width = overlayMode ? windowWidth : collapsed ? 84 : 304;
+  const width = overlayMode ? windowWidth : collapsed ? 76 : 312;
   const items = useMemo(() => NAV_ITEMS.filter((item) => !item.adminOnly || canAccess("admin")), [canAccess]);
   const userRole = user?.isOwner ? "Owner Account" : user?.role?.replace("_", " ") ?? "Clinical User";
   const initials = user?.avatarInitials || user?.name?.split(/\s+/).map((part) => part[0]).join("").slice(0, 2).toUpperCase() || "EC";
@@ -124,10 +194,10 @@ export function EnterpriseSidebar({
         },
       ]}
     >
-      <BlurView intensity={8} tint="dark" style={StyleSheet.absoluteFill} />
+      <BlurView intensity={12} tint="dark" style={StyleSheet.absoluteFill} />
       <View style={StyleSheet.absoluteFill}>
         <LinearGradient
-          colors={["rgba(8,15,25,0.97)", "rgba(8,15,25,0.92)", "rgba(3,10,18,0.96)"]}
+          colors={["rgba(15,23,42,0.94)", "rgba(15,23,42,0.82)", "rgba(8,15,25,0.92)"]}
           style={StyleSheet.absoluteFill}
         />
       </View>
@@ -142,11 +212,6 @@ export function EnterpriseSidebar({
             <Text style={styles.brandTitle}>ECG Insight</Text>
             <Text style={styles.brandSubtitle}>Medical AI Platform</Text>
           </View>
-        ) : null}
-        {onToggleCollapse ? (
-          <Pressable accessibilityRole="button" onPress={onToggleCollapse} style={styles.collapseButton}>
-            <Feather name={collapsed ? "chevrons-right" : "chevrons-left"} size={16} color="#67E8F9" />
-          </Pressable>
         ) : null}
       </View>
 
@@ -167,53 +232,26 @@ export function EnterpriseSidebar({
       ) : null}
 
       <ScrollView contentContainerStyle={styles.nav} showsVerticalScrollIndicator={false}>
-        {items.map((item) => {
+        {items.map((item, index) => {
           const active = pathname === item.route || (item.route !== "/(tabs)" && pathname.startsWith(item.route.replace("/(tabs)", "")));
-          const pulseScale = activePulse.interpolate({ inputRange: [0, 1], outputRange: [1, 1.08] });
-          const pulseOpacity = activePulse.interpolate({ inputRange: [0, 1], outputRange: [0.44, 0.86] });
+          const previous = items[index - 1];
           return (
-            <Pressable
-              key={item.label}
-              accessibilityRole="button"
-              accessibilityLabel={item.label}
-              onPress={() => {
-                void triggerHaptic("selection");
-                router.push(item.route as never);
-                onClose?.();
-              }}
-              style={({ hovered, pressed }) => [
-                styles.navItem,
-                {
-                  borderColor: active ? "#22D3EEAA" : hovered ? "#22D3EE3A" : "transparent",
-                  elevation: hovered || active ? 8 : 0,
-                  justifyContent: collapsed ? "center" : "flex-start",
-                  shadowColor: active || hovered ? "#00E5FF" : "transparent",
-                  shadowOpacity: active ? 0.28 : hovered ? 0.18 : 0,
-                  transform: [{ scale: pressed ? 0.985 : hovered ? 1.012 : 1 }],
-                },
-              ]}
-            >
-              {active ? (
-                <>
-                  <LinearGradient
-                    colors={["rgba(0,229,255,0.22)", "rgba(20,184,166,0.12)", "rgba(8,15,25,0)"]}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 1 }}
-                    style={StyleSheet.absoluteFill}
-                  />
-                  <Animated.View style={[styles.activePulse, { opacity: pulseOpacity, transform: [{ scale: pulseScale }] }]} />
-                  <Animated.View style={[styles.activeRail, { opacity: pulseOpacity, transform: [{ scaleY: pulseScale }] }]} />
-                </>
+            <React.Fragment key={item.label}>
+              {!collapsed && (!previous || previous.section !== item.section) ? (
+                <Text style={styles.sectionLabel}>{item.section}</Text>
               ) : null}
-              <Animated.View style={{ transform: [{ scale: active ? pulseScale : 1 }] }}>
-                <Feather name={item.icon} size={18} color={active ? "#67E8F9" : "#B6C7D8"} />
-              </Animated.View>
-              {!collapsed ? (
-                <Text style={[styles.navText, { color: active ? "#F8FAFC" : "#C8D7E5" }]} numberOfLines={1}>
-                  {item.label}
-                </Text>
-              ) : null}
-            </Pressable>
+              <SidebarNavButton
+                active={active}
+                activePulse={activePulse}
+                collapsed={collapsed}
+                item={item}
+                onPress={() => {
+                  void triggerHaptic("selection");
+                  router.push(item.route as never);
+                  onClose?.();
+                }}
+              />
+            </React.Fragment>
           );
         })}
       </ScrollView>
@@ -277,20 +315,10 @@ const styles = StyleSheet.create({
     width: 44,
   },
   brandSubtitle: { color: "#8FB6C8", fontFamily: "Inter_600SemiBold", fontSize: 10, letterSpacing: 1.1, textTransform: "uppercase" },
-  brandText: { flex: 1 },
+  brandText: { flex: 1, minWidth: 0 },
   brandTitle: { color: "#F8FAFC", fontFamily: "Inter_700Bold", fontSize: 19 },
-  collapseButton: {
-    alignItems: "center",
-    backgroundColor: "rgba(0,229,255,0.1)",
-    borderColor: "rgba(103,232,249,0.26)",
-    borderRadius: 12,
-    borderWidth: 1,
-    height: 34,
-    justifyContent: "center",
-    width: 34,
-  },
   footer: { borderColor: "rgba(103,232,249,0.16)", borderTopWidth: 1, gap: 6, paddingTop: 12 },
-  footerAction: { alignItems: "center", borderRadius: 14, flexDirection: "row", gap: 10, minHeight: 40, paddingHorizontal: 12 },
+  footerAction: { alignItems: "center", borderRadius: 14, flexDirection: "row", gap: 10, minHeight: 48, paddingHorizontal: 12 },
   footerText: { color: "#C8D7E5", fontFamily: "Inter_700Bold", fontSize: 13 },
   header: { alignItems: "center", flexDirection: "row", gap: 10, paddingBottom: 8 },
   logoutAction: { backgroundColor: "rgba(239,68,68,0.08)" },
@@ -304,37 +332,57 @@ const styles = StyleSheet.create({
     top: -70,
     width: 180,
   },
-  nav: { gap: 6, paddingBottom: 12, paddingTop: 4 },
+  nav: { gap: 6, overflow: "visible", paddingBottom: 12, paddingTop: 4 },
   navItem: {
     alignItems: "center",
     borderRadius: 18,
     borderWidth: 1,
     flexDirection: "row",
     gap: 10,
-    minHeight: 46,
+    minHeight: 48,
     overflow: "hidden",
     paddingHorizontal: 12,
     shadowOffset: { height: 10, width: 0 },
     shadowRadius: 20,
   },
+  navItemWrap: { overflow: "visible", position: "relative" },
   navText: { flex: 1, fontFamily: "Inter_700Bold", fontSize: 13.5 },
   onlineDot: { backgroundColor: "#34D399", borderRadius: 999, height: 7, width: 7 },
   onlineRow: { alignItems: "center", flexDirection: "row", gap: 6, marginTop: 5 },
   onlineText: { color: "#8FE8C7", fontFamily: "Inter_600SemiBold", fontSize: 11 },
+  sectionLabel: { color: "#6CBFD1", fontFamily: "Inter_700Bold", fontSize: 10, letterSpacing: 1.2, marginTop: 8, paddingHorizontal: 10, textTransform: "uppercase" },
   sidebar: {
-    backgroundColor: "rgba(8,15,25,0.92)",
+    backgroundColor: "rgba(15,23,42,0.82)",
     borderRadius: 30,
     borderWidth: 1,
     elevation: 14,
     gap: 14,
-    overflow: "hidden",
-    padding: 14,
+    overflow: "visible",
+    padding: 12,
     shadowOffset: { height: 18, width: 0 },
     shadowOpacity: 0.24,
     shadowRadius: 32,
   },
   overlaySidebar: { borderRadius: 0, bottom: 0, left: 0, position: "absolute", top: 0, zIndex: 50 },
   pushSidebar: { alignSelf: "stretch", marginBottom: 20, marginLeft: 18, marginTop: 20, position: "relative" },
+  tooltip: {
+    backgroundColor: "rgba(15,23,42,0.96)",
+    borderColor: "rgba(0,255,255,0.18)",
+    borderRadius: 12,
+    borderWidth: 1,
+    left: 64,
+    minWidth: 132,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    position: "absolute",
+    shadowColor: "#00E5FF",
+    shadowOffset: { height: 8, width: 0 },
+    shadowOpacity: 0.2,
+    shadowRadius: 18,
+    top: 4,
+    zIndex: 90,
+  },
+  tooltipText: { color: "#E0F7FA", fontFamily: "Inter_700Bold", fontSize: 12 },
   userCard: {
     alignItems: "center",
     backgroundColor: "rgba(15,35,52,0.72)",

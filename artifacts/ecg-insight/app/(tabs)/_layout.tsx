@@ -2,8 +2,8 @@ import { BlurView } from "expo-blur";
 import { Redirect, Tabs } from "expo-router";
 import { SymbolView } from "expo-symbols";
 import { Feather } from "@expo/vector-icons";
-import React, { useEffect, useState } from "react";
-import { Platform, Pressable, StyleSheet, TouchableOpacity, View, useColorScheme, useWindowDimensions } from "react-native";
+import React, { useEffect, useRef, useState } from "react";
+import { Animated, Platform, Pressable, StyleSheet, TouchableOpacity, View, useColorScheme, useWindowDimensions } from "react-native";
 import { PanGestureHandler, State, type PanGestureHandlerStateChangeEvent } from "react-native-gesture-handler";
 import { useAuth } from "@/context/AuthContext";
 import { useColors } from "@/hooks/useColors";
@@ -17,6 +17,7 @@ function ClassicTabLayout() {
   const { triggerHaptic } = useVisualExperience();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
+  const toggleScale = useRef(new Animated.Value(1)).current;
   const { width } = useWindowDimensions();
   const isDark = colorScheme === "dark";
   const isIOS = Platform.OS === "ios";
@@ -30,6 +31,25 @@ function ClassicTabLayout() {
     if (isTablet) setSidebarCollapsed(true);
     if (isDesktop) setSidebarCollapsed(false);
   }, [isDesktop, isTablet]);
+
+  useEffect(() => {
+    if (Platform.OS !== "web" || !isMobile || typeof document === "undefined") return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = mobileDrawerOpen ? "hidden" : previousOverflow;
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [isMobile, mobileDrawerOpen]);
+
+  function animateToggleScale(toValue: number) {
+    Animated.spring(toggleScale, {
+      damping: 14,
+      mass: 0.7,
+      stiffness: 220,
+      toValue,
+      useNativeDriver: true,
+    }).start();
+  }
 
   const tabIcon = (name: keyof typeof Feather.glyphMap, color: string, focused: boolean) => (
     <View style={[styles.tabIconWrap, { transform: [{ scale: focused ? 1.14 : 1 }] }]}>
@@ -47,11 +67,45 @@ function ClassicTabLayout() {
   return (
     <View style={styles.layoutRoot}>
       {usePushSidebar ? (
-        <EnterpriseSidebar
-          collapsed={sidebarCollapsed}
-          onToggleCollapse={() => setSidebarCollapsed((value) => !value)}
-          placement="push"
-        />
+        <>
+          <EnterpriseSidebar
+            collapsed={sidebarCollapsed}
+            placement="push"
+          />
+          <Animated.View
+            style={[
+              styles.sidebarToggleLayer,
+              {
+                left: (sidebarCollapsed ? 18 + 76 : 18 + 312) - 24,
+                transform: [{ scale: toggleScale }],
+              },
+            ]}
+          >
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={sidebarCollapsed ? "Expand navigation sidebar" : "Collapse navigation sidebar"}
+              accessibilityHint="Toggles the medical navigation sidebar width"
+              focusable
+              onPress={() => {
+                void triggerHaptic("selection");
+                setSidebarCollapsed((value) => !value);
+              }}
+              onPressIn={() => animateToggleScale(0.92)}
+              onPressOut={() => animateToggleScale(1)}
+              style={({ hovered, pressed }) => [
+                styles.sidebarToggle,
+                {
+                  borderColor: hovered || pressed ? "rgba(103,232,249,0.78)" : "rgba(103,232,249,0.36)",
+                  opacity: pressed ? 0.92 : 1,
+                  shadowOpacity: hovered || pressed ? 0.42 : 0.26,
+                },
+              ]}
+            >
+              <BlurView intensity={12} tint="dark" style={StyleSheet.absoluteFill} />
+              <Feather name={sidebarCollapsed ? "chevrons-right" : "chevrons-left"} size={19} color="#67E8F9" />
+            </Pressable>
+          </Animated.View>
+        </>
       ) : mobileDrawerOpen ? (
         <>
           <Pressable
@@ -250,11 +304,11 @@ const styles = StyleSheet.create({
   activeDot: { borderRadius: 999, bottom: -6, height: 4, position: "absolute", width: 18 },
   drawerBackdrop: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: "rgba(0,0,0,0.46)",
+    backgroundColor: "rgba(0,0,0,0.44)",
     zIndex: 40,
   },
-  layoutRoot: { flex: 1, flexDirection: "row", overflow: "hidden" },
-  mainContent: { flex: 1, minWidth: 0, position: "relative" },
+  layoutRoot: { flex: 1, flexDirection: "row", overflow: "visible" },
+  mainContent: { flex: 1, minWidth: 0, overflow: "hidden", position: "relative" },
   mobileDrawerPanel: { ...StyleSheet.absoluteFillObject, zIndex: 50 },
   menuButton: {
     alignItems: "center",
@@ -267,6 +321,24 @@ const styles = StyleSheet.create({
     top: Platform.OS === "web" ? 18 : 48,
     width: 48,
     zIndex: 34,
+  },
+  sidebarToggle: {
+    alignItems: "center",
+    backgroundColor: "rgba(15,23,42,0.82)",
+    borderRadius: 999,
+    borderWidth: 1,
+    height: 48,
+    justifyContent: "center",
+    overflow: "hidden",
+    shadowColor: "#00E5FF",
+    shadowOffset: { height: 8, width: 0 },
+    shadowRadius: 18,
+    width: 48,
+  },
+  sidebarToggleLayer: {
+    position: "absolute",
+    top: Platform.OS === "web" ? 38 : 52,
+    zIndex: 120,
   },
   tabIconWrap: { alignItems: "center", justifyContent: "center", minHeight: 30, minWidth: 34 },
   tabBlur: { borderRadius: 26, overflow: "hidden" },
