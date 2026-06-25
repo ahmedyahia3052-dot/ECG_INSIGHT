@@ -6,10 +6,10 @@ import { useAuth } from "@/context/AuthContext";
 import { useColors } from "@/hooks/useColors";
 import {
   archiveReport,
+  downloadReportPdf,
   finalizeReport,
   generateReport,
   listReports,
-  reportPdfUrl,
   signReport,
   updateReport,
   type ClinicalReport,
@@ -133,12 +133,16 @@ export default function ReportsDashboardScreen() {
     ]);
   };
 
-  const openPdf = (report: ClinicalReport) => {
-    if (typeof window !== "undefined") {
-      window.open(reportPdfUrl(report.id), "_blank", "noopener,noreferrer");
+  const openPdf = async (report: ClinicalReport) => {
+    if (!token) return;
+    if (typeof window === "undefined") {
+      toast.info("PDF available", "Use the web app to open the generated PDF report.");
       return;
     }
-    toast.info("PDF available", "Use the web app to open the generated PDF report.");
+    const blob = await downloadReportPdf(token, report.id);
+    const url = URL.createObjectURL(blob);
+    window.open(url, "_blank", "noopener,noreferrer");
+    setTimeout(() => URL.revokeObjectURL(url), 60_000);
   };
 
   return (
@@ -239,7 +243,7 @@ export default function ReportsDashboardScreen() {
               <BoltButton label="Edit" onPress={() => startEdit(report)} variant="outline" />
               <BoltButton label="Finalize" onPress={() => actionMutation.mutate({ action: "finalize", reportId: report.id })} variant="outline" />
               <BoltButton label="Sign" onPress={() => actionMutation.mutate({ action: "sign", reportId: report.id })} variant="outline" />
-              <BoltButton label="PDF" onPress={() => openPdf(report)} variant="ghost" />
+              <BoltButton label="PDF" onPress={() => void openPdf(report)} variant="ghost" />
               <BoltButton label="Archive" onPress={() => confirmArchive(report)} variant="danger" />
             </View>
           </BoltCard>

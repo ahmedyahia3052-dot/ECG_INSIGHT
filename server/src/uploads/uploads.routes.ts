@@ -6,6 +6,7 @@ import { Router } from "express";
 import { prisma } from "../config/prisma";
 import { buildPreprocessingArtifact, isSupportedImageOrPdfIngestionFile, mergeEcgMetadata, toJsonObject } from "../ai/preprocessing.pipeline";
 import { queueAnalysis } from "../ai/ai.service";
+import { assertCaseCanAcceptAnalysis } from "../cases/state-machine";
 import { requireAuth, requireRole } from "../middleware/auth";
 import { AppError } from "../middleware/error";
 import { serializeFile } from "../utils/clinical";
@@ -76,6 +77,12 @@ uploadsRouter.post(
       if (!ecgCase) {
         fs.rmSync(req.file.path, { force: true });
         throw new AppError(404, "ECG case not found.", "CASE_NOT_FOUND");
+      }
+      try {
+        assertCaseCanAcceptAnalysis(ecgCase);
+      } catch (error) {
+        fs.rmSync(req.file.path, { force: true });
+        throw error;
       }
 
       const preprocessing = isSupportedImageOrPdfIngestionFile(req.file.originalname)

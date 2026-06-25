@@ -6,6 +6,7 @@ import { Router } from "express";
 import type { Prisma, Role } from "@prisma/client";
 import { z } from "zod";
 import { prisma } from "../../config/prisma";
+import { assertCaseStatusTransition, statusTimestampPatch } from "../../cases/state-machine";
 import { requireAuth, requireRole } from "../../middleware/auth";
 import { AppError } from "../../middleware/error";
 import { validateBody } from "../../middleware/validate";
@@ -402,6 +403,9 @@ reportsRouter.post("/:reportId/finalize", requireRole("DOCTOR"), async (req, res
   try {
     const current = await reportForAccess(String(req.params.reportId), req.auth!);
     assertCanFinalize(req.auth!, current);
+    const ecgCase = await prisma.eCGCase.findUnique({ where: { id: current.caseId } });
+    if (!ecgCase) throw new AppError(404, "ECG case not found.", "CASE_NOT_FOUND");
+    assertCaseStatusTransition(ecgCase.status, "FINALIZED");
     const report = await prisma.clinicalReport.update({
       data: {
         finalizedAt: new Date(),
@@ -409,6 +413,13 @@ reportsRouter.post("/:reportId/finalize", requireRole("DOCTOR"), async (req, res
         status: "FINALIZED",
       },
       where: { id: current.id },
+    });
+    await prisma.eCGCase.update({
+      data: {
+        ...statusTimestampPatch("FINALIZED", req.auth!.id),
+        status: "FINALIZED",
+      },
+      where: { id: ecgCase.id },
     });
     await createReportVersion(report, req.auth!.id, "Report finalized for physician signature.");
     await prisma.auditLog.create({

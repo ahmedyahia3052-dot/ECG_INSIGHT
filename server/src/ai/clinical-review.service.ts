@@ -1,5 +1,6 @@
 import type { AISeverity, Prisma } from "@prisma/client";
 import { prisma } from "../config/prisma";
+import { assertCaseStatusTransition, statusTimestampPatch } from "../cases/state-machine";
 import { AppError } from "../middleware/error";
 import { createNotification } from "../utils/notifications";
 import { generateClinicalReport } from "../modules/reports/reports.service";
@@ -24,6 +25,8 @@ export async function submitClinicalReview(
   });
   if (!ecgCase) throw new AppError(404, "ECG case not found.", "CASE_NOT_FOUND");
   const latestAnalysis = ecgCase.analyses[0];
+  const nextStatus = review.approved ? "APPROVED" : "UNDER_REVIEW";
+  assertCaseStatusTransition(ecgCase.status, nextStatus);
 
   if (latestAnalysis && (review.interpretation || review.diagnosis || review.severity)) {
     await prisma.aIAnalysis.update({
@@ -43,14 +46,11 @@ export async function submitClinicalReview(
       clinicalNotes: review.comments,
       doctorDiagnosis: diagnosis,
       finalDiagnosis: diagnosis,
-      finalizedAt: review.approved ? new Date() : undefined,
-      approvedAt: review.approved ? new Date() : undefined,
+      ...statusTimestampPatch(nextStatus, doctorId),
       priority: review.severity === "CRITICAL" ? "CRITICAL" : ecgCase.priority,
       recommendations: latestAnalysis?.recommendations.join("\n"),
-      reviewedAt: new Date(),
-      reviewedById: doctorId,
       severity: review.severity === "CRITICAL" ? "CRITICAL" : review.severity && review.severity !== "NORMAL" ? "ABNORMAL" : undefined,
-      status: review.approved ? "APPROVED" : "UNDER_REVIEW",
+      status: nextStatus,
     },
     where: { id: caseId },
   });
@@ -100,5 +100,5 @@ export async function submitClinicalReview(
     });
   }
 
-  return { caseId, diagnosis, reportId: report?.id ?? null, status: review.approved ? "finalized" : "reviewed" };
+  return { caseId, diagnosis, reportId: report?.id ?? null, status: review.approved ? "approved" : "reviewed" };
 }

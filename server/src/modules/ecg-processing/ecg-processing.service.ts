@@ -2,6 +2,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import type { ECGMeasurement, SignalQuality } from "@prisma/client";
 import { prisma } from "../../config/prisma";
+import { assertCaseCanAcceptAnalysis } from "../../cases/state-machine";
 import { AppError } from "../../middleware/error";
 import { queueAnalysis } from "../../ai/ai.service";
 
@@ -167,6 +168,7 @@ async function waveformForCase(caseId: string) {
 export async function processCaseWaveform(caseId: string, actorId: string) {
   const ecgCase = await prisma.eCGCase.findUnique({ where: { id: caseId } });
   if (!ecgCase) throw new AppError(404, "ECG case not found.", "CASE_NOT_FOUND");
+  assertCaseCanAcceptAnalysis(ecgCase);
 
   const { samples } = await waveformForCase(caseId);
   const features = featuresFrom(samples, DEFAULT_SAMPLE_RATE);

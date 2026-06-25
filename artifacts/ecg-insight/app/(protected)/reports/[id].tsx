@@ -1,11 +1,11 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLocalSearchParams } from "expo-router";
 import React from "react";
-import { Linking, StyleSheet, Text, View } from "react-native";
+import { Platform, StyleSheet, Text, View } from "react-native";
 
 import { Badge, Card, EmptyState, formatDate, medicalTheme, PageSection, PrimaryButton, SectionHeader } from "@/components/enterprise/EnterpriseUI";
 import { useAuth } from "@/context/AuthContext";
-import { emailReport, finalizeReport, getReport, reportPdfUrl, signReport } from "@/services/reports";
+import { downloadReportPdf, emailReport, finalizeReport, getReport, signReport } from "@/services/reports";
 
 export default function ReportDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -45,7 +45,7 @@ export default function ReportDetailScreen() {
         <View style={styles.actions}>
           <PrimaryButton label="Finalize" onPress={() => finalizeMutation.mutate()} variant="outline" />
           <PrimaryButton label="Sign" onPress={() => signMutation.mutate()} variant="outline" />
-          <PrimaryButton label="Export PDF" onPress={() => void Linking.openURL(reportPdfUrl(report.id))} />
+          <PrimaryButton label="Export PDF" onPress={() => void openReportPdf(token, report.id)} />
           <PrimaryButton label="Email" onPress={() => emailMutation.mutate()} variant="outline" />
         </View>
       </Card>
@@ -66,6 +66,14 @@ export default function ReportDetailScreen() {
       </View>
     </PageSection>
   );
+}
+
+async function openReportPdf(token: string | undefined, reportId: string) {
+  if (!token || Platform.OS !== "web" || typeof window === "undefined") return;
+  const blob = await downloadReportPdf(token, reportId);
+  const url = URL.createObjectURL(blob);
+  window.open(url, "_blank", "noopener,noreferrer");
+  setTimeout(() => URL.revokeObjectURL(url), 60_000);
 }
 
 function Info({ label, value }: { label: string; value: string }) {

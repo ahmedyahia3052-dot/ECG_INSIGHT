@@ -1,11 +1,11 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "expo-router";
 import React, { useState } from "react";
-import { StyleSheet, Text, View } from "react-native";
+import { Platform, StyleSheet, Text, View } from "react-native";
 
 import { Badge, Card, EmptyState, Field, formatDate, medicalTheme, PageSection, PrimaryButton, SectionHeader } from "@/components/enterprise/EnterpriseUI";
 import { useAuth } from "@/context/AuthContext";
-import { createReport, deleteReport, finalizeReport, listReports, reportPdfUrl, signReport, type ClinicalReport, type ReportsResponse } from "@/services/reports";
+import { createReport, deleteReport, downloadReportPdf, finalizeReport, listReports, signReport, type ClinicalReport, type ReportsResponse } from "@/services/reports";
 
 type ReportStatus = "all" | ClinicalReport["status"];
 const statuses: ReportStatus[] = ["all", "draft", "under_review", "finalized", "signed", "archived"];
@@ -125,8 +125,8 @@ export default function ReportsIndexScreen() {
               <PrimaryButton label="Edit" onPress={() => router.push(`/reports/${report.id}` as never)} variant="outline" />
               <PrimaryButton label="Finalize" onPress={() => finalizeMutation.mutate(report.id)} variant="outline" />
               <PrimaryButton label="Sign" onPress={() => signMutation.mutate(report.id)} variant="outline" />
-              <PrimaryButton label="Print" onPress={() => openReportPdf(report.id)} variant="outline" />
-              <PrimaryButton label="Export PDF" onPress={() => openReportPdf(report.id)} variant="outline" />
+              <PrimaryButton label="Print" onPress={() => void openReportPdf(token, report.id, "print")} variant="outline" />
+              <PrimaryButton label="Export PDF" onPress={() => void openReportPdf(token, report.id)} variant="outline" />
               <PrimaryButton label="Delete" onPress={() => deleteMutation.mutate(report.id)} variant="danger" />
             </View>
           </View>
@@ -151,9 +151,10 @@ const styles = StyleSheet.create({
   table: { gap: 10 },
 });
 
-function openReportPdf(reportId: string) {
-  const url = reportPdfUrl(reportId);
-  if (typeof window !== "undefined") {
-    window.open(url, "_blank", "noopener,noreferrer");
-  }
+async function openReportPdf(token: string | undefined, reportId: string, watermark?: string) {
+  if (!token || Platform.OS !== "web" || typeof window === "undefined") return;
+  const blob = await downloadReportPdf(token, reportId, watermark);
+  const url = URL.createObjectURL(blob);
+  window.open(url, "_blank", "noopener,noreferrer");
+  setTimeout(() => URL.revokeObjectURL(url), 60_000);
 }

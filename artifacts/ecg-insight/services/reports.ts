@@ -1,4 +1,4 @@
-import { API_URL, apiRequest } from "./api";
+import { API_URL, ApiError, apiRequest } from "./api";
 
 export interface ClinicalReport {
   acquisitionDate: string;
@@ -66,6 +66,17 @@ export interface ReportSignature {
 export function reportPdfUrl(reportId: string, watermark?: string) {
   const query = watermark ? `?watermark=${encodeURIComponent(watermark)}` : "";
   return `${API_URL}/reports/${reportId}/pdf${query}`;
+}
+
+export async function downloadReportPdf(accessToken: string, reportId: string, watermark?: string) {
+  const response = await fetch(reportPdfUrl(reportId, watermark), {
+    credentials: "include",
+    headers: { authorization: `Bearer ${accessToken}` },
+  });
+  if (!response.ok) {
+    throw new ApiError("Unable to export report PDF.", response.status, "REPORT_EXPORT_FAILED");
+  }
+  return response.blob();
 }
 
 export async function listReports(accessToken: string, params = new URLSearchParams()) {

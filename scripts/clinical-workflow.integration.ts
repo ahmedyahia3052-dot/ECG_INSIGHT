@@ -165,7 +165,10 @@ async function main() {
     token: doctor.token,
   });
   expectStatus(response, 201, "patient create");
-  const patient = (response.body as { patient: { id: string } }).patient;
+  const patient = (response.body as { patient: { gender: string; id: string } }).patient;
+  assert(patient.gender === "male", "Created patient gender must persist as male in API response.");
+  const persistedPatient = await prisma.patient.findUnique({ where: { id: patient.id } });
+  assert(persistedPatient?.gender === "MALE", "Created patient gender must persist as MALE in PostgreSQL.");
   expectStatus(await request(`/patients/${patient.id}`, { token: other.token }), 403, "other doctor patient access denied");
 
   response = await request("/cases", {
@@ -188,10 +191,33 @@ async function main() {
   response = await request(`/ai/analyze/${ecgCase.id}`, { method: "POST", token: doctor.token });
   expectStatus(response, 202, "ai analyze");
   assert(typeof (response.body as { analysis: { confidenceScore?: number } }).analysis.confidenceScore === "number", "AI confidence missing.");
+  for (let attempt = 0; attempt < 10; attempt += 1) {
+    response = await request(`/ai/result/${ecgCase.id}`, { token: doctor.token });
+    if ((response.body as { analysis?: { status?: string } }).analysis?.status === "completed") break;
+    await new Promise((resolve) => setTimeout(resolve, 50));
+  }
+  assert((response.body as { analysis?: { status?: string } }).analysis?.status === "completed", "AI analysis must complete before approval.");
 
   response = await request(`/reports/cases/${ecgCase.id}/generate`, { method: "POST", token: doctor.token });
   expectStatus(response, 201, "report generate");
   const report = (response.body as { report: { id: string } }).report;
+  response = await request(`/cases/${ecgCase.id}/status`, {
+    body: { status: "approved" },
+    method: "POST",
+    token: doctor.token,
+  });
+  expectStatus(response, 200, "case approve");
+  response = await request(`/reports/${report.id}/finalize`, { method: "POST", token: doctor.token });
+  expectStatus(response, 200, "report finalize");
+  expectStatus(
+    await request(`/cases/${ecgCase.id}/reject`, { body: { reason: "Invalid post-finalization rejection." }, method: "POST", token: doctor.token }),
+    409,
+    "finalized case reject blocked",
+  );
+  expectStatus(await request(`/ai/analyze/${ecgCase.id}`, { method: "POST", token: doctor.token }), 409, "finalized case analysis blocked");
+  const finalizedCase = await prisma.eCGCase.findUnique({ where: { id: ecgCase.id } });
+  assert(finalizedCase?.status === "FINALIZED", "Report finalization must finalize the ECG case.");
+  assert(finalizedCase.rejectedAt === null, "Finalized approved case must not have rejectedAt set.");
   expectStatus(await request(`/reports/${report.id}/pdf`, { token: doctor.token }), 200, "report pdf export");
 
   const documentForm = new FormData();
@@ -257,8 +283,23 @@ async function main() {
   const notification = (response.body as { notification: { id: string } }).notification;
   expectStatus(await request(`/notifications/${notification.id}/read`, { method: "POST", token: doctor.token }), 200, "notification read");
   expectStatus(await request(`/notifications/${notification.id}`, { method: "DELETE", token: doctor.token }), 204, "notification delete");
+  response = await request("/preferences", {
+    body: {
+      compactDashboardDensity: true,
+      criticalAlertSound: true,
+      highContrastClinicalMode: true,
+      reduceMotion: true,
+      rememberLastPatientFilter: true,
+      requireConfirmationForDestructiveActions: true,
+    },
+    method: "PATCH",
+    token: doctor.token,
+  });
+  expectStatus(response, 200, "preferences update");
+  const preferences = (response.body as { preferences: { reduceMotion: boolean } }).preferences;
+  assert(preferences.reduceMotion === true, "Preferences must persist user settings.");
 
-  expectStatus(await request(`/reports?q=${encodeURIComponent("Workflow")}&status=draft&page=1&pageSize=5`, { token: doctor.token }), 200, "report search pagination");
+  expectStatus(await request(`/reports?q=${encodeURIComponent("Workflow")}&status=finalized&page=1&pageSize=5`, { token: doctor.token }), 200, "report search pagination");
   expectStatus(await request(`/ecg/files/list?patientId=${patient.id}&fileType=PDF_REPORT&page=1&pageSize=5`, { token: doctor.token }), 200, "ecg file filter pagination");
   expectStatus(await request(`/tasks?q=${encodeURIComponent("Workflow Task")}&status=COMPLETED&page=1&pageSize=5`, { token: doctor.token }), 200, "task search filter pagination");
   expectStatus(await request(`/teams?q=${encodeURIComponent("Workflow Team")}&page=1&pageSize=5`, { token: doctor.token }), 200, "team search pagination");

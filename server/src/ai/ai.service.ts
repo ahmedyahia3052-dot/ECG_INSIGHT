@@ -1,5 +1,11 @@
 import type { AIAnalysis, AIAnalysisStatus, AISeverity, Prisma } from "@prisma/client";
 import { prisma } from "../config/prisma";
+import {
+  assertCaseCanAcceptAnalysis,
+  assertCaseStatusTransition,
+  canTransitionCaseStatus,
+  isReadOnlyCaseStatus,
+} from "../cases/state-machine";
 import { AppError } from "../middleware/error";
 import { createNotification } from "../utils/notifications";
 import { isCriticalDiagnosis } from "./engine";
@@ -47,10 +53,13 @@ async function completeAnalysis(analysisId: string, actorId: string) {
       data: { status: "PROCESSING" },
       where: { id: analysisId },
     });
-    await prisma.eCGCase.update({
-      data: { aiStatus: "PROCESSING", status: "PROCESSING" },
-      where: { id: queued.caseId },
-    });
+    const processingCase = await prisma.eCGCase.findUnique({ where: { id: queued.caseId } });
+    if (processingCase && canTransitionCaseStatus(processingCase.status, "PROCESSING")) {
+      await prisma.eCGCase.update({
+        data: { aiStatus: "PROCESSING", status: "PROCESSING" },
+        where: { id: queued.caseId },
+      });
+    }
 
     const measurement = await prisma.eCGMeasurement.findFirst({
       orderBy: { createdAt: "desc" },
@@ -84,21 +93,32 @@ async function completeAnalysis(analysisId: string, actorId: string) {
       where: { id: analysisId },
     });
 
-    await prisma.eCGCase.update({
-      data: {
-        aiStatus: "COMPLETED",
-        aiDiagnosis: analysis.diagnosis,
-        confidenceScore: analysis.confidenceScore,
-        finalDiagnosis: analysis.diagnosis,
-        heartRate: analysis.heartRate,
-        priority: isCritical(analysis) ? "CRITICAL" : queued.case.priority,
-        recommendations: analysis.recommendations.join("\n"),
-        rhythm: analysis.rhythm,
-        severity: isCritical(analysis) ? "CRITICAL" : analysis.severity === "NORMAL" ? "NORMAL" : "ABNORMAL",
-        status: "AI_COMPLETED",
-      },
-      where: { id: queued.caseId },
-    });
+    const latestCase = await prisma.eCGCase.findUnique({ where: { id: queued.caseId } });
+    if (latestCase && canTransitionCaseStatus(latestCase.status, "AI_COMPLETED")) {
+      await prisma.eCGCase.update({
+        data: {
+          aiStatus: "COMPLETED",
+          aiDiagnosis: analysis.diagnosis,
+          confidenceScore: analysis.confidenceScore,
+          finalDiagnosis: analysis.diagnosis,
+          heartRate: analysis.heartRate,
+          priority: isCritical(analysis) ? "CRITICAL" : latestCase.priority,
+          recommendations: analysis.recommendations.join("\n"),
+          rhythm: analysis.rhythm,
+          severity: isCritical(analysis) ? "CRITICAL" : analysis.severity === "NORMAL" ? "NORMAL" : "ABNORMAL",
+          status: "AI_COMPLETED",
+        },
+        where: { id: queued.caseId },
+      });
+    } else if (latestCase && !isReadOnlyCaseStatus(latestCase.status)) {
+      await prisma.eCGCase.update({
+        data: {
+          aiStatus: "COMPLETED",
+          aiDiagnosis: analysis.diagnosis,
+        },
+        where: { id: queued.caseId },
+      });
+    }
 
     await prisma.auditLog.create({
       data: {
@@ -185,6 +205,8 @@ async function completeAnalysis(analysisId: string, actorId: string) {
 export async function queueAnalysis(caseId: string, actorId: string) {
   const ecgCase = await prisma.eCGCase.findUnique({ where: { id: caseId } });
   if (!ecgCase) throw new AppError(404, "ECG case not found.", "CASE_NOT_FOUND");
+  assertCaseCanAcceptAnalysis(ecgCase);
+  assertCaseStatusTransition(ecgCase.status, "PROCESSING");
 
   const analysis = await prisma.aIAnalysis.create({
     data: {

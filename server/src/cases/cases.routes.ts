@@ -13,6 +13,11 @@ import {
 import { createNotification } from "../utils/notifications";
 import { assertResourceAccess, canAccessCase, canAccessPatient } from "../utils/resource-access";
 import {
+  assertCaseEditable,
+  assertCaseStatusTransition,
+  statusTimestampPatch,
+} from "./state-machine";
+import {
   assignDoctorSchema,
   caseCreateSchema,
   caseListSchema,
@@ -228,6 +233,9 @@ casesRouter.patch("/:caseId", requireRole("DOCTOR"), validateBody(caseUpdateSche
     const previous = await prisma.eCGCase.findUnique({ where: { id: caseId } });
     if (!previous) throw new AppError(404, "ECG case not found.", "CASE_NOT_FOUND");
     assertResourceAccess(await canAccessCase(previous.id, req.auth!));
+    assertCaseEditable(previous);
+    const nextStatus = req.body.status ? fromApiCaseStatus(req.body.status) : undefined;
+    if (nextStatus) assertCaseStatusTransition(previous.status, nextStatus);
 
     const ecgCase = await prisma.eCGCase.update({
       data: {
@@ -248,7 +256,7 @@ casesRouter.patch("/:caseId", requireRole("DOCTOR"), validateBody(caseUpdateSche
         recommendations: req.body.recommendations,
         rhythm: req.body.rhythm,
         severity: req.body.severity ? severityFromApi(req.body.severity) : undefined,
-        status: req.body.status ? fromApiCaseStatus(req.body.status) : undefined,
+        status: nextStatus,
       },
       include: caseInclude,
       where: { id: caseId },
@@ -275,11 +283,14 @@ casesRouter.post(
   validateBody(assignDoctorSchema),
   async (req, res, next) => {
     try {
-      assertResourceAccess(await canAccessCase(String(req.params.caseId), req.auth!));
+      const current = await prisma.eCGCase.findUnique({ where: { id: String(req.params.caseId) } });
+      if (!current) throw new AppError(404, "ECG case not found.", "CASE_NOT_FOUND");
+      assertResourceAccess(await canAccessCase(current.id, req.auth!));
+      assertCaseEditable(current);
       const ecgCase = await prisma.eCGCase.update({
         data: { assignedDoctorId: req.body.assignedDoctorId },
         include: caseInclude,
-        where: { id: String(req.params.caseId) },
+        where: { id: current.id },
       });
       await audit({
         action: "CASE_ASSIGNED",
@@ -308,18 +319,18 @@ casesRouter.post(
   validateBody(updateStatusSchema),
   async (req, res, next) => {
     try {
-      assertResourceAccess(await canAccessCase(String(req.params.caseId), req.auth!));
+      const current = await prisma.eCGCase.findUnique({ where: { id: String(req.params.caseId) } });
+      if (!current) throw new AppError(404, "ECG case not found.", "CASE_NOT_FOUND");
+      assertResourceAccess(await canAccessCase(current.id, req.auth!));
+      const nextStatus = fromApiCaseStatus(req.body.status);
+      assertCaseStatusTransition(current.status, nextStatus);
       const ecgCase = await prisma.eCGCase.update({
         data: {
-          approvedAt: req.body.status === "approved" ? new Date() : undefined,
-          finalizedAt: req.body.status === "finalized" ? new Date() : undefined,
-          rejectedAt: req.body.status === "rejected" ? new Date() : undefined,
-          reviewedAt: req.body.status === "under_review" || req.body.status === "reviewed" ? new Date() : undefined,
-          reviewedById: req.body.status === "under_review" || req.body.status === "reviewed" || req.body.status === "approved" || req.body.status === "rejected" ? req.auth!.id : undefined,
-          status: fromApiCaseStatus(req.body.status),
+          ...statusTimestampPatch(nextStatus, req.auth!.id),
+          status: nextStatus,
         },
         include: caseInclude,
-        where: { id: String(req.params.caseId) },
+        where: { id: current.id },
       });
       await audit({
         action: "CASE_STATUS_CHANGED",
@@ -349,6 +360,7 @@ casesRouter.post("/:caseId/review", requireRole("DOCTOR"), validateBody(reviewCa
     const current = await findCaseForRoute(String(req.params.caseId));
     if (!current) throw new AppError(404, "ECG case not found.", "CASE_NOT_FOUND");
     assertResourceAccess(await canAccessCase(current.id, req.auth!));
+    assertCaseStatusTransition(current.status, "UNDER_REVIEW");
     const ecgCase = await prisma.eCGCase.update({
       data: {
         clinicalComments: req.body.clinicalComments,
@@ -392,11 +404,10 @@ casesRouter.post("/:caseId/approve", requireRole("DOCTOR"), async (req, res, nex
     const current = await findCaseForRoute(String(req.params.caseId));
     if (!current) throw new AppError(404, "ECG case not found.", "CASE_NOT_FOUND");
     assertResourceAccess(await canAccessCase(current.id, req.auth!));
+    assertCaseStatusTransition(current.status, "APPROVED");
     const ecgCase = await prisma.eCGCase.update({
       data: {
-        approvedAt: new Date(),
-        reviewedAt: current.reviewedAt ?? new Date(),
-        reviewedById: req.auth!.id,
+        ...statusTimestampPatch("APPROVED", req.auth!.id),
         status: "APPROVED",
       },
       include: caseInclude,
@@ -421,13 +432,12 @@ casesRouter.post("/:caseId/reject", requireRole("DOCTOR"), validateBody(rejectCa
     const current = await findCaseForRoute(String(req.params.caseId));
     if (!current) throw new AppError(404, "ECG case not found.", "CASE_NOT_FOUND");
     assertResourceAccess(await canAccessCase(current.id, req.auth!));
+    assertCaseStatusTransition(current.status, "REJECTED");
     const comments = req.body.clinicalComments ?? req.body.reason ?? current.clinicalComments;
     const ecgCase = await prisma.eCGCase.update({
       data: {
         clinicalComments: comments,
-        rejectedAt: new Date(),
-        reviewedAt: current.reviewedAt ?? new Date(),
-        reviewedById: req.auth!.id,
+        ...statusTimestampPatch("REJECTED", req.auth!.id),
         status: "REJECTED",
       },
       include: caseInclude,
@@ -452,6 +462,7 @@ casesRouter.delete("/:caseId", requireRole("DOCTOR"), async (req, res, next) => 
     const ecgCase = await prisma.eCGCase.findUnique({ where: { id: String(req.params.caseId) } });
     if (!ecgCase) throw new AppError(404, "ECG case not found.", "CASE_NOT_FOUND");
     assertResourceAccess(await canAccessCase(ecgCase.id, req.auth!));
+    assertCaseEditable(ecgCase);
     await prisma.eCGCase.delete({ where: { id: ecgCase.id } });
     await audit({
       action: "CASE_DELETED",

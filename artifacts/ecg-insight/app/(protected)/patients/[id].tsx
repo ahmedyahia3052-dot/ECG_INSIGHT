@@ -8,7 +8,7 @@ import { useAuth } from "@/context/AuthContext";
 import { getPatient } from "@/services/clinical";
 import { API_URL } from "@/services/api";
 import { deleteClinicalDocument, uploadClinicalDocument } from "@/services/documents";
-import { generateReport, reportPdfUrl } from "@/services/reports";
+import { downloadReportPdf, generateReport } from "@/services/reports";
 
 type PatientTab = "ai" | "documents" | "ecg" | "history" | "overview" | "reports" | "timeline";
 
@@ -132,7 +132,7 @@ export default function PatientProfileScreen() {
       ) : null}
       {activeTab === "history" ? <MedicalHistoryTab patient={patient} onEdit={() => router.push(`/patients/${patient.id}/edit` as never)} /> : null}
       {activeTab === "ai" ? <AiSummaryTab patient={patient} cases={cases} criticalCases={criticalCases} abnormalCases={abnormalCases} /> : null}
-      {activeTab === "reports" ? <ReportsTab reports={reports} /> : null}
+      {activeTab === "reports" ? <ReportsTab reports={reports} token={token} /> : null}
     </PageSection>
   );
 }
@@ -334,7 +334,7 @@ function AiSummaryTab({ abnormalCases, cases, criticalCases, patient }: {
   );
 }
 
-function ReportsTab({ reports }: { reports: Array<{ id: string; reportNumber: string; reportingDate: string; status: string }> }) {
+function ReportsTab({ reports, token }: { reports: Array<{ id: string; reportNumber: string; reportingDate: string; status: string }>; token?: string }) {
   return (
     <Card style={styles.panelFull}>
       <SectionHeader title="Report Center" />
@@ -345,9 +345,9 @@ function ReportsTab({ reports }: { reports: Array<{ id: string; reportNumber: st
           <Info label="Created Date" value={formatDate(item.reportingDate)} />
           <Badge label={item.status} tone={item.status === "signed" ? "success" : "primary"} />
           <View style={styles.actions}>
-            <PrimaryButton label="View" onPress={() => openUrl(reportPdfUrl(item.id))} variant="outline" />
-            <PrimaryButton label="Print" onPress={() => openUrl(reportPdfUrl(item.id, "print"))} variant="outline" />
-            <PrimaryButton label="Download PDF" onPress={() => openUrl(reportPdfUrl(item.id))} variant="outline" />
+            <PrimaryButton label="View" onPress={() => void openReportPdf(token, item.id)} variant="outline" />
+            <PrimaryButton label="Print" onPress={() => void openReportPdf(token, item.id, "print")} variant="outline" />
+            <PrimaryButton label="Download PDF" onPress={() => void openReportPdf(token, item.id)} variant="outline" />
           </View>
         </View>
       )) : <EmptyState title="No reports" message="Generate a report from an ECG case to populate the report center." />}
@@ -357,6 +357,14 @@ function ReportsTab({ reports }: { reports: Array<{ id: string; reportNumber: st
 
 function openUrl(url: string) {
   if (Platform.OS === "web" && typeof window !== "undefined") window.open(url, "_blank");
+}
+
+async function openReportPdf(token: string | undefined, reportId: string, watermark?: string) {
+  if (!token || Platform.OS !== "web" || typeof window === "undefined") return;
+  const blob = await downloadReportPdf(token, reportId, watermark);
+  const url = URL.createObjectURL(blob);
+  window.open(url, "_blank", "noopener,noreferrer");
+  setTimeout(() => URL.revokeObjectURL(url), 60_000);
 }
 
 function uploadDocument(patientId: string, category: string, mutate: (formData: FormData) => void) {

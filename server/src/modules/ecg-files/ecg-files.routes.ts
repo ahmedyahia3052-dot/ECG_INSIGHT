@@ -9,6 +9,7 @@ import { prisma } from "../../config/prisma";
 import { buildPreprocessingArtifact, isSupportedImageOrPdfIngestionFile, mergeEcgMetadata, toJsonObject } from "../../ai/preprocessing.pipeline";
 import { requireAuth, requireRole } from "../../middleware/auth";
 import { AppError } from "../../middleware/error";
+import { assertCaseEditable } from "../../cases/state-machine";
 import { assertResourceAccess, canAccessCase, canAccessPatient } from "../../utils/resource-access";
 import {
   compareEcgFile,
@@ -118,6 +119,12 @@ ecgFilesRouter.post("/files/upload", requireRole("DOCTOR"), upload.single("file"
       if (!ecgCase || ecgCase.patientId !== patient.id) {
         fs.rmSync(req.file.path, { force: true });
         throw new AppError(404, "Linked ECG case not found for this patient.", "CASE_NOT_FOUND");
+      }
+      try {
+        assertCaseEditable(ecgCase);
+      } catch (error) {
+        fs.rmSync(req.file.path, { force: true });
+        throw error;
       }
       assertResourceAccess(await canAccessCase(ecgCase.id, req.auth!));
     }

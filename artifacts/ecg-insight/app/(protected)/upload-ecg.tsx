@@ -1,13 +1,13 @@
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import * as ImagePicker from "expo-image-picker";
 import { useRouter } from "expo-router";
 import React, { useState } from "react";
 import { Image, Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
-import { Badge, Card, Field, medicalTheme, PageSection, PrimaryButton, SectionHeader } from "@/components/enterprise/EnterpriseUI";
+import { Badge, Card, Field, medicalTheme, PageSection, patientDisplayName, PrimaryButton, SectionHeader } from "@/components/enterprise/EnterpriseUI";
 import { useAuth } from "@/context/AuthContext";
 import { analyzeCase, getAIResult, type AIAnalysisResult } from "@/services/ai";
-import { createCase, createPatient } from "@/services/clinical";
+import { createCase, createPatient, listPatients } from "@/services/clinical";
 import { uploadClinicalEcgFile } from "@/services/ecgFiles";
 import { generateReport, type ClinicalReport } from "@/services/reports";
 
@@ -20,14 +20,18 @@ type SelectedAsset = {
 };
 
 type WorkflowStage = "idle" | "creating_case" | "uploading" | "preprocessing" | "analyzing" | "reporting" | "complete";
+type PatientMode = "existing" | "new";
 
-const acceptedFormats = ["jpg", "jpeg", "png", "pdf"];
+const acceptedFormats = ["jpg", "jpeg", "png", "pdf", "json", "csv", "txt"];
 const processingSteps = ["Auto crop", "Border detection", "Deskew", "Perspective correction", "Contrast enhancement", "Shadow removal", "ECG grid cleanup"];
 
 export default function UploadEcgScreen() {
   const router = useRouter();
   const { authToken } = useAuth();
   const token = authToken?.token;
+  const [patientMode, setPatientMode] = useState<PatientMode>("existing");
+  const [patientSearch, setPatientSearch] = useState("");
+  const [selectedPatientId, setSelectedPatientId] = useState("");
   const [patientName, setPatientName] = useState("");
   const [dateOfBirth, setDateOfBirth] = useState("1970-01-01");
   const [gender, setGender] = useState<"male" | "female" | "other" | "unknown">("unknown");
@@ -40,29 +44,55 @@ export default function UploadEcgScreen() {
   const [report, setReport] = useState<ClinicalReport | null>(null);
   const [stage, setStage] = useState<WorkflowStage>("idle");
 
+  const patientsQuery = useQuery({
+    enabled: !!token && patientMode === "existing",
+    queryFn: () => {
+      const params = new URLSearchParams({ pageSize: "8" });
+      if (patientSearch.trim()) params.set("q", patientSearch.trim());
+      return listPatients(token!, params);
+    },
+    queryKey: ["upload-existing-patients", token, patientSearch, patientMode],
+    retry: false,
+  });
+
   const mutation = useMutation({
     mutationFn: async () => {
       if (!token) throw new Error("Authentication required.");
       if (!assets.length) throw new Error("Select, drop, or capture at least one ECG image/PDF first.");
-      if (!patientName.trim()) throw new Error("Patient name is required.");
       setStage("creating_case");
-      const [firstName, ...rest] = patientName.trim().split(/\s+/);
-      const patient = await createPatient(token, {
-        dateOfBirth,
-        firstName: firstName || "ECG",
-        gender,
-        lastName: rest.join(" ") || "Patient",
-        medicalRecordNumber: mrn.trim() || `MRN-${Date.now()}`,
-      });
+      const patient = patientMode === "existing"
+        ? patientsQuery.data?.patients.find((item) => item.id === selectedPatientId)
+        : undefined;
+      if (patientMode === "existing" && !patient) {
+        throw new Error("Select an existing patient before uploading ECG files.");
+      }
+      if (patientMode === "new" && !patientName.trim()) throw new Error("Patient name is required.");
+      if (patientMode === "new" && !mrn.trim()) throw new Error("MRN is required for new patients to prevent duplicates.");
+      if (patientMode === "new") {
+        const duplicateCheck = await listPatients(token, new URLSearchParams({ pageSize: "1", q: mrn.trim() }));
+        if (duplicateCheck.total > 0) {
+          throw new Error("A patient with this MRN or matching identifier already exists. Select the existing patient instead.");
+        }
+      }
+      const createdPatient = patientMode === "new"
+        ? await createPatient(token, {
+            dateOfBirth,
+            firstName: patientName.trim().split(/\s+/)[0] || "ECG",
+            gender,
+            lastName: patientName.trim().split(/\s+/).slice(1).join(" ") || "Patient",
+            medicalRecordNumber: mrn.trim(),
+          })
+        : null;
+      const patientId = patientMode === "new" ? createdPatient!.patient.id : selectedPatientId;
       const ecgCase = await createCase(token, {
         ecgType: "12-Lead ECG",
-        patientId: patient.patient.id,
+        patientId,
         priority,
       });
       setStage("uploading");
       for (const item of assets) {
         const formData = new FormData();
-        formData.append("patientId", patient.patient.id);
+        formData.append("patientId", patientId);
         formData.append("caseId", ecgCase.case.id);
         formData.append("source", item.source);
         formData.append(
@@ -120,14 +150,14 @@ export default function UploadEcgScreen() {
     const input = document.createElement("input");
     input.type = "file";
     input.multiple = true;
-    input.accept = ".jpg,.jpeg,.png,.pdf,image/jpeg,image/png,application/pdf";
+    input.accept = ".jpg,.jpeg,.png,.pdf,.json,.csv,.txt,image/jpeg,image/png,application/pdf,application/json,text/csv,text/plain";
     input.onchange = () => {
       const files = Array.from(input.files ?? []);
       setAssets((current) => [
         ...current,
         ...files.map((file) => ({
           file,
-          mimeType: file.type || (file.name.toLowerCase().endsWith(".pdf") ? "application/pdf" : "image/jpeg"),
+          mimeType: file.type || mimeTypeForFile(file.name),
           name: file.name,
           source: "drag_and_drop" as const,
           uri: URL.createObjectURL(file),
@@ -159,8 +189,10 @@ export default function UploadEcgScreen() {
                 <View key={item.name} style={styles.assetCard}>
                   {item.mimeType.includes("pdf") || item.name.toLowerCase().endsWith(".pdf") ? (
                     <View style={styles.pdfPreview}><Text style={styles.pdfText}>PDF</Text></View>
-                  ) : (
+                  ) : item.mimeType.startsWith("image/") ? (
                     <Image source={{ uri: item.uri }} resizeMode="cover" style={styles.previewThumb} />
+                  ) : (
+                    <View style={styles.pdfPreview}><Text style={styles.pdfText}>{fileLabel(item.name)}</Text></View>
                   )}
                   <Text numberOfLines={1} style={styles.assetName}>{item.name}</Text>
                   <Text style={styles.muted}>{item.source.replace(/_/g, " ")}</Text>
@@ -187,12 +219,37 @@ export default function UploadEcgScreen() {
       <Card style={styles.form}>
         <SectionHeader title="Patient & Case Details" />
         {error ? <Text style={styles.error}>{error}</Text> : null}
-        <View style={styles.grid}>
-          <Field label="Full Name" onChangeText={setPatientName} value={patientName} />
-          <Field label="Employee ID / MRN" onChangeText={setMrn} value={mrn} />
-          <Field label="DOB" onChangeText={setDateOfBirth} value={dateOfBirth} />
-          <Field label="Gender" onChangeText={(value) => setGender(normalizeGender(value))} value={gender} />
+        <View style={styles.actions}>
+          <PrimaryButton label="Select Existing Patient" onPress={() => setPatientMode("existing")} variant={patientMode === "existing" ? "primary" : "outline"} />
+          <PrimaryButton label="Create New Patient" onPress={() => setPatientMode("new")} variant={patientMode === "new" ? "primary" : "outline"} />
         </View>
+        {patientMode === "existing" ? (
+          <View style={styles.patientPicker}>
+            <Field label="Search Existing Patient" onChangeText={setPatientSearch} placeholder="Name, MRN, employee ID, email..." value={patientSearch} />
+            {patientsQuery.isLoading ? <Text style={styles.muted}>Searching patients...</Text> : null}
+            {(patientsQuery.data?.patients ?? []).map((patient) => (
+              <Pressable
+                key={patient.id}
+                onPress={() => setSelectedPatientId(patient.id)}
+                style={[styles.patientOption, selectedPatientId === patient.id && styles.patientOptionSelected]}
+              >
+                <View style={styles.patientOptionMain}>
+                  <Text style={styles.patientOptionTitle}>{patientDisplayName(patient)}</Text>
+                  <Text style={styles.muted}>MRN {patient.medicalRecordNumber} • {patient.age}y • {patient.gender}</Text>
+                </View>
+                <Badge label={selectedPatientId === patient.id ? "Selected" : "Select"} tone={selectedPatientId === patient.id ? "success" : "primary"} />
+              </Pressable>
+            ))}
+            {!patientsQuery.isLoading && !(patientsQuery.data?.patients ?? []).length ? <Text style={styles.muted}>No matching patients. Switch to Create New Patient if this is a new record.</Text> : null}
+          </View>
+        ) : (
+          <View style={styles.grid}>
+            <Field label="Full Name" onChangeText={setPatientName} value={patientName} />
+            <Field label="MRN" onChangeText={setMrn} value={mrn} />
+            <Field label="DOB" onChangeText={setDateOfBirth} value={dateOfBirth} />
+            <Field label="Gender" onChangeText={(value) => setGender(normalizeGender(value))} value={gender} />
+          </View>
+        )}
         <View style={styles.actions}>
           {(["low", "medium", "high", "critical"] as const).map((value) => (
             <PrimaryButton key={value} label={value} onPress={() => setPriority(value)} variant={priority === value ? "primary" : "outline"} />
@@ -265,6 +322,21 @@ function normalizeGender(value: string): "female" | "male" | "other" | "unknown"
   return "unknown";
 }
 
+function mimeTypeForFile(name: string) {
+  const lower = name.toLowerCase();
+  if (lower.endsWith(".pdf")) return "application/pdf";
+  if (lower.endsWith(".json")) return "application/json";
+  if (lower.endsWith(".csv")) return "text/csv";
+  if (lower.endsWith(".txt")) return "text/plain";
+  if (lower.endsWith(".png")) return "image/png";
+  return "image/jpeg";
+}
+
+function fileLabel(name: string) {
+  const ext = name.split(".").pop();
+  return ext ? ext.toUpperCase().slice(0, 5) : "FILE";
+}
+
 const styles = StyleSheet.create({
   actions: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
   assetCard: { backgroundColor: medicalTheme.card, borderColor: medicalTheme.border, borderRadius: 14, borderWidth: 1, gap: 8, padding: 10, width: 190 },
@@ -277,6 +349,11 @@ const styles = StyleSheet.create({
   formatRow: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   grid: { flexDirection: "row", flexWrap: "wrap", gap: 12 },
   muted: { color: medicalTheme.muted, fontSize: 13, fontWeight: "700" },
+  patientOption: { alignItems: "center", backgroundColor: medicalTheme.surface, borderColor: medicalTheme.border, borderRadius: 14, borderWidth: 1, flexDirection: "row", gap: 12, padding: 12 },
+  patientOptionMain: { flex: 1, minWidth: 0 },
+  patientOptionSelected: { borderColor: medicalTheme.success },
+  patientOptionTitle: { color: medicalTheme.text, fontSize: 14, fontWeight: "900" },
+  patientPicker: { gap: 10 },
   pdfPreview: { alignItems: "center", backgroundColor: "#3F1421", borderRadius: 12, height: 120, justifyContent: "center" },
   pdfText: { color: medicalTheme.critical, fontSize: 24, fontWeight: "900" },
   previewStrip: { gap: 12 },

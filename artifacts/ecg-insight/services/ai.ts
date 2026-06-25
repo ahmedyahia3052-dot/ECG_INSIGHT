@@ -43,7 +43,7 @@ export interface DoctorReviewResult {
   caseId: string;
   diagnosis: string;
   reportId: string | null;
-  status: "finalized" | "reviewed";
+  status: "approved" | "reviewed";
 }
 
 export interface AIStatistics {
