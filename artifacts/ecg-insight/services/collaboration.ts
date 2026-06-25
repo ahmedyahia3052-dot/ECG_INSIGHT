@@ -1,8 +1,26 @@
 import { apiRequest } from "./api";
 
+export interface NotificationRecord {
+  caseId?: string;
+  id: string;
+  message: string;
+  read: boolean;
+  timestamp?: string;
+  title: string;
+  type: string;
+}
+
+export interface NotificationsResponse {
+  notifications: NotificationRecord[];
+  page: number;
+  pageSize: number;
+  total: number;
+  totalPages: number;
+}
+
 export async function listNotifications(accessToken: string, params = new URLSearchParams()) {
   const suffix = params.toString() ? `?${params.toString()}` : "";
-  return apiRequest<{ notifications: unknown[] }>(`/notifications${suffix}`, { accessToken });
+  return apiRequest<NotificationsResponse>(`/notifications${suffix}`, { accessToken });
 }
 
 export async function markNotificationRead(accessToken: string, notificationId: string) {

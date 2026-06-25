@@ -35,6 +35,14 @@ export interface ClinicalReport {
   urgentActions: string[];
 }
 
+export interface ReportsResponse {
+  page: number;
+  pageSize: number;
+  reports: ClinicalReport[];
+  total: number;
+  totalPages: number;
+}
+
 export interface ReportVersion {
   authorId: string;
   createdAt: string;
@@ -59,7 +67,7 @@ export function reportPdfUrl(reportId: string, watermark?: string) {
 
 export async function listReports(accessToken: string, params = new URLSearchParams()) {
   const suffix = params.toString() ? `?${params.toString()}` : "";
-  return apiRequest<{ reports: ClinicalReport[] }>(`/reports${suffix}`, { accessToken });
+  return apiRequest<ReportsResponse>(`/reports${suffix}`, { accessToken });
 }
 
 export async function generateReport(accessToken: string, caseId: string) {

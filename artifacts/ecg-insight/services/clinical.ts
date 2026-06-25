@@ -42,6 +42,33 @@ export interface CasesResponse {
   totalPages: number;
 }
 
+export interface PatientsResponse {
+  page: number;
+  pageSize: number;
+  patients: ApiPatient[];
+  total: number;
+  totalPages: number;
+}
+
+export type PatientInput = {
+  dateOfBirth: string;
+  firstName: string;
+  gender: "male" | "female" | "other" | "unknown";
+  lastName: string;
+  medicalRecordNumber: string;
+  address?: string;
+  allergies?: string;
+  email?: string;
+  employeeId?: string;
+  emergencyContact?: string;
+  medicalHistory?: string;
+  medications?: string;
+  nationalId?: string;
+  notes?: string;
+  occupation?: string;
+  phone?: string;
+};
+
 function toMockStatus(apiCase: ApiECGCase): ECGStatus {
   if (apiCase.priority === "critical") return "critical";
   if (apiCase.finalDiagnosis || apiCase.status === "reviewed" || apiCase.status === "finalized") {
@@ -90,6 +117,11 @@ export async function listCases(accessToken: string, params: URLSearchParams) {
   return apiRequest<CasesResponse>(`/cases?${params.toString()}`, { accessToken });
 }
 
+export async function listPatients(accessToken: string, params = new URLSearchParams()) {
+  const suffix = params.toString() ? `?${params.toString()}` : "";
+  return apiRequest<PatientsResponse>(`/patients${suffix}`, { accessToken });
+}
+
 export async function getCase(accessToken: string, caseId: string) {
   return apiRequest<{ case: ApiECGCase }>(`/cases/${caseId}`, { accessToken });
 }
@@ -106,16 +138,25 @@ export async function createCase(accessToken: string, input: {
   });
 }
 
-export async function createPatient(accessToken: string, input: {
-  dateOfBirth: string;
-  firstName: string;
-  gender: "male" | "female" | "other" | "unknown";
-  lastName: string;
-  medicalRecordNumber: string;
-}) {
+export async function createPatient(accessToken: string, input: PatientInput) {
   return apiRequest<{ patient: ApiPatient }>("/patients", {
     accessToken,
     body: JSON.stringify(input),
     method: "POST",
+  });
+}
+
+export async function updatePatient(accessToken: string, patientId: string, input: Partial<PatientInput>) {
+  return apiRequest<{ patient: ApiPatient }>(`/patients/${patientId}`, {
+    accessToken,
+    body: JSON.stringify(input),
+    method: "PATCH",
+  });
+}
+
+export async function archivePatient(accessToken: string, patientId: string) {
+  return apiRequest<{ patient: ApiPatient }>(`/patients/${patientId}`, {
+    accessToken,
+    method: "DELETE",
   });
 }

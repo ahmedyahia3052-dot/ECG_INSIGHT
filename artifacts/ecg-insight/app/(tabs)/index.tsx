@@ -328,7 +328,7 @@ export default function DashboardScreen() {
       {casesQuery.isError ? (
         <BoltEmpty
           actionLabel="Retry"
-          message="The API returned an error. No mock data is displayed in production UI."
+          message="The API returned an error. No fallback data is displayed in production UI."
           onAction={() => void casesQuery.refetch()}
           title="Live cases unavailable"
         />
