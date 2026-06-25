@@ -308,7 +308,7 @@ export default function TabLayout() {
       </BoltScreen>
     );
   }
-  if (!isAuthenticated) return <Redirect href="/(auth)/login" />;
+  if (!isAuthenticated) return <Redirect href="/login" />;
 
   return <ClassicTabLayout />;
 }

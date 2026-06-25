@@ -1,10 +1,15 @@
 import { apiRequest } from "./api";
 
 export interface NotificationRecord {
+  actionUrl?: string;
   caseId?: string;
+  entityId?: string;
+  entityType?: string;
   id: string;
   message: string;
+  patientId?: string;
   read: boolean;
+  reportId?: string;
   timestamp?: string;
   title: string;
   type: string;
@@ -26,7 +31,14 @@ export async function listNotifications(accessToken: string, params = new URLSea
 export async function markNotificationRead(accessToken: string, notificationId: string) {
   return apiRequest<{ notification: unknown }>(`/notifications/${notificationId}/read`, {
     accessToken,
-    method: "POST",
+    method: "PATCH",
+  });
+}
+
+export async function markAllNotificationsRead(accessToken: string) {
+  return apiRequest<{ updatedCount: number }>("/notifications/read-all", {
+    accessToken,
+    method: "PATCH",
   });
 }
 

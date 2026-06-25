@@ -1,4 +1,5 @@
 import { Feather } from "@expo/vector-icons";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Redirect, Slot, usePathname, useRouter } from "expo-router";
 import React, { PropsWithChildren, ReactNode, useMemo, useState } from "react";
 import {
@@ -17,6 +18,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useAuth } from "@/context/AuthContext";
+import { deleteNotification, listNotifications, markAllNotificationsRead, markNotificationRead, type NotificationRecord } from "@/services/collaboration";
 
 export const medicalTheme = {
   background: "#06111F",
@@ -38,6 +40,7 @@ type NavItem = {
   href: string;
   icon: keyof typeof Feather.glyphMap;
   minRole?: "admin" | "doctor" | "student" | "super_admin";
+  ownerOnly?: boolean;
   title: string;
 };
 
@@ -52,6 +55,7 @@ const NAV_ITEMS: NavItem[] = [
   { group: "WORKSPACE", href: "/notifications", icon: "bell", title: "Notifications" },
   { group: "ADMINISTRATION", href: "/admin-dashboard", icon: "shield", minRole: "admin", title: "Admin Dashboard" },
   { group: "ADMINISTRATION", href: "/team-management", icon: "user-plus", minRole: "admin", title: "Team Management" },
+  { group: "ADMINISTRATION", href: "/owner/licenses", icon: "award", minRole: "super_admin", ownerOnly: true, title: "License Management" },
   { group: "ADMINISTRATION", href: "/billing-subscription", icon: "credit-card", title: "Billing & Subscription" },
   { group: "ACCOUNT", href: "/profile", icon: "user", title: "Profile" },
   { group: "ACCOUNT", href: "/settings", icon: "settings", title: "Settings" },
@@ -65,6 +69,7 @@ const PAGE_TITLES: Record<string, { subtitle: string; title: string }> = {
   "/ecg-analysis": { subtitle: "Review cases, AI findings, validation, and report generation.", title: "ECG Analysis" },
   "/ecg-cases": { subtitle: "Enterprise ECG case workflow, review, approval, and reports.", title: "ECG Cases" },
   "/notifications": { subtitle: "Clinical alerts, workflow events, and collaboration updates.", title: "Notifications" },
+  "/owner/licenses": { subtitle: "Hidden owner-only license grants, subscription control, and lifetime access.", title: "License Management" },
   "/patients": { subtitle: "Enterprise patient registry, risk profile, and ECG history.", title: "Patients" },
   "/profile": { subtitle: "Account, role, institution, and secure session details.", title: "Profile" },
   "/reports": { subtitle: "Draft, review, finalize, sign, export, and email reports.", title: "Reports" },
@@ -106,19 +111,53 @@ export function EnterpriseShell({ children }: PropsWithChildren) {
   const pathname = usePathname();
   const { width } = useWindowDimensions();
   const insets = useSafeAreaInsets();
-  const { logout, user } = useAuth();
+  const queryClient = useQueryClient();
+  const { authToken, logout, user } = useAuth();
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [hoveredNav, setHoveredNav] = useState<string | null>(null);
   const [searchFocused, setSearchFocused] = useState(false);
+  const [notificationOpen, setNotificationOpen] = useState(false);
   const isMobile = width < 860;
   const sidebarCompact = !isMobile && sidebarCollapsed;
   const meta = pageMeta(pathname);
-  const navItems = useMemo(() => NAV_ITEMS.filter((item) => !item.minRole || roleRank(user?.role) >= roleRank(item.minRole)), [user?.role]);
+  const navItems = useMemo(() => NAV_ITEMS.filter((item) => {
+    if (item.ownerOnly && !(user?.isOwner || user?.protectedOwner)) return false;
+    return !item.minRole || roleRank(user?.role) >= roleRank(item.minRole);
+  }), [user?.isOwner, user?.protectedOwner, user?.role]);
+  const notificationQuery = useQuery({
+    enabled: !!authToken?.token,
+    queryFn: () => listNotifications(authToken!.token, new URLSearchParams({ pageSize: "8" })),
+    queryKey: ["enterprise-shell-notifications", authToken?.token],
+    retry: false,
+  });
+  const unreadCount = notificationQuery.data?.notifications.filter((item) => !item.read).length ?? 0;
+  const invalidateNotifications = () => {
+    void queryClient.invalidateQueries({ queryKey: ["enterprise-shell-notifications", authToken?.token] });
+    void queryClient.invalidateQueries({ queryKey: ["enterprise-notifications", authToken?.token] });
+  };
+  const readNotificationMutation = useMutation({
+    mutationFn: (id: string) => markNotificationRead(authToken!.token, id),
+    onSuccess: invalidateNotifications,
+  });
+  const deleteNotificationMutation = useMutation({
+    mutationFn: (id: string) => deleteNotification(authToken!.token, id),
+    onSuccess: invalidateNotifications,
+  });
+  const readAllNotificationMutation = useMutation({
+    mutationFn: () => markAllNotificationsRead(authToken!.token),
+    onSuccess: invalidateNotifications,
+  });
 
   const navigate = (href: string) => {
     setDrawerOpen(false);
+    setNotificationOpen(false);
     router.push(href as never);
+  };
+
+  const openNotification = (notification: NotificationRecord) => {
+    readNotificationMutation.mutate(notification.id);
+    navigate(notification.actionUrl ?? (notification.caseId ? `/ecg-cases/${notification.caseId}` : notification.patientId ? `/patients/${notification.patientId}` : notification.reportId ? `/reports/${notification.reportId}` : "/notifications"));
   };
 
   const sidebar = (
@@ -236,11 +275,41 @@ export function EnterpriseShell({ children }: PropsWithChildren) {
               />
               <Text style={styles.shortcutHint}>Ctrl+K</Text>
             </View>
-            <Pressable accessibilityLabel="Notifications" accessibilityRole="button" onPress={() => navigate("/notifications")} style={styles.iconButton}>
+            <Pressable accessibilityLabel="Notifications" accessibilityRole="button" onPress={() => setNotificationOpen((value) => !value)} style={styles.iconButton}>
               <Feather name="bell" size={18} color={medicalTheme.text} />
-              <View style={styles.badgeDotTop} />
+              {unreadCount ? <View style={styles.countBadge}><Text style={styles.countBadgeText}>{unreadCount > 9 ? "9+" : unreadCount}</Text></View> : null}
             </Pressable>
           </View>
+          {notificationOpen ? (
+            <>
+              <Pressable style={styles.notificationBackdrop} onPress={() => setNotificationOpen(false)} />
+              <Card style={styles.notificationDrawer}>
+                <SectionHeader
+                  title="Notifications"
+                  subtitle={`${unreadCount} unread`}
+                  action={<PrimaryButton label="Read All" onPress={() => readAllNotificationMutation.mutate()} variant="outline" />}
+                />
+                {notificationQuery.data?.notifications.length ? notificationQuery.data.notifications.map((notification) => (
+                  <View key={notification.id} style={styles.notificationRow}>
+                    <Pressable onPress={() => openNotification(notification)} style={styles.notificationTextWrap}>
+                      <Text style={styles.notificationTitle}>{notification.title}</Text>
+                      <Text numberOfLines={2} style={styles.notificationMessage}>{notification.message}</Text>
+                      <Text style={styles.notificationMeta}>{notification.read ? "Read" : "Unread"} • {notification.type}</Text>
+                    </Pressable>
+                    <View style={styles.notificationActions}>
+                      <Pressable accessibilityLabel="Mark notification read" onPress={() => readNotificationMutation.mutate(notification.id)} style={styles.smallIconButton}>
+                        <Feather name="check" size={14} color={medicalTheme.success} />
+                      </Pressable>
+                      <Pressable accessibilityLabel="Dismiss notification" onPress={() => deleteNotificationMutation.mutate(notification.id)} style={styles.smallIconButton}>
+                        <Feather name="x" size={14} color={medicalTheme.critical} />
+                      </Pressable>
+                    </View>
+                  </View>
+                )) : <EmptyState title="No notifications" message="You are all caught up." />}
+                <PrimaryButton label="Open Notification Center" onPress={() => navigate("/notifications")} variant="outline" />
+              </Card>
+            </>
+          ) : null}
         </View>
         <ScrollView contentContainerStyle={styles.pageScroll} showsVerticalScrollIndicator={false}>
           {children}
@@ -375,6 +444,8 @@ const styles = StyleSheet.create({
   buttonTextOutline: { color: medicalTheme.primary },
   card: { backgroundColor: medicalTheme.card, borderColor: medicalTheme.border, borderRadius: 18, borderWidth: 1, padding: 16 },
   contentRoot: { backgroundColor: medicalTheme.background, flex: 1, minWidth: 0 },
+  countBadge: { alignItems: "center", backgroundColor: medicalTheme.critical, borderRadius: 999, minWidth: 18, paddingHorizontal: 4, position: "absolute", right: 5, top: 4 },
+  countBadgeText: { color: "#FFFFFF", fontSize: 10, fontWeight: "900" },
   collapseButton: { alignItems: "center", alignSelf: "center", backgroundColor: "#0B2134", borderColor: "#1F7085", borderRadius: 999, borderWidth: 1, flexDirection: "row", gap: 8, minHeight: 38, paddingHorizontal: 12 },
   collapseText: { color: medicalTheme.primary, fontSize: 12, fontWeight: "900" },
   drawer: { bottom: 0, left: 0, position: "absolute", top: 0, width: 318, zIndex: 10 },
@@ -405,6 +476,14 @@ const styles = StyleSheet.create({
   navScrollCollapsed: { alignItems: "center", paddingHorizontal: 10 },
   navText: { color: medicalTheme.muted, flex: 1, fontSize: 14, fontWeight: "800" },
   navTextActive: { color: medicalTheme.text },
+  notificationActions: { flexDirection: "row", gap: 6 },
+  notificationBackdrop: { ...StyleSheet.absoluteFillObject, zIndex: 20 },
+  notificationDrawer: { gap: 10, maxHeight: 520, position: "absolute", right: 20, top: 78, width: 390, zIndex: 40 },
+  notificationMessage: { color: medicalTheme.muted, fontSize: 12, lineHeight: 17 },
+  notificationMeta: { color: medicalTheme.primary, fontSize: 10, fontWeight: "900", marginTop: 4, textTransform: "uppercase" },
+  notificationRow: { alignItems: "center", borderBottomColor: medicalTheme.border, borderBottomWidth: 1, flexDirection: "row", gap: 10, paddingVertical: 10 },
+  notificationTextWrap: { flex: 1, gap: 2 },
+  notificationTitle: { color: medicalTheme.text, fontSize: 13, fontWeight: "900" },
   pageScroll: { gap: 16, padding: 18, paddingBottom: 42 },
   pageSubtitle: { color: medicalTheme.muted, fontSize: 13, lineHeight: 19, marginTop: 3 },
   pageTitle: { color: medicalTheme.text, fontSize: 26, fontWeight: "900", letterSpacing: -0.6 },
@@ -421,6 +500,7 @@ const styles = StyleSheet.create({
   sidebar: { backgroundColor: medicalTheme.surface, borderColor: medicalTheme.border, borderRightWidth: 1, width: 306 },
   sidebarCollapsed: { width: 82 },
   shortcutHint: { backgroundColor: "#0A2236", borderColor: medicalTheme.border, borderRadius: 7, borderWidth: 1, color: medicalTheme.muted, fontSize: 10, fontWeight: "900", overflow: "hidden", paddingHorizontal: 6, paddingVertical: 3 },
+  smallIconButton: { alignItems: "center", backgroundColor: medicalTheme.surface, borderColor: medicalTheme.border, borderRadius: 9, borderWidth: 1, height: 32, justifyContent: "center", width: 32 },
   statCard: { flex: 1, gap: 9, minWidth: 158 },
   statIcon: { alignItems: "center", borderRadius: 12, height: 40, justifyContent: "center", width: 40 },
   statLabel: { color: medicalTheme.muted, fontSize: 12, fontWeight: "800" },

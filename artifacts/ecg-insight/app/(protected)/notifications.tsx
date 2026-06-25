@@ -1,13 +1,15 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useRouter } from "expo-router";
 import React, { useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
 
 import { Badge, Card, EmptyState, Field, formatDate, medicalTheme, PageSection, PrimaryButton, SectionHeader } from "@/components/enterprise/EnterpriseUI";
 import { useAuth } from "@/context/AuthContext";
-import { deleteNotification, listAlerts, listNotifications, markNotificationRead } from "@/services/collaboration";
+import { deleteNotification, listAlerts, listNotifications, markAllNotificationsRead, markNotificationRead, type NotificationRecord } from "@/services/collaboration";
 
 export default function NotificationsScreen() {
   const queryClient = useQueryClient();
+  const router = useRouter();
   const { authToken } = useAuth();
   const token = authToken?.token;
   const [search, setSearch] = useState("");
@@ -27,6 +29,7 @@ export default function NotificationsScreen() {
   const alertsQuery = useQuery({ enabled: !!token, queryFn: () => listAlerts(token!), queryKey: ["enterprise-alerts", token], retry: false });
   const invalidate = () => queryClient.invalidateQueries({ queryKey: ["enterprise-notifications", token] });
   const readMutation = useMutation({ mutationFn: (id: string) => markNotificationRead(token!, id), onSuccess: invalidate });
+  const readAllMutation = useMutation({ mutationFn: () => markAllNotificationsRead(token!), onSuccess: invalidate });
   const deleteMutation = useMutation({ mutationFn: (id: string) => deleteNotification(token!, id), onSuccess: invalidate });
 
   const notifications = notificationsQuery.data?.notifications ?? [];
@@ -38,6 +41,7 @@ export default function NotificationsScreen() {
         <Field label="Search" onChangeText={setSearch} placeholder="Search notifications..." value={search} />
         <View style={styles.filterRow}>
           {["all", "critical", "warning", "info", "success"].map((item) => <PrimaryButton key={item} label={item} onPress={() => setType(item)} variant={type === item ? "primary" : "outline"} />)}
+          <PrimaryButton label="Mark All Read" onPress={() => readAllMutation.mutate()} variant="outline" />
         </View>
       </Card>
       <Card style={styles.panel}>
@@ -52,6 +56,7 @@ export default function NotificationsScreen() {
             <Badge label={item.type} tone={item.type.toLowerCase() === "critical" ? "critical" : "primary"} />
             <View style={styles.actions}>
               <PrimaryButton label="Read" onPress={() => readMutation.mutate(item.id)} variant="outline" />
+              <PrimaryButton label="Open" onPress={() => openNotification(item, router.push, readMutation.mutate)} variant="outline" />
               <PrimaryButton label="Dismiss" onPress={() => deleteMutation.mutate(item.id)} variant="danger" />
             </View>
           </View>
@@ -59,6 +64,12 @@ export default function NotificationsScreen() {
       </Card>
     </PageSection>
   );
+}
+
+function openNotification(item: NotificationRecord, push: (href: never) => void, markRead: (id: string) => void) {
+  markRead(item.id);
+  const target = item.actionUrl ?? (item.caseId ? `/ecg-cases/${item.caseId}` : item.patientId ? `/patients/${item.patientId}` : item.reportId ? `/reports/${item.reportId}` : "/notifications");
+  push(target as never);
 }
 
 const styles = StyleSheet.create({

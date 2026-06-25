@@ -15,7 +15,7 @@ export default function CaseLayout() {
       </BoltScreen>
     );
   }
-  if (!isAuthenticated) return <Redirect href="/(auth)/login" />;
+  if (!isAuthenticated) return <Redirect href="/login" />;
 
   return (
     <Stack

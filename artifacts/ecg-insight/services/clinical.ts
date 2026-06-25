@@ -24,7 +24,7 @@ export interface ApiPatient {
   familyHistory?: boolean;
   firstName: string;
   fullName?: string;
-  gender: "male" | "female" | "other" | "unknown";
+  gender: "child_female" | "child_male" | "female" | "male" | "other" | "unknown";
   heartFailure?: boolean;
   heightCm?: number;
   hypertension?: boolean;
@@ -119,7 +119,7 @@ export interface PatientsResponse {
 export type PatientInput = {
   dateOfBirth: string;
   firstName: string;
-  gender: "male" | "female" | "other" | "unknown";
+  gender: "child_female" | "child_male" | "female" | "male" | "other" | "unknown";
   lastName: string;
   medicalRecordNumber: string;
   alcoholStatus?: string;

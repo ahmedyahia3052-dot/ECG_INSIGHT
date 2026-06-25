@@ -5,7 +5,7 @@ import { StyleSheet, Text, View } from "react-native";
 
 import { Badge, Card, EmptyState, Field, formatDate, medicalTheme, PageSection, PrimaryButton, SectionHeader } from "@/components/enterprise/EnterpriseUI";
 import { useAuth } from "@/context/AuthContext";
-import { archiveReport, finalizeReport, generateReport, listReports, signReport, type ClinicalReport } from "@/services/reports";
+import { createReport, archiveReport, finalizeReport, listReports, signReport, type ClinicalReport } from "@/services/reports";
 
 type ReportStatus = "all" | ClinicalReport["status"];
 const statuses: ReportStatus[] = ["all", "draft", "under_review", "finalized", "signed", "archived"];
@@ -18,6 +18,12 @@ export default function ReportsIndexScreen() {
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState<ReportStatus>("all");
   const [caseId, setCaseId] = useState("");
+  const [patientId, setPatientId] = useState("");
+  const [reportType, setReportType] = useState<"ecg_case" | "manual" | "patient">("ecg_case");
+  const [doctorInterpretation, setDoctorInterpretation] = useState("");
+  const [recommendations, setRecommendations] = useState("");
+  const [wizardOpen, setWizardOpen] = useState(false);
+  const [message, setMessage] = useState("");
 
   const reportsQuery = useQuery({
     enabled: !!token,
@@ -33,9 +39,20 @@ export default function ReportsIndexScreen() {
 
   const invalidate = () => queryClient.invalidateQueries({ queryKey: ["enterprise-reports", token] });
   const generateMutation = useMutation({
-    mutationFn: () => generateReport(token!, caseId.trim()),
+    mutationFn: () => createReport(token!, {
+      caseId: reportType === "ecg_case" ? caseId.trim() : undefined,
+      doctorInterpretation,
+      patientId: reportType !== "ecg_case" ? patientId.trim() : undefined,
+      recommendations,
+      reportType,
+    }),
     onSuccess: () => {
       setCaseId("");
+      setPatientId("");
+      setDoctorInterpretation("");
+      setRecommendations("");
+      setWizardOpen(false);
+      setMessage("Report created successfully.");
       return invalidate();
     },
   });
@@ -51,13 +68,36 @@ export default function ReportsIndexScreen() {
         <SectionHeader title="Reports Workflow" subtitle="Create, edit, finalize, sign, export, and email clinical reports." />
         <View style={styles.grid}>
           <Field label="Search" onChangeText={setSearch} placeholder="Patient, report number, physician..." value={search} />
-          <Field label="Generate From Case ID" onChangeText={setCaseId} placeholder="Case UUID" value={caseId} />
         </View>
         <View style={styles.filterRow}>
           {statuses.map((item) => <PrimaryButton key={item} label={item} onPress={() => setStatus(item)} variant={status === item ? "primary" : "outline"} />)}
-          <PrimaryButton disabled={!caseId.trim() || generateMutation.isPending} icon="file-plus" label="Create Report" onPress={() => generateMutation.mutate()} />
+          <PrimaryButton icon="file-plus" label="Create Report" onPress={() => setWizardOpen((value) => !value)} />
         </View>
+        {message ? <Text style={styles.success}>{message}</Text> : null}
       </Card>
+
+      {wizardOpen ? (
+        <Card style={styles.controls}>
+          <SectionHeader title="Report Wizard" subtitle="Generate from ECG case, patient, or manual clinical report." />
+          <View style={styles.filterRow}>
+            {(["ecg_case", "patient", "manual"] as const).map((item) => (
+              <PrimaryButton key={item} label={item.replace("_", " ")} onPress={() => setReportType(item)} variant={reportType === item ? "primary" : "outline"} />
+            ))}
+          </View>
+          <View style={styles.grid}>
+            {reportType === "ecg_case" ? <Field label="ECG Case ID" onChangeText={setCaseId} placeholder="Case UUID or case number" value={caseId} /> : null}
+            {reportType !== "ecg_case" ? <Field label="Patient ID" onChangeText={setPatientId} placeholder="Patient UUID" value={patientId} /> : null}
+            <Field label="Doctor Interpretation" onChangeText={setDoctorInterpretation} value={doctorInterpretation} />
+            <Field label="Recommendations" onChangeText={setRecommendations} value={recommendations} />
+          </View>
+          <PrimaryButton
+            disabled={generateMutation.isPending || (reportType === "ecg_case" ? !caseId.trim() : !patientId.trim())}
+            icon="file-plus"
+            label={generateMutation.isPending ? "Creating..." : "Create Draft Report"}
+            onPress={() => generateMutation.mutate()}
+          />
+        </Card>
+      ) : null}
 
       <Card style={styles.table}>
         <SectionHeader title="Clinical Reports" />
@@ -96,5 +136,6 @@ const styles = StyleSheet.create({
   reportRow: { alignItems: "center", borderBottomColor: medicalTheme.border, borderBottomWidth: 1, flexDirection: "row", flexWrap: "wrap", gap: 12, paddingVertical: 12 },
   reportTitle: { color: medicalTheme.text, fontSize: 15, fontWeight: "900" },
   rowActions: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+  success: { color: medicalTheme.success, fontSize: 13, fontWeight: "900" },
   table: { gap: 10 },
 });

@@ -1,6 +1,6 @@
 import { apiRequest } from "./api";
 
-export type SubscriptionPlanCode = "basic" | "enterprise" | "free" | "professional";
+export type SubscriptionPlanCode = "basic" | "enterprise" | "free" | "lifetime" | "professional";
 
 export interface SubscriptionPlan {
   active: boolean;
@@ -32,6 +32,7 @@ export interface LicenseRecord {
   expiryDate: string | null;
   grantedBy: string;
   id: string;
+  notes?: string;
   startDate: string;
   status: string;
   userId: string;
@@ -56,6 +57,33 @@ export async function revokeLicense(accessToken: string, userId: string) {
   return apiRequest<{ revokedCount: number }>(`/subscriptions/licenses/${userId}`, {
     accessToken,
     method: "DELETE",
+  });
+}
+
+export async function grantOwnerLicense(accessToken: string, input: {
+  expiresAt?: string;
+  lifetime: boolean;
+  notes?: string;
+  plan: SubscriptionPlanCode;
+  startsAt?: string;
+  userId: string;
+}) {
+  return apiRequest<{ license: LicenseRecord }>("/subscriptions/licenses", {
+    accessToken,
+    body: JSON.stringify(input),
+    method: "POST",
+  });
+}
+
+export async function updateOwnerLicense(accessToken: string, licenseId: string, input: {
+  action: "activate" | "extend" | "revoke" | "suspend";
+  expiresAt?: string;
+  notes?: string;
+}) {
+  return apiRequest<{ license: LicenseRecord }>(`/subscriptions/licenses/${licenseId}`, {
+    accessToken,
+    body: JSON.stringify(input),
+    method: "PATCH",
   });
 }
 

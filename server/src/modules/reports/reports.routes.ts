@@ -166,6 +166,61 @@ reportsRouter.get("/", async (req, res, next) => {
   }
 });
 
+reportsRouter.post("/", requireRole("DOCTOR"), async (req, res, next) => {
+  try {
+    const body = z.object({
+      aiFindings: z.string().trim().max(4000).optional(),
+      caseId: z.string().trim().optional(),
+      doctorInterpretation: z.string().trim().max(4000).optional(),
+      manualTitle: z.string().trim().max(180).optional(),
+      patientId: z.string().trim().optional(),
+      recommendations: z.string().trim().max(4000).optional(),
+      reportType: z.enum(["ecg_case", "patient", "manual"]),
+    }).parse(req.body);
+
+    let caseId = body.caseId;
+    if (!caseId) {
+      if (!body.patientId) throw new AppError(400, "Patient is required for patient or manual reports.", "PATIENT_REQUIRED");
+      assertResourceAccess(await canAccessPatient(body.patientId, req.auth!));
+      const patient = await prisma.patient.findUnique({ where: { id: body.patientId } });
+      if (!patient || patient.archivedAt) throw new AppError(404, "Patient not found.", "PATIENT_NOT_FOUND");
+      const total = await prisma.eCGCase.count();
+      const ecgCase = await prisma.eCGCase.create({
+        data: {
+          caseId: `ECG-${new Date().toISOString().slice(0, 10).replace(/-/g, "")}-${Date.now().toString().slice(-6)}`,
+          caseNumber: `ECGCASE-${String(total + 1).padStart(6, "0")}`,
+          clinicalComments: body.doctorInterpretation,
+          clinicalNotes: body.doctorInterpretation,
+          doctorDiagnosis: body.manualTitle ?? "Manual clinical report",
+          ecgType: body.reportType === "manual" ? "Manual Report" : "Patient Clinical Report",
+          finalDiagnosis: body.manualTitle ?? "Manual clinical report",
+          patientId: body.patientId,
+          recommendations: body.recommendations,
+          severity: "NORMAL",
+          status: "UNDER_REVIEW",
+          uploadedById: req.auth!.id,
+        },
+      });
+      caseId = ecgCase.id;
+    }
+
+    assertResourceAccess(await canAccessCase(caseId, req.auth!));
+    const report = await generateClinicalReport(caseId, req.auth!.id);
+    const updated = await prisma.clinicalReport.update({
+      data: {
+        aiFindings: body.aiFindings ?? report.aiFindings,
+        finalPhysicianImpression: body.doctorInterpretation ?? report.finalPhysicianImpression,
+        recommendations: body.recommendations ? body.recommendations.split(/\r?\n|;/).map((item) => item.trim()).filter(Boolean) : report.recommendations,
+      },
+      include: reportInclude(),
+      where: { id: report.id },
+    });
+    res.status(201).json({ report: serializeReport(updated) });
+  } catch (error) {
+    next(error);
+  }
+});
+
 reportsRouter.post("/cases/:caseId/generate", requireRole("DOCTOR"), async (req, res, next) => {
   try {
     assertResourceAccess(await canAccessCase(String(req.params.caseId), req.auth!));

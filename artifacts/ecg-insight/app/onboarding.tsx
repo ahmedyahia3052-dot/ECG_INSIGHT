@@ -52,7 +52,7 @@ export default function OnboardingScreen() {
 
   async function finish() {
     await AsyncStorage.setItem(ONBOARDING_STORAGE_KEY, "true").catch(() => {});
-    router.replace("/(auth)/login");
+    router.replace("/login");
   }
 
   return (

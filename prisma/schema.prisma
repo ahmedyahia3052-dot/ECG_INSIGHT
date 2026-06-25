@@ -60,7 +60,9 @@ enum LicenseType {
 
 enum LicenseStatus {
   ACTIVE
+  SUSPENDED
   REVOKED
+  EXPIRED
 }
 
 enum PaymentProvider {
@@ -111,6 +113,8 @@ enum NotificationType {
 enum Gender {
   MALE
   FEMALE
+  CHILD_MALE
+  CHILD_FEMALE
   OTHER
   UNKNOWN
 }
@@ -2457,6 +2461,11 @@ model Notification {
   id          String           @id @default(cuid())
   userId      String?
   caseId      String?
+  patientId   String?
+  reportId    String?
+  actionUrl   String?
+  entityType  String?
+  entityId    String?
   targetRole  Role?
   type        NotificationType @default(INFO)
   title       String
@@ -2471,5 +2480,7 @@ model Notification {
 
   @@index([userId])
   @@index([caseId])
+  @@index([patientId])
+  @@index([reportId])
   @@index([targetRole])
 }

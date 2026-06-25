@@ -34,7 +34,7 @@ export default function ProfileScreen() {
         <BoltEmpty
           actionLabel="Sign in"
           message="A user profile is required to display account settings."
-          onAction={() => router.replace("/(auth)/login")}
+          onAction={() => router.replace("/login")}
           title="Profile unavailable"
         />
       </BoltScreen>
@@ -47,7 +47,7 @@ export default function ProfileScreen() {
 
   async function handleLogout() {
     await logout();
-    router.replace("/(auth)/login");
+    router.replace("/login");
   }
 
   return (

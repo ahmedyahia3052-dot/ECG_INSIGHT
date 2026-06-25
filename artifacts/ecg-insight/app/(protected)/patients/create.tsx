@@ -9,12 +9,19 @@ import { useAuth } from "@/context/AuthContext";
 import { createPatient, type PatientInput } from "@/services/clinical";
 
 const patientSchema = z.object({
-  dateOfBirth: z.string().min(4),
   firstName: z.string().min(1, "First name is required."),
-  gender: z.enum(["male", "female", "other", "unknown"]),
+  gender: z.enum(["male", "female", "child_male", "child_female", "other", "unknown"], { message: "Gender is required." }),
   lastName: z.string().min(1, "Last name is required."),
-  medicalRecordNumber: z.string().min(1, "Medical record number is required."),
 });
+
+const genderOptions: Array<{ label: string; value: PatientInput["gender"] }> = [
+  { label: "Male", value: "male" },
+  { label: "Female", value: "female" },
+  { label: "Child Male", value: "child_male" },
+  { label: "Child Female", value: "child_female" },
+  { label: "Other", value: "other" },
+  { label: "Unknown", value: "unknown" },
+];
 
 export default function CreatePatientScreen() {
   const router = useRouter();
@@ -35,7 +42,11 @@ export default function CreatePatientScreen() {
       if (!token) throw new Error("Authentication required.");
       const parsed = patientSchema.safeParse(form);
       if (!parsed.success) throw new Error(parsed.error.issues[0]?.message ?? "Invalid patient details.");
-      return createPatient(token, form);
+      return createPatient(token, {
+        ...form,
+        dateOfBirth: form.dateOfBirth || "1970-01-01",
+        medicalRecordNumber: form.medicalRecordNumber?.trim() || `MRN-${Date.now()}`,
+      });
     },
     onError: (mutationError) => setError(mutationError instanceof Error ? mutationError.message : "Unable to create patient."),
     onSuccess: async (payload) => {
@@ -53,10 +64,19 @@ export default function CreatePatientScreen() {
           <Field label="First Name" onChangeText={(value) => setForm((current) => ({ ...current, firstName: value }))} value={form.firstName} />
           <Field label="Middle Name" onChangeText={(value) => setForm((current) => ({ ...current, middleName: value }))} value={form.middleName} />
           <Field label="Last Name" onChangeText={(value) => setForm((current) => ({ ...current, lastName: value }))} value={form.lastName} />
-          <Field label="Employee ID / MRN" onChangeText={(value) => setForm((current) => ({ ...current, medicalRecordNumber: value }))} value={form.medicalRecordNumber} />
+          <Field label="Employee ID / MRN (Optional)" onChangeText={(value) => setForm((current) => ({ ...current, medicalRecordNumber: value }))} value={form.medicalRecordNumber} />
           <Field label="Employee ID" onChangeText={(value) => setForm((current) => ({ ...current, employeeId: value }))} value={form.employeeId} />
           <Field label="DOB" onChangeText={(value) => setForm((current) => ({ ...current, dateOfBirth: value }))} value={form.dateOfBirth} />
-          <Field label="Gender" onChangeText={(value) => setForm((current) => ({ ...current, gender: normalizeGender(value) }))} placeholder="male / female / other / unknown" value={form.gender} />
+        </View>
+        <View style={styles.genderPanel}>
+          <Text style={styles.genderLabel}>Gender</Text>
+          <View style={styles.genderOptions}>
+            {genderOptions.map((option) => (
+              <PrimaryButton key={option.value} label={option.label} onPress={() => setForm((current) => ({ ...current, gender: option.value }))} variant={form.gender === option.value ? "primary" : "outline"} />
+            ))}
+          </View>
+        </View>
+        <View style={styles.grid}>
           <Field label="Phone" onChangeText={(value) => setForm((current) => ({ ...current, phone: value }))} value={form.phone} />
           <Field label="Email" onChangeText={(value) => setForm((current) => ({ ...current, email: value }))} value={form.email} />
           <Field label="National ID" onChangeText={(value) => setForm((current) => ({ ...current, nationalId: value }))} value={form.nationalId} />
@@ -85,15 +105,12 @@ export default function CreatePatientScreen() {
   );
 }
 
-function normalizeGender(value: string): PatientInput["gender"] {
-  const normalized = value.toLowerCase();
-  if (normalized === "male" || normalized === "female" || normalized === "other") return normalized;
-  return "unknown";
-}
-
 const styles = StyleSheet.create({
   actions: { flexDirection: "row", flexWrap: "wrap", gap: 10, justifyContent: "flex-end" },
   error: { color: medicalTheme.critical, fontSize: 13, fontWeight: "800" },
   form: { gap: 16 },
+  genderLabel: { color: medicalTheme.text, fontSize: 12, fontWeight: "800" },
+  genderOptions: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+  genderPanel: { gap: 8 },
   grid: { flexDirection: "row", flexWrap: "wrap", gap: 12 },
 });

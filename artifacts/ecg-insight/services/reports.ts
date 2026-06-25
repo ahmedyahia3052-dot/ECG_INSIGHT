@@ -77,6 +77,22 @@ export async function generateReport(accessToken: string, caseId: string) {
   });
 }
 
+export async function createReport(accessToken: string, input: {
+  aiFindings?: string;
+  caseId?: string;
+  doctorInterpretation?: string;
+  manualTitle?: string;
+  patientId?: string;
+  recommendations?: string;
+  reportType: "ecg_case" | "manual" | "patient";
+}) {
+  return apiRequest<{ report: ClinicalReport }>("/reports", {
+    accessToken,
+    body: JSON.stringify(input),
+    method: "POST",
+  });
+}
+
 export async function getReport(accessToken: string, reportId: string) {
   return apiRequest<{ report: ClinicalReport }>(`/reports/${reportId}`, { accessToken });
 }

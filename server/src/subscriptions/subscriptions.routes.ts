@@ -1,5 +1,6 @@
 import { Router, type RequestHandler } from "express";
 import type { Prisma } from "@prisma/client";
+import { z } from "zod";
 import { prisma } from "../config/prisma";
 import { requireAuth, requireRole } from "../middleware/auth";
 import { AppError } from "../middleware/error";
@@ -34,12 +35,21 @@ subscriptionsRouter.use(requireAuth);
 const ownerRole = requireRole("SUPER_ADMIN");
 const publicPlanCodes: Parameters<typeof toApiTier>[0][] = ["FREE", "BASIC", "PROFESSIONAL", "ENTERPRISE"];
 
-const ownerOnly: RequestHandler = (req, _res, next) => {
-  if (req.auth?.role === "OWNER" || req.auth?.actorRole === "OWNER") {
+const ownerOnly: RequestHandler = async (req, _res, next) => {
+  try {
+    if (req.auth?.role === "OWNER" || req.auth?.actorRole === "OWNER") {
+      next();
+      return;
+    }
+    if (req.auth?.role !== "SUPER_ADMIN") {
+      throw new AppError(403, "Owner access required.", "OWNER_ONLY");
+    }
+    const user = await prisma.user.findUnique({ where: { id: req.auth.id } });
+    if (!user?.protectedOwner) throw new AppError(403, "Owner access required.", "OWNER_ONLY");
     next();
-    return;
+  } catch (error) {
+    next(error);
   }
-  next(new AppError(403, "Owner access required.", "OWNER_ONLY"));
 };
 
 function serializePlan(plan: {
@@ -86,6 +96,7 @@ function serializeLicense(license: {
   expiresAt: Date | null;
   grantedBy: { email: string; name: string; username: string | null } | null;
   id: string;
+  reason: string | null;
   startsAt: Date;
   status: string;
   type: string;
@@ -98,6 +109,7 @@ function serializeLicense(license: {
     grantedBy: license.grantedBy?.name ?? license.grantedBy?.email ?? "System",
     id: license.id,
     startDate: license.startsAt,
+    notes: license.reason ?? undefined,
     status: license.status,
     subscriptionType: license.type === "LIFETIME" ? "Lifetime Premium" : license.type.replaceAll("_", " "),
     userId: license.userId,
@@ -105,6 +117,21 @@ function serializeLicense(license: {
     username: license.user.username,
   };
 }
+
+const ownerLicenseGrantSchema = z.object({
+  expiresAt: z.coerce.date().optional(),
+  lifetime: z.boolean().default(false),
+  notes: z.string().trim().max(1000).optional(),
+  plan: z.enum(["free", "basic", "professional", "enterprise", "lifetime"]),
+  startsAt: z.coerce.date().optional(),
+  userId: z.string().min(1),
+});
+
+const ownerLicenseActionSchema = z.object({
+  action: z.enum(["activate", "suspend", "revoke", "extend"]),
+  expiresAt: z.coerce.date().optional(),
+  notes: z.string().trim().max(1000).optional(),
+});
 
 subscriptionsRouter.get("/", requireRole("ADMIN"), async (_req, res, next) => {
   try {
@@ -241,6 +268,66 @@ subscriptionsRouter.post("/licenses/lifetime", ownerRole, validateBody(grantLice
   }
 });
 
+subscriptionsRouter.post("/licenses", ownerOnly, async (req, res, next) => {
+  try {
+    const body = ownerLicenseGrantSchema.parse(req.body);
+    const user = await prisma.user.findUnique({ where: { id: body.userId } });
+    if (!user) throw new AppError(404, "User not found.", "USER_NOT_FOUND");
+    const startsAt = body.startsAt ?? new Date();
+    const isLifetime = body.lifetime || body.plan === "lifetime";
+    const license = await prisma.license.create({
+      data: {
+        expiresAt: isLifetime ? null : body.expiresAt,
+        grantedById: req.auth!.id,
+        reason: body.notes,
+        startsAt,
+        status: "ACTIVE",
+        type: isLifetime ? "LIFETIME" : "ENTERPRISE_SEAT",
+        userId: body.userId,
+      },
+      include: {
+        grantedBy: { select: { email: true, name: true, username: true } },
+        user: { select: { email: true, name: true, username: true } },
+      },
+    });
+    await prisma.subscription.upsert({
+      create: {
+        currentPeriodEnd: isLifetime ? null : body.expiresAt,
+        currentPeriodStart: startsAt,
+        status: "ACTIVE",
+        tier: fromApiTier(isLifetime ? "lifetime" : body.plan),
+        userId: body.userId,
+      },
+      update: {
+        currentPeriodEnd: isLifetime ? null : body.expiresAt,
+        currentPeriodStart: startsAt,
+        status: "ACTIVE",
+        tier: fromApiTier(isLifetime ? "lifetime" : body.plan),
+      },
+      where: { userId: body.userId },
+    });
+    await prisma.user.update({
+      data: {
+        isLifetime,
+        lifetimeGrantedAt: isLifetime ? new Date() : undefined,
+        lifetimeGrantedBy: isLifetime ? req.auth!.id : undefined,
+      },
+      where: { id: body.userId },
+    });
+    await prisma.billingEvent.create({
+      data: {
+        message: `Owner granted ${body.plan} license.`,
+        metadata: { licenseId: license.id, notes: body.notes, plan: body.plan } as Prisma.InputJsonObject,
+        type: "LICENSE_GRANTED",
+        userId: body.userId,
+      },
+    });
+    res.status(201).json({ license: serializeLicense(license) });
+  } catch (error) {
+    next(error);
+  }
+});
+
 subscriptionsRouter.get("/licenses", ownerOnly, async (_req, res, next) => {
   try {
     const licenses = await prisma.license.findMany({
@@ -251,6 +338,56 @@ subscriptionsRouter.get("/licenses", ownerOnly, async (_req, res, next) => {
       orderBy: { createdAt: "desc" },
     });
     res.json({ licenses: licenses.map(serializeLicense) });
+  } catch (error) {
+    next(error);
+  }
+});
+
+subscriptionsRouter.patch("/licenses/:licenseId", ownerOnly, async (req, res, next) => {
+  try {
+    const body = ownerLicenseActionSchema.parse(req.body);
+    const current = await prisma.license.findUnique({ where: { id: String(req.params.licenseId) } });
+    if (!current) throw new AppError(404, "License not found.", "LICENSE_NOT_FOUND");
+    const status = body.action === "activate" || body.action === "extend" ? "ACTIVE" : body.action === "suspend" ? "SUSPENDED" : "REVOKED";
+    const license = await prisma.license.update({
+      data: {
+        expiresAt: body.action === "extend" ? body.expiresAt : undefined,
+        reason: body.notes ?? current.reason,
+        revokedAt: body.action === "revoke" ? new Date() : undefined,
+        revokedById: body.action === "revoke" ? req.auth!.id : undefined,
+        status,
+      },
+      include: {
+        grantedBy: { select: { email: true, name: true, username: true } },
+        user: { select: { email: true, name: true, username: true } },
+      },
+      where: { id: current.id },
+    });
+    await prisma.subscription.upsert({
+      create: {
+        currentPeriodEnd: license.expiresAt,
+        status: status === "ACTIVE" ? "ACTIVE" : status === "SUSPENDED" ? "SUSPENDED" : "CANCELED",
+        tier: license.type === "LIFETIME" ? "LIFETIME" : "ENTERPRISE",
+        userId: license.userId,
+      },
+      update: {
+        currentPeriodEnd: license.expiresAt,
+        status: status === "ACTIVE" ? "ACTIVE" : status === "SUSPENDED" ? "SUSPENDED" : "CANCELED",
+        tier: license.type === "LIFETIME" ? "LIFETIME" : "ENTERPRISE",
+      },
+      where: { userId: license.userId },
+    });
+    if (license.type === "LIFETIME") {
+      await prisma.user.update({
+        data: {
+          isLifetime: status === "ACTIVE",
+          lifetimeRevokedAt: status === "REVOKED" ? new Date() : undefined,
+          lifetimeRevokedBy: status === "REVOKED" ? req.auth!.id : undefined,
+        },
+        where: { id: license.userId },
+      });
+    }
+    res.json({ license: serializeLicense(license) });
   } catch (error) {
     next(error);
   }
