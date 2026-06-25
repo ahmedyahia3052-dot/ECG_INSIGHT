@@ -106,6 +106,7 @@ export function PremiumMetricCard({
   icon,
   label,
   sparkline,
+  subtitle,
   suffix,
   trend,
   trendTone = "success",
@@ -114,6 +115,7 @@ export function PremiumMetricCard({
   icon: BoltIcon;
   label: string;
   sparkline: number[];
+  subtitle?: string;
   suffix?: string;
   trend: string;
   trendTone?: "success" | "warning" | "danger" | "primary";
@@ -141,6 +143,7 @@ export function PremiumMetricCard({
           <AnimatedCounter suffix={suffix} value={value} />
         </Text>
         <Text style={[styles.metricLabel, { color: colors.textSecondary }]}>{label}</Text>
+        {subtitle ? <Text style={[styles.metricSubtitle, { color: colors.textSecondary }]}>{subtitle}</Text> : null}
         <Sparkline data={sparkline} tone={tint} />
       </Animated.View>
     </Pressable>
@@ -248,6 +251,7 @@ const styles = StyleSheet.create({
   },
   metricIcon: { alignItems: "center", borderRadius: 14, height: 42, justifyContent: "center", width: 42 },
   metricLabel: { fontFamily: "Inter_600SemiBold", fontSize: 12 },
+  metricSubtitle: { fontFamily: "Inter_500Medium", fontSize: 11, lineHeight: 15 },
   metricTop: { alignItems: "center", flexDirection: "row", justifyContent: "space-between" },
   metricValue: { fontFamily: "Inter_700Bold", fontSize: 28, letterSpacing: -0.8 },
   monitorCard: {

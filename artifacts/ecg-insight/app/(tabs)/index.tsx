@@ -21,7 +21,7 @@ import {
   BoltNavCard,
   BoltScreen,
 } from "@/components/bolt/BoltUI";
-import { LiveEcgWave, Sparkline } from "@/components/bolt/UltraPremium";
+import { LiveEcgWave, PremiumMetricCard } from "@/components/bolt/UltraPremium";
 import { useVisualExperience } from "@/context/VisualExperienceContext";
 import { PremiumRefreshControl, SkeletonDashboard } from "@/components/interaction/PremiumInteraction";
 
@@ -266,22 +266,22 @@ export default function DashboardScreen() {
       ) : (
         <View style={styles.kpiGrid}>
           <View style={styles.kpiCell}>
-            <CommandKpiCard icon="activity" label="Total ECG Analyses" sparkline={weeklySeries} subtitle="All uploaded ECG cases" trend="+12%" value={cases.length} />
+            <PremiumMetricCard icon="activity" label="Total ECG Analyses" sparkline={weeklySeries} subtitle="All uploaded ECG cases" trend="+12%" value={cases.length} />
           </View>
           <View style={styles.kpiCell}>
-            <CommandKpiCard icon="alert-triangle" label="Critical Cases" sparkline={criticalSeries} subtitle="Urgent physician review" trend={critical ? "Review" : "Clear"} trendTone={critical ? "danger" : "success"} value={critical} />
+            <PremiumMetricCard icon="alert-triangle" label="Critical Cases" sparkline={criticalSeries} subtitle="Urgent physician review" trend={critical ? "Review" : "Clear"} trendTone={critical ? "danger" : "success"} value={critical} />
           </View>
           <View style={styles.kpiCell}>
-            <CommandKpiCard icon="check-circle" label="Normal Cases" sparkline={[normalCases, reviewed, cases.length, normalCases + 1]} subtitle="No critical status mapped" trend={normalCases ? "Stable" : "Pending"} trendTone="success" value={normalCases} />
+            <PremiumMetricCard icon="check-circle" label="Normal Cases" sparkline={[normalCases, reviewed, cases.length, normalCases + 1]} subtitle="No critical status mapped" trend={normalCases ? "Stable" : "Pending"} trendTone="success" value={normalCases} />
           </View>
           <View style={styles.kpiCell}>
-            <CommandKpiCard icon="clipboard" label="Pending Reports" sparkline={[pendingReviews, reports.length, critical, reviewed]} subtitle="Reports awaiting signature" trend={pendingReviews ? "Queue" : "Clear"} trendTone={pendingReviews ? "warning" : "success"} value={pendingReviews} />
+            <PremiumMetricCard icon="clipboard" label="Pending Reports" sparkline={[pendingReviews, reports.length, critical, reviewed]} subtitle="Reports awaiting signature" trend={pendingReviews ? "Queue" : "Clear"} trendTone={pendingReviews ? "warning" : "success"} value={pendingReviews} />
           </View>
           <View style={styles.kpiCell}>
-            <CommandKpiCard icon="users" label="Active Patients" sparkline={[patientCount, recentPatients.length, cases.length, patientCount + 1]} subtitle="Live patient registry" trend="+8%" value={patientCount} />
+            <PremiumMetricCard icon="users" label="Active Patients" sparkline={[patientCount, recentPatients.length, cases.length, patientCount + 1]} subtitle="Live patient registry" trend="+8%" value={patientCount} />
           </View>
           <View style={styles.kpiCell}>
-            <CommandKpiCard icon="cpu" label="AI Accuracy" sparkline={criticalSeries} suffix="%" subtitle="Average confidence" trend="AI" value={aiAccuracy} />
+            <PremiumMetricCard icon="cpu" label="AI Accuracy" sparkline={criticalSeries} suffix="%" subtitle="Average confidence" trend="AI" value={aiAccuracy} />
           </View>
         </View>
       )}
@@ -579,47 +579,6 @@ function QuickActionCard({
       </View>
       <Text style={[styles.quickActionText, { color: colors.text }]}>{label}</Text>
     </Pressable>
-  );
-}
-
-function CommandKpiCard({
-  icon,
-  label,
-  sparkline,
-  subtitle,
-  suffix = "",
-  trend,
-  trendTone = "primary",
-  value,
-}: {
-  icon: keyof typeof Feather.glyphMap;
-  label: string;
-  sparkline: number[];
-  subtitle: string;
-  suffix?: string;
-  trend: string;
-  trendTone?: "danger" | "primary" | "success" | "warning";
-  value: number;
-}) {
-  const colors = useColors();
-  const tint = trendTone === "danger" ? colors.destructive : trendTone === "warning" ? colors.warning : trendTone === "success" ? colors.success : colors.primary;
-  return (
-    <BoltCard style={styles.commandKpiCard}>
-      <View style={styles.metricTop}>
-        <View style={[styles.metricIcon, { backgroundColor: tint + "1F" }]}>
-          <Feather name={icon} size={19} color={tint} />
-        </View>
-        <BoltBadge label={trend} tone={trendTone === "primary" ? "primary" : trendTone} />
-      </View>
-      <View style={styles.kpiBody}>
-        <View style={styles.caseMain}>
-          <Text style={[styles.kpiValue, { color: colors.text }]}>{value.toLocaleString()}{suffix}</Text>
-          <Text style={[styles.kpiLabel, { color: colors.text }]}>{label}</Text>
-          <Text style={[styles.kpiSubtitle, { color: colors.textSecondary }]}>{subtitle}</Text>
-        </View>
-        <Sparkline data={sparkline} tone={tint} />
-      </View>
-    </BoltCard>
   );
 }
 
@@ -1191,7 +1150,6 @@ const styles = StyleSheet.create({
   chartGrid: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
   clinicalTimelineItem: { alignItems: "flex-start", flexDirection: "row", gap: 10, minHeight: 50 },
   commandColumn: { flex: 1, gap: 10, minWidth: 320 },
-  commandKpiCard: { flex: 1, gap: 12, minHeight: 150 },
   commandGrid: { alignItems: "flex-start", flexDirection: "row", flexWrap: "wrap", gap: 10 },
   ecgDateCol: { flex: 0.82, minWidth: 0 },
   ecgIdCol: { flex: 0.75, minWidth: 0 },
@@ -1220,17 +1178,11 @@ const styles = StyleSheet.create({
   heroTop: { alignItems: "center", flexDirection: "row", gap: 12 },
   heroWave: { left: 0, opacity: 0.35, position: "absolute", right: 0, top: 10 },
   kicker: { fontFamily: "Inter_700Bold", fontSize: 11, letterSpacing: 1.1, textTransform: "uppercase" },
-  kpiBody: { alignItems: "center", flexDirection: "row", gap: 10, justifyContent: "space-between" },
   kpiCell: { flex: 1, minWidth: 220 },
   kpiGrid: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
-  kpiLabel: { fontFamily: "Inter_700Bold", fontSize: 13 },
-  kpiSubtitle: { fontFamily: "Inter_500Medium", fontSize: 11, lineHeight: 15 },
-  kpiValue: { fontFamily: "Inter_700Bold", fontSize: 30, letterSpacing: -0.8 },
   loadingCard: { flex: 1, height: 132, minWidth: "47%" },
   loadingGrid: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
   metricRow: { flexDirection: "row", gap: 10 },
-  metricIcon: { alignItems: "center", borderRadius: 16, height: 42, justifyContent: "center", width: 42 },
-  metricTop: { alignItems: "center", flexDirection: "row", justifyContent: "space-between" },
   muted: { fontFamily: "Inter_400Regular", fontSize: 13, lineHeight: 19 },
   mobileGreeting: { fontFamily: "Inter_700Bold", fontSize: 20, letterSpacing: -0.4 },
   mobileHeader: { alignItems: "center", flexDirection: "row", gap: 12, minHeight: 58 },
