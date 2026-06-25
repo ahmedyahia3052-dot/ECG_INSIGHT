@@ -1,9 +1,11 @@
 import { Router } from "express";
 import { z } from "zod";
+import { prisma } from "../../config/prisma";
 import { requireAuth, requireRole } from "../../middleware/auth";
 import { AppError } from "../../middleware/error";
-import { assertResourceAccess, canAccessCase } from "../../utils/resource-access";
+import { assertResourceAccess, canAccessCase, canAccessPatient } from "../../utils/resource-access";
 import { exportDigitalEcg, getDigitalEcg, reconstructCaseEcg } from "./ecg-digitization.service";
+import { analyzeEcgImage, getEcgImageAnalysisResults } from "./ecg-image-analysis.service";
 import {
   getProcessedWaveform,
   latestMeasurement,
@@ -50,6 +52,29 @@ const calibrationOverrideSchema = z.object({
   paperSpeedMmPerSec: z.union([z.literal(25), z.literal(50)]).optional(),
 });
 
+const imageAnalysisSchema = z.object({
+  caseId: z.string().trim().optional(),
+  ecgFileId: z.string().trim().optional(),
+}).refine((body) => body.caseId || body.ecgFileId, {
+  message: "caseId or ecgFileId is required.",
+});
+
+ecgProcessingRouter.post("/analyze", requireRole("DOCTOR"), async (req, res, next) => {
+  try {
+    const body = imageAnalysisSchema.parse(req.body);
+    if (body.caseId) assertResourceAccess(await canAccessCase(body.caseId, req.auth!));
+    if (body.ecgFileId) {
+      const file = await prisma.eCGFile.findUnique({ where: { id: body.ecgFileId } });
+      if (!file) throw new AppError(404, "ECG file not found.", "ECG_FILE_NOT_FOUND");
+      assertResourceAccess(file.caseId ? await canAccessCase(file.caseId, req.auth!) : await canAccessPatient(file.patientId, req.auth!));
+    }
+    const result = await analyzeEcgImage({ actorId: req.auth!.id, caseId: body.caseId, ecgFileId: body.ecgFileId });
+    res.status(202).json({ result });
+  } catch (error) {
+    next(error);
+  }
+});
+
 ecgProcessingRouter.post("/digital/:caseId/reconstruct", requireRole("DOCTOR"), async (req, res, next) => {
   try {
     const caseId = String(req.params.caseId);
@@ -94,6 +119,18 @@ ecgProcessingRouter.get("/digital/:caseId/export/:format", async (req, res, next
     res.setHeader("content-type", exported.contentType);
     res.setHeader("content-disposition", `attachment; filename="${exported.fileName}"`);
     res.send(exported.data);
+  } catch (error) {
+    next(error);
+  }
+});
+
+ecgProcessingRouter.get("/:id/results", async (req, res, next) => {
+  try {
+    const id = String(req.params.id);
+    const results = await getEcgImageAnalysisResults(id);
+    if (results.case?.id) assertResourceAccess(await canAccessCase(results.case.id, req.auth!));
+    else if (results.patientId) assertResourceAccess(await canAccessPatient(results.patientId, req.auth!));
+    res.json({ results });
   } catch (error) {
     next(error);
   }
