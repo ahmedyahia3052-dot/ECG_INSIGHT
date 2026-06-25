@@ -4,7 +4,6 @@ import { usePathname } from "expo-router";
 import React, { useEffect, useMemo, useState } from "react";
 import { Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 
-import { Badge, medicalTheme, PrimaryButton } from "@/components/enterprise/EnterpriseUI";
 import { useAuth } from "@/context/AuthContext";
 import {
   copilotExportUrl,
@@ -20,6 +19,7 @@ import {
   type CopilotMessage,
   type CopilotTag,
 } from "@/services/copilot";
+import { medicalTheme } from "@/theme/medicalTheme";
 
 const tags: CopilotTag[] = ["ECG Interpretation", "Clinical Summary", "Occupational Fitness", "Differential Diagnosis", "Follow-up"];
 const disclaimer = "AI assistance only. Final diagnosis and clinical decisions remain the responsibility of the physician.";
@@ -219,6 +219,38 @@ function MessageBubble({ message }: { message: CopilotMessage }) {
   );
 }
 
+function Badge({ label, tone = "primary" }: { label: string; tone?: "critical" | "primary" | "success" | "warning" }) {
+  const color = tone === "critical" ? medicalTheme.critical : tone === "success" ? medicalTheme.success : tone === "warning" ? medicalTheme.warning : medicalTheme.primary;
+  return (
+    <View style={[styles.badge, { borderColor: color }]}>
+      <Text style={[styles.badgeText, { color }]}>{label}</Text>
+    </View>
+  );
+}
+
+function PrimaryButton({
+  disabled,
+  label,
+  onPress,
+  variant = "primary",
+}: {
+  disabled?: boolean;
+  label: string;
+  onPress: () => void;
+  variant?: "danger" | "outline" | "primary";
+}) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      disabled={disabled}
+      onPress={onPress}
+      style={[styles.button, variant === "outline" && styles.buttonOutline, variant === "danger" && styles.buttonDanger, disabled && styles.buttonDisabled]}
+    >
+      <Text style={[styles.buttonText, variant === "outline" && styles.buttonTextOutline]}>{label}</Text>
+    </Pressable>
+  );
+}
+
 function MarkdownText({ value }: { value: string }) {
   return (
     <View style={styles.markdown}>
@@ -267,7 +299,15 @@ function exportConversation(conversationId: string, token: string) {
 
 const styles = StyleSheet.create({
   assistantMessage: { alignSelf: "flex-start", backgroundColor: medicalTheme.surface, borderColor: medicalTheme.border },
+  badge: { alignSelf: "flex-start", backgroundColor: "rgba(20,221,230,0.08)", borderRadius: 999, borderWidth: 1, paddingHorizontal: 8, paddingVertical: 4 },
+  badgeText: { fontSize: 10, fontWeight: "900", textTransform: "uppercase" },
   body: { flex: 1, flexDirection: "row", gap: 12, minHeight: 0 },
+  button: { alignItems: "center", backgroundColor: medicalTheme.primary, borderRadius: 12, justifyContent: "center", minHeight: 36, paddingHorizontal: 10, paddingVertical: 8 },
+  buttonDanger: { backgroundColor: medicalTheme.critical },
+  buttonDisabled: { opacity: 0.45 },
+  buttonOutline: { backgroundColor: "transparent", borderColor: medicalTheme.border, borderWidth: 1 },
+  buttonText: { color: medicalTheme.background, fontSize: 11, fontWeight: "900" },
+  buttonTextOutline: { color: medicalTheme.primary },
   chat: { flex: 1, gap: 10, minWidth: 0 },
   citation: { color: medicalTheme.primary, fontSize: 10, fontWeight: "800" },
   citations: { gap: 3, marginTop: 6 },
