@@ -168,7 +168,13 @@ export default function LicenseDashboardScreen() {
     );
   }
 
-  if (!isOwner) return null;
+  if (!isOwner) {
+    return (
+      <BoltScreen>
+        <BoltEmpty title="Owner access required" message="Redirecting away from the protected license dashboard." />
+      </BoltScreen>
+    );
+  }
 
   return (
     <BoltScreen>

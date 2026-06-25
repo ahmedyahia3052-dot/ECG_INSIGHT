@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import React, { useCallback, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import { useAuth } from "@/context/AuthContext";
 import { useColors } from "@/hooks/useColors";
@@ -23,6 +23,10 @@ export default function NotificationCenterScreen() {
   const [page, setPage] = useState(1);
   const queryKey = ["notification-center", token, page, search, read, type];
   const [refreshing, setRefreshing] = useState(false);
+
+  useEffect(() => {
+    if (__DEV__) console.info("[route-mount] NotificationsPage", { page, read, search, type });
+  }, [page, read, search, type]);
   const notificationsQuery = useQuery({
     enabled: !!token,
     queryFn: async () => {

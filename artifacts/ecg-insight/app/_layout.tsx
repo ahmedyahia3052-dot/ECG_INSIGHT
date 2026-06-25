@@ -9,6 +9,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import React, { useEffect } from "react";
+import { StyleSheet, Text, View } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { KeyboardProvider } from "react-native-keyboard-controller";
 import { SafeAreaProvider } from "react-native-safe-area-context";
@@ -43,6 +44,10 @@ function RootLayoutNav() {
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
       <Stack.Screen name="case" options={{ headerShown: false }} />
       <Stack.Screen name="admin" options={{ headerShown: false }} />
+      <Stack.Screen name="dashboard" options={{ headerShown: false }} />
+      <Stack.Screen name="notifications" options={{ headerShown: false }} />
+      <Stack.Screen name="patients" options={{ headerShown: false }} />
+      <Stack.Screen name="reports" options={{ headerShown: false }} />
       <Stack.Screen name="unauthorized" options={{ headerShown: false }} />
     </Stack>
   );
@@ -62,7 +67,14 @@ export default function RootLayout() {
     }
   }, [fontsLoaded, fontError]);
 
-  if (!fontsLoaded && !fontError) return null;
+  if (!fontsLoaded && !fontError) {
+    return (
+      <View style={styles.bootScreen}>
+        <Text style={styles.bootTitle}>Preparing ECG Insight</Text>
+        <Text style={styles.bootText}>Loading clinical workspace...</Text>
+      </View>
+    );
+  }
 
   return (
     <SafeAreaProvider>
@@ -85,3 +97,15 @@ export default function RootLayout() {
     </SafeAreaProvider>
   );
 }
+
+const styles = StyleSheet.create({
+  bootScreen: {
+    alignItems: "center",
+    backgroundColor: "#050816",
+    flex: 1,
+    justifyContent: "center",
+    padding: 24,
+  },
+  bootText: { color: "#94A3B8", fontSize: 13, marginTop: 8 },
+  bootTitle: { color: "#F8FAFC", fontSize: 18, fontWeight: "700" },
+});

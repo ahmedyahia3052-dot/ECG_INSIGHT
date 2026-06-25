@@ -1,6 +1,6 @@
 import { Feather } from "@expo/vector-icons";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import React, { useCallback, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Alert, Pressable, StyleSheet, Text, View } from "react-native";
 import { useAuth } from "@/context/AuthContext";
 import { useColors } from "@/hooks/useColors";
@@ -46,6 +46,10 @@ export default function ReportsDashboardScreen() {
     rhythmInterpretation: "",
     severityClassification: "",
   });
+
+  useEffect(() => {
+    if (__DEV__) console.info("[route-mount] ReportsPage", { page, search, status });
+  }, [page, search, status]);
 
   const queryKey = useMemo(() => ["reports", token, page, search, status], [page, search, status, token]);
   const reportsQuery = useQuery({

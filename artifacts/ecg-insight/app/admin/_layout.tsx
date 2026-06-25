@@ -2,6 +2,7 @@ import { useAuth } from "@/context/AuthContext";
 import { useColors } from "@/hooks/useColors";
 import { Stack, useRouter } from "expo-router";
 import { useEffect } from "react";
+import { StyleSheet, Text, View } from "react-native";
 
 export default function AdminLayout() {
   const colors = useColors();
@@ -15,7 +16,21 @@ export default function AdminLayout() {
     }
   }, [user, isLoading, router]);
 
-  if (!user || user.role !== "super_admin") return null;
+  if (isLoading) {
+    return (
+      <View style={[styles.state, { backgroundColor: colors.background }]}>
+        <Text style={[styles.title, { color: colors.text }]}>Loading admin workspace...</Text>
+      </View>
+    );
+  }
+
+  if (!user || user.role !== "super_admin") {
+    return (
+      <View style={[styles.state, { backgroundColor: colors.background }]}>
+        <Text style={[styles.title, { color: colors.text }]}>Redirecting to unauthorized page...</Text>
+      </View>
+    );
+  }
 
   return (
     <Stack
@@ -41,3 +56,8 @@ export default function AdminLayout() {
     </Stack>
   );
 }
+
+const styles = StyleSheet.create({
+  state: { alignItems: "center", flex: 1, justifyContent: "center", padding: 24 },
+  title: { fontSize: 16, fontWeight: "700" },
+});

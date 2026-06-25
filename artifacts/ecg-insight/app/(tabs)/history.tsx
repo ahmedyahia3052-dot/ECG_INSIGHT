@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "expo-router";
-import React, { useCallback, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Alert, Pressable, StyleSheet, Text, View } from "react-native";
 import { useAuth } from "@/context/AuthContext";
 import { useColors } from "@/hooks/useColors";
@@ -48,6 +48,10 @@ export default function PatientsScreen() {
   const [mode, setMode] = useState<FormMode>(null);
   const [selected, setSelected] = useState<ApiPatient | null>(null);
   const [form, setForm] = useState<PatientInput>(defaultForm);
+
+  useEffect(() => {
+    if (__DEV__) console.info("[route-mount] PatientsPage", { page, search });
+  }, [page, search]);
 
   const queryKey = useMemo(() => ["patients", token, page, search, gender], [gender, page, search, token]);
   const patientsQuery = useQuery({

@@ -10,6 +10,7 @@ import { useColors } from "@/hooks/useColors";
 import { EnterpriseSidebar } from "@/components/bolt/EnterpriseSidebar";
 import { FloatingAIAssistant, FloatingEcgActionButton } from "@/components/bolt/MobileActionLayer";
 import { useVisualExperience } from "@/context/VisualExperienceContext";
+import { BoltEcgLoader, BoltScreen } from "@/components/bolt/BoltUI";
 
 function ClassicTabLayout() {
   const colors = useColors();
@@ -141,6 +142,10 @@ function ClassicTabLayout() {
             tabBarActiveTintColor: colors.primary,
             tabBarInactiveTintColor: colors.mutedForeground,
             headerShown: false,
+            sceneStyle: {
+              backgroundColor: "transparent",
+              flex: 1,
+            },
             tabBarStyle: {
               display: isMobile ? "flex" : "none",
               position: "absolute",
@@ -294,7 +299,13 @@ function ClassicTabLayout() {
 export default function TabLayout() {
   const { isAuthenticated, isLoading } = useAuth();
 
-  if (isLoading) return null;
+  if (isLoading) {
+    return (
+      <BoltScreen>
+        <BoltEcgLoader label="Loading secure clinical workspace" />
+      </BoltScreen>
+    );
+  }
   if (!isAuthenticated) return <Redirect href="/(auth)/login" />;
 
   return <ClassicTabLayout />;
@@ -308,7 +319,7 @@ const styles = StyleSheet.create({
     zIndex: 40,
   },
   layoutRoot: { flex: 1, flexDirection: "row", overflow: "visible" },
-  mainContent: { flex: 1, minWidth: 0, overflow: "hidden", position: "relative" },
+  mainContent: { flex: 1, minWidth: 0, overflow: "visible", position: "relative" },
   mobileDrawerPanel: { ...StyleSheet.absoluteFillObject, zIndex: 50 },
   menuButton: {
     alignItems: "center",

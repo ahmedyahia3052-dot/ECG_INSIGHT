@@ -2,12 +2,19 @@ import { Redirect, Stack } from "expo-router";
 import React from "react";
 import { useAuth } from "@/context/AuthContext";
 import { useColors } from "@/hooks/useColors";
+import { BoltEcgLoader, BoltScreen } from "@/components/bolt/BoltUI";
 
 export default function CaseLayout() {
   const colors = useColors();
   const { isAuthenticated, isLoading } = useAuth();
 
-  if (isLoading) return null;
+  if (isLoading) {
+    return (
+      <BoltScreen>
+        <BoltEcgLoader label="Loading ECG case workspace" />
+      </BoltScreen>
+    );
+  }
   if (!isAuthenticated) return <Redirect href="/(auth)/login" />;
 
   return (

@@ -115,6 +115,10 @@ export default function DashboardScreen() {
   const monitorHeartRate = aiHistory[0]?.heartRate ?? cases[0]?.heartRate ?? 72;
   const isMobile = width < 768;
 
+  useEffect(() => {
+    if (__DEV__) console.info("[route-mount] DashboardPage", { isMobile });
+  }, [isMobile]);
+
   const weeklySeries = useMemo(() => {
     const base = Math.max(cases.length, 1);
     return [base, base + 1, base + 2, base + critical, base + reports.length, base + reviewed, base + cases.length];

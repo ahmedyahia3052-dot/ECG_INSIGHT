@@ -9,6 +9,7 @@ import {
   BoltBadge,
   BoltButton,
   BoltCard,
+  BoltEmpty,
   BoltHero,
   BoltNavCard,
   BoltScreen,
@@ -27,7 +28,18 @@ export default function ProfileScreen() {
     retry: false,
   });
 
-  if (!user) return null;
+  if (!user) {
+    return (
+      <BoltScreen>
+        <BoltEmpty
+          actionLabel="Sign in"
+          message="A user profile is required to display account settings."
+          onAction={() => router.replace("/(auth)/login")}
+          title="Profile unavailable"
+        />
+      </BoltScreen>
+    );
+  }
   const subscription = subscriptionQuery.data;
   const planLabel = subscription?.lifetimeAccess.granted
     ? "Special Lifetime Access"

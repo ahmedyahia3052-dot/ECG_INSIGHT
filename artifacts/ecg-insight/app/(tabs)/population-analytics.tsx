@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+import { useEffect } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import { useAuth } from "@/context/AuthContext";
 import { useColors } from "@/hooks/useColors";
@@ -45,6 +46,10 @@ export default function PopulationAnalyticsScreen() {
   const criticalCases = toNumber(analytics.criticalCases ?? analytics.critical ?? analytics.highRiskPatients);
   const abnormalCases = toNumber(analytics.abnormalCases ?? analytics.abnormal ?? analytics.flaggedCases);
   const departments = toNumber(analytics.departments ?? analytics.departmentCount ?? analytics.organizations);
+
+  useEffect(() => {
+    if (__DEV__) console.info("[route-mount] AnalyticsPage", { hasAnalytics: entries.length > 0 });
+  }, [entries.length]);
 
   return (
     <BoltScreen>

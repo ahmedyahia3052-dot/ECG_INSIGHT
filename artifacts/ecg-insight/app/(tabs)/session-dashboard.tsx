@@ -78,7 +78,7 @@ const styles = StyleSheet.create({
 });
 
 function browserName(userAgent?: string | null) {
-  if (!userAgent) return null;
+  if (!userAgent) return "Unknown browser";
   if (userAgent.includes("Edg/")) return "Microsoft Edge";
   if (userAgent.includes("Chrome/")) return "Chrome";
   if (userAgent.includes("Safari/")) return "Safari";
