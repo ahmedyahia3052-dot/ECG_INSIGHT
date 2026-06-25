@@ -1,12 +1,12 @@
 import { apiRequest } from "./api";
 
 export interface WorkspacePreferences {
-  compactDashboardDensity: boolean;
+  compactDensity: boolean;
   criticalAlertSound: boolean;
-  highContrastClinicalMode: boolean;
+  destructiveActionConfirmation: boolean;
+  highContrastMode: boolean;
   reduceMotion: boolean;
-  rememberLastPatientFilter: boolean;
-  requireConfirmationForDestructiveActions: boolean;
+  rememberPatientFilters: boolean;
   updatedAt?: string;
   userId?: string;
 }
@@ -19,6 +19,6 @@ export async function updatePreferences(accessToken: string, input: Partial<Work
   return apiRequest<{ preferences: WorkspacePreferences }>("/preferences", {
     accessToken,
     body: JSON.stringify(input),
-    method: "PATCH",
+    method: "PUT",
   });
 }

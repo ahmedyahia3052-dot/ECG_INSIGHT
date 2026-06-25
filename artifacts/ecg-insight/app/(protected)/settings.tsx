@@ -8,11 +8,11 @@ import { getPreferences, updatePreferences, type WorkspacePreferences } from "@/
 
 const settings: Array<{ description: string; key: keyof WorkspacePreferences; label: string }> = [
   { description: "Reduce non-essential transitions and motion effects.", key: "reduceMotion", label: "Reduce Motion" },
-  { description: "Increase contrast for clinical readability.", key: "highContrastClinicalMode", label: "High Contrast Clinical Mode" },
-  { description: "Use denser cards and reduced spacing on dashboard views.", key: "compactDashboardDensity", label: "Compact Dashboard Density" },
+  { description: "Increase contrast for clinical readability.", key: "highContrastMode", label: "High Contrast Clinical Mode" },
+  { description: "Use denser cards and reduced spacing on dashboard views.", key: "compactDensity", label: "Compact Dashboard Density" },
   { description: "Play an audible cue for critical clinical alerts.", key: "criticalAlertSound", label: "Critical Alert Sound" },
-  { description: "Remember the last patient registry search/filter state.", key: "rememberLastPatientFilter", label: "Remember Last Patient Filter" },
-  { description: "Require confirmation before delete, revoke, archive, or destructive actions.", key: "requireConfirmationForDestructiveActions", label: "Require Confirmation For Destructive Actions" },
+  { description: "Remember the last patient registry search/filter state.", key: "rememberPatientFilters", label: "Remember Last Patient Filter" },
+  { description: "Require confirmation before delete, revoke, archive, or destructive actions.", key: "destructiveActionConfirmation", label: "Require Confirmation For Destructive Actions" },
 ];
 
 export default function SettingsScreen() {

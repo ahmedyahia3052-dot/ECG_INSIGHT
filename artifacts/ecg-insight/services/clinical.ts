@@ -307,6 +307,13 @@ export async function updateCaseStatus(accessToken: string, caseId: string, stat
   });
 }
 
+export async function createCaseRevision(accessToken: string, caseId: string) {
+  return apiRequest<{ case: ApiECGCase }>(`/cases/${caseId}/revisions`, {
+    accessToken,
+    method: "POST",
+  });
+}
+
 export async function reviewCase(accessToken: string, caseId: string, input: {
   clinicalComments?: string;
   doctorDiagnosis?: string;

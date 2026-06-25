@@ -319,10 +319,28 @@ casesRouter.post(
   validateBody(updateStatusSchema),
   async (req, res, next) => {
     try {
-      const current = await prisma.eCGCase.findUnique({ where: { id: String(req.params.caseId) } });
+      let current = await prisma.eCGCase.findUnique({ where: { id: String(req.params.caseId) } });
       if (!current) throw new AppError(404, "ECG case not found.", "CASE_NOT_FOUND");
       assertResourceAccess(await canAccessCase(current.id, req.auth!));
       const nextStatus = fromApiCaseStatus(req.body.status);
+      if (current.status === "AI_COMPLETED" && (nextStatus === "APPROVED" || nextStatus === "REJECTED")) {
+        const reviewed = await prisma.eCGCase.update({
+          data: {
+            ...statusTimestampPatch("UNDER_REVIEW", req.auth!.id),
+            status: "UNDER_REVIEW",
+          },
+          where: { id: current.id },
+        });
+        await audit({
+          action: "CASE_STATUS_CHANGED",
+          actorId: req.auth!.id,
+          caseId: reviewed.id,
+          message: `ECG case ${reviewed.caseNumber ?? reviewed.caseId} status changed to UNDER_REVIEW.`,
+          metadata: { previousStatus: current.status, status: reviewed.status },
+          patientId: reviewed.patientId,
+        });
+        current = reviewed;
+      }
       assertCaseStatusTransition(current.status, nextStatus);
       const ecgCase = await prisma.eCGCase.update({
         data: {
@@ -355,6 +373,41 @@ casesRouter.post(
   },
 );
 
+casesRouter.post("/:caseId/revisions", requireRole("DOCTOR"), async (req, res, next) => {
+  try {
+    const source = await findCaseForRoute(String(req.params.caseId));
+    if (!source) throw new AppError(404, "ECG case not found.", "CASE_NOT_FOUND");
+    assertResourceAccess(await canAccessCase(source.id, req.auth!));
+    const revision = await prisma.eCGCase.create({
+      data: {
+        acquisitionDate: new Date(),
+        assignedDoctorId: source.assignedDoctorId,
+        caseId: nextCaseId(),
+        caseNumber: await nextCaseNumber(),
+        clinicalNotes: `Revision created from ${source.caseNumber ?? source.caseId}.`,
+        ecgType: source.ecgType,
+        patientId: source.patientId,
+        priority: source.priority,
+        severity: "NORMAL",
+        status: "UPLOADED",
+        uploadedById: req.auth!.id,
+      },
+      include: caseInclude,
+    });
+    await audit({
+      action: "CASE_CREATED",
+      actorId: req.auth!.id,
+      caseId: revision.id,
+      message: `New ECG revision ${revision.caseNumber ?? revision.caseId} created from ${source.caseNumber ?? source.caseId}.`,
+      metadata: { revisionOf: source.id, sourceStatus: source.status },
+      patientId: revision.patientId,
+    });
+    res.status(201).json({ case: serializeCase(revision) });
+  } catch (error) {
+    next(error);
+  }
+});
+
 casesRouter.post("/:caseId/review", requireRole("DOCTOR"), validateBody(reviewCaseSchema), async (req, res, next) => {
   try {
     const current = await findCaseForRoute(String(req.params.caseId));
@@ -377,11 +430,11 @@ casesRouter.post("/:caseId/review", requireRole("DOCTOR"), validateBody(reviewCa
       where: { id: current.id },
     });
     await audit({
-      action: "CASE_UPDATED",
+      action: "CASE_STATUS_CHANGED",
       actorId: req.auth!.id,
       caseId: ecgCase.id,
-      message: `Doctor review started for ECG case ${ecgCase.caseNumber ?? ecgCase.caseId}.`,
-      metadata: { status: ecgCase.status },
+      message: `ECG case ${ecgCase.caseNumber ?? ecgCase.caseId} moved to under review.`,
+      metadata: { previousStatus: current.status, status: ecgCase.status },
       patientId: ecgCase.patientId,
     });
     await prisma.timelineEvent.create({

@@ -54,10 +54,20 @@ async function completeAnalysis(analysisId: string, actorId: string) {
       where: { id: analysisId },
     });
     const processingCase = await prisma.eCGCase.findUnique({ where: { id: queued.caseId } });
-    if (processingCase && canTransitionCaseStatus(processingCase.status, "PROCESSING")) {
+    if (processingCase && processingCase.status !== "PROCESSING" && canTransitionCaseStatus(processingCase.status, "PROCESSING")) {
       await prisma.eCGCase.update({
         data: { aiStatus: "PROCESSING", status: "PROCESSING" },
         where: { id: queued.caseId },
+      });
+      await prisma.auditLog.create({
+        data: {
+          action: "CASE_STATUS_CHANGED",
+          actorId,
+          caseId: queued.caseId,
+          message: `ECG case status changed from ${processingCase.status} to PROCESSING.`,
+          metadata: { from: processingCase.status, to: "PROCESSING" },
+          patientId: processingCase.patientId,
+        },
       });
     }
 
@@ -109,6 +119,16 @@ async function completeAnalysis(analysisId: string, actorId: string) {
           status: "AI_COMPLETED",
         },
         where: { id: queued.caseId },
+      });
+      await prisma.auditLog.create({
+        data: {
+          action: "CASE_STATUS_CHANGED",
+          actorId,
+          caseId: queued.caseId,
+          message: `ECG case status changed from ${latestCase.status} to AI_COMPLETED.`,
+          metadata: { from: latestCase.status, to: "AI_COMPLETED" },
+          patientId: latestCase.patientId,
+        },
       });
     } else if (latestCase && !isReadOnlyCaseStatus(latestCase.status)) {
       await prisma.eCGCase.update({
@@ -228,6 +248,16 @@ export async function queueAnalysis(caseId: string, actorId: string) {
   await prisma.eCGCase.update({
     data: { aiStatus: "QUEUED", status: "PROCESSING" },
     where: { id: caseId },
+  });
+  await prisma.auditLog.create({
+    data: {
+      action: "CASE_STATUS_CHANGED",
+      actorId,
+      caseId,
+      message: `ECG case status changed from ${ecgCase.status} to PROCESSING.`,
+      metadata: { from: ecgCase.status, to: "PROCESSING" },
+      patientId: ecgCase.patientId,
+    },
   });
   await prisma.auditLog.create({
     data: {

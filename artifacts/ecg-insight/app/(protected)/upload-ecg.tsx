@@ -34,7 +34,8 @@ export default function UploadEcgScreen() {
   const [selectedPatientId, setSelectedPatientId] = useState("");
   const [patientName, setPatientName] = useState("");
   const [dateOfBirth, setDateOfBirth] = useState("1970-01-01");
-  const [gender, setGender] = useState<"male" | "female" | "other" | "unknown">("unknown");
+  const [gender, setGender] = useState<"child" | "female" | "male" | "other" | "unknown">("unknown");
+  const [genderOpen, setGenderOpen] = useState(false);
   const [mrn, setMrn] = useState("");
   const [priority, setPriority] = useState<"low" | "medium" | "high" | "critical">("medium");
   const [assets, setAssets] = useState<SelectedAsset[]>([]);
@@ -217,7 +218,7 @@ export default function UploadEcgScreen() {
       </Card>
 
       <Card style={styles.form}>
-        <SectionHeader title="Patient & Case Details" />
+        <SectionHeader title="Patient & Case Details" subtitle="Choose an existing patient first to avoid duplicate records, or create a new patient before attaching ECG files." />
         {error ? <Text style={styles.error}>{error}</Text> : null}
         <View style={styles.actions}>
           <PrimaryButton label="Select Existing Patient" onPress={() => setPatientMode("existing")} variant={patientMode === "existing" ? "primary" : "outline"} />
@@ -225,7 +226,7 @@ export default function UploadEcgScreen() {
         </View>
         {patientMode === "existing" ? (
           <View style={styles.patientPicker}>
-            <Field label="Search Existing Patient" onChangeText={setPatientSearch} placeholder="Name, MRN, employee ID, email..." value={patientSearch} />
+            <Field label="Search Existing Patient" onChangeText={setPatientSearch} placeholder="Patient ID, employee ID, name, MRN..." value={patientSearch} />
             {patientsQuery.isLoading ? <Text style={styles.muted}>Searching patients...</Text> : null}
             {(patientsQuery.data?.patients ?? []).map((patient) => (
               <Pressable
@@ -247,7 +248,25 @@ export default function UploadEcgScreen() {
             <Field label="Full Name" onChangeText={setPatientName} value={patientName} />
             <Field label="MRN" onChangeText={setMrn} value={mrn} />
             <Field label="DOB" onChangeText={setDateOfBirth} value={dateOfBirth} />
-            <Field label="Gender" onChangeText={(value) => setGender(normalizeGender(value))} value={gender} />
+            <View style={styles.genderPanel}>
+              <Text style={styles.genderLabel}>Gender</Text>
+              <PrimaryButton label={genderLabel(gender)} onPress={() => setGenderOpen((value) => !value)} variant="outline" />
+              {genderOpen ? (
+                <View style={styles.genderDropdown}>
+                  {(["male", "female", "child", "other", "unknown"] as const).map((value) => (
+                    <PrimaryButton
+                      key={value}
+                      label={genderLabel(value)}
+                      onPress={() => {
+                        setGender(value);
+                        setGenderOpen(false);
+                      }}
+                      variant={gender === value ? "primary" : "outline"}
+                    />
+                  ))}
+                </View>
+              ) : null}
+            </View>
           </View>
         )}
         <View style={styles.actions}>
@@ -316,10 +335,12 @@ async function waitForAnalysis(token: string, id: string) {
   throw new Error("AI analysis did not return a result.");
 }
 
-function normalizeGender(value: string): "female" | "male" | "other" | "unknown" {
-  const normalized = value.toLowerCase();
-  if (normalized === "male" || normalized === "female" || normalized === "other") return normalized;
-  return "unknown";
+function genderLabel(value: "child" | "female" | "male" | "other" | "unknown") {
+  if (value === "male") return "Male";
+  if (value === "female") return "Female";
+  if (value === "child") return "Child";
+  if (value === "other") return "Other";
+  return "Unknown";
 }
 
 function mimeTypeForFile(name: string) {
@@ -347,6 +368,9 @@ const styles = StyleSheet.create({
   error: { color: medicalTheme.critical, fontSize: 13, fontWeight: "800" },
   form: { gap: 14 },
   formatRow: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+  genderDropdown: { backgroundColor: medicalTheme.surface, borderColor: medicalTheme.border, borderRadius: 14, borderWidth: 1, flexDirection: "row", flexWrap: "wrap", gap: 8, padding: 10 },
+  genderLabel: { color: medicalTheme.text, fontSize: 12, fontWeight: "800" },
+  genderPanel: { gap: 8, minWidth: 240 },
   grid: { flexDirection: "row", flexWrap: "wrap", gap: 12 },
   muted: { color: medicalTheme.muted, fontSize: 13, fontWeight: "700" },
   patientOption: { alignItems: "center", backgroundColor: medicalTheme.surface, borderColor: medicalTheme.border, borderRadius: 14, borderWidth: 1, flexDirection: "row", gap: 12, padding: 12 },

@@ -6,7 +6,7 @@ import { StyleSheet, Text, View } from "react-native";
 import { Badge, Card, EmptyState, Field, formatDate, medicalTheme, PageSection, patientDisplayName, PrimaryButton, SectionHeader } from "@/components/enterprise/EnterpriseUI";
 import { useAuth } from "@/context/AuthContext";
 import { getAIExplainability, getAIResult, submitDoctorReview } from "@/services/ai";
-import { approveCase, getCase, rejectCase, reviewCase } from "@/services/clinical";
+import { approveCase, createCaseRevision, getCase, rejectCase, reviewCase } from "@/services/clinical";
 import { generateReport } from "@/services/reports";
 
 type Severity = "abnormal" | "critical" | "normal";
@@ -99,9 +99,17 @@ export default function EcgCaseReviewScreen() {
       await invalidate();
     },
   });
+  const revisionMutation = useMutation({
+    mutationFn: () => createCaseRevision(token!, id),
+    onSuccess: (payload) => {
+      setMessage(`New revision created: ${payload.case.caseNumber ?? payload.case.caseId}`);
+      router.push(`/ecg-cases/${payload.case.id}` as never);
+    },
+  });
 
   if (caseQuery.isLoading) return <Text style={styles.muted}>Loading review workspace...</Text>;
   if (!ecgCase) return <EmptyState title="ECG case not found" message="The selected ECG case could not be loaded for review." />;
+  const readOnly = ecgCase.status === "finalized";
 
   return (
     <PageSection>
@@ -116,7 +124,8 @@ export default function EcgCaseReviewScreen() {
         </View>
         <View style={styles.actions}>
           <PrimaryButton label="Back to Case" onPress={() => router.push(`/ecg-cases/${ecgCase.id}` as never)} variant="outline" />
-          <PrimaryButton label="Generate Report" onPress={() => reportMutation.mutate()} variant="outline" />
+          <PrimaryButton disabled={readOnly} label="Generate Report" onPress={() => reportMutation.mutate()} variant="outline" />
+          {readOnly ? <PrimaryButton label="Create New Revision" onPress={() => revisionMutation.mutate()} /> : null}
         </View>
       </Card>
 
@@ -142,18 +151,19 @@ export default function EcgCaseReviewScreen() {
       <Card style={styles.form}>
         <SectionHeader title="Doctor Review" subtitle="Edit diagnosis, comments, severity, recommendations, then approve or reject." />
         <View style={styles.grid}>
-          <Field label="Doctor Diagnosis" onChangeText={setDoctorDiagnosis} value={doctorDiagnosis} />
-          <Field label="Clinical Comments" onChangeText={setClinicalComments} value={clinicalComments} />
-          <Field label="Final Recommendations" onChangeText={setRecommendations} value={recommendations} />
+          <Field editable={!readOnly} label="Doctor Diagnosis" onChangeText={setDoctorDiagnosis} value={doctorDiagnosis} />
+          <Field editable={!readOnly} label="Clinical Comments" onChangeText={setClinicalComments} value={clinicalComments} />
+          <Field editable={!readOnly} label="Final Recommendations" onChangeText={setRecommendations} value={recommendations} />
         </View>
         <View style={styles.actions}>
-          {severities.map((item) => <PrimaryButton key={item} label={item} onPress={() => setSeverity(item)} variant={severity === item ? "primary" : "outline"} />)}
+          {severities.map((item) => <PrimaryButton disabled={readOnly} key={item} label={item} onPress={() => setSeverity(item)} variant={severity === item ? "primary" : "outline"} />)}
         </View>
         <View style={styles.actions}>
-          <PrimaryButton disabled={saveMutation.isPending} label="Save Review" onPress={() => saveMutation.mutate()} variant="outline" />
-          <PrimaryButton disabled={approveMutation.isPending} label="Approve" onPress={() => approveMutation.mutate()} />
-          <PrimaryButton disabled={rejectMutation.isPending} label="Reject" onPress={() => rejectMutation.mutate()} variant="danger" />
+          <PrimaryButton disabled={readOnly || saveMutation.isPending} label="Save Review" onPress={() => saveMutation.mutate()} variant="outline" />
+          <PrimaryButton disabled={readOnly || approveMutation.isPending} label="Approve" onPress={() => approveMutation.mutate()} />
+          <PrimaryButton disabled={readOnly || rejectMutation.isPending} label="Reject" onPress={() => rejectMutation.mutate()} variant="danger" />
         </View>
+        {readOnly ? <Text style={styles.muted}>Finalized ECG cases are read-only. Create a new revision for additional analysis.</Text> : null}
         {message ? <Text style={styles.success}>{message}</Text> : null}
       </Card>
     </PageSection>

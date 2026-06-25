@@ -125,8 +125,9 @@ export default function ReportsIndexScreen() {
               <PrimaryButton label="Edit" onPress={() => router.push(`/reports/${report.id}` as never)} variant="outline" />
               <PrimaryButton label="Finalize" onPress={() => finalizeMutation.mutate(report.id)} variant="outline" />
               <PrimaryButton label="Sign" onPress={() => signMutation.mutate(report.id)} variant="outline" />
+              <PrimaryButton label="Preview PDF" onPress={() => void openReportPdf(token, report.id, "preview")} variant="outline" />
               <PrimaryButton label="Print" onPress={() => void openReportPdf(token, report.id, "print")} variant="outline" />
-              <PrimaryButton label="Export PDF" onPress={() => void openReportPdf(token, report.id)} variant="outline" />
+              <PrimaryButton label="Export PDF" onPress={() => void openReportPdf(token, report.id, "download")} variant="outline" />
               <PrimaryButton label="Delete" onPress={() => deleteMutation.mutate(report.id)} variant="danger" />
             </View>
           </View>
@@ -151,10 +152,21 @@ const styles = StyleSheet.create({
   table: { gap: 10 },
 });
 
-async function openReportPdf(token: string | undefined, reportId: string, watermark?: string) {
+async function openReportPdf(token: string | undefined, reportId: string, mode: "download" | "preview" | "print") {
   if (!token || Platform.OS !== "web" || typeof window === "undefined") return;
-  const blob = await downloadReportPdf(token, reportId, watermark);
+  const blob = await downloadReportPdf(token, reportId);
   const url = URL.createObjectURL(blob);
-  window.open(url, "_blank", "noopener,noreferrer");
+  if (mode === "download") {
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "ecg-insight-report.pdf";
+    link.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1_000);
+    return;
+  }
+  const opened = window.open(url, "_blank", "noopener,noreferrer");
+  if (mode === "print" && opened) {
+    opened.addEventListener("load", () => opened.print(), { once: true });
+  }
   setTimeout(() => URL.revokeObjectURL(url), 60_000);
 }

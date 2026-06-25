@@ -7,7 +7,7 @@ import { Badge, Card, EmptyState, formatDate, medicalTheme, PageSection, patient
 import { useAuth } from "@/context/AuthContext";
 import { analyzeCase, getAIExplainability, getAIResult } from "@/services/ai";
 import { API_URL } from "@/services/api";
-import { approveCase, getCase, rejectCase, updateCaseStatus, type ApiECGCase } from "@/services/clinical";
+import { approveCase, createCaseRevision, getCase, rejectCase, updateCaseStatus, type ApiECGCase } from "@/services/clinical";
 import { generateReport } from "@/services/reports";
 
 export default function EcgCaseDetailScreen() {
@@ -44,7 +44,12 @@ export default function EcgCaseDetailScreen() {
   const processMutation = useMutation({ mutationFn: () => updateCaseStatus(token!, id, "processing"), onSuccess: invalidate });
   const approveMutation = useMutation({ mutationFn: () => approveCase(token!, id), onSuccess: invalidate });
   const rejectMutation = useMutation({ mutationFn: () => rejectCase(token!, id, { reason: "Rejected from detail review." }), onSuccess: invalidate });
+  const finalizeMutation = useMutation({ mutationFn: () => updateCaseStatus(token!, id, "finalized"), onSuccess: invalidate });
   const reportMutation = useMutation({ mutationFn: () => generateReport(token!, id), onSuccess: invalidate });
+  const revisionMutation = useMutation({
+    mutationFn: () => createCaseRevision(token!, id),
+    onSuccess: (payload) => router.push(`/ecg-cases/${payload.case.id}` as never),
+  });
 
   const ecgCase = caseQuery.data?.case;
   const analysis = analysisQuery.data?.analysis;
@@ -52,6 +57,12 @@ export default function EcgCaseDetailScreen() {
 
   if (caseQuery.isLoading) return <Text style={styles.muted}>Loading ECG case...</Text>;
   if (!ecgCase) return <EmptyState title="ECG case not found" message="The selected ECG case could not be loaded." />;
+  const readOnly = ecgCase.status === "finalized";
+  const canProcess = ecgCase.status === "uploaded";
+  const canAnalyze = ecgCase.status === "uploaded" || ecgCase.status === "processing";
+  const canReview = ecgCase.status === "ai_completed" || ecgCase.status === "under_review";
+  const canApproveReject = ecgCase.status === "under_review";
+  const canFinalize = ecgCase.status === "approved" || ecgCase.status === "rejected";
 
   return (
     <PageSection>
@@ -66,12 +77,14 @@ export default function EcgCaseDetailScreen() {
           </View>
         </View>
         <View style={styles.actions}>
-          <PrimaryButton label="Process" onPress={() => processMutation.mutate()} variant="outline" />
-          <PrimaryButton label="Run AI" onPress={() => analyzeMutation.mutate()} />
-          <PrimaryButton label="Review" onPress={() => router.push(`/ecg-cases/${ecgCase.id}/review` as never)} variant="outline" />
-          <PrimaryButton label="Approve" onPress={() => approveMutation.mutate()} variant="outline" />
-          <PrimaryButton label="Reject" onPress={() => rejectMutation.mutate()} variant="danger" />
-          <PrimaryButton label="Generate Report" onPress={() => reportMutation.mutate()} variant="outline" />
+          <PrimaryButton disabled={!canProcess} label="Process" onPress={() => processMutation.mutate()} variant="outline" />
+          <PrimaryButton disabled={!canAnalyze} label="Run AI" onPress={() => analyzeMutation.mutate()} />
+          <PrimaryButton disabled={!canReview && !readOnly} label="Review" onPress={() => router.push(`/ecg-cases/${ecgCase.id}/review` as never)} variant="outline" />
+          <PrimaryButton disabled={!canApproveReject} label="Approve" onPress={() => approveMutation.mutate()} variant="outline" />
+          <PrimaryButton disabled={!canApproveReject} label="Reject" onPress={() => rejectMutation.mutate()} variant="danger" />
+          <PrimaryButton disabled={!canFinalize} label="Finalize" onPress={() => finalizeMutation.mutate()} variant="outline" />
+          <PrimaryButton disabled={readOnly} label="Generate Report" onPress={() => reportMutation.mutate()} variant="outline" />
+          {readOnly || ecgCase.status === "approved" || ecgCase.status === "rejected" ? <PrimaryButton label="Create New Revision" onPress={() => revisionMutation.mutate()} variant="outline" /> : null}
         </View>
       </Card>
 

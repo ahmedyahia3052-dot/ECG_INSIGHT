@@ -1,4 +1,4 @@
-import { Router } from "express";
+import { Router, type RequestHandler } from "express";
 import { z } from "zod";
 import { prisma } from "../../config/prisma";
 import { requireAuth } from "../../middleware/auth";
@@ -9,12 +9,27 @@ preferencesRouter.use(requireAuth);
 
 const preferenceSchema = z.object({
   compactDashboardDensity: z.boolean().optional(),
+  compactDensity: z.boolean().optional(),
   criticalAlertSound: z.boolean().optional(),
+  destructiveActionConfirmation: z.boolean().optional(),
+  highContrastMode: z.boolean().optional(),
   highContrastClinicalMode: z.boolean().optional(),
+  rememberPatientFilters: z.boolean().optional(),
   reduceMotion: z.boolean().optional(),
   rememberLastPatientFilter: z.boolean().optional(),
   requireConfirmationForDestructiveActions: z.boolean().optional(),
 });
+
+function preferencePatch(body: z.infer<typeof preferenceSchema>) {
+  return {
+    compactDashboardDensity: body.compactDensity ?? body.compactDashboardDensity,
+    criticalAlertSound: body.criticalAlertSound,
+    highContrastClinicalMode: body.highContrastMode ?? body.highContrastClinicalMode,
+    reduceMotion: body.reduceMotion,
+    rememberLastPatientFilter: body.rememberPatientFilters ?? body.rememberLastPatientFilter,
+    requireConfirmationForDestructiveActions: body.destructiveActionConfirmation ?? body.requireConfirmationForDestructiveActions,
+  };
+}
 
 function serializePreferences(preferences: {
   compactDashboardDensity: boolean;
@@ -27,12 +42,12 @@ function serializePreferences(preferences: {
   userId: string;
 }) {
   return {
-    compactDashboardDensity: preferences.compactDashboardDensity,
+    compactDensity: preferences.compactDashboardDensity,
     criticalAlertSound: preferences.criticalAlertSound,
-    highContrastClinicalMode: preferences.highContrastClinicalMode,
+    destructiveActionConfirmation: preferences.requireConfirmationForDestructiveActions,
+    highContrastMode: preferences.highContrastClinicalMode,
     reduceMotion: preferences.reduceMotion,
-    rememberLastPatientFilter: preferences.rememberLastPatientFilter,
-    requireConfirmationForDestructiveActions: preferences.requireConfirmationForDestructiveActions,
+    rememberPatientFilters: preferences.rememberLastPatientFilter,
     updatedAt: preferences.updatedAt.toISOString(),
     userId: preferences.userId,
   };
@@ -55,12 +70,12 @@ preferencesRouter.get("/", async (req, res, next) => {
   }
 });
 
-preferencesRouter.patch("/", async (req, res, next) => {
+const updatePreferenceHandler: RequestHandler = async (req, res, next) => {
   try {
     const body = preferenceSchema.parse(req.body);
     await ensurePreferences(req.auth!.id);
     const preferences = await prisma.userPreference.update({
-      data: body,
+      data: preferencePatch(body),
       where: { userId: req.auth!.id },
     });
     await prisma.auditLog.create({
@@ -76,4 +91,7 @@ preferencesRouter.patch("/", async (req, res, next) => {
   } catch (error) {
     next(error);
   }
-});
+};
+
+preferencesRouter.patch("/", updatePreferenceHandler);
+preferencesRouter.put("/", updatePreferenceHandler);

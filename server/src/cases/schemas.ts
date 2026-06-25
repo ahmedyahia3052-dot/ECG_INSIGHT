@@ -1,6 +1,7 @@
 import { z } from "zod";
 
-export const caseStatusSchema = z.enum(["uploaded", "processing", "ai_completed", "under_review", "approved", "rejected", "finalized", "pending", "reviewed"]);
+export const caseStatusSchema = z.enum(["uploaded", "processing", "ai_completed", "under_review", "approved", "rejected", "finalized"]);
+const caseCreateStatusSchema = z.preprocess((value) => value === "pending" ? "uploaded" : value, caseStatusSchema);
 export const caseSeveritySchema = z.enum(["normal", "abnormal", "critical"]);
 
 export const caseCreateSchema = z.object({
@@ -21,7 +22,7 @@ export const caseCreateSchema = z.object({
   recommendations: z.string().trim().max(3000).optional(),
   rhythm: z.string().trim().max(160).optional(),
   severity: caseSeveritySchema.default("normal"),
-  status: caseStatusSchema.default("uploaded"),
+  status: caseCreateStatusSchema.default("uploaded"),
 });
 
 export const caseUpdateSchema = z.object({

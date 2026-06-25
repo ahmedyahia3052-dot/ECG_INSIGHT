@@ -2,14 +2,14 @@ import type { ECGCase, ECGCaseStatus } from "@prisma/client";
 import { AppError } from "../middleware/error";
 
 const allowedTransitions: Record<ECGCaseStatus, ECGCaseStatus[]> = {
-  PENDING: ["UPLOADED", "PROCESSING", "UNDER_REVIEW"],
-  UPLOADED: ["PROCESSING", "AI_COMPLETED", "UNDER_REVIEW", "REJECTED"],
-  PROCESSING: ["AI_COMPLETED", "UNDER_REVIEW", "REJECTED"],
-  AI_COMPLETED: ["UNDER_REVIEW", "REVIEWED", "APPROVED", "REJECTED"],
-  UNDER_REVIEW: ["REVIEWED", "APPROVED", "REJECTED"],
-  REVIEWED: ["APPROVED", "REJECTED"],
+  PENDING: ["UPLOADED"],
+  UPLOADED: ["PROCESSING"],
+  PROCESSING: ["AI_COMPLETED"],
+  AI_COMPLETED: ["UNDER_REVIEW"],
+  UNDER_REVIEW: ["APPROVED", "REJECTED"],
+  REVIEWED: [],
   APPROVED: ["FINALIZED"],
-  REJECTED: [],
+  REJECTED: ["FINALIZED"],
   FINALIZED: [],
 };
 
@@ -18,7 +18,7 @@ export function isReadOnlyCaseStatus(status: ECGCaseStatus) {
 }
 
 export function isTerminalCaseStatus(status: ECGCaseStatus) {
-  return status === "FINALIZED" || status === "REJECTED";
+  return status === "FINALIZED";
 }
 
 export function canTransitionCaseStatus(from: ECGCaseStatus, to: ECGCaseStatus) {
@@ -40,10 +40,10 @@ export function assertCaseEditable(ecgCase: Pick<ECGCase, "status">) {
 }
 
 export function assertCaseCanAcceptAnalysis(ecgCase: Pick<ECGCase, "status">) {
-  if (isTerminalCaseStatus(ecgCase.status) || ecgCase.status === "APPROVED") {
+  if (isTerminalCaseStatus(ecgCase.status) || ecgCase.status === "APPROVED" || ecgCase.status === "REJECTED" || ecgCase.status === "UNDER_REVIEW" || ecgCase.status === "AI_COMPLETED") {
     throw new AppError(
       409,
-      "Approved, rejected, or finalized ECG cases cannot be re-analyzed.",
+      "This ECG case cannot be re-analyzed. Create a new revision to run analysis again.",
       "CASE_ANALYSIS_LOCKED",
     );
   }
