@@ -13,6 +13,16 @@ import { log } from "./utils/logger";
 
 const developmentOrigins = ["http://localhost:8082", "http://localhost:8081", "http://localhost:5173", "http://localhost:3000"];
 
+function isDevelopmentLocalhostOrigin(origin: string) {
+  if (env.NODE_ENV !== "development") return false;
+  try {
+    const url = new URL(origin);
+    return (url.hostname === "localhost" || url.hostname === "127.0.0.1") && ["http:", "https:"].includes(url.protocol);
+  } catch {
+    return false;
+  }
+}
+
 function allowedOrigins() {
   const configuredOrigins = env.CLIENT_ORIGIN.split(",")
     .map((origin) => origin.trim())
@@ -43,7 +53,7 @@ export function createApp() {
       credentials: true,
       methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
       origin(origin, callback) {
-        if (!origin || corsOrigins.includes(origin)) {
+        if (!origin || corsOrigins.includes(origin) || isDevelopmentLocalhostOrigin(origin)) {
           callback(null, true);
           return;
         }

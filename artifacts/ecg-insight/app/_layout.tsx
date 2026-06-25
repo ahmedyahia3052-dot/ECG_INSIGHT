@@ -11,14 +11,10 @@ import * as SplashScreen from "expo-splash-screen";
 import React, { useEffect } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
-import { KeyboardProvider } from "react-native-keyboard-controller";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
 import { ErrorBoundary } from "@/components/ErrorBoundary";
-import { GlobalQueryStatus } from "@/components/GlobalQueryStatus";
 import { AuthProvider } from "@/context/AuthContext";
-import { VisualExperienceProvider } from "@/context/VisualExperienceContext";
-import { ToastProvider } from "@/components/interaction/PremiumInteraction";
 import { ApiError } from "@/services/api";
 
 SplashScreen.preventAutoHideAsync();
@@ -39,16 +35,10 @@ function RootLayoutNav() {
   return (
     <Stack screenOptions={{ headerShown: false }}>
       <Stack.Screen name="index" options={{ headerShown: false }} />
-      <Stack.Screen name="onboarding" options={{ headerShown: false }} />
-      <Stack.Screen name="(auth)" options={{ headerShown: false }} />
-      <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-      <Stack.Screen name="case" options={{ headerShown: false }} />
-      <Stack.Screen name="admin" options={{ headerShown: false }} />
-      <Stack.Screen name="dashboard" options={{ headerShown: false }} />
-      <Stack.Screen name="notifications" options={{ headerShown: false }} />
-      <Stack.Screen name="patients" options={{ headerShown: false }} />
-      <Stack.Screen name="reports" options={{ headerShown: false }} />
-      <Stack.Screen name="unauthorized" options={{ headerShown: false }} />
+      <Stack.Screen name="login" options={{ headerShown: false }} />
+      <Stack.Screen name="forgot-password" options={{ headerShown: false }} />
+      <Stack.Screen name="verify-email" options={{ headerShown: false }} />
+      <Stack.Screen name="(protected)" options={{ headerShown: false }} />
     </Stack>
   );
 }
@@ -81,16 +71,9 @@ export default function RootLayout() {
       <ErrorBoundary>
         <QueryClientProvider client={queryClient}>
           <GestureHandlerRootView style={{ flex: 1 }}>
-            <KeyboardProvider>
-              <AuthProvider>
-                <VisualExperienceProvider>
-                  <ToastProvider>
-                    <RootLayoutNav />
-                    <GlobalQueryStatus />
-                  </ToastProvider>
-                </VisualExperienceProvider>
-              </AuthProvider>
-            </KeyboardProvider>
+            <AuthProvider>
+              <RootLayoutNav />
+            </AuthProvider>
           </GestureHandlerRootView>
         </QueryClientProvider>
       </ErrorBoundary>
