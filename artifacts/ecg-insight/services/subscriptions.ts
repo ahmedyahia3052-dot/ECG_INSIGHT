@@ -76,7 +76,7 @@ export async function grantOwnerLicense(accessToken: string, input: {
 }
 
 export async function updateOwnerLicense(accessToken: string, licenseId: string, input: {
-  action: "activate" | "extend" | "revoke" | "suspend";
+  action: "activate" | "extend" | "resume" | "revoke" | "suspend";
   expiresAt?: string;
   notes?: string;
 }) {

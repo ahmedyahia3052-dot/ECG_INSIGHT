@@ -34,18 +34,15 @@ subscriptionsRouter.use(requireAuth);
 
 const ownerRole = requireRole("SUPER_ADMIN");
 const publicPlanCodes: Parameters<typeof toApiTier>[0][] = ["FREE", "BASIC", "PROFESSIONAL", "ENTERPRISE"];
+const DEVELOPER_OWNER_EMAIL = "ahmedyahia3052@gmail.com";
 
 const ownerOnly: RequestHandler = async (req, _res, next) => {
   try {
-    if (req.auth?.role === "OWNER" || req.auth?.actorRole === "OWNER") {
-      next();
-      return;
-    }
-    if (req.auth?.role !== "SUPER_ADMIN") {
-      throw new AppError(403, "Owner access required.", "OWNER_ONLY");
-    }
+    if (!req.auth) throw new AppError(401, "Authentication required.", "AUTH_REQUIRED");
     const user = await prisma.user.findUnique({ where: { id: req.auth.id } });
-    if (!user?.protectedOwner) throw new AppError(403, "Owner access required.", "OWNER_ONLY");
+    if (user?.email.toLowerCase() !== DEVELOPER_OWNER_EMAIL || !user.protectedOwner) {
+      throw new AppError(403, "Developer owner access required.", "OWNER_ONLY");
+    }
     next();
   } catch (error) {
     next(error);
@@ -128,7 +125,7 @@ const ownerLicenseGrantSchema = z.object({
 });
 
 const ownerLicenseActionSchema = z.object({
-  action: z.enum(["activate", "suspend", "revoke", "extend"]),
+  action: z.enum(["activate", "resume", "suspend", "revoke", "extend"]),
   expiresAt: z.coerce.date().optional(),
   notes: z.string().trim().max(1000).optional(),
 });
@@ -257,7 +254,7 @@ subscriptionsRouter.get("/analytics", ownerRole, async (_req, res, next) => {
   }
 });
 
-subscriptionsRouter.post("/licenses/lifetime", ownerRole, validateBody(grantLicenseSchema), async (req, res, next) => {
+subscriptionsRouter.post("/licenses/lifetime", ownerOnly, validateBody(grantLicenseSchema), async (req, res, next) => {
   try {
     const user = await prisma.user.findUnique({ where: { id: req.body.userId } });
     if (!user) throw new AppError(404, "User not found.", "USER_NOT_FOUND");
@@ -322,6 +319,15 @@ subscriptionsRouter.post("/licenses", ownerOnly, async (req, res, next) => {
         userId: body.userId,
       },
     });
+    await prisma.auditLog.create({
+      data: {
+        action: "LICENSE_GRANTED",
+        actorId: req.auth!.id,
+        entityId: license.id,
+        entityType: "License",
+        message: `Developer owner granted ${body.plan} license to ${user.email}.`,
+      },
+    });
     res.status(201).json({ license: serializeLicense(license) });
   } catch (error) {
     next(error);
@@ -348,7 +354,7 @@ subscriptionsRouter.patch("/licenses/:licenseId", ownerOnly, async (req, res, ne
     const body = ownerLicenseActionSchema.parse(req.body);
     const current = await prisma.license.findUnique({ where: { id: String(req.params.licenseId) } });
     if (!current) throw new AppError(404, "License not found.", "LICENSE_NOT_FOUND");
-    const status = body.action === "activate" || body.action === "extend" ? "ACTIVE" : body.action === "suspend" ? "SUSPENDED" : "REVOKED";
+    const status = body.action === "activate" || body.action === "resume" || body.action === "extend" ? "ACTIVE" : body.action === "suspend" ? "SUSPENDED" : "REVOKED";
     const license = await prisma.license.update({
       data: {
         expiresAt: body.action === "extend" ? body.expiresAt : undefined,
@@ -387,6 +393,23 @@ subscriptionsRouter.patch("/licenses/:licenseId", ownerOnly, async (req, res, ne
         where: { id: license.userId },
       });
     }
+    await prisma.billingEvent.create({
+      data: {
+        message: `Developer owner ${body.action} license.`,
+        metadata: { action: body.action, licenseId: license.id, notes: body.notes } as Prisma.InputJsonObject,
+        type: body.action === "revoke" ? "LICENSE_REVOKED" : "LICENSE_GRANTED",
+        userId: license.userId,
+      },
+    });
+    await prisma.auditLog.create({
+      data: {
+        action: body.action === "revoke" ? "LICENSE_REVOKED" : "LICENSE_GRANTED",
+        actorId: req.auth!.id,
+        entityId: license.id,
+        entityType: "License",
+        message: `Developer owner ${body.action} license for ${license.user.email}.`,
+      },
+    });
     res.json({ license: serializeLicense(license) });
   } catch (error) {
     next(error);
@@ -402,7 +425,7 @@ subscriptionsRouter.delete("/licenses/:userId", ownerOnly, async (req, res, next
   }
 });
 
-subscriptionsRouter.post("/activate", ownerRole, validateBody(activateSubscriptionSchema), async (req, res, next) => {
+subscriptionsRouter.post("/activate", ownerOnly, validateBody(activateSubscriptionSchema), async (req, res, next) => {
   try {
     if (req.body.plan === "lifetime") {
       throw new AppError(400, "Use the lifetime license endpoint instead of plan activation.", "PRIVATE_LIFETIME_PLAN");

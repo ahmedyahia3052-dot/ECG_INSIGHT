@@ -6,6 +6,7 @@ export interface ClinicalReport {
   archivedAt?: string;
   authorId: string;
   caseId: string;
+  caseNumber?: string;
   clinicalIndication?: string;
   contractorName?: string;
   createdAt: string;
@@ -19,6 +20,8 @@ export interface ClinicalReport {
   id: string;
   organizationName?: string;
   patientId: string;
+  patientCode?: string;
+  patientName?: string;
   physicianLicenseNumber?: string;
   physicianName: string;
   physicianSpecialty?: string;
@@ -131,6 +134,13 @@ export async function archiveReport(accessToken: string, reportId: string) {
   return apiRequest<{ report: ClinicalReport }>(`/reports/${reportId}/archive`, {
     accessToken,
     method: "POST",
+  });
+}
+
+export async function deleteReport(accessToken: string, reportId: string) {
+  return apiRequest<void>(`/reports/${reportId}`, {
+    accessToken,
+    method: "DELETE",
   });
 }
 

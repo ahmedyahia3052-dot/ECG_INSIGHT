@@ -75,7 +75,9 @@ reportsRouter.use(requireAuth);
 function reportInclude() {
   return {
     author: { select: { email: true, id: true, name: true, specialization: true } },
+    case: { select: { caseId: true, caseNumber: true } },
     emailLogs: { orderBy: { sentAt: "desc" } },
+    patient: { select: { firstName: true, lastName: true, patientCode: true } },
     versions: { orderBy: { versionNumber: "desc" } },
   } satisfies Prisma.ClinicalReportInclude;
 }
@@ -179,6 +181,13 @@ reportsRouter.post("/", requireRole("DOCTOR"), async (req, res, next) => {
     }).parse(req.body);
 
     let caseId = body.caseId;
+    if (caseId) {
+      const existingCase = await prisma.eCGCase.findFirst({
+        where: { OR: [{ id: caseId }, { caseId }, { caseNumber: caseId }] },
+      });
+      if (!existingCase) throw new AppError(404, "ECG case not found.", "CASE_NOT_FOUND");
+      caseId = existingCase.id;
+    }
     if (!caseId) {
       if (!body.patientId) throw new AppError(400, "Patient is required for patient or manual reports.", "PATIENT_REQUIRED");
       assertResourceAccess(await canAccessPatient(body.patientId, req.auth!));
@@ -216,6 +225,31 @@ reportsRouter.post("/", requireRole("DOCTOR"), async (req, res, next) => {
       where: { id: report.id },
     });
     res.status(201).json({ report: serializeReport(updated) });
+  } catch (error) {
+    next(error);
+  }
+});
+
+reportsRouter.delete("/:reportId", requireRole("DOCTOR"), async (req, res, next) => {
+  try {
+    const report = await reportForAccess(String(req.params.reportId), req.auth!);
+    if (!canManageReport(req.auth!, report)) throw new AppError(403, "You can only delete your own reports.", "FORBIDDEN");
+    if (report.status === "SIGNED") throw new AppError(409, "Signed reports cannot be deleted. Archive them instead.", "REPORT_LOCKED");
+    await prisma.reportVersion.deleteMany({ where: { reportId: report.id } });
+    await prisma.emailLog.deleteMany({ where: { reportId: report.id } });
+    await prisma.clinicalReport.delete({ where: { id: report.id } });
+    await prisma.auditLog.create({
+      data: {
+        action: "REPORT_ARCHIVED",
+        actorId: req.auth!.id,
+        caseId: report.caseId,
+        entityId: report.id,
+        entityType: "ClinicalReport",
+        message: `Clinical report ${report.reportNumber} deleted.`,
+        patientId: report.patientId,
+      },
+    });
+    res.status(204).send();
   } catch (error) {
     next(error);
   }

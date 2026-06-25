@@ -113,6 +113,7 @@ enum NotificationType {
 enum Gender {
   MALE
   FEMALE
+  CHILD
   CHILD_MALE
   CHILD_FEMALE
   OTHER
@@ -696,6 +697,7 @@ model User {
   usageRecords                UsageRecord[]
   billingEvents               BillingEvent[]
   notifications               Notification[]
+  preferences                 UserPreference?
   uploadedCases               ECGCase[]                 @relation("UploadedCases")
   assignedCases               ECGCase[]                 @relation("AssignedCases")
   reviewedCases               ECGCase[]                 @relation("ReviewedCases")
@@ -743,6 +745,22 @@ model User {
 
   @@index([role])
   @@index([isActive])
+}
+
+model UserPreference {
+  id                                      String   @id @default(cuid())
+  userId                                  String   @unique
+  reduceMotion                            Boolean  @default(false)
+  highContrastClinicalMode                Boolean  @default(false)
+  compactDashboardDensity                 Boolean  @default(false)
+  criticalAlertSound                      Boolean  @default(true)
+  rememberLastPatientFilter               Boolean  @default(false)
+  requireConfirmationForDestructiveActions Boolean @default(true)
+  createdAt                               DateTime @default(now())
+  updatedAt                               DateTime @updatedAt
+  user                                    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_preferences")
 }
 
 model Patient {

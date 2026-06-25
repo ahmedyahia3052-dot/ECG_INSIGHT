@@ -4,7 +4,9 @@ import { AppError } from "../../middleware/error";
 
 type ReportWithRelations = ClinicalReport & {
   author: Pick<User, "email" | "id" | "name" | "specialization">;
+  case?: { caseNumber: string | null; caseId: string } | null;
   emailLogs?: Array<{ id: string; recipient: string; senderId: string; sentAt: Date; status: string }>;
+  patient?: { firstName: string; lastName: string; patientCode: string | null } | null;
   versions?: Array<{ authorId: string; createdAt: Date; id: string; modifications: string; versionNumber: number }>;
 };
 
@@ -152,6 +154,7 @@ export function serializeReport(report: ReportWithRelations | ClinicalReport) {
     archivedAt: report.archivedAt?.toISOString(),
     authorId: report.authorId,
     caseId: report.caseId,
+    caseNumber: "case" in report ? report.case?.caseNumber ?? report.case?.caseId : undefined,
     clinicalIndication: report.clinicalIndication ?? undefined,
     contractorName: report.contractorName ?? undefined,
     createdAt: report.createdAt.toISOString(),
@@ -173,6 +176,8 @@ export function serializeReport(report: ReportWithRelations | ClinicalReport) {
     organizationName: report.organizationName ?? undefined,
     occupationalReportSection: report.occupationalReportSection,
     patientId: report.patientId,
+    patientName: "patient" in report && report.patient ? `${report.patient.firstName} ${report.patient.lastName}`.trim() : undefined,
+    patientCode: "patient" in report ? report.patient?.patientCode ?? undefined : undefined,
     physicianLicenseNumber: report.physicianLicenseNumber ?? undefined,
     physicianName: report.physicianName,
     physicianSpecialty: report.physicianSpecialty ?? undefined,

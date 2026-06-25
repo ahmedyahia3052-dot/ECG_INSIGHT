@@ -23,6 +23,7 @@ import { knowledgeRouter } from "./knowledge/knowledge.routes";
 import { notificationsRouter } from "../notifications/notifications.routes";
 import { ocrRouter } from "./ocr/ocr.routes";
 import { patientsRouter } from "../patients/patients.routes";
+import { preferencesRouter } from "./preferences/preferences.routes";
 import {
   fitnessAssessmentsRouter,
   occupationalRiskRouter,
@@ -80,6 +81,7 @@ modulesRouter.use("/ocr", ocrRouter);
 modulesRouter.use("/occupational-risk", occupationalRiskRouter);
 modulesRouter.use("/organizations", organizationsRouter);
 modulesRouter.use("/patients", patientsRouter);
+modulesRouter.use("/preferences", preferencesRouter);
 modulesRouter.use("/pacs", pacsRouter);
 modulesRouter.use("/fhir", fhirRouter);
 modulesRouter.use("/reports", reportsRouter);

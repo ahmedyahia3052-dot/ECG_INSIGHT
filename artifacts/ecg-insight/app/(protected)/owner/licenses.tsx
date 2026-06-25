@@ -8,7 +8,7 @@ import { apiRequest } from "@/services/api";
 import { grantOwnerLicense, listLicenses, updateOwnerLicense, type LicenseRecord, type SubscriptionPlanCode } from "@/services/subscriptions";
 
 type UserOption = { email: string; id: string; name: string; username?: string };
-type LicenseAction = "activate" | "extend" | "revoke" | "suspend";
+type LicenseAction = "extend" | "resume" | "revoke" | "suspend";
 
 const plans: SubscriptionPlanCode[] = ["free", "basic", "professional", "enterprise", "lifetime"];
 
@@ -25,7 +25,7 @@ export default function OwnerLicensesScreen() {
   const [notes, setNotes] = useState("");
   const [message, setMessage] = useState("");
 
-  const isOwner = Boolean(user?.isOwner || user?.protectedOwner);
+  const isOwner = user?.email?.toLowerCase() === "ahmedyahia3052@gmail.com";
 
   const licensesQuery = useQuery({
     enabled: !!token && isOwner,
@@ -65,7 +65,7 @@ export default function OwnerLicensesScreen() {
   }, [licenses, query]);
 
   if (!isOwner) {
-    return <EmptyState title="Owner access required" message="This hidden enterprise licensing system is available only to the protected Developer Super Admin owner account." />;
+    return <EmptyState title="Owner access required" message="This hidden enterprise licensing system is available only to ahmedyahia3052@gmail.com." />;
   }
 
   return (
@@ -112,18 +112,20 @@ export default function OwnerLicensesScreen() {
       </Card>
 
       <Card style={styles.form}>
-        <SectionHeader title="License Records" subtitle="Activate, suspend, revoke, or extend licenses." />
+        <SectionHeader title="Active Licenses" subtitle="User, plan, lifecycle status, dates, lifetime flag, and owner actions." />
         {filteredLicenses.length ? filteredLicenses.map((license) => (
           <View key={license.id} style={styles.row}>
             <View style={styles.rowMain}>
-              <Text style={styles.rowTitle}>{license.userName}</Text>
-              <Text style={styles.muted}>{license.email} • {license.subscriptionType} • Start {formatDate(license.startDate)} • Expiry {formatDate(license.expiryDate ?? undefined)}</Text>
+              <Text style={styles.rowTitle}>User: {license.userName}</Text>
+              <Text style={styles.muted}>Plan: {license.subscriptionType} • Status: {license.status}</Text>
+              <Text style={styles.muted}>Start Date: {formatDate(license.startDate)} • Expiration Date: {formatDate(license.expiryDate ?? undefined)} • Lifetime: {license.subscriptionType.toLowerCase().includes("lifetime") || !license.expiryDate ? "Yes" : "No"}</Text>
             </View>
             <Badge label={license.status} tone={license.status === "ACTIVE" ? "success" : license.status === "SUSPENDED" ? "warning" : "critical"} />
             <View style={styles.actions}>
-              {(["activate", "suspend", "revoke", "extend"] as const).map((action) => (
-                <PrimaryButton key={action} label={action} onPress={() => actionMutation.mutate({ action, license })} variant={action === "revoke" ? "danger" : "outline"} />
-              ))}
+              <PrimaryButton label="Extend" onPress={() => actionMutation.mutate({ action: "extend", license })} variant="outline" />
+              <PrimaryButton label="Suspend" onPress={() => actionMutation.mutate({ action: "suspend", license })} variant="outline" />
+              <PrimaryButton label="Resume" onPress={() => actionMutation.mutate({ action: "resume", license })} variant="outline" />
+              <PrimaryButton label="Revoke" onPress={() => actionMutation.mutate({ action: "revoke", license })} variant="danger" />
             </View>
           </View>
         )) : <EmptyState title="No licenses found" message="Grant a license or adjust search filters." />}

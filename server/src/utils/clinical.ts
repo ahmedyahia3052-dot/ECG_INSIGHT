@@ -15,13 +15,14 @@ import type {
 } from "@prisma/client";
 import { toApiRole } from "./users";
 
-export type ApiGender = "child_female" | "child_male" | "female" | "male" | "other" | "unknown";
+export type ApiGender = "child" | "child_female" | "child_male" | "female" | "male" | "other" | "unknown";
 export type ApiCaseStatus = "ai_completed" | "approved" | "finalized" | "pending" | "processing" | "rejected" | "reviewed" | "under_review" | "uploaded";
 export type ApiPriority = "low" | "medium" | "high" | "critical";
 export type ApiCaseSeverity = "abnormal" | "critical" | "normal";
 export type ApiSmokingStatus = "never" | "former" | "current" | "unknown";
 
 const genderToApi: Record<Gender, ApiGender> = {
+  CHILD: "child",
   CHILD_FEMALE: "child_female",
   CHILD_MALE: "child_male",
   FEMALE: "female",
@@ -31,6 +32,7 @@ const genderToApi: Record<Gender, ApiGender> = {
 };
 
 const genderFromApi: Record<ApiGender, Gender> = {
+  child: "CHILD",
   child_female: "CHILD_FEMALE",
   child_male: "CHILD_MALE",
   female: "FEMALE",

@@ -10,15 +10,14 @@ import { createPatient, type PatientInput } from "@/services/clinical";
 
 const patientSchema = z.object({
   firstName: z.string().min(1, "First name is required."),
-  gender: z.enum(["male", "female", "child_male", "child_female", "other", "unknown"], { message: "Gender is required." }),
+  gender: z.enum(["male", "female", "child", "other", "unknown"], { message: "Gender is required." }),
   lastName: z.string().min(1, "Last name is required."),
 });
 
 const genderOptions: Array<{ label: string; value: PatientInput["gender"] }> = [
   { label: "Male", value: "male" },
   { label: "Female", value: "female" },
-  { label: "Child Male", value: "child_male" },
-  { label: "Child Female", value: "child_female" },
+  { label: "Child", value: "child" },
   { label: "Other", value: "other" },
   { label: "Unknown", value: "unknown" },
 ];
@@ -28,14 +27,15 @@ export default function CreatePatientScreen() {
   const queryClient = useQueryClient();
   const { authToken } = useAuth();
   const token = authToken?.token;
-  const [form, setForm] = useState<PatientInput>({
+  const [form, setForm] = useState<Omit<PatientInput, "gender"> & { gender: PatientInput["gender"] | "" }>({
     dateOfBirth: "1970-01-01",
     firstName: "",
-    gender: "unknown",
+    gender: "",
     lastName: "",
     medicalRecordNumber: "",
   });
   const [error, setError] = useState("");
+  const [genderOpen, setGenderOpen] = useState(false);
 
   const mutation = useMutation({
     mutationFn: async () => {
@@ -45,6 +45,7 @@ export default function CreatePatientScreen() {
       return createPatient(token, {
         ...form,
         dateOfBirth: form.dateOfBirth || "1970-01-01",
+        gender: parsed.data.gender,
         medicalRecordNumber: form.medicalRecordNumber?.trim() || `MRN-${Date.now()}`,
       });
     },
@@ -70,11 +71,22 @@ export default function CreatePatientScreen() {
         </View>
         <View style={styles.genderPanel}>
           <Text style={styles.genderLabel}>Gender</Text>
-          <View style={styles.genderOptions}>
-            {genderOptions.map((option) => (
-              <PrimaryButton key={option.value} label={option.label} onPress={() => setForm((current) => ({ ...current, gender: option.value }))} variant={form.gender === option.value ? "primary" : "outline"} />
-            ))}
-          </View>
+          <PrimaryButton label={genderLabel(form.gender)} onPress={() => setGenderOpen((value) => !value)} variant={form.gender ? "primary" : "outline"} />
+          {genderOpen ? (
+            <View style={styles.genderDropdown}>
+              {genderOptions.map((option) => (
+                <PrimaryButton
+                  key={option.value}
+                  label={option.label}
+                  onPress={() => {
+                    setForm((current) => ({ ...current, gender: option.value }));
+                    setGenderOpen(false);
+                  }}
+                  variant={form.gender === option.value ? "primary" : "outline"}
+                />
+              ))}
+            </View>
+          ) : null}
         </View>
         <View style={styles.grid}>
           <Field label="Phone" onChangeText={(value) => setForm((current) => ({ ...current, phone: value }))} value={form.phone} />
@@ -109,8 +121,12 @@ const styles = StyleSheet.create({
   actions: { flexDirection: "row", flexWrap: "wrap", gap: 10, justifyContent: "flex-end" },
   error: { color: medicalTheme.critical, fontSize: 13, fontWeight: "800" },
   form: { gap: 16 },
+  genderDropdown: { backgroundColor: medicalTheme.surface, borderColor: medicalTheme.border, borderRadius: 14, borderWidth: 1, flexDirection: "row", flexWrap: "wrap", gap: 8, padding: 10 },
   genderLabel: { color: medicalTheme.text, fontSize: 12, fontWeight: "800" },
-  genderOptions: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   genderPanel: { gap: 8 },
   grid: { flexDirection: "row", flexWrap: "wrap", gap: 12 },
 });
+
+function genderLabel(value: PatientInput["gender"] | "") {
+  return genderOptions.find((option) => option.value === value)?.label ?? "Select Gender";
+}

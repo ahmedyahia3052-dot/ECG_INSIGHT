@@ -1,7 +1,7 @@
 import { Feather } from "@expo/vector-icons";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Redirect, Slot, usePathname, useRouter } from "expo-router";
-import React, { PropsWithChildren, ReactNode, useMemo, useState } from "react";
+import React, { PropsWithChildren, ReactNode, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Pressable,
@@ -118,20 +118,22 @@ export function EnterpriseShell({ children }: PropsWithChildren) {
   const [hoveredNav, setHoveredNav] = useState<string | null>(null);
   const [searchFocused, setSearchFocused] = useState(false);
   const [notificationOpen, setNotificationOpen] = useState(false);
+  const [notificationFilter, setNotificationFilter] = useState<"ai" | "all" | "critical" | "license" | "system" | "unread">("all");
   const isMobile = width < 860;
   const sidebarCompact = !isMobile && sidebarCollapsed;
   const meta = pageMeta(pathname);
   const navItems = useMemo(() => NAV_ITEMS.filter((item) => {
-    if (item.ownerOnly && !(user?.isOwner || user?.protectedOwner)) return false;
+    if (item.ownerOnly && user?.email?.toLowerCase() !== "ahmedyahia3052@gmail.com") return false;
     return !item.minRole || roleRank(user?.role) >= roleRank(item.minRole);
   }), [user?.isOwner, user?.protectedOwner, user?.role]);
   const notificationQuery = useQuery({
     enabled: !!authToken?.token,
-    queryFn: () => listNotifications(authToken!.token, new URLSearchParams({ pageSize: "8" })),
+    queryFn: () => listNotifications(authToken!.token, new URLSearchParams({ pageSize: "30" })),
     queryKey: ["enterprise-shell-notifications", authToken?.token],
     retry: false,
   });
   const unreadCount = notificationQuery.data?.notifications.filter((item) => !item.read).length ?? 0;
+  const filteredNotifications = useMemo(() => (notificationQuery.data?.notifications ?? []).filter((item) => notificationMatchesFilter(item, notificationFilter)), [notificationFilter, notificationQuery.data?.notifications]);
   const invalidateNotifications = () => {
     void queryClient.invalidateQueries({ queryKey: ["enterprise-shell-notifications", authToken?.token] });
     void queryClient.invalidateQueries({ queryKey: ["enterprise-notifications", authToken?.token] });
@@ -159,6 +161,15 @@ export function EnterpriseShell({ children }: PropsWithChildren) {
     readNotificationMutation.mutate(notification.id);
     navigate(notification.actionUrl ?? (notification.caseId ? `/ecg-cases/${notification.caseId}` : notification.patientId ? `/patients/${notification.patientId}` : notification.reportId ? `/reports/${notification.reportId}` : "/notifications"));
   };
+
+  useEffect(() => {
+    if (!notificationOpen || typeof document === "undefined") return undefined;
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setNotificationOpen(false);
+    };
+    document.addEventListener("keydown", closeOnEscape);
+    return () => document.removeEventListener("keydown", closeOnEscape);
+  }, [notificationOpen]);
 
   const sidebar = (
     <View style={[styles.sidebar, sidebarCompact && styles.sidebarCollapsed, isMobile && styles.drawer, { paddingTop: isMobile ? insets.top + 18 : 24 }]}>
@@ -280,43 +291,77 @@ export function EnterpriseShell({ children }: PropsWithChildren) {
               {unreadCount ? <View style={styles.countBadge}><Text style={styles.countBadgeText}>{unreadCount > 9 ? "9+" : unreadCount}</Text></View> : null}
             </Pressable>
           </View>
-          {notificationOpen ? (
-            <>
-              <Pressable style={styles.notificationBackdrop} onPress={() => setNotificationOpen(false)} />
-              <Card style={styles.notificationDrawer}>
-                <SectionHeader
-                  title="Notifications"
-                  subtitle={`${unreadCount} unread`}
-                  action={<PrimaryButton label="Read All" onPress={() => readAllNotificationMutation.mutate()} variant="outline" />}
-                />
-                {notificationQuery.data?.notifications.length ? notificationQuery.data.notifications.map((notification) => (
-                  <View key={notification.id} style={styles.notificationRow}>
-                    <Pressable onPress={() => openNotification(notification)} style={styles.notificationTextWrap}>
-                      <Text style={styles.notificationTitle}>{notification.title}</Text>
-                      <Text numberOfLines={2} style={styles.notificationMessage}>{notification.message}</Text>
-                      <Text style={styles.notificationMeta}>{notification.read ? "Read" : "Unread"} • {notification.type}</Text>
-                    </Pressable>
-                    <View style={styles.notificationActions}>
-                      <Pressable accessibilityLabel="Mark notification read" onPress={() => readNotificationMutation.mutate(notification.id)} style={styles.smallIconButton}>
-                        <Feather name="check" size={14} color={medicalTheme.success} />
-                      </Pressable>
-                      <Pressable accessibilityLabel="Dismiss notification" onPress={() => deleteNotificationMutation.mutate(notification.id)} style={styles.smallIconButton}>
-                        <Feather name="x" size={14} color={medicalTheme.critical} />
-                      </Pressable>
-                    </View>
-                  </View>
-                )) : <EmptyState title="No notifications" message="You are all caught up." />}
-                <PrimaryButton label="Open Notification Center" onPress={() => navigate("/notifications")} variant="outline" />
-              </Card>
-            </>
-          ) : null}
         </View>
         <ScrollView contentContainerStyle={styles.pageScroll} showsVerticalScrollIndicator={false}>
           {children}
         </ScrollView>
       </View>
+      {notificationOpen ? (
+        <View style={styles.notificationOverlay} pointerEvents="box-none">
+          <Pressable style={styles.notificationBackdrop} onPress={() => setNotificationOpen(false)} />
+          <Card style={styles.notificationDrawer}>
+            <SectionHeader
+              title="Notification Center"
+              subtitle={`${unreadCount} unread • ${notificationQuery.data?.total ?? 0} total`}
+              action={<PrimaryButton label="Read All" onPress={() => readAllNotificationMutation.mutate()} variant="outline" />}
+            />
+            <View style={styles.notificationFilters}>
+              {(["all", "unread", "critical", "system", "license", "ai"] as const).map((filter) => (
+                <PrimaryButton key={filter} label={filter} onPress={() => setNotificationFilter(filter)} variant={notificationFilter === filter ? "primary" : "outline"} />
+              ))}
+            </View>
+            <ScrollView style={styles.notificationList} showsVerticalScrollIndicator>
+              {filteredNotifications.length ? filteredNotifications.map((notification) => (
+                <View key={notification.id} style={styles.notificationRow}>
+                  <View style={styles.notificationIcon}>
+                    <Feather name={notificationIcon(notification)} size={16} color={notificationColor(notification)} />
+                  </View>
+                  <Pressable onPress={() => openNotification(notification)} style={styles.notificationTextWrap}>
+                    <Text style={styles.notificationTitle}>{notification.title}</Text>
+                    <Text numberOfLines={3} style={styles.notificationMessage}>{notification.message}</Text>
+                    <Text style={styles.notificationMeta}>{formatDate(notification.timestamp)} • {notification.read ? "Read" : "Unread"}</Text>
+                  </Pressable>
+                  <View style={styles.notificationActions}>
+                    <Badge label={notification.type} tone={notification.type === "critical" ? "critical" : "primary"} />
+                    <Pressable accessibilityLabel="Mark notification read" onPress={() => readNotificationMutation.mutate(notification.id)} style={styles.smallIconButton}>
+                      <Feather name="check" size={14} color={medicalTheme.success} />
+                    </Pressable>
+                    <Pressable accessibilityLabel="Dismiss notification" onPress={() => deleteNotificationMutation.mutate(notification.id)} style={styles.smallIconButton}>
+                      <Feather name="trash-2" size={14} color={medicalTheme.critical} />
+                    </Pressable>
+                  </View>
+                </View>
+              )) : <EmptyState title="No notifications" message="No notifications match this filter." />}
+            </ScrollView>
+            <PrimaryButton label="Open Full Notification Center" onPress={() => navigate("/notifications")} variant="outline" />
+          </Card>
+        </View>
+      ) : null}
     </View>
   );
+}
+
+function notificationMatchesFilter(notification: NotificationRecord, filter: "ai" | "all" | "critical" | "license" | "system" | "unread") {
+  const haystack = `${notification.type} ${notification.entityType ?? ""} ${notification.title} ${notification.message}`.toLowerCase();
+  if (filter === "all") return true;
+  if (filter === "unread") return !notification.read;
+  return haystack.includes(filter);
+}
+
+function notificationIcon(notification: NotificationRecord): keyof typeof Feather.glyphMap {
+  const haystack = `${notification.type} ${notification.entityType ?? ""} ${notification.title}`.toLowerCase();
+  if (haystack.includes("critical")) return "alert-triangle";
+  if (haystack.includes("license")) return "award";
+  if (haystack.includes("ai")) return "cpu";
+  if (haystack.includes("system")) return "server";
+  return "bell";
+}
+
+function notificationColor(notification: NotificationRecord) {
+  if (notification.type === "critical") return medicalTheme.critical;
+  if (notification.type === "warning") return medicalTheme.warning;
+  if (notification.type === "success") return medicalTheme.success;
+  return medicalTheme.primary;
 }
 
 export function FullScreenLoader({ label }: { label: string }) {
@@ -477,10 +522,14 @@ const styles = StyleSheet.create({
   navText: { color: medicalTheme.muted, flex: 1, fontSize: 14, fontWeight: "800" },
   navTextActive: { color: medicalTheme.text },
   notificationActions: { flexDirection: "row", gap: 6 },
-  notificationBackdrop: { ...StyleSheet.absoluteFillObject, zIndex: 20 },
-  notificationDrawer: { gap: 10, maxHeight: 520, position: "absolute", right: 20, top: 78, width: 390, zIndex: 40 },
+  notificationBackdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: "rgba(2,6,23,0.08)" },
+  notificationDrawer: { backgroundColor: "rgba(12,26,45,0.96)", gap: 12, maxHeight: 600, position: "absolute", right: 18, shadowColor: "#000", shadowOpacity: 0.34, shadowRadius: 28, top: 76, width: 420, zIndex: 80 },
+  notificationFilters: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+  notificationIcon: { alignItems: "center", backgroundColor: medicalTheme.surface, borderColor: medicalTheme.border, borderRadius: 12, borderWidth: 1, height: 38, justifyContent: "center", width: 38 },
+  notificationList: { maxHeight: 390 },
   notificationMessage: { color: medicalTheme.muted, fontSize: 12, lineHeight: 17 },
   notificationMeta: { color: medicalTheme.primary, fontSize: 10, fontWeight: "900", marginTop: 4, textTransform: "uppercase" },
+  notificationOverlay: { ...StyleSheet.absoluteFillObject, zIndex: 70 },
   notificationRow: { alignItems: "center", borderBottomColor: medicalTheme.border, borderBottomWidth: 1, flexDirection: "row", gap: 10, paddingVertical: 10 },
   notificationTextWrap: { flex: 1, gap: 2 },
   notificationTitle: { color: medicalTheme.text, fontSize: 13, fontWeight: "900" },
