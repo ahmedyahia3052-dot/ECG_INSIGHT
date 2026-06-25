@@ -40,7 +40,7 @@ export default function CreatePatientScreen() {
     onError: (mutationError) => setError(mutationError instanceof Error ? mutationError.message : "Unable to create patient."),
     onSuccess: async (payload) => {
       await queryClient.invalidateQueries({ queryKey: ["enterprise-patients", token] });
-      router.replace(`/patients/${payload.patient.id}` as never);
+      router.replace(`/patients/${payload.patient.id}?created=1` as never);
     },
   });
 

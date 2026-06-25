@@ -155,9 +155,13 @@ export interface PatientDetailResponse {
     documents: Array<{
       category: string;
       createdAt: string;
+      downloadUrl: string;
       id: string;
       mimeType: string;
+      originalName: string;
+      sizeBytes: number;
       title: string;
+      uploadedById: string;
     }>;
     reports: Array<{
       id: string;

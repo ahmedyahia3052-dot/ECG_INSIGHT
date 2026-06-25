@@ -21,6 +21,7 @@ const documentTypeLabels: Record<DocumentCategory, string> = {
   HOLTER: "Holter Report",
   LABORATORY_RESULTS: "Laboratory Report",
   OTHER: "Consultation Report",
+  PRESCRIPTION: "Prescription",
   STRESS_ECG: "Stress ECG Report",
   SURGERY_REPORTS: "Operative Report",
 };

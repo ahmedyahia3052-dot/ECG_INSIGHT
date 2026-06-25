@@ -213,9 +213,13 @@ patientsRouter.get("/:patientId", async (req, res, next) => {
         documents: patient.documents.map((item) => ({
           category: item.category.toLowerCase(),
           createdAt: item.createdAt.toISOString(),
+          downloadUrl: `/api/documents/${item.storedName}`,
           id: item.id,
           mimeType: item.mimeType,
+          originalName: item.originalName,
+          sizeBytes: item.sizeBytes,
           title: item.title,
+          uploadedById: item.uploadedById,
         })),
         reports: patient.reports.map((item) => ({
           id: item.id,

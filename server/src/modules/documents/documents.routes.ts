@@ -38,6 +38,7 @@ const categorySchema = z.enum([
   "laboratory_results",
   "surgery_reports",
   "discharge_summary",
+  "prescription",
   "other",
 ]);
 
@@ -59,6 +60,7 @@ const categoryMap = {
   holter: "HOLTER",
   laboratory_results: "LABORATORY_RESULTS",
   other: "OTHER",
+  prescription: "PRESCRIPTION",
   stress_ecg: "STRESS_ECG",
   surgery_reports: "SURGERY_REPORTS",
 } as const;
