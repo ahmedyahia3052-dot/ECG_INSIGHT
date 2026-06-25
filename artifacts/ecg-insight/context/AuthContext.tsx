@@ -1,7 +1,7 @@
 import React, { createContext, useCallback, useContext, useEffect } from "react";
 import { create } from "zustand";
 import { type ManagedUser } from "@/data/mockData";
-import { apiRequest, ApiError } from "@/services/api";
+import { apiRequest, ApiError, setApiAccessToken, setApiTokenRefreshHandler } from "@/services/api";
 
 export type UserRole = "super_admin" | "admin" | "corporate_client" | "doctor" | "student" | "user";
 
@@ -198,6 +198,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   );
 
   useEffect(() => {
+    setApiAccessToken(accessToken);
+    setApiTokenRefreshHandler((nextAccessToken) => {
+      setState({ accessToken: nextAccessToken });
+    });
+    return () => {
+      setApiTokenRefreshHandler(null);
+    };
+  }, [accessToken, setState]);
+
+  useEffect(() => {
     (async () => {
       try {
         const refreshed = await apiRequest<AuthPayload>("/auth/refresh", {
@@ -208,6 +218,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           isLoading: false,
           user: refreshed.user,
         });
+        setApiAccessToken(refreshed.accessToken);
         if (ROLE_HIERARCHY[refreshed.user.role] >= ROLE_HIERARCHY.admin) {
           await fetchManagedUsers(refreshed.accessToken);
         }
@@ -232,6 +243,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           rememberMe: remember,
           user: payload.user,
         });
+        setApiAccessToken(payload.accessToken);
         if (ROLE_HIERARCHY[payload.user.role] >= ROLE_HIERARCHY.admin) {
           await fetchManagedUsers(payload.accessToken);
         }
@@ -261,6 +273,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           rememberMe: true,
           user: payload.user,
         });
+        setApiAccessToken(payload.accessToken);
         return { success: true };
       } catch (error) {
         return { success: false, error: errorMessage(error, "Registration failed.") };
@@ -289,6 +302,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           method: "POST",
         });
         setState({ accessToken: payload.accessToken, rememberMe: remember, user: payload.user });
+        setApiAccessToken(payload.accessToken);
         return { success: true };
       } catch (error) {
         return { success: false, error: errorMessage(error, "Phone verification failed.") };
@@ -305,6 +319,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           method: "POST",
         });
         setState({ accessToken: payload.accessToken, rememberMe: true, user: payload.user });
+        setApiAccessToken(payload.accessToken);
         return { success: true };
       } catch (error) {
         return { success: false, error: errorMessage(error, `${provider} sign-in failed.`) };
@@ -335,6 +350,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       originalUser: null,
       user: null,
     });
+    setApiAccessToken(null);
   }, [accessToken, setState]);
 
   const forgotPassword = useCallback(
@@ -386,6 +402,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         originalUser: originalUser ?? user,
         user: payload.user,
       });
+      setApiAccessToken(payload.accessToken);
     },
     [accessToken, originalAccessToken, originalUser, setState, user]
   );
@@ -399,6 +416,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       originalUser: null,
       user: originalUser,
     });
+    setApiAccessToken(originalAccessToken);
     await fetchManagedUsers(originalAccessToken).catch(() => {});
   }, [fetchManagedUsers, originalAccessToken, originalUser, setState]);
 
