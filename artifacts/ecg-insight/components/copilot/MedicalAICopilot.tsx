@@ -108,6 +108,26 @@ export function MedicalAICopilot() {
     setTag(context.contextType === "patient" ? "Clinical Summary" : context.contextType === "case" ? "ECG Interpretation" : "ECG Interpretation");
   }, [context.contextType]);
 
+  useEffect(() => {
+    if (Platform.OS !== "web" || typeof window === "undefined" || !token) return undefined;
+    const askFromFinding = (event: Event) => {
+      const prompt = (event as CustomEvent<{ prompt?: string }>).detail?.prompt;
+      if (!prompt) return;
+      setOpen(true);
+      setMinimized(false);
+      setQuestion(prompt);
+      void sendCopilotMessage(token, { ...context, conversationId: selectedId, question: prompt, tag: "ECG Interpretation" }).then((payload) => {
+        setSelectedId(payload.conversation.id);
+        setQuestion("");
+        setTypingMessage("");
+        animateTyping(payload.message.content, setTypingMessage);
+        invalidate();
+      });
+    };
+    window.addEventListener("medical-copilot:ask", askFromFinding);
+    return () => window.removeEventListener("medical-copilot:ask", askFromFinding);
+  }, [context, selectedId, token]);
+
   if (!token) return null;
 
   if (!open) {

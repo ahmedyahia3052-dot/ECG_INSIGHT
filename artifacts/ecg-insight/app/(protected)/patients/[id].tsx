@@ -119,7 +119,7 @@ export default function PatientProfileScreen() {
 
       {activeTab === "overview" ? <OverviewTab patient={patient} cases={cases} reports={reports} criticalCases={criticalCases} abnormalCases={abnormalCases} pendingReviews={pendingReviews} /> : null}
       {activeTab === "ecg" ? <EcgCasesTab cases={cases} onGenerateReport={(caseId) => reportMutation.mutate(caseId)} onNew={() => router.push("/ecg-cases/new" as never)} onOpen={(caseId) => router.push(`/ecg-cases/${caseId}` as never)} onReview={(caseId) => router.push(`/ecg-cases/${caseId}/review` as never)} /> : null}
-      {activeTab === "timeline" ? <TimelineTab timeline={timeline} /> : null}
+      {activeTab === "timeline" ? <TimelineTab cases={cases} timeline={timeline} /> : null}
       {activeTab === "documents" ? (
         <DocumentsTab
           category={documentCategory}
@@ -234,10 +234,24 @@ function EcgCasesTab({ cases, onGenerateReport, onNew, onOpen, onReview }: {
   );
 }
 
-function TimelineTab({ timeline }: { timeline: Array<{ createdAt: string; id: string; notes?: string; title: string; type: string }> }) {
+function TimelineTab({ cases, timeline }: {
+  cases: Array<{ aiDiagnosis?: string; caseId: string; caseNumber?: string; finalDiagnosis?: string; id: string; severity?: string; uploadDate: string }>;
+  timeline: Array<{ createdAt: string; id: string; notes?: string; title: string; type: string }>;
+}) {
   return (
     <Card style={styles.panelFull}>
       <SectionHeader title="Clinical Timeline" subtitle="Newest clinical events first." />
+      <View style={styles.ecgTimeline}>
+        <Text style={styles.infoValue}>ECG Timeline</Text>
+        {cases.length ? cases.slice().reverse().map((item) => (
+          <View key={item.id} style={styles.ecgTimelineItem}>
+            <Text style={styles.timelineYear}>{new Date(item.uploadDate).getFullYear()}</Text>
+            <View style={[styles.timelineDot, item.severity === "critical" && styles.timelineDotCritical]} />
+            <Text style={styles.infoLabel}>{item.caseNumber ?? item.caseId}</Text>
+            <Text style={styles.infoValue}>{item.aiDiagnosis ?? item.finalDiagnosis ?? "Pending interpretation"}</Text>
+          </View>
+        )) : <Text style={styles.muted}>No ECG trend history yet.</Text>}
+      </View>
       {timeline.length ? timeline.map((item) => (
         <View key={item.id} style={styles.timelineCard}>
           <View style={styles.timelineDot} />
@@ -428,6 +442,8 @@ const styles = StyleSheet.create({
   aiCard: { backgroundColor: "#081F33", borderColor: "#1F7085", gap: 12 },
   badges: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 10 },
   actions: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
+  ecgTimeline: { backgroundColor: medicalTheme.surface, borderColor: medicalTheme.border, borderRadius: 16, borderWidth: 1, gap: 10, padding: 12 },
+  ecgTimelineItem: { alignItems: "center", flexDirection: "row", flexWrap: "wrap", gap: 10 },
   grid: { flexDirection: "row", flexWrap: "wrap", gap: 16 },
   heroText: { flex: 1, minWidth: 240 },
   info: { borderBottomColor: medicalTheme.border, borderBottomWidth: 1, gap: 3, paddingVertical: 9 },
@@ -446,6 +462,8 @@ const styles = StyleSheet.create({
   tabsCard: { padding: 12 },
   timelineCard: { alignItems: "center", backgroundColor: medicalTheme.surface, borderColor: medicalTheme.border, borderRadius: 14, borderWidth: 1, flexDirection: "row", flexWrap: "wrap", gap: 12, padding: 14 },
   timelineDot: { backgroundColor: medicalTheme.primary, borderRadius: 99, height: 12, width: 12 },
+  timelineDotCritical: { backgroundColor: medicalTheme.critical },
+  timelineYear: { color: medicalTheme.primary, fontSize: 14, fontWeight: "900", minWidth: 48 },
   title: { color: medicalTheme.text, fontSize: 30, fontWeight: "900" },
   toast: { backgroundColor: "#073A34", borderColor: medicalTheme.success },
 });
