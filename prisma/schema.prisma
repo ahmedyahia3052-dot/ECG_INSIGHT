@@ -1715,6 +1715,81 @@ model ClinicalConversation {
   @@index([createdAt])
 }
 
+model CopilotConversation {
+  id          String   @id @default(cuid())
+  userId      String
+  title       String
+  tag         String   @default("ECG Interpretation")
+  favorite    Boolean  @default(false)
+  patientId   String?
+  caseId      String?
+  contextType String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  messages    CopilotMessage[]
+
+  @@index([userId])
+  @@index([patientId])
+  @@index([caseId])
+  @@index([tag])
+  @@index([favorite])
+  @@index([updatedAt])
+}
+
+model CopilotMessage {
+  id             String   @id @default(cuid())
+  conversationId String
+  role           String
+  content        String
+  citations      Json?
+  confidence     Float?
+  responseTimeMs Int?
+  createdAt      DateTime @default(now())
+  conversation   CopilotConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@index([conversationId])
+  @@index([role])
+  @@index([createdAt])
+}
+
+model CopilotSettings {
+  id        String   @id @default(cuid())
+  enabled   Boolean  @default(true)
+  provider  String   @default("RuleBasedRAG")
+  updatedBy String?
+  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now())
+}
+
+model CopilotUsageEvent {
+  id             String   @id @default(cuid())
+  userId         String
+  conversationId String?
+  question       String
+  tag            String?
+  responseTimeMs Int
+  createdAt      DateTime @default(now())
+
+  @@index([userId])
+  @@index([conversationId])
+  @@index([tag])
+  @@index([createdAt])
+}
+
+model ECGKnowledgeEntry {
+  id         String   @id @default(cuid())
+  topic      String
+  category   String
+  content    String
+  references String[]
+  tags       String[]
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([category])
+  @@index([topic])
+}
+
 model PatientTrend {
   id         String      @id @default(cuid())
   patientId  String

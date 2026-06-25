@@ -18,6 +18,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useAuth } from "@/context/AuthContext";
+import { MedicalAICopilot } from "@/components/copilot/MedicalAICopilot";
 import { deleteNotification, listNotifications, markAllNotificationsRead, markNotificationRead, type NotificationRecord } from "@/services/collaboration";
 
 export const medicalTheme = {
@@ -337,6 +338,7 @@ export function EnterpriseShell({ children }: PropsWithChildren) {
           </Card>
         </View>
       ) : null}
+      <MedicalAICopilot />
     </View>
   );
 }
