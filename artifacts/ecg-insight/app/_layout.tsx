@@ -77,7 +77,7 @@ export default function RootLayout() {
   }
 
   return (
-    <SafeAreaProvider>
+    <SafeAreaProvider style={styles.appRoot}>
       <ErrorBoundary>
         <QueryClientProvider client={queryClient}>
           <GestureHandlerRootView style={{ flex: 1 }}>
@@ -106,6 +106,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     padding: 24,
   },
+  appRoot: { flex: 1 },
   bootText: { color: "#94A3B8", fontSize: 13, marginTop: 8 },
   bootTitle: { color: "#F8FAFC", fontSize: 18, fontWeight: "700" },
 });

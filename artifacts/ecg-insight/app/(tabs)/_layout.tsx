@@ -137,6 +137,7 @@ function ClassicTabLayout() {
             <Feather name="menu" size={19} color={colors.primary} />
           </TouchableOpacity>
         ) : null}
+        <View style={styles.tabHost}>
         <Tabs
           screenOptions={{
             tabBarActiveTintColor: colors.primary,
@@ -289,6 +290,7 @@ function ClassicTabLayout() {
       <Tabs.Screen name="task-dashboard" options={{ href: null, title: "Task Dashboard" }} />
       <Tabs.Screen name="alert-dashboard" options={{ href: null, title: "Alert Dashboard" }} />
         </Tabs>
+        </View>
         {isMobile ? <FloatingEcgActionButton /> : null}
         <FloatingAIAssistant compact={isMobile} />
       </View>
@@ -318,8 +320,8 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(0,0,0,0.44)",
     zIndex: 40,
   },
-  layoutRoot: { flex: 1, flexDirection: "row", overflow: "visible" },
-  mainContent: { flex: 1, minWidth: 0, overflow: "visible", position: "relative" },
+  layoutRoot: { flex: 1, flexDirection: "row", height: "100%", minHeight: 0, overflow: "visible", width: "100%" },
+  mainContent: { alignSelf: "stretch", flex: 1, height: "100%", minHeight: 0, minWidth: 0, overflow: "visible", position: "relative" },
   mobileDrawerPanel: { ...StyleSheet.absoluteFillObject, zIndex: 50 },
   menuButton: {
     alignItems: "center",
@@ -353,4 +355,5 @@ const styles = StyleSheet.create({
   },
   tabIconWrap: { alignItems: "center", justifyContent: "center", minHeight: 30, minWidth: 34 },
   tabBlur: { borderRadius: 26, overflow: "hidden" },
+  tabHost: { alignSelf: "stretch", flex: 1, height: "100%", minHeight: 0, minWidth: 0, width: "100%" },
 });
