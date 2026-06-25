@@ -48,6 +48,10 @@ modulesRouter.get("/healthz", (_req, res) => {
   res.json({ ok: true, service: "ecg-insight-api" });
 });
 
+modulesRouter.get("/health", (_req, res) => {
+  res.json({ ok: true, service: "ecg-insight-api" });
+});
+
 modulesRouter.use("/auth", authRouter);
 modulesRouter.use("/audit", auditRouter);
 modulesRouter.use("/assistant", assistantRouter);

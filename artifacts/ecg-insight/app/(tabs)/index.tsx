@@ -8,7 +8,7 @@ import { useAuth, type User } from "@/context/AuthContext";
 import { useColors } from "@/hooks/useColors";
 import { useOfflineCache } from "@/hooks/useOfflineCache";
 import { getAIHistory, getAIStatistics } from "@/services/ai";
-import { API_ROOT_URL } from "@/services/api";
+import { API_ROOT_URL, API_URL } from "@/services/api";
 import { apiCaseToEcgCase, listCases, listPatients, type ApiPatient } from "@/services/clinical";
 import { listNotifications } from "@/services/collaboration";
 import { listReports, type ClinicalReport } from "@/services/reports";
@@ -79,7 +79,7 @@ export default function DashboardScreen() {
   const systemStatusQuery = useQuery({
     queryFn: async () => {
       const [health, readiness] = await Promise.all([
-        fetch(`${API_ROOT_URL}/health`).then((response) => response.ok),
+        fetch(`${API_URL}/health`).then((response) => response.ok),
         fetch(`${API_ROOT_URL}/readiness`).then((response) => response.ok),
       ]);
       return { api: health, database: readiness };

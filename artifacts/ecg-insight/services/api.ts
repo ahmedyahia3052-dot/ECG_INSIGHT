@@ -1,8 +1,8 @@
 import axios, { AxiosError, type AxiosRequestConfig, type AxiosResponse } from "axios";
-import { requiredApiUrl } from "./env";
+import { API_BASE_URL, API_ROOT_URL as CONFIG_API_ROOT_URL } from "@/src/config/api";
 
-export const API_URL = requiredApiUrl();
-export const API_ROOT_URL = API_URL.replace(/\/api$/i, "");
+export const API_URL = API_BASE_URL;
+export const API_ROOT_URL = CONFIG_API_ROOT_URL;
 const API_TIMEOUT_MS = 15_000;
 
 type AuthRefreshPayload = {
@@ -171,7 +171,7 @@ export async function apiRequest<T>(
 
 export async function checkBackendHealth() {
   try {
-    const response = await apiClient.get<{ ok: boolean; service?: string }>(`${API_ROOT_URL}/health`, {
+    const response = await apiClient.get<{ ok: boolean; service?: string }>("/health", {
       timeout: 5_000,
     });
     return {
