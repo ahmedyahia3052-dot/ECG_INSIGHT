@@ -304,6 +304,7 @@ export default function DashboardScreen() {
             lastUpdate={currentTime}
             rhythm={monitorRhythm}
           />
+          <RecentEcgActivity cases={cases.slice(0, isMobile ? 4 : 6)} />
           <RecentPatientsPanel
             error={patientsQuery.isError}
             loading={patientsQuery.isLoading}

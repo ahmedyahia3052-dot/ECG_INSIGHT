@@ -2,13 +2,31 @@ import { type ECGCase, type ECGStatus } from "@/data/mockData";
 import { apiRequest } from "./api";
 
 export interface ApiPatient {
+  address?: string;
   age: number;
+  allergies?: string;
+  archivedAt?: string;
   dateOfBirth: string;
+  diabetes?: boolean;
+  dyslipidemia?: boolean;
+  email?: string;
+  employeeId?: string;
+  emergencyContact?: string;
+  familyHistory?: boolean;
   firstName: string;
   gender: "male" | "female" | "other" | "unknown";
+  hypertension?: boolean;
   id: string;
   lastName: string;
+  medicalHistory?: string;
   medicalRecordNumber: string;
+  medications?: string;
+  nationalId?: string;
+  notes?: string;
+  obesity?: boolean;
+  occupation?: string;
+  phone?: string;
+  smokingStatus?: "current" | "former" | "never" | "unknown";
 }
 
 export interface ApiECGFile {
