@@ -60,6 +60,9 @@ export default function CaseDetailScreen() {
   const ai = aiQuery.data?.analysis;
   const measurement = measurementQuery.data?.measurement;
   const digitalEcg = digitalQuery.data?.digitalEcg;
+  const severity = ai?.severity ?? ecgCase?.status ?? "normal";
+  const severityTone = severity === "critical" || severity === "severe" ? "danger" : severity === "normal" ? "success" : "warning";
+  const isCritical = severityTone === "danger";
 
   if (caseQuery.isError) {
     return (
@@ -112,16 +115,45 @@ export default function CaseDetailScreen() {
             )}
           </BoltCard>
 
+          {isCritical ? (
+            <BoltCard highlight style={[styles.analysisCard, { borderColor: colors.destructive }]}>
+              <BoltBadge icon="alert-triangle" label="Critical findings first" tone="danger" />
+              <Text style={[styles.criticalTitle, { color: colors.destructive }]}>
+                Immediate physician review required
+              </Text>
+              {(ai?.urgentActions?.length ? ai.urgentActions : ["Escalate to urgent clinical review and correlate with symptoms."]).map((item, index) => (
+                <Text key={`${item}-${index}`} style={[styles.muted, { color: colors.text }]}>
+                  {index + 1}. {item}
+                </Text>
+              ))}
+            </BoltCard>
+          ) : null}
+
           <BoltCard highlight style={styles.analysisCard}>
             <View style={styles.cardHeader}>
-              <Text style={[styles.sectionTitle, { color: colors.text }]}>AI Interpretation</Text>
+              <Text style={[styles.sectionTitle, { color: colors.text }]}>Diagnosis</Text>
               <BoltBadge
-                label={ai?.severity ?? ecgCase.status}
-                tone={ai?.severity === "critical" || ecgCase.status === "critical" ? "danger" : "primary"}
+                label={severity}
+                tone={severityTone}
               />
             </View>
             <Text style={[styles.diagnosis, { color: colors.text }]}>{ai?.diagnosis ?? ecgCase.diagnosis}</Text>
-            <Text style={[styles.muted, { color: colors.textSecondary }]}>{ai?.interpretation ?? "AI result is still pending for this case."}</Text>
+            <Text style={[styles.confidence, { color: severityTone === "danger" ? colors.destructive : severityTone === "success" ? colors.success : colors.warning }]}>
+              Confidence {ai?.confidenceScore ?? ecgCase.confidence}%
+            </Text>
+            <Text style={[styles.muted, { color: colors.textSecondary }]}>
+              {ai?.interpretation ?? "AI result is still pending for this case."}
+            </Text>
+          </BoltCard>
+
+          <BoltCard style={styles.analysisCard}>
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>Differential Diagnosis</Text>
+            {(ai?.diagnosis ? buildDifferential(ai.diagnosis, ai.rhythm) : [ecgCase.rhythm, ecgCase.diagnosis]).map((item) => (
+              <View key={item} style={styles.recommendation}>
+                <BoltBadge label="DDx" tone="primary" />
+                <Text style={[styles.recommendationText, { color: colors.text }]}>{item}</Text>
+              </View>
+            ))}
           </BoltCard>
 
           <BoltCard style={styles.analysisCard}>
@@ -147,8 +179,20 @@ export default function CaseDetailScreen() {
   );
 }
 
+function buildDifferential(diagnosis: string, rhythm: string) {
+  const terms = [diagnosis, rhythm].filter(Boolean);
+  const lower = terms.join(" ").toLowerCase();
+  if (lower.includes("atrial")) return ["Atrial fibrillation", "Atrial flutter", "Frequent supraventricular ectopy"];
+  if (lower.includes("brady")) return ["Sinus bradycardia", "AV conduction delay", "Medication-related bradycardia"];
+  if (lower.includes("tachy")) return ["Sinus tachycardia", "Supraventricular tachycardia", "Atrial fibrillation with rapid ventricular response"];
+  if (lower.includes("stemi") || lower.includes("ische")) return ["Acute coronary syndrome", "STEMI pattern", "Pericarditis or early repolarization mimic"];
+  return ["Normal sinus rhythm", "Nonspecific ST-T changes", "Artifact or lead placement variation"];
+}
+
 const styles = StyleSheet.create({
   analysisCard: { gap: 10 },
+  confidence: { fontFamily: "Inter_700Bold", fontSize: 16 },
+  criticalTitle: { fontFamily: "Inter_700Bold", fontSize: 18, lineHeight: 24 },
   cardHeader: { alignItems: "center", flexDirection: "row", gap: 10, justifyContent: "space-between" },
   diagnosis: { fontFamily: "Inter_700Bold", fontSize: 20, lineHeight: 26 },
   muted: { fontFamily: "Inter_400Regular", fontSize: 13, lineHeight: 20 },

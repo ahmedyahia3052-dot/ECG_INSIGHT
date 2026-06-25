@@ -1,10 +1,13 @@
+import { Feather } from "@expo/vector-icons";
+import * as Haptics from "expo-haptics";
 import { useQuery } from "@tanstack/react-query";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
 import React, { useCallback, useMemo, useState } from "react";
-import { RefreshControl, StyleSheet, Text, View } from "react-native";
+import { Pressable, RefreshControl, StyleSheet, Text, View, useWindowDimensions } from "react-native";
 import { useAuth } from "@/context/AuthContext";
 import { useColors } from "@/hooks/useColors";
+import { useOfflineCache } from "@/hooks/useOfflineCache";
 import { getAIHistory, getAIStatistics } from "@/services/ai";
 import { API_ROOT_URL } from "@/services/api";
 import { apiCaseToEcgCase, listCases } from "@/services/clinical";
@@ -24,6 +27,7 @@ import { AnalyticsChartCard, EcgMonitorWidget, LiveEcgWave, PremiumMetricCard, S
 export default function DashboardScreen() {
   const colors = useColors();
   const router = useRouter();
+  const { width } = useWindowDimensions();
   const { authToken, canAccess, isImpersonating, stopImpersonation, user } = useAuth();
   const token = authToken?.token;
   const [refreshing, setRefreshing] = useState(false);
@@ -83,7 +87,10 @@ export default function DashboardScreen() {
     retry: false,
   });
 
-  const cases = casesQuery.data?.cases.map(apiCaseToEcgCase) ?? [];
+  const casesCache = useOfflineCache("ecg-insight:mobile:cases", casesQuery.data?.cases);
+  const notificationsCache = useOfflineCache("ecg-insight:mobile:notifications", notificationsQuery.data?.notifications);
+  const liveCases = casesQuery.data?.cases ?? casesCache.cachedData ?? [];
+  const cases = liveCases.map(apiCaseToEcgCase);
   const reports = (reportsQuery.data as { reports?: unknown[] } | undefined)?.reports ?? [];
   const critical = cases.filter((item) => item.status === "critical").length;
   const patients = new Set(cases.map((item) => item.patientName)).size;
@@ -96,7 +103,7 @@ export default function DashboardScreen() {
     : 0;
   const today = new Date().toISOString().slice(0, 10);
   const todayCount = cases.filter((item) => item.date.slice(0, 10) === today).length;
-  const notifications = notificationsQuery.data?.notifications ?? [];
+  const notifications = notificationsQuery.data?.notifications ?? notificationsCache.cachedData ?? [];
   const unread = notifications.filter((item) => {
     const record = item as { read?: boolean; readAt?: string | null };
     return !record.read && !record.readAt;
@@ -109,6 +116,7 @@ export default function DashboardScreen() {
   const status = systemStatusQuery.data;
   const monitorRhythm = aiHistory[0]?.rhythm ?? cases[0]?.rhythm ?? "Normal Sinus Rhythm";
   const monitorHeartRate = aiHistory[0]?.heartRate ?? cases[0]?.heartRate ?? 72;
+  const isMobile = width < 768;
 
   const weeklySeries = useMemo(() => {
     const base = Math.max(cases.length, 1);
@@ -154,6 +162,14 @@ export default function DashboardScreen() {
         </BoltCard>
       ) : null}
 
+      <MobileHomeHeader
+        avatar={user?.avatarInitials ?? "AY"}
+        greeting={greeting()}
+        notifications={unread}
+        onNotifications={() => router.push("/(tabs)/notification-center")}
+        planName={String(planName)}
+      />
+
       <BoltCard highlight style={styles.hero}>
         <LinearGradient colors={["rgba(0,229,255,0.18)", "rgba(20,184,166,0.04)"]} style={StyleSheet.absoluteFill} />
         <View style={styles.heroWave}>
@@ -192,6 +208,24 @@ export default function DashboardScreen() {
         </View>
       </BoltCard>
 
+      <View style={styles.quickActions}>
+        <QuickActionCard icon="upload-cloud" label="Upload ECG" onPress={() => router.push("/(tabs)/upload?method=upload" as never)} />
+        <QuickActionCard icon="camera" label="Capture ECG" onPress={() => router.push("/(tabs)/upload?method=camera" as never)} />
+        <QuickActionCard icon="user-plus" label="Add Patient" onPress={() => router.push("/(tabs)/upload")} />
+        <QuickActionCard icon="file-text" label="Reports" onPress={() => router.push("/(tabs)/reports-dashboard")} />
+        <QuickActionCard icon="message-circle" label="AI Assistant" onPress={() => router.push("/(tabs)/ai-assistant" as never)} />
+      </View>
+
+      {casesQuery.isError && casesCache.hasOfflineData ? (
+        <BoltCard style={styles.offlineCard}>
+          <BoltBadge icon="wifi-off" label="Offline cache" tone="warning" />
+          <Text style={[styles.muted, { color: colors.textSecondary }]}>
+            Showing locally cached ECG data from {casesCache.savedAt ? new Date(casesCache.savedAt).toLocaleString() : "a previous session"}.
+            Automatic sync resumes when the API is reachable.
+          </Text>
+        </BoltCard>
+      ) : null}
+
       {loading ? (
         <View style={styles.loadingGrid}>
           {[0, 1, 2, 3, 4, 5].map((item) => <ShimmerBlock key={item} style={styles.loadingCard} />)}
@@ -226,7 +260,7 @@ export default function DashboardScreen() {
         unread={unread}
       />
 
-      <RecentTimeline cases={cases.slice(0, 8)} />
+      <RecentTimeline cases={cases.slice(0, isMobile ? 5 : 8)} />
 
       <AIAssistantPanel
         diagnosis={aiHistory[0]?.diagnosis ?? cases[0]?.diagnosis ?? "No diagnosis selected"}
@@ -309,6 +343,81 @@ function StatusPill({ label, operational }: { label: string; operational: boolea
         </Text>
       </View>
     </View>
+  );
+}
+
+function MobileHomeHeader({
+  avatar,
+  greeting,
+  notifications,
+  onNotifications,
+  planName,
+}: {
+  avatar: string;
+  greeting: string;
+  notifications: number;
+  onNotifications: () => void;
+  planName: string;
+}) {
+  const colors = useColors();
+  return (
+    <View style={styles.mobileHeader}>
+      <View style={[styles.avatar, { backgroundColor: colors.primary }]}>
+        <Text style={styles.avatarText}>{avatar}</Text>
+      </View>
+      <View style={styles.mobileHeaderText}>
+        <Text style={[styles.mobileGreeting, { color: colors.text }]}>{greeting}, Dr. Ahmed</Text>
+        <BoltBadge icon="credit-card" label={planName} />
+      </View>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="Notifications"
+        onPress={onNotifications}
+        style={[styles.notificationButton, { borderColor: colors.gradientBorder }]}
+      >
+        <Feather name="bell" size={19} color={colors.primary} />
+        {notifications ? (
+          <View style={[styles.notificationDot, { backgroundColor: colors.destructive }]}>
+            <Text style={styles.notificationText}>{Math.min(notifications, 9)}</Text>
+          </View>
+        ) : null}
+      </Pressable>
+    </View>
+  );
+}
+
+function QuickActionCard({
+  icon,
+  label,
+  onPress,
+}: {
+  icon: keyof typeof Feather.glyphMap;
+  label: string;
+  onPress: () => void;
+}) {
+  const colors = useColors();
+  return (
+    <Pressable
+      accessibilityRole="button"
+      onPress={() => {
+        Haptics.selectionAsync().catch(() => {});
+        onPress();
+      }}
+      style={({ pressed }) => [
+        styles.quickActionCard,
+        {
+          backgroundColor: colors.glass,
+          borderColor: colors.gradientBorder,
+          opacity: pressed ? 0.78 : 1,
+          transform: [{ scale: pressed ? 0.98 : 1 }],
+        },
+      ]}
+    >
+      <View style={[styles.quickActionIcon, { backgroundColor: colors.primary + "18" }]}>
+        <Feather name={icon} size={22} color={colors.primary} />
+      </View>
+      <Text style={[styles.quickActionText, { color: colors.text }]}>{label}</Text>
+    </Pressable>
   );
 }
 
@@ -434,8 +543,19 @@ const styles = StyleSheet.create({
   loadingGrid: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
   metricRow: { flexDirection: "row", gap: 10 },
   muted: { fontFamily: "Inter_400Regular", fontSize: 13, lineHeight: 19 },
+  mobileGreeting: { fontFamily: "Inter_700Bold", fontSize: 20, letterSpacing: -0.4 },
+  mobileHeader: { alignItems: "center", flexDirection: "row", gap: 12, minHeight: 58 },
+  mobileHeaderText: { flex: 1, gap: 5 },
   navGrid: { gap: 10 },
+  notificationButton: { alignItems: "center", borderRadius: 16, borderWidth: 1, height: 48, justifyContent: "center", width: 48 },
+  notificationDot: { alignItems: "center", borderRadius: 999, height: 18, justifyContent: "center", position: "absolute", right: -4, top: -5, width: 18 },
+  notificationText: { color: "#fff", fontFamily: "Inter_700Bold", fontSize: 10 },
+  offlineCard: { gap: 8 },
   panel: { gap: 12 },
+  quickActionCard: { alignItems: "center", borderRadius: 22, borderWidth: 1, flex: 1, gap: 10, justifyContent: "center", minHeight: 104, minWidth: "30%", padding: 14 },
+  quickActionIcon: { alignItems: "center", borderRadius: 18, height: 48, justifyContent: "center", width: 48 },
+  quickActions: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
+  quickActionText: { fontFamily: "Inter_700Bold", fontSize: 13, textAlign: "center" },
   panelHeader: { alignItems: "center", flexDirection: "row", justifyContent: "space-between" },
   sectionHeader: { alignItems: "center", flexDirection: "row", justifyContent: "space-between" },
   sectionTitle: { fontFamily: "Inter_700Bold", fontSize: 18 },
