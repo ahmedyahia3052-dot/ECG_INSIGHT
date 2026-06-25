@@ -2,8 +2,9 @@ import { BlurView } from "expo-blur";
 import { Redirect, Tabs } from "expo-router";
 import { SymbolView } from "expo-symbols";
 import { Feather } from "@expo/vector-icons";
+import * as Haptics from "expo-haptics";
 import React, { useState } from "react";
-import { Platform, StyleSheet, View, useColorScheme, useWindowDimensions } from "react-native";
+import { Platform, Pressable, StyleSheet, TouchableOpacity, View, useColorScheme, useWindowDimensions } from "react-native";
 import { useAuth } from "@/context/AuthContext";
 import { useColors } from "@/hooks/useColors";
 import { EnterpriseSidebar } from "@/components/bolt/EnterpriseSidebar";
@@ -13,6 +14,7 @@ function ClassicTabLayout() {
   const colors = useColors();
   const colorScheme = useColorScheme();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
   const { width } = useWindowDimensions();
   const isDark = colorScheme === "dark";
   const isIOS = Platform.OS === "ios";
@@ -34,6 +36,30 @@ function ClassicTabLayout() {
           collapsed={sidebarCollapsed}
           onToggleCollapse={() => setSidebarCollapsed((value) => !value)}
         />
+      ) : mobileDrawerOpen ? (
+        <>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Close navigation drawer"
+            onPress={() => setMobileDrawerOpen(false)}
+            style={styles.drawerBackdrop}
+          />
+          <EnterpriseSidebar collapsed={false} onClose={() => setMobileDrawerOpen(false)} />
+        </>
+      ) : null}
+      {isMobile ? (
+        <TouchableOpacity
+          accessibilityRole="button"
+          accessibilityLabel="Open navigation drawer"
+          activeOpacity={0.84}
+          onPress={() => {
+            Haptics.selectionAsync().catch(() => {});
+            setMobileDrawerOpen(true);
+          }}
+          style={[styles.menuButton, { backgroundColor: colors.glass, borderColor: colors.gradientBorder }]}
+        >
+          <Feather name="menu" size={19} color={colors.primary} />
+        </TouchableOpacity>
       ) : null}
       <Tabs
         screenOptions={{
@@ -200,6 +226,23 @@ export default function TabLayout() {
 
 const styles = StyleSheet.create({
   activeDot: { borderRadius: 999, bottom: -6, height: 4, position: "absolute", width: 18 },
+  drawerBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(0,0,0,0.46)",
+    zIndex: 40,
+  },
+  menuButton: {
+    alignItems: "center",
+    borderRadius: 16,
+    borderWidth: 1,
+    height: 48,
+    justifyContent: "center",
+    left: 18,
+    position: "absolute",
+    top: Platform.OS === "web" ? 18 : 48,
+    width: 48,
+    zIndex: 34,
+  },
   tabIconWrap: { alignItems: "center", justifyContent: "center", minHeight: 30, minWidth: 34 },
   tabBlur: { borderRadius: 26, overflow: "hidden" },
 });

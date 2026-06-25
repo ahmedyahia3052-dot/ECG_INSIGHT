@@ -23,9 +23,11 @@ export function FloatingEcgActionButton() {
   }, [open, scale]);
 
   const actions = [
-    { icon: "camera" as const, label: "Camera Capture", route: "/(tabs)/upload?method=camera" },
-    { icon: "image" as const, label: "Upload Image", route: "/(tabs)/upload?method=upload" },
-    { icon: "file" as const, label: "Upload PDF", route: "/(tabs)/document-center" },
+    { icon: "upload-cloud" as const, label: "Upload ECG", route: "/(tabs)/upload?method=upload" },
+    { icon: "camera" as const, label: "Capture ECG", route: "/(tabs)/upload?method=camera" },
+    { icon: "user-plus" as const, label: "Add Patient", route: "/(tabs)/upload" },
+    { icon: "file-plus" as const, label: "Generate Report", route: "/(tabs)/reports-dashboard" },
+    { icon: "activity" as const, label: "Start Analysis", route: "/(tabs)/upload?method=scanner" },
   ];
 
   return (
