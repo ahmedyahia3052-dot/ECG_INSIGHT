@@ -18,6 +18,7 @@ export interface CopilotCitation {
   id: string;
   label: string;
   source: string;
+  tags?: string[];
   type: string;
 }
 
@@ -94,7 +95,7 @@ export async function updateCopilotSettings(accessToken: string, input: CopilotS
 }
 
 export async function getCopilotAnalytics(accessToken: string) {
-  return apiRequest<{ analytics: { activeUsers: number; averageResponseTimeMs: number; mostCommonQuestions: Array<{ count: number; question: string }>; totalConversations: number } }>("/copilot/analytics", { accessToken });
+  return apiRequest<{ analytics: { activeUsers: number; averageResponseTimeMs: number; mostCommonQuestions: Array<{ count: number; question: string }>; topDiagnosesRequested: Array<{ count: number; diagnosis: string }>; totalConversations: number } }>("/copilot/analytics", { accessToken });
 }
 
 export function copilotExportUrl(conversationId: string) {

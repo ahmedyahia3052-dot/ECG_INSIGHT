@@ -71,6 +71,7 @@ export function MedicalAICopilot() {
   const conversations = conversationsQuery.data?.conversations ?? [];
   const unread = messages.filter((message) => message.role === "assistant").length ? 0 : 1;
   const enabled = settingsQuery.data?.settings.enabled ?? true;
+  const latestAssistant = [...messages].reverse().find((message) => message.role === "assistant");
 
   const invalidate = () => {
     void queryClient.invalidateQueries({ queryKey: ["copilot-conversations", token] });
@@ -163,9 +164,10 @@ export function MedicalAICopilot() {
           <View style={styles.chat}>
             <Text style={styles.disclaimer}>{disclaimer}</Text>
             <View style={styles.contextCard}>
-              <Badge label={context.contextType} tone="primary" />
-              <Text style={styles.contextText}>{context.contextPath}</Text>
+              <Badge label="Current Context" tone="primary" />
+              <Text style={styles.contextText}>{contextLabel(context)}</Text>
             </View>
+            {latestAssistant ? <RagEvidence message={latestAssistant} /> : null}
             <View style={styles.tagRow}>
               {tags.map((item) => <PrimaryButton key={item} label={item} onPress={() => setTag(item)} variant={tag === item ? "primary" : "outline"} />)}
             </View>
@@ -194,11 +196,27 @@ export function MedicalAICopilot() {
                 <PrimaryButton label={enabled ? "Disable Copilot" : "Enable Copilot"} onPress={() => settingsMutation.mutate(!enabled)} variant={enabled ? "danger" : "primary"} />
                 <Text style={styles.ownerMetric}>Provider: {settingsQuery.data?.settings.provider ?? "RuleBasedRAG"}</Text>
                 <Text style={styles.ownerMetric}>Conversations: {analyticsQuery.data?.analytics.totalConversations ?? 0} • Active users: {analyticsQuery.data?.analytics.activeUsers ?? 0} • Avg response: {analyticsQuery.data?.analytics.averageResponseTimeMs ?? 0} ms</Text>
+                <Text style={styles.ownerMetric}>Top diagnoses: {(analyticsQuery.data?.analytics.topDiagnosesRequested ?? []).slice(0, 3).map((item) => `${item.diagnosis} (${item.count})`).join(", ") || "No diagnosis analytics yet"}</Text>
               </View>
             ) : null}
           </View>
         </View>
       ) : null}
+    </View>
+  );
+}
+
+function RagEvidence({ message }: { message: CopilotMessage }) {
+  const sources = message.citations?.slice(0, 4) ?? [];
+  const knowledgeTags = Array.from(new Set(message.citations?.flatMap((citation) => citation.tags ?? []) ?? [])).slice(0, 8);
+  return (
+    <View style={styles.evidencePanel}>
+      <View style={styles.evidenceHeader}>
+        <Text style={styles.evidenceTitle}>RAG Evidence</Text>
+        {message.confidence !== undefined ? <Text style={styles.evidenceConfidence}>{Math.round(message.confidence * 100)}% confidence</Text> : null}
+      </View>
+      <Text style={styles.evidenceText}>Sources Used: {sources.map((source) => source.label).join(" • ") || "ECG Knowledge Base"}</Text>
+      <Text style={styles.evidenceText}>Knowledge Tags: {knowledgeTags.join(", ") || "general-ecg"}</Text>
     </View>
   );
 }
@@ -273,6 +291,12 @@ function contextFromPath(pathname: string) {
   return { contextPath: pathname, contextType: "global" as const };
 }
 
+function contextLabel(context: ReturnType<typeof contextFromPath>) {
+  if (context.contextType === "case") return `Patient -> ECG Case ${context.caseId} -> Reports and prior ECGs`;
+  if (context.contextType === "patient") return `Patient ${context.patientId} -> ECG history -> Reports and documents`;
+  return "Global ECG knowledge only. Open a patient profile or ECG case for patient-specific RAG.";
+}
+
 function animateTyping(text: string, setValue: (value: string) => void) {
   if (Platform.OS !== "web") {
     setValue(text);
@@ -322,6 +346,11 @@ const styles = StyleSheet.create({
   conversationTitle: { color: medicalTheme.text, fontSize: 12, fontWeight: "900" },
   disclaimer: { color: medicalTheme.warning, fontSize: 11, fontWeight: "900" },
   emptyText: { color: medicalTheme.muted, fontSize: 13, fontWeight: "700", lineHeight: 20, padding: 14 },
+  evidenceConfidence: { color: medicalTheme.success, fontSize: 11, fontWeight: "900" },
+  evidenceHeader: { alignItems: "center", flexDirection: "row", justifyContent: "space-between" },
+  evidencePanel: { backgroundColor: "#071D2D", borderColor: "#164E63", borderRadius: 12, borderWidth: 1, gap: 5, padding: 10 },
+  evidenceText: { color: medicalTheme.muted, fontSize: 11, fontWeight: "800", lineHeight: 16 },
+  evidenceTitle: { color: medicalTheme.text, fontSize: 12, fontWeight: "900" },
   floatingButton: { alignItems: "center", backgroundColor: medicalTheme.primary, borderRadius: 999, bottom: 24, height: 58, justifyContent: "center", position: "absolute", right: 24, shadowColor: medicalTheme.primary, shadowOpacity: 0.36, shadowRadius: 16, width: 58, zIndex: 100 },
   fullscreen: { bottom: 18, left: 18, position: "absolute", right: 18, top: 18, width: "auto" },
   header: { alignItems: "center", borderBottomColor: medicalTheme.border, borderBottomWidth: 1, flexDirection: "row", gap: 8, justifyContent: "space-between", paddingBottom: 10 },

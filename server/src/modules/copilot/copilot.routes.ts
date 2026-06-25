@@ -13,7 +13,47 @@ const OWNER_EMAIL = "ahmedyahia3052@gmail.com";
 const DISCLAIMER = "AI assistance only. Final diagnosis and clinical decisions remain the responsibility of the physician.";
 const tags = ["ECG Interpretation", "Clinical Summary", "Occupational Fitness", "Differential Diagnosis", "Follow-up"] as const;
 
-type Citation = { id: string; label: string; source: string; type: string };
+type Citation = { id: string; label: string; source: string; tags?: string[]; type: string };
+
+type ClinicalContext = {
+  criticalAlerts: string[];
+  currentCase?: {
+    axis?: number | null;
+    diagnosis?: string | null;
+    doctorDiagnosis?: string | null;
+    heartRate?: number | null;
+    intervals: string;
+    rhythm?: string | null;
+    severity?: string;
+    status?: string;
+  };
+  documents: string[];
+  patient?: {
+    age: number;
+    allergies: string;
+    company?: string | null;
+    department?: string | null;
+    employeeId?: string | null;
+    fullName: string;
+    gender: string;
+    history: string;
+    medications: string;
+    occupation?: string | null;
+    riskFactors: string[];
+  };
+  previousEcgs: string[];
+  reports: string[];
+  sources: Citation[];
+};
+
+type KnowledgeHit = {
+  category: string;
+  content: string;
+  id: string;
+  references: string[];
+  tags: string[];
+  topic: string;
+};
 
 const contextSchema = z.object({
   caseId: z.string().optional(),
@@ -105,67 +145,197 @@ function serializeMessage(message: {
   };
 }
 
-async function collectContext(input: { caseId?: string; patientId?: string; question: string }) {
-  const citations: Citation[] = [];
-  const snippets: string[] = [];
-  const patientIdFromCase = input.caseId
-    ? (await prisma.eCGCase.findFirst({ where: { OR: [{ id: input.caseId }, { caseId: input.caseId }, { caseNumber: input.caseId }] } }))?.patientId
-    : undefined;
-  const patientId = input.patientId ?? patientIdFromCase;
+async function retrieveClinicalContext(input: { caseId?: string; patientId?: string }) {
+  const caseRecord = input.caseId
+    ? await prisma.eCGCase.findFirst({
+        include: {
+          analyses: { orderBy: { createdAt: "desc" }, take: 2 },
+          clinicalAlerts: { orderBy: { createdAt: "desc" }, take: 5 },
+          documents: { include: { extraction: true, searchIndex: true }, orderBy: { createdAt: "desc" }, take: 8 },
+          files: { orderBy: { createdAt: "desc" }, take: 3 },
+          measurements: { orderBy: { createdAt: "desc" }, take: 2 },
+          reports: { orderBy: { createdAt: "desc" }, take: 3 },
+        },
+        where: { OR: [{ id: input.caseId }, { caseId: input.caseId }, { caseNumber: input.caseId }] },
+      })
+    : null;
+  const patientId = input.patientId ?? caseRecord?.patientId;
+  const patient = patientId
+    ? await prisma.patient.findUnique({
+        include: {
+          cases: {
+            include: {
+              analyses: { orderBy: { createdAt: "desc" }, take: 1 },
+              measurements: { orderBy: { createdAt: "desc" }, take: 1 },
+            },
+            orderBy: { uploadDate: "desc" },
+            take: 8,
+          },
+          clinicalAlerts: { orderBy: { createdAt: "desc" }, take: 8 },
+          documents: { include: { extraction: true, searchIndex: true }, orderBy: { createdAt: "desc" }, take: 12 },
+          reports: { orderBy: { createdAt: "desc" }, take: 8 },
+        },
+        where: { id: patientId },
+      })
+    : null;
 
-  if (patientId) {
-    const patient = await prisma.patient.findUnique({
-      include: {
-        cases: { orderBy: { uploadDate: "desc" }, take: 5 },
-        reports: { orderBy: { createdAt: "desc" }, take: 5 },
-      },
-      where: { id: patientId },
-    });
-    if (patient) {
-      citations.push({ id: patient.id, label: "Patient profile", source: `Patient ${patient.firstName} ${patient.lastName}`, type: "patient" });
-      snippets.push(`Patient demographics: ${patient.firstName} ${patient.lastName}, gender ${patient.gender}, DOB ${patient.dateOfBirth.toISOString().slice(0, 10)}.`);
-      snippets.push(`Medical history: ${patient.medicalHistory ?? "not documented"}. Medications: ${patient.medications ?? "not documented"}. Allergies: ${patient.knownAllergies ?? patient.allergies ?? "not documented"}.`);
-      for (const ecgCase of patient.cases) {
-        citations.push({ id: ecgCase.id, label: ecgCase.caseNumber ?? ecgCase.caseId, source: "Stored ECG case", type: "case" });
-        snippets.push(`ECG ${ecgCase.caseNumber ?? ecgCase.caseId}: status ${ecgCase.status}, rhythm ${ecgCase.rhythm ?? "pending"}, AI ${ecgCase.aiDiagnosis ?? "pending"}, doctor ${ecgCase.doctorDiagnosis ?? "pending"}, HR ${ecgCase.heartRate ?? "n/a"}, PR ${ecgCase.prInterval ?? "n/a"}, QRS ${ecgCase.qrsDuration ?? "n/a"}, QTc ${ecgCase.qtcInterval ?? "n/a"}.`);
-      }
-      for (const report of patient.reports) {
-        citations.push({ id: report.id, label: report.reportNumber, source: "Previous report", type: "report" });
-        snippets.push(`Report ${report.reportNumber}: ${report.finalPhysicianImpression ?? report.aiFindings ?? "draft report without final impression"}.`);
-      }
+  const sources: Citation[] = [];
+  const context: ClinicalContext = {
+    criticalAlerts: [],
+    documents: [],
+    previousEcgs: [],
+    reports: [],
+    sources,
+  };
+
+  if (patient) {
+    const fullName = patient.fullName ?? `${patient.firstName} ${patient.lastName}`.trim();
+    const riskFactors = [
+      patient.hypertension ? "hypertension" : undefined,
+      patient.diabetes ? "diabetes" : undefined,
+      patient.dyslipidemia ? "dyslipidemia" : undefined,
+      patient.obesity ? "obesity" : undefined,
+      patient.previousMI ? "previous MI" : undefined,
+      patient.previousCABG ? "previous CABG" : undefined,
+      patient.previousPCI ? "previous PCI" : undefined,
+      patient.smokingStatus === "CURRENT" ? "current smoker" : patient.smokingStatus === "FORMER" ? "former smoker" : undefined,
+      patient.familyHistory ? `family history: ${patient.familyHistory}` : undefined,
+    ].filter(Boolean) as string[];
+    context.patient = {
+      age: ageFromDob(patient.dateOfBirth),
+      allergies: patient.knownAllergies ?? patient.allergies ?? "not documented",
+      company: patient.company,
+      department: patient.departmentName,
+      employeeId: patient.employeeId,
+      fullName,
+      gender: patient.gender,
+      history: patient.medicalHistory ?? patient.notes ?? "not documented",
+      medications: patient.medications ?? "not documented",
+      occupation: patient.occupation ?? patient.jobTitle,
+      riskFactors,
+    };
+    sources.push({ id: patient.id, label: "Patient Profile", source: fullName, tags: ["demographics", "history", "risk"], type: "patient" });
+    for (const report of patient.reports) {
+      context.reports.push(`${report.reportNumber}: ${report.finalPhysicianImpression ?? report.aiFindings ?? report.rhythmInterpretation ?? "draft report without final impression"}`);
+      sources.push({ id: report.id, label: report.reportNumber, source: "Previous Report", tags: ["report"], type: "report" });
+    }
+    for (const ecgCase of patient.cases) {
+      if (caseRecord && ecgCase.id === caseRecord.id) continue;
+      const measurement = ecgCase.measurements[0];
+      context.previousEcgs.push(`${ecgCase.caseNumber ?? ecgCase.caseId}: ${ecgCase.aiDiagnosis ?? ecgCase.analyses[0]?.diagnosis ?? "diagnosis pending"}, rhythm ${ecgCase.rhythm ?? ecgCase.analyses[0]?.rhythm ?? "pending"}, HR ${ecgCase.heartRate ?? measurement?.heartRate ?? "n/a"}, QTc ${ecgCase.qtcInterval ?? measurement?.qtcInterval ?? "n/a"}, severity ${ecgCase.severity}.`);
+      sources.push({ id: ecgCase.id, label: ecgCase.caseNumber ?? ecgCase.caseId, source: "Previous ECG", tags: ["ecg-history"], type: "case" });
+    }
+    for (const alert of patient.clinicalAlerts) {
+      context.criticalAlerts.push(`${alert.alertType}: ${alert.message} (${alert.severity}, confidence ${Math.round(alert.confidenceScore * 100)}%)`);
+      sources.push({ id: alert.id, label: String(alert.alertType), source: "Clinical Alert", tags: ["critical-alert"], type: "alert" });
+    }
+    for (const document of patient.documents) {
+      context.documents.push(`${document.category}: ${document.title} - ${document.extraction?.aiSummary ?? document.searchIndex?.searchText?.slice(0, 180) ?? document.originalName}`);
+      sources.push({ id: document.id, label: document.title, source: "Cardiovascular Document", tags: [String(document.category).toLowerCase()], type: "document" });
     }
   }
 
-  if (input.caseId) {
-    const ecgCase = await prisma.eCGCase.findFirst({
-      include: { analyses: { orderBy: { createdAt: "desc" }, take: 1 }, measurements: { orderBy: { createdAt: "desc" }, take: 1 } },
-      where: { OR: [{ id: input.caseId }, { caseId: input.caseId }, { caseNumber: input.caseId }] },
-    });
-    if (ecgCase) {
-      citations.push({ id: ecgCase.id, label: ecgCase.caseNumber ?? ecgCase.caseId, source: "Current ECG case", type: "case" });
-      snippets.push(`Current ECG case: AI diagnosis ${ecgCase.aiDiagnosis ?? ecgCase.analyses[0]?.diagnosis ?? "pending"}, doctor diagnosis ${ecgCase.doctorDiagnosis ?? "pending"}, comments ${ecgCase.clinicalComments ?? ecgCase.clinicalNotes ?? "none"}, severity ${ecgCase.severity}, status ${ecgCase.status}.`);
-      if (ecgCase.measurements[0]) snippets.push(`Measurements: HR ${ecgCase.measurements[0].heartRate}, PR ${ecgCase.measurements[0].prInterval}, QRS ${ecgCase.measurements[0].qrsDuration}, QT ${ecgCase.measurements[0].qtInterval}, QTc ${ecgCase.measurements[0].qtcInterval}.`);
+  if (caseRecord) {
+    const measurement = caseRecord.measurements[0];
+    const analysis = caseRecord.analyses[0];
+    context.currentCase = {
+      axis: measurement?.electricalAxis,
+      diagnosis: caseRecord.aiDiagnosis ?? analysis?.diagnosis,
+      doctorDiagnosis: caseRecord.doctorDiagnosis ?? caseRecord.finalDiagnosis,
+      heartRate: caseRecord.heartRate ?? measurement?.heartRate ?? analysis?.heartRate,
+      intervals: `PR ${caseRecord.prInterval ?? measurement?.prInterval ?? "n/a"} ms, QRS ${caseRecord.qrsDuration ?? measurement?.qrsDuration ?? "n/a"} ms, QT ${caseRecord.qtInterval ?? measurement?.qtInterval ?? "n/a"} ms, QTc ${caseRecord.qtcInterval ?? measurement?.qtcInterval ?? "n/a"} ms`,
+      rhythm: caseRecord.rhythm ?? analysis?.rhythm,
+      severity: caseRecord.severity,
+      status: caseRecord.status,
+    };
+    sources.push({ id: caseRecord.id, label: caseRecord.caseNumber ?? caseRecord.caseId, source: "Current ECG Case", tags: ["current-ecg", "measurements"], type: "case" });
+    for (const alert of caseRecord.clinicalAlerts) {
+      context.criticalAlerts.push(`${alert.alertType}: ${alert.message} (${alert.severity}, confidence ${Math.round(alert.confidenceScore * 100)}%)`);
+      sources.push({ id: alert.id, label: String(alert.alertType), source: "Current Case Alert", tags: ["critical-alert"], type: "alert" });
+    }
+    for (const report of caseRecord.reports) {
+      context.reports.push(`${report.reportNumber}: ${report.finalPhysicianImpression ?? report.aiFindings ?? report.rhythmInterpretation ?? "draft report without final impression"}`);
+      sources.push({ id: report.id, label: report.reportNumber, source: "Current Case Report", tags: ["report"], type: "report" });
+    }
+    for (const document of caseRecord.documents) {
+      context.documents.push(`${document.category}: ${document.title} - ${document.extraction?.aiSummary ?? document.searchIndex?.searchText?.slice(0, 180) ?? document.originalName}`);
+      sources.push({ id: document.id, label: document.title, source: "Case Document", tags: [String(document.category).toLowerCase()], type: "document" });
     }
   }
 
-  const terms = input.question.toLowerCase().split(/\W+/).filter((word) => word.length > 2);
-  const knowledge = await prisma.eCGKnowledgeEntry.findMany({
+  context.sources = dedupeCitations(sources);
+  return context;
+}
+
+async function retrieveKnowledge(question: string, context: ClinicalContext): Promise<{ hits: KnowledgeHit[]; sources: Citation[]; tags: string[] }> {
+  const haystack = [
+    question,
+    context.currentCase?.diagnosis,
+    context.currentCase?.doctorDiagnosis,
+    context.currentCase?.rhythm,
+    context.currentCase?.severity,
+    ...context.previousEcgs,
+    ...context.reports,
+    ...context.criticalAlerts,
+  ].filter(Boolean).join(" ").toLowerCase();
+  const terms = clinicalTerms(haystack);
+  const hits = await prisma.eCGKnowledgeEntry.findMany({
     orderBy: { updatedAt: "desc" },
-    take: 6,
+    take: 8,
     where: {
       OR: [
-        { topic: { contains: input.question, mode: "insensitive" } },
-        { content: { contains: terms[0] ?? input.question, mode: "insensitive" } },
         { tags: { hasSome: terms } },
+        ...terms.slice(0, 8).flatMap((term) => [
+          { topic: { contains: term, mode: "insensitive" as const } },
+          { content: { contains: term, mode: "insensitive" as const } },
+        ]),
       ],
     },
   });
-  for (const entry of knowledge.length ? knowledge : await prisma.eCGKnowledgeEntry.findMany({ take: 4, orderBy: { category: "asc" } })) {
-    citations.push({ id: entry.id, label: entry.topic, source: "ECG knowledge base", type: "knowledge" });
-    snippets.push(`${entry.topic}: ${entry.content}`);
-  }
+  const fallback = hits.length ? [] : await prisma.eCGKnowledgeEntry.findMany({ orderBy: { topic: "asc" }, take: 6 });
+  const selected = (hits.length ? hits : fallback).map((entry) => ({
+    category: entry.category,
+    content: entry.content,
+    id: entry.id,
+    references: entry.references,
+    tags: entry.tags,
+    topic: entry.topic,
+  }));
+  const sources = selected.map((entry) => ({ id: entry.id, label: entry.topic, source: "ECG Knowledge Base", tags: entry.tags, type: "knowledge" }));
+  return { hits: selected, sources, tags: Array.from(new Set(selected.flatMap((entry) => entry.tags))).slice(0, 12) };
+}
 
-  return { citations: dedupeCitations(citations), snippets };
+function buildPrompt(question: string, context: ClinicalContext, knowledge: KnowledgeHit[]) {
+  return [
+    `Question: ${question}`,
+    `Patient: ${context.patient ? `${context.patient.age}-year-old ${context.patient.gender.toLowerCase()} ${context.patient.fullName}; employee ${context.patient.employeeId ?? "n/a"}; ${context.patient.company ?? "company n/a"} / ${context.patient.department ?? "department n/a"}; occupation ${context.patient.occupation ?? "n/a"}.` : "No active patient context."}`,
+    `History: ${context.patient ? `${context.patient.history}; medications ${context.patient.medications}; allergies ${context.patient.allergies}; risk factors ${context.patient.riskFactors.join(", ") || "none documented"}.` : "General ECG knowledge only."}`,
+    `Current ECG: ${context.currentCase ? `${context.currentCase.rhythm ?? "rhythm pending"}, HR ${context.currentCase.heartRate ?? "n/a"}, ${context.currentCase.intervals}, axis ${context.currentCase.axis ?? "n/a"}, diagnosis ${context.currentCase.diagnosis ?? "pending"}, doctor ${context.currentCase.doctorDiagnosis ?? "pending"}, severity ${context.currentCase.severity}.` : "No current ECG case open."}`,
+    `Previous ECGs: ${context.previousEcgs.slice(0, 5).join(" | ") || "none retrieved"}.`,
+    `Documents: ${context.documents.slice(0, 5).join(" | ") || "none retrieved"}.`,
+    `Knowledge: ${knowledge.map((entry) => `${entry.topic}: ${entry.content}`).join(" | ") || "general safety knowledge"}.`,
+  ].join("\n");
+}
+
+function generateClinicalResponse(input: { context: ClinicalContext; knowledge: KnowledgeHit[]; prompt: string; question: string }) {
+  const risk = riskStratification(input.context, input.question);
+  const confidence = confidenceScore(input.context, input.knowledge);
+  const patientSummary = input.context.patient
+    ? `${input.context.patient.age}-year-old ${input.context.patient.gender.toLowerCase()} ${input.context.patient.fullName} with ${input.context.patient.riskFactors.join(", ") || "no documented major risk factors"}. Medical history: ${input.context.patient.history}.`
+    : "No patient profile is currently open. Response is based on general ECG knowledge only.";
+  const ecgInterpretation = input.context.currentCase
+    ? `${input.context.currentCase.rhythm ?? "Rhythm not documented"} with HR ${input.context.currentCase.heartRate ?? "n/a"} bpm, ${input.context.currentCase.intervals}, axis ${input.context.currentCase.axis ?? "n/a"}, AI impression ${input.context.currentCase.diagnosis ?? "pending"}, physician impression ${input.context.currentCase.doctorDiagnosis ?? "pending"}, severity ${input.context.currentCase.severity ?? "not classified"}.`
+    : "No active ECG case is open. For case-specific interpretation, open an ECG case and ask again.";
+  const differential = differentialDiagnosis(input.question, input.context, input.knowledge);
+  const occupational = occupationalOpinion(risk, input.context, input.question);
+  const recommendations = recommendationsFor(risk, input.context, input.knowledge);
+  const followUp = followUpFor(risk, input.context);
+
+  return {
+    confidence,
+    content: `${DISCLAIMER}\n\n## Clinical Summary\n${patientSummary}\n\n## ECG Interpretation\n${ecgInterpretation}\n\n## Differential Diagnosis\n${differential.map((item, index) => `${index + 1}. ${item}`).join("\n")}\n\n## Risk Stratification\n${risk.level}: ${risk.reason}\n\n## Occupational Fitness Opinion\n${occupational}\n\n## Recommendations\n${recommendations.map((item) => `- ${item}`).join("\n")}\n\n## Follow-up Plan\n${followUp.map((item) => `- ${item}`).join("\n")}\n\n## Confidence Score\n${Math.round(confidence * 100)}%\n\n## Sources Used\n${input.context.sources.concat(input.knowledge.map((entry) => ({ id: entry.id, label: entry.topic, source: "ECG Knowledge Base", tags: entry.tags, type: "knowledge" }))).slice(0, 10).map((source) => `- ${source.source}: ${source.label}`).join("\n") || "- ECG Knowledge Base"}\n\n## Knowledge Tags\n${Array.from(new Set(input.knowledge.flatMap((entry) => entry.tags))).slice(0, 10).join(", ") || "general-ecg"}`,
+    prompt: input.prompt,
+  };
 }
 
 function dedupeCitations(citations: Citation[]) {
@@ -178,6 +348,99 @@ function dedupeCitations(citations: Citation[]) {
   }).slice(0, 10);
 }
 
+function ageFromDob(dateOfBirth: Date) {
+  const now = new Date();
+  let age = now.getFullYear() - dateOfBirth.getFullYear();
+  const monthDiff = now.getMonth() - dateOfBirth.getMonth();
+  if (monthDiff < 0 || (monthDiff === 0 && now.getDate() < dateOfBirth.getDate())) age -= 1;
+  return Math.max(age, 0);
+}
+
+function clinicalTerms(text: string) {
+  const aliases: Record<string, string[]> = {
+    af: ["af", "atrial", "fibrillation"],
+    flutter: ["flutter"],
+    hyperkalemia: ["hyperkalemia", "potassium"],
+    hypokalemia: ["hypokalemia", "potassium"],
+    ischemia: ["ischemia", "st", "depression", "elevation"],
+    lbbb: ["lbbb", "bundle", "branch"],
+    lvh: ["lvh", "hypertrophy"],
+    nstemi: ["nstemi", "troponin", "ischemia"],
+    pac: ["pac", "premature", "atrial"],
+    pericarditis: ["pericarditis"],
+    pvc: ["pvc", "premature", "ventricular"],
+    qt: ["qt", "qtc", "torsades"],
+    rbbb: ["rbbb", "bundle", "branch"],
+    rvh: ["rvh", "hypertrophy"],
+    stemi: ["stemi", "st", "elevation"],
+  };
+  const raw = text.split(/\W+/).filter((word) => word.length > 1);
+  const expanded = raw.flatMap((word) => aliases[word] ?? [word]);
+  return Array.from(new Set(expanded)).slice(0, 24);
+}
+
+function riskStratification(context: ClinicalContext, question: string) {
+  const text = `${question} ${context.currentCase?.diagnosis ?? ""} ${context.currentCase?.doctorDiagnosis ?? ""} ${context.currentCase?.rhythm ?? ""} ${context.criticalAlerts.join(" ")}`.toLowerCase();
+  if (context.criticalAlerts.length || /stemi|ventricular tachycardia|vf|complete heart block|high-grade|extreme bradycardia/.test(text)) {
+    return { level: "HIGH", reason: "Critical alert or potentially life-threatening ECG pattern is present or suspected." };
+  }
+  if (/nstemi|ischemia|atrial fibrillation|af|long qt|qtc|bundle branch|av block/.test(text)) {
+    return { level: "MODERATE", reason: "Clinically significant abnormality requires physician review and correlation." };
+  }
+  if (context.currentCase?.severity === "CRITICAL" || context.currentCase?.severity === "ABNORMAL") {
+    return { level: context.currentCase.severity === "CRITICAL" ? "HIGH" : "MODERATE", reason: `Case severity is classified as ${context.currentCase.severity}.` };
+  }
+  return { level: "LOW", reason: "No high-risk feature was retrieved from the current context." };
+}
+
+function confidenceScore(context: ClinicalContext, knowledge: KnowledgeHit[]) {
+  let score = 0.52;
+  if (context.patient) score += 0.12;
+  if (context.currentCase) score += 0.14;
+  if (context.previousEcgs.length) score += 0.06;
+  if (context.reports.length) score += 0.05;
+  if (context.documents.length) score += 0.04;
+  if (knowledge.length >= 3) score += 0.07;
+  return Math.min(score, 0.94);
+}
+
+function differentialDiagnosis(question: string, context: ClinicalContext, knowledge: KnowledgeHit[]) {
+  const text = `${question} ${context.currentCase?.diagnosis ?? ""} ${context.currentCase?.rhythm ?? ""} ${knowledge.map((entry) => entry.topic).join(" ")}`.toLowerCase();
+  if (/stemi|st elevation|inferior|anterior|lateral/.test(text)) return ["Acute STEMI", "Early repolarization", "Pericarditis", "LVH or bundle branch repolarization change"];
+  if (/af|atrial fibrillation|irregular/.test(text)) return ["Atrial fibrillation", "Atrial flutter with variable block", "Frequent PACs", "Artifact mimicking irregular rhythm"];
+  if (/qt|qtc|torsades/.test(text)) return ["Acquired long QT", "Congenital long QT", "Electrolyte disturbance", "Medication-related QT prolongation"];
+  if (/brady|block|av/.test(text)) return ["Sinus bradycardia", "AV block", "Medication effect", "Ischemia or electrolyte disturbance"];
+  if (/tachy|pvc|ventricular/.test(text)) return ["Sinus tachycardia", "PVCs", "Supraventricular tachycardia", "Ventricular tachycardia if wide-complex and sustained"];
+  return knowledge.slice(0, 4).map((entry) => entry.topic).concat(["Clinical correlation required"]).slice(0, 4);
+}
+
+function occupationalOpinion(risk: { level: string; reason: string }, context: ClinicalContext, question: string) {
+  const safetySensitive = /offshore|driver|height|confined|safety|fitness|occupational/.test(`${question} ${context.patient?.occupation ?? ""}`.toLowerCase());
+  if (risk.level === "HIGH") return safetySensitive ? "Temporarily unfit for safety-sensitive work until urgent physician/cardiology assessment clears the worker." : "Avoid safety-sensitive duties until physician assessment is completed.";
+  if (risk.level === "MODERATE") return safetySensitive ? "Fit status should be restricted or deferred pending physician review, symptom assessment, and relevant investigations." : "Clinical review is recommended before unrestricted duties.";
+  return "No retrieved ECG context mandates restriction; final fitness decision remains with the occupational physician.";
+}
+
+function recommendationsFor(risk: { level: string }, context: ClinicalContext, knowledge: KnowledgeHit[]) {
+  const recommendations = new Set<string>();
+  if (risk.level === "HIGH") {
+    recommendations.add("Urgent cardiology or emergency evaluation according to local protocol.");
+    recommendations.add("Repeat ECG and compare with prior tracings immediately.");
+  }
+  if (risk.level === "MODERATE") recommendations.add("Physician review with clinical correlation, vitals, symptoms, and medication/electrolyte assessment.");
+  if (context.currentCase) recommendations.add("Verify automated measurements manually: rhythm, rate, PR, QRS, QT/QTc, axis, and ST-T changes.");
+  if (context.previousEcgs.length) recommendations.add("Document interval changes compared with previous ECGs and reports.");
+  if (knowledge.some((entry) => entry.tags.includes("qt"))) recommendations.add("Check potassium, magnesium, calcium, renal function, and QT-prolonging medications.");
+  recommendations.add("Record final physician impression in the ECG report workflow.");
+  return Array.from(recommendations);
+}
+
+function followUpFor(risk: { level: string }, context: ClinicalContext) {
+  if (risk.level === "HIGH") return ["Immediate escalation and same-day physician/cardiology review.", "Finalize duty restriction after acute risk is excluded or treated."];
+  if (risk.level === "MODERATE") return ["Schedule cardiology or occupational medicine follow-up.", "Repeat ECG or order additional testing based on symptoms and physician assessment."];
+  return context.currentCase ? ["Routine follow-up if symptomatic or if occupational policy requires periodic surveillance."] : ["Open a patient profile or ECG case for patient-specific follow-up planning."];
+}
+
 function classifyQuestion(question: string) {
   const lower = question.toLowerCase();
   if (lower.includes("occupational") || lower.includes("fitness")) return "Occupational Fitness";
@@ -185,21 +448,6 @@ function classifyQuestion(question: string) {
   if (lower.includes("follow")) return "Follow-up";
   if (lower.includes("summar")) return "Clinical Summary";
   return "ECG Interpretation";
-}
-
-function answer(question: string, snippets: string[], tag: string) {
-  const lower = question.toLowerCase();
-  const confidence = snippets.length > 4 ? 0.82 : snippets.length > 1 ? 0.7 : 0.58;
-  const focus = lower.includes("qt") ? "QT prolongation and repolarization risk"
-    : lower.includes("af") || lower.includes("atrial") ? "atrial arrhythmia evaluation"
-    : lower.includes("stemi") || lower.includes("st ") ? "ischemic ST-segment assessment"
-    : lower.includes("fitness") || lower.includes("occupational") ? "occupational cardiovascular fitness"
-    : tag;
-  const evidence = snippets.slice(0, 6).map((snippet, index) => `${index + 1}. ${snippet}`).join("\n");
-  return {
-    confidence,
-    content: `${DISCLAIMER}\n\n## Clinical Copilot Response\n**Focus:** ${focus}\n\n**Confidence:** ${Math.round(confidence * 100)}% based on available ECG Insight records and internal ECG knowledge.\n\n**Interpretation support:**\n${evidence || "No patient-specific context was available, so this response is limited to general ECG knowledge."}\n\n**Clinical guidance:**\n- Treat this as decision support, not a final diagnosis.\n- Correlate ECG findings with symptoms, vitals, medication/electrolyte history, prior ECGs, and physician examination.\n- If the question involves STEMI, VT/VF, high-grade AV block, syncope, or marked QT prolongation, escalate urgently according to local protocol.\n\n**Suggested next steps:**\n- Confirm measurements and rhythm manually.\n- Compare with previous ECGs and reports when available.\n- Document physician impression and follow-up recommendations in the report workflow.`,
-  };
 }
 
 async function conversationForUser(conversationId: string, userId: string) {
@@ -317,12 +565,14 @@ copilotRouter.post("/chat", requireRole("DOCTOR"), async (req, res, next) => {
     await prisma.copilotMessage.create({
       data: { content: body.question, conversationId: conversation.id, role: "user" },
     });
-    const context = await collectContext({ caseId: body.caseId ?? conversation.caseId ?? undefined, patientId: body.patientId ?? conversation.patientId ?? undefined, question: body.question });
-    const result = answer(body.question, context.snippets, tag);
+    const clinicalContext = await retrieveClinicalContext({ caseId: body.caseId ?? conversation.caseId ?? undefined, patientId: body.patientId ?? conversation.patientId ?? undefined });
+    const knowledge = await retrieveKnowledge(body.question, clinicalContext);
+    const prompt = buildPrompt(body.question, clinicalContext, knowledge.hits);
+    const result = generateClinicalResponse({ context: clinicalContext, knowledge: knowledge.hits, prompt, question: body.question });
     const responseTimeMs = Date.now() - started;
     const assistant = await prisma.copilotMessage.create({
       data: {
-        citations: context.citations as unknown as Prisma.InputJsonValue,
+        citations: clinicalContext.sources.concat(knowledge.sources) as unknown as Prisma.InputJsonValue,
         confidence: result.confidence,
         content: result.content,
         conversationId: conversation.id,
@@ -331,7 +581,7 @@ copilotRouter.post("/chat", requireRole("DOCTOR"), async (req, res, next) => {
       },
     });
     await prisma.copilotUsageEvent.create({
-      data: { conversationId: conversation.id, question: body.question, responseTimeMs, tag, userId: req.auth!.id },
+      data: { conversationId: conversation.id, question: `${body.question} | diagnoses:${knowledge.hits.map((hit) => hit.topic).slice(0, 4).join(",")}`, responseTimeMs, tag, userId: req.auth!.id },
     });
     await prisma.copilotConversation.update({
       data: { tag, updatedAt: new Date() },
@@ -357,11 +607,16 @@ copilotRouter.get("/analytics", requireRole("SUPER_ADMIN"), async (req, res, nex
     ]);
     const averageResponseTimeMs = usage.length ? Math.round(usage.reduce((sum, item) => sum + item.responseTimeMs, 0) / usage.length) : 0;
     const commonQuestions = Object.entries(usage.reduce<Record<string, number>>((acc, item) => {
-      const key = item.question.toLowerCase().slice(0, 80);
+      const key = item.question.split("|")[0].toLowerCase().slice(0, 80);
       acc[key] = (acc[key] ?? 0) + 1;
       return acc;
     }, {})).sort((a, b) => b[1] - a[1]).slice(0, 10).map(([question, count]) => ({ count, question }));
-    res.json({ analytics: { activeUsers: activeUsers.length, averageResponseTimeMs, mostCommonQuestions: commonQuestions, totalConversations } });
+    const topDiagnosesRequested = Object.entries(usage.reduce<Record<string, number>>((acc, item) => {
+      const diagnosisPart = item.question.split("diagnoses:")[1] ?? "";
+      for (const diagnosis of diagnosisPart.split(",").map((value) => value.trim()).filter(Boolean)) acc[diagnosis] = (acc[diagnosis] ?? 0) + 1;
+      return acc;
+    }, {})).sort((a, b) => b[1] - a[1]).slice(0, 10).map(([diagnosis, count]) => ({ count, diagnosis }));
+    res.json({ analytics: { activeUsers: activeUsers.length, averageResponseTimeMs, mostCommonQuestions: commonQuestions, topDiagnosesRequested, totalConversations } });
   } catch (error) {
     next(error);
   }
