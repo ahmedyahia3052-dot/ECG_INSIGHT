@@ -1,13 +1,14 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React from "react";
-import { Image, Platform, ScrollView, StyleSheet, Text, View } from "react-native";
+import { StyleSheet, Text, View } from "react-native";
 
 import { Badge, Card, EmptyState, formatDate, medicalTheme, PageSection, patientDisplayName, PrimaryButton, SectionHeader } from "@/components/enterprise/EnterpriseUI";
+import { EcgProViewer } from "@/components/ecg/EcgProViewer";
 import { useAuth } from "@/context/AuthContext";
 import { analyzeCase, getAIExplainability, getAIResult } from "@/services/ai";
-import { API_URL } from "@/services/api";
-import { approveCase, createCaseRevision, getCase, rejectCase, updateCaseStatus, type ApiECGCase } from "@/services/clinical";
+import { approveCase, createCaseRevision, getCase, rejectCase, updateCaseStatus } from "@/services/clinical";
+import { getDigitalECG } from "@/services/ecgProcessing";
 import { generateReport } from "@/services/reports";
 
 export default function EcgCaseDetailScreen() {
@@ -35,6 +36,12 @@ export default function EcgCaseDetailScreen() {
     queryKey: ["enterprise-ecg-case-explainability", token, id],
     retry: false,
   });
+  const digitalEcgQuery = useQuery({
+    enabled: !!token && !!id,
+    queryFn: () => getDigitalECG(token!, id),
+    queryKey: ["enterprise-ecg-case-digital", token, id],
+    retry: false,
+  });
 
   const invalidate = async () => {
     await queryClient.invalidateQueries({ queryKey: ["enterprise-ecg-case", token, id] });
@@ -54,6 +61,7 @@ export default function EcgCaseDetailScreen() {
   const ecgCase = caseQuery.data?.case;
   const analysis = analysisQuery.data?.analysis;
   const explainability = explainabilityQuery.data?.explainability;
+  const digitalEcg = digitalEcgQuery.data?.digitalEcg;
 
   if (caseQuery.isLoading) return <Text style={styles.muted}>Loading ECG case...</Text>;
   if (!ecgCase) return <EmptyState title="ECG case not found" message="The selected ECG case could not be loaded." />;
@@ -88,11 +96,9 @@ export default function EcgCaseDetailScreen() {
         </View>
       </Card>
 
+      <EcgProViewer analysis={analysis} digitalEcg={digitalEcg} ecgCase={ecgCase} explainability={explainability} />
+
       <View style={styles.grid}>
-        <Card style={styles.viewer}>
-          <SectionHeader title="ECG Viewer" subtitle="Original ECG image/PDF with zoom-ready scroll viewer." />
-          <EcgViewer ecgCase={ecgCase} />
-        </Card>
         <Card style={styles.panel}>
           <SectionHeader title="ECG Measurements" />
           <Info label="Heart Rate" value={unit(ecgCase.heartRate, "BPM")} />
@@ -140,32 +146,6 @@ export default function EcgCaseDetailScreen() {
   );
 }
 
-function EcgViewer({ ecgCase }: { ecgCase: ApiECGCase }) {
-  const imageUrl = absoluteUrl(ecgCase.imagePath ?? ecgCase.originalFileUrl ?? ecgCase.files.find((file) => file.mimeType.startsWith("image/"))?.downloadUrl);
-  const pdfUrl = absoluteUrl(ecgCase.pdfPath ?? ecgCase.files.find((file) => file.mimeType.includes("pdf"))?.downloadUrl);
-  if (imageUrl) {
-    return (
-      <ScrollView horizontal maximumZoomScale={3} minimumZoomScale={1} style={styles.viewerScroll}>
-        <Image resizeMode="contain" source={{ uri: imageUrl }} style={styles.ecgImage} />
-      </ScrollView>
-    );
-  }
-  if (pdfUrl) {
-    return <PrimaryButton label="Open ECG PDF" onPress={() => openUrl(pdfUrl)} />;
-  }
-  return <EmptyState title="No ECG file" message="Upload the original ECG image/PDF from the Upload ECG workflow." />;
-}
-
-function absoluteUrl(path?: string) {
-  if (!path) return undefined;
-  if (path.startsWith("http")) return path;
-  return `${API_URL.replace(/\/api$/, "")}${path}`;
-}
-
-function openUrl(url: string) {
-  if (Platform.OS === "web" && typeof window !== "undefined") window.open(url, "_blank");
-}
-
 function unit(value: number | undefined, suffix: string) {
   return value === undefined ? "Pending" : `${value} ${suffix}`;
 }
@@ -193,7 +173,6 @@ function Info({ label, value }: { label: string; value: string }) {
 const styles = StyleSheet.create({
   actions: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   body: { color: medicalTheme.text, fontSize: 13, fontWeight: "700", lineHeight: 20 },
-  ecgImage: { backgroundColor: "#020617", borderRadius: 14, height: 420, width: 760 },
   grid: { flexDirection: "row", flexWrap: "wrap", gap: 16 },
   hero: { alignItems: "center", flexDirection: "row", flexWrap: "wrap", gap: 16 },
   heroText: { flex: 1, minWidth: 260 },
@@ -204,6 +183,4 @@ const styles = StyleSheet.create({
   panel: { flex: 1, gap: 10, minWidth: 320 },
   stack: { gap: 8 },
   title: { color: medicalTheme.text, fontSize: 28, fontWeight: "900" },
-  viewer: { flex: 1.5, gap: 12, minWidth: 360 },
-  viewerScroll: { borderRadius: 14, maxHeight: 440 },
 });
