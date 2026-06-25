@@ -37,6 +37,19 @@ function errorMessage(error: unknown) {
   return "Request failed.";
 }
 
+function displayValue(value: unknown) {
+  if (value == null || value === "") return "Not provided";
+  if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") return String(value);
+  if (Array.isArray(value)) return `${value.length} item${value.length === 1 ? "" : "s"}`;
+  return "Available";
+}
+
+function readableFields(item: Record<string, unknown>) {
+  return Object.entries(item)
+    .filter(([key]) => key !== "passwordHash" && key !== "id")
+    .slice(0, 6);
+}
+
 export function WorkflowCrudPanel<TItem extends WorkflowItem>({
   createFields = [],
   createItem,
@@ -185,6 +198,37 @@ export function WorkflowCrudPanel<TItem extends WorkflowItem>({
         value={search}
       />
 
+      {mode ? (
+        <View style={[styles.formCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+          <Text style={[styles.cardTitle, { color: colors.text }]}>{mode === "create" ? `Create ${title}` : `Edit ${title}`}</Text>
+          {fields.map((field) => (
+            <TextInput
+              key={field.key}
+              onChangeText={(value) => setForm((current) => ({ ...current, [field.key]: value }))}
+              placeholder={field.placeholder ?? field.label}
+              placeholderTextColor={colors.textSecondary}
+              style={[styles.input, { backgroundColor: colors.background, borderColor: colors.border, color: colors.text }]}
+              value={form[field.key] ?? ""}
+            />
+          ))}
+          <View style={styles.actions}>
+            <Pressable
+              disabled={isMutating}
+              onPress={() => (mode === "create" ? createMutation.mutate() : updateMutation.mutate())}
+              style={[styles.primaryButton, { backgroundColor: colors.primary, opacity: isMutating ? 0.6 : 1 }]}
+            >
+              <Text style={styles.primaryButtonText}>{isMutating ? "Saving..." : "Save"}</Text>
+            </Pressable>
+            <Pressable style={[styles.secondaryButton, { borderColor: colors.border }]} onPress={() => setMode(null)}>
+              <Text style={[styles.secondaryButtonText, { color: colors.text }]}>Cancel</Text>
+            </Pressable>
+          </View>
+          {createMutation.isError || updateMutation.isError ? (
+            <Text style={styles.errorText}>{errorMessage(createMutation.error ?? updateMutation.error)}</Text>
+          ) : null}
+        </View>
+      ) : null}
+
       {filters.map((filter) => (
         <View key={filter.key} style={styles.filterRow}>
           <Text style={[styles.filterLabel, { color: colors.textSecondary }]}>{filter.label}</Text>
@@ -226,7 +270,7 @@ export function WorkflowCrudPanel<TItem extends WorkflowItem>({
           <View key={item.id ?? titleForItem(item)} style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
             <Text style={[styles.cardTitle, { color: colors.text }]}>{titleForItem(item)}</Text>
             <Text style={[styles.cardText, { color: colors.textSecondary }]}>
-              {detailText ? detailText(item) : JSON.stringify(item).slice(0, 240)}
+              {detailText ? detailText(item) : readableFields(item as Record<string, unknown>).map(([key, value]) => `${key}: ${displayValue(value)}`).join(" · ")}
             </Text>
             <View style={styles.actions}>
               <Pressable style={[styles.secondaryButton, { borderColor: colors.border }]} onPress={() => setSelected(selected?.id === item.id ? null : item)}>
@@ -244,7 +288,14 @@ export function WorkflowCrudPanel<TItem extends WorkflowItem>({
               ) : null}
             </View>
             {selected?.id === item.id ? (
-              <Text style={[styles.details, { color: colors.textSecondary }]}>{JSON.stringify(item, null, 2).slice(0, 1000)}</Text>
+              <View style={[styles.details, { borderTopColor: colors.border }]}>
+                {readableFields(item as Record<string, unknown>).map(([key, value]) => (
+                  <View key={key} style={styles.detailRow}>
+                    <Text style={[styles.detailKey, { color: colors.textSecondary }]}>{key}</Text>
+                    <Text style={[styles.detailValue, { color: colors.text }]}>{displayValue(value)}</Text>
+                  </View>
+                ))}
+              </View>
             ) : null}
           </View>
         ))
@@ -268,36 +319,6 @@ export function WorkflowCrudPanel<TItem extends WorkflowItem>({
         </Pressable>
       </View>
 
-      {mode ? (
-        <View style={[styles.formCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-          <Text style={[styles.cardTitle, { color: colors.text }]}>{mode === "create" ? `Create ${title}` : `Edit ${title}`}</Text>
-          {fields.map((field) => (
-            <TextInput
-              key={field.key}
-              onChangeText={(value) => setForm((current) => ({ ...current, [field.key]: value }))}
-              placeholder={field.placeholder ?? field.label}
-              placeholderTextColor={colors.textSecondary}
-              style={[styles.input, { backgroundColor: colors.background, borderColor: colors.border, color: colors.text }]}
-              value={form[field.key] ?? ""}
-            />
-          ))}
-          <View style={styles.actions}>
-            <Pressable
-              disabled={isMutating}
-              onPress={() => (mode === "create" ? createMutation.mutate() : updateMutation.mutate())}
-              style={[styles.primaryButton, { backgroundColor: colors.primary, opacity: isMutating ? 0.6 : 1 }]}
-            >
-              <Text style={styles.primaryButtonText}>{isMutating ? "Saving..." : "Save"}</Text>
-            </Pressable>
-            <Pressable style={[styles.secondaryButton, { borderColor: colors.border }]} onPress={() => setMode(null)}>
-              <Text style={[styles.secondaryButtonText, { color: colors.text }]}>Cancel</Text>
-            </Pressable>
-          </View>
-          {createMutation.isError || updateMutation.isError ? (
-            <Text style={styles.errorText}>{errorMessage(createMutation.error ?? updateMutation.error)}</Text>
-          ) : null}
-        </View>
-      ) : null}
     </View>
   );
 }
@@ -311,7 +332,10 @@ const styles = StyleSheet.create({
   chipText: { fontSize: 12, fontWeight: "700" },
   dangerButton: { borderRadius: 12, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 8 },
   dangerButtonText: { color: "#DC2626", fontSize: 13, fontWeight: "700" },
-  details: { borderTopWidth: StyleSheet.hairlineWidth, fontFamily: "monospace", fontSize: 11, lineHeight: 16, paddingTop: 8 },
+  detailKey: { flex: 1, fontSize: 12, fontWeight: "700", textTransform: "capitalize" },
+  detailRow: { alignItems: "center", flexDirection: "row", gap: 10, justifyContent: "space-between" },
+  detailValue: { flex: 1.3, fontSize: 13, fontWeight: "600", textAlign: "right" },
+  details: { borderTopWidth: StyleSheet.hairlineWidth, gap: 8, paddingTop: 8 },
   errorText: { color: "#DC2626", fontSize: 13, lineHeight: 18 },
   filterLabel: { fontSize: 12, fontWeight: "700", textTransform: "uppercase" },
   filterRow: { alignItems: "center", flexDirection: "row", flexWrap: "wrap", gap: 8 },

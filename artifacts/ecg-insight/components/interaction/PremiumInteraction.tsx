@@ -205,8 +205,8 @@ export function useToast() {
 
 export function PageTransition({ children, style }: { children: React.ReactNode; style?: StyleProp<ViewStyle> }) {
   const { effectiveMotionEnabled } = useVisualExperience();
-  const opacity = useRef(new Animated.Value(0)).current;
-  const translateY = useRef(new Animated.Value(12)).current;
+  const opacity = useRef(new Animated.Value(1)).current;
+  const translateY = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     if (!effectiveMotionEnabled) {
@@ -214,9 +214,11 @@ export function PageTransition({ children, style }: { children: React.ReactNode;
       translateY.setValue(0);
       return;
     }
+    opacity.setValue(1);
+    translateY.setValue(8);
     Animated.parallel([
-      Animated.timing(opacity, { duration: 300, easing: Easing.out(Easing.cubic), toValue: 1, useNativeDriver: true }),
-      Animated.timing(translateY, { duration: 300, easing: Easing.out(Easing.cubic), toValue: 0, useNativeDriver: true }),
+      Animated.timing(opacity, { duration: 260, easing: Easing.out(Easing.cubic), toValue: 1, useNativeDriver: true }),
+      Animated.timing(translateY, { duration: 260, easing: Easing.out(Easing.cubic), toValue: 0, useNativeDriver: true }),
     ]).start();
     return () => {
       opacity.stopAnimation();
