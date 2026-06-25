@@ -3,30 +3,55 @@ import { apiRequest } from "./api";
 
 export interface ApiPatient {
   address?: string;
+  alcoholStatus?: string;
   age: number;
   allergies?: string;
+  arrhythmiaHistory?: boolean;
   archivedAt?: string;
+  bloodGroup?: string;
+  bmi?: number;
+  company?: string;
+  contractor?: string;
   dateOfBirth: string;
   diabetes?: boolean;
+  department?: string;
   dyslipidemia?: boolean;
   email?: string;
   employeeId?: string;
   emergencyContact?: string;
+  emergencyContactName?: string;
+  emergencyContactPhone?: string;
   familyHistory?: boolean;
   firstName: string;
+  fullName?: string;
   gender: "male" | "female" | "other" | "unknown";
+  heartFailure?: boolean;
+  heightCm?: number;
   hypertension?: boolean;
   id: string;
+  ischemicHeartDisease?: boolean;
+  jobTitle?: string;
+  knownAllergies?: string;
   lastName: string;
+  maritalStatus?: string;
   medicalHistory?: string;
   medicalRecordNumber: string;
   medications?: string;
+  middleName?: string;
   nationalId?: string;
   notes?: string;
   obesity?: boolean;
   occupation?: string;
+  passportNumber?: string;
+  patientCode?: string;
   phone?: string;
+  previousCABG?: boolean;
+  previousMI?: boolean;
+  previousPCI?: boolean;
   smokingStatus?: "current" | "former" | "never" | "unknown";
+  status?: "active" | "inactive";
+  stentsHistory?: string;
+  weightKg?: number;
 }
 
 export interface ApiECGFile {
@@ -74,6 +99,32 @@ export type PatientInput = {
   gender: "male" | "female" | "other" | "unknown";
   lastName: string;
   medicalRecordNumber: string;
+  alcoholStatus?: string;
+  arrhythmiaHistoryFlag?: boolean;
+  bloodGroup?: string;
+  bmi?: number;
+  company?: string;
+  contractorName?: string;
+  departmentName?: string;
+  diabetes?: boolean;
+  dyslipidemia?: boolean;
+  emergencyContactName?: string;
+  emergencyContactPhone?: string;
+  heartFailure?: boolean;
+  heightCm?: number;
+  hypertension?: boolean;
+  ischemicHeartDisease?: boolean;
+  jobTitle?: string;
+  knownAllergies?: string;
+  maritalStatus?: string;
+  middleName?: string;
+  passportNumber?: string;
+  previousCABG?: boolean;
+  previousMI?: boolean;
+  previousPCI?: boolean;
+  status?: "active" | "inactive";
+  stentsHistory?: string;
+  weightKg?: number;
   address?: string;
   allergies?: string;
   email?: string;
@@ -85,7 +136,45 @@ export type PatientInput = {
   notes?: string;
   occupation?: string;
   phone?: string;
+  smokingStatus?: "current" | "former" | "never" | "unknown";
 };
+
+export interface PatientDetailResponse {
+  patient: ApiPatient;
+  related: {
+    cases: Array<{
+      aiDiagnosis?: string;
+      aiSeverity?: string;
+      caseId: string;
+      finalDiagnosis?: string;
+      id: string;
+      priority: string;
+      status: string;
+      uploadDate: string;
+    }>;
+    documents: Array<{
+      category: string;
+      createdAt: string;
+      id: string;
+      mimeType: string;
+      title: string;
+    }>;
+    reports: Array<{
+      id: string;
+      reportNumber: string;
+      reportingDate: string;
+      status: string;
+    }>;
+    timeline: Array<{
+      createdAt: string;
+      id: string;
+      metadata?: unknown;
+      notes?: string;
+      title: string;
+      type: string;
+    }>;
+  };
+}
 
 function toMockStatus(apiCase: ApiECGCase): ECGStatus {
   if (apiCase.priority === "critical") return "critical";
@@ -142,6 +231,10 @@ export async function listPatients(accessToken: string, params = new URLSearchPa
 
 export async function getCase(accessToken: string, caseId: string) {
   return apiRequest<{ case: ApiECGCase }>(`/cases/${caseId}`, { accessToken });
+}
+
+export async function getPatient(accessToken: string, patientId: string) {
+  return apiRequest<PatientDetailResponse>(`/patients/${patientId}`, { accessToken });
 }
 
 export async function createCase(accessToken: string, input: {

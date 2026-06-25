@@ -17,6 +17,35 @@ export interface AIAnalysisResult {
   urgentActions: string[];
 }
 
+export interface AIExplainability {
+  heatmap: {
+    format: string;
+    points: Array<{ intensity: number; lead: string; x: number; y: number }>;
+  };
+  leadHighlights: Array<{
+    confidence: number;
+    finding: string;
+    lead: string;
+    reason: string;
+  }>;
+  panel: Array<{ label: string; value: string }>;
+}
+
+export interface DoctorReviewInput {
+  approved?: boolean;
+  comments?: string;
+  diagnosis?: string;
+  interpretation?: string;
+  severity?: "CRITICAL" | "MILD" | "MODERATE" | "NORMAL" | "SEVERE";
+}
+
+export interface DoctorReviewResult {
+  caseId: string;
+  diagnosis: string;
+  reportId: string | null;
+  status: "finalized" | "reviewed";
+}
+
 export interface AIStatistics {
   abnormalPercentage: number;
   averageConfidence: number;
@@ -44,4 +73,16 @@ export async function getAIStatistics(accessToken: string) {
 
 export async function getAIHistory(accessToken: string) {
   return apiRequest<{ analyses: AIAnalysisResult[] }>("/ai/history", { accessToken });
+}
+
+export async function getAIExplainability(accessToken: string, caseId: string) {
+  return apiRequest<{ explainability: AIExplainability | null }>(`/ai/explainability/${caseId}`, { accessToken });
+}
+
+export async function submitDoctorReview(accessToken: string, caseId: string, input: DoctorReviewInput) {
+  return apiRequest<{ review: DoctorReviewResult }>(`/ai/review/${caseId}`, {
+    accessToken,
+    body: JSON.stringify(input),
+    method: "POST",
+  });
 }

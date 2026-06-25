@@ -1,232 +1,14 @@
-import type { AIAnalysis, AIAnalysisStatus, AISeverity, ECGCase, ECGMeasurement, Prisma } from "@prisma/client";
+import type { AIAnalysis, AIAnalysisStatus, AISeverity, Prisma } from "@prisma/client";
 import { prisma } from "../config/prisma";
 import { AppError } from "../middleware/error";
 import { createNotification } from "../utils/notifications";
+import { isCriticalDiagnosis } from "./engine";
+import { generateExplainabilityArtifact } from "./explainability";
+import { toJsonObject } from "./preprocessing.pipeline";
+import { getAIProvider } from "./providers";
 
 const AI_VERSION = "ecg-insight-ai-v1.0.0";
 const activeJobs = new Set<string>();
-
-const supportedDiagnoses = [
-  "Normal Sinus Rhythm",
-  "Sinus Bradycardia",
-  "Sinus Tachycardia",
-  "Atrial Fibrillation",
-  "Atrial Flutter",
-  "PVC",
-  "PAC",
-  "First Degree AV Block",
-  "Second Degree AV Block",
-  "Third Degree AV Block",
-  "ST Elevation",
-  "ST Depression",
-  "Ventricular Tachycardia",
-  "Ventricular Fibrillation",
-] as const;
-
-type SupportedDiagnosis = (typeof supportedDiagnoses)[number];
-
-interface AnalysisBlueprint {
-  diagnosis: SupportedDiagnosis;
-  rhythm: string;
-  heartRate: number;
-  severity: AISeverity;
-  confidenceScore: number;
-  interpretation: string;
-  recommendations: string[];
-  urgentActions: string[];
-}
-
-const diagnosisBlueprints: Record<SupportedDiagnosis, AnalysisBlueprint> = {
-  "Normal Sinus Rhythm": {
-    confidenceScore: 0.97,
-    diagnosis: "Normal Sinus Rhythm",
-    heartRate: 72,
-    interpretation: "Regular sinus rhythm with normal rate and no acute abnormality detected.",
-    recommendations: ["Continue routine monitoring.", "Correlate with clinical presentation."],
-    rhythm: "Regular sinus",
-    severity: "NORMAL",
-    urgentActions: [],
-  },
-  "Sinus Bradycardia": {
-    confidenceScore: 0.94,
-    diagnosis: "Sinus Bradycardia",
-    heartRate: 48,
-    interpretation: "Sinus rhythm below 60 bpm. Assess symptoms and medication contributors.",
-    recommendations: ["Review beta blocker or rate-limiting medication use.", "Monitor if symptomatic."],
-    rhythm: "Regular sinus bradycardia",
-    severity: "MILD",
-    urgentActions: [],
-  },
-  "Sinus Tachycardia": {
-    confidenceScore: 0.93,
-    diagnosis: "Sinus Tachycardia",
-    heartRate: 118,
-    interpretation: "Sinus rhythm above 100 bpm. Evaluate physiologic or pathologic drivers.",
-    recommendations: ["Assess fever, pain, dehydration, anemia, and thyroid status."],
-    rhythm: "Regular sinus tachycardia",
-    severity: "MILD",
-    urgentActions: [],
-  },
-  "Atrial Fibrillation": {
-    confidenceScore: 0.95,
-    diagnosis: "Atrial Fibrillation",
-    heartRate: 92,
-    interpretation: "Irregularly irregular rhythm without consistent P waves.",
-    recommendations: ["Assess stroke risk.", "Consider rate/rhythm control strategy."],
-    rhythm: "Irregularly irregular",
-    severity: "MODERATE",
-    urgentActions: [],
-  },
-  "Atrial Flutter": {
-    confidenceScore: 0.91,
-    diagnosis: "Atrial Flutter",
-    heartRate: 140,
-    interpretation: "Flutter wave morphology with rapid atrial activity.",
-    recommendations: ["Review anticoagulation need.", "Consider cardiology consultation."],
-    rhythm: "Atrial flutter",
-    severity: "MODERATE",
-    urgentActions: [],
-  },
-  PVC: {
-    confidenceScore: 0.9,
-    diagnosis: "PVC",
-    heartRate: 76,
-    interpretation: "Premature ventricular complexes detected.",
-    recommendations: ["Quantify PVC burden.", "Check electrolytes and structural heart disease risk."],
-    rhythm: "Sinus rhythm with ventricular ectopy",
-    severity: "MILD",
-    urgentActions: [],
-  },
-  PAC: {
-    confidenceScore: 0.89,
-    diagnosis: "PAC",
-    heartRate: 74,
-    interpretation: "Premature atrial complexes detected.",
-    recommendations: ["Monitor frequency.", "Evaluate triggers if symptomatic."],
-    rhythm: "Sinus rhythm with atrial ectopy",
-    severity: "MILD",
-    urgentActions: [],
-  },
-  "First Degree AV Block": {
-    confidenceScore: 0.94,
-    diagnosis: "First Degree AV Block",
-    heartRate: 65,
-    interpretation: "PR interval prolongation consistent with first degree AV block.",
-    recommendations: ["Review AV nodal blocking medications.", "Routine ECG follow-up."],
-    rhythm: "Sinus rhythm with prolonged PR",
-    severity: "MILD",
-    urgentActions: [],
-  },
-  "Second Degree AV Block": {
-    confidenceScore: 0.9,
-    diagnosis: "Second Degree AV Block",
-    heartRate: 52,
-    interpretation: "Intermittent AV conduction block detected.",
-    recommendations: ["Identify Mobitz type.", "Cardiology review recommended."],
-    rhythm: "Intermittent AV block",
-    severity: "SEVERE",
-    urgentActions: ["Assess hemodynamic stability.", "Prepare pacing support if unstable."],
-  },
-  "Third Degree AV Block": {
-    confidenceScore: 0.92,
-    diagnosis: "Third Degree AV Block",
-    heartRate: 34,
-    interpretation: "AV dissociation consistent with complete heart block.",
-    recommendations: ["Urgent cardiology/electrophysiology evaluation."],
-    rhythm: "Complete AV block",
-    severity: "CRITICAL",
-    urgentActions: ["Immediate clinical assessment.", "Prepare temporary pacing."],
-  },
-  "ST Elevation": {
-    confidenceScore: 0.96,
-    diagnosis: "ST Elevation",
-    heartRate: 96,
-    interpretation: "ST elevation pattern concerning for acute myocardial injury/STEMI.",
-    recommendations: ["Activate STEMI protocol if clinically consistent."],
-    rhythm: "Sinus rhythm with ST elevation",
-    severity: "CRITICAL",
-    urgentActions: ["Immediate physician review.", "Activate cath lab/STEMI pathway."],
-  },
-  "ST Depression": {
-    confidenceScore: 0.9,
-    diagnosis: "ST Depression",
-    heartRate: 88,
-    interpretation: "ST depression pattern may suggest ischemia or strain.",
-    recommendations: ["Correlate with symptoms and troponin.", "Repeat ECG if dynamic changes suspected."],
-    rhythm: "Sinus rhythm with ST depression",
-    severity: "SEVERE",
-    urgentActions: ["Expedite clinician review if symptomatic."],
-  },
-  "Ventricular Tachycardia": {
-    confidenceScore: 0.98,
-    diagnosis: "Ventricular Tachycardia",
-    heartRate: 182,
-    interpretation: "Wide-complex tachycardia consistent with ventricular tachycardia.",
-    recommendations: ["Immediate ACLS-guided management."],
-    rhythm: "Ventricular tachycardia",
-    severity: "CRITICAL",
-    urgentActions: ["Immediate emergency response.", "Assess pulse and prepare cardioversion/defibrillation."],
-  },
-  "Ventricular Fibrillation": {
-    confidenceScore: 0.99,
-    diagnosis: "Ventricular Fibrillation",
-    heartRate: 0,
-    interpretation: "Chaotic ventricular activity consistent with ventricular fibrillation.",
-    recommendations: ["Immediate resuscitation required."],
-    rhythm: "Ventricular fibrillation",
-    severity: "CRITICAL",
-    urgentActions: ["Call code/emergency response.", "Immediate defibrillation and CPR."],
-  },
-};
-
-function selectDiagnosis(ecgCase: ECGCase, measurement?: ECGMeasurement | null): SupportedDiagnosis {
-  if (measurement) {
-    if (measurement.stDeviation >= 1.5) return "ST Elevation";
-    if (measurement.stDeviation <= -1) return "ST Depression";
-    if (measurement.heartRate >= 160 && measurement.qrsDuration >= 120) return "Ventricular Tachycardia";
-    if (measurement.heartRate < 40 && measurement.prInterval > 220) return "Third Degree AV Block";
-    if (measurement.heartRate < 60) return "Sinus Bradycardia";
-    if (measurement.heartRate > 100) return "Sinus Tachycardia";
-    if (measurement.rhythmRegularity < 0.72) return "Atrial Fibrillation";
-    if (measurement.prInterval > 200) return "First Degree AV Block";
-    if (measurement.qrsDuration > 110) return "PVC";
-  }
-
-  const haystack = `${ecgCase.ecgType} ${ecgCase.finalDiagnosis ?? ""} ${ecgCase.clinicalNotes ?? ""}`.toLowerCase();
-  if (haystack.includes("vf") || haystack.includes("ventricular fibrillation")) return "Ventricular Fibrillation";
-  if (haystack.includes("vt") || haystack.includes("ventricular tachycardia")) return "Ventricular Tachycardia";
-  if (haystack.includes("stemi") || haystack.includes("st elevation")) return "ST Elevation";
-  if (haystack.includes("st depression")) return "ST Depression";
-  if (haystack.includes("third") || haystack.includes("complete heart block")) return "Third Degree AV Block";
-  if (haystack.includes("second")) return "Second Degree AV Block";
-  if (haystack.includes("first")) return "First Degree AV Block";
-  if (haystack.includes("flutter")) return "Atrial Flutter";
-  if (haystack.includes("fib")) return "Atrial Fibrillation";
-  if (haystack.includes("pvc")) return "PVC";
-  if (haystack.includes("pac")) return "PAC";
-  if (haystack.includes("brady")) return "Sinus Bradycardia";
-  if (haystack.includes("tachy")) return "Sinus Tachycardia";
-  if (ecgCase.priority === "CRITICAL") return "ST Elevation";
-  return "Normal Sinus Rhythm";
-}
-
-function applyMeasurementOverrides(blueprint: AnalysisBlueprint, measurement?: ECGMeasurement | null): AnalysisBlueprint {
-  if (!measurement) return blueprint;
-  const severity: AISeverity =
-    measurement.signalQuality === "FAIR" && blueprint.severity === "NORMAL" ? "MILD" : blueprint.severity;
-  return {
-    ...blueprint,
-    confidenceScore: Math.max(0.65, blueprint.confidenceScore - (measurement.signalQuality === "FAIR" ? 0.08 : 0)),
-    heartRate: measurement.heartRate,
-    interpretation:
-      `${blueprint.interpretation} Measurements: PR ${measurement.prInterval}ms, QRS ${measurement.qrsDuration}ms, QTc ${measurement.qtcInterval}ms, ST deviation ${measurement.stDeviation}mm.`,
-    recommendations: [
-      ...blueprint.recommendations,
-      `Signal quality: ${measurement.signalQuality.toLowerCase()}. Rhythm regularity: ${Math.round(measurement.rhythmRegularity * 100)}%.`,
-    ],
-    severity,
-  };
-}
 
 export function serializeAnalysis(analysis: AIAnalysis) {
   return {
@@ -248,12 +30,7 @@ export function serializeAnalysis(analysis: AIAnalysis) {
 }
 
 function isCritical(analysis: Pick<AIAnalysis, "diagnosis" | "severity">) {
-  return (
-    analysis.severity === "CRITICAL" ||
-    ["ST Elevation", "Ventricular Tachycardia", "Ventricular Fibrillation", "Third Degree AV Block"].includes(
-      analysis.diagnosis,
-    )
-  );
+  return isCriticalDiagnosis(analysis.diagnosis, analysis.severity);
 }
 
 async function completeAnalysis(analysisId: string, actorId: string) {
@@ -279,20 +56,30 @@ async function completeAnalysis(analysisId: string, actorId: string) {
       orderBy: { createdAt: "desc" },
       where: { caseId: queued.caseId },
     });
-    const blueprint = applyMeasurementOverrides(diagnosisBlueprints[selectDiagnosis(queued.case, measurement)], measurement);
+    const provider = getAIProvider();
+    const engineResult = await provider.analyze({ case: queued.case, measurement });
+    const explainability = generateExplainabilityArtifact({
+      confidenceScore: engineResult.confidenceScore,
+      detectedAbnormalities: engineResult.detectedAbnormalities,
+      diagnosis: engineResult.primaryDiagnosis,
+      interpretation: engineResult.interpretation,
+      measurement,
+      rationale: engineResult.interpretationRationale,
+      severity: engineResult.severity,
+    });
     const analysis = await prisma.aIAnalysis.update({
       data: {
-        aiVersion: AI_VERSION,
-        confidenceScore: blueprint.confidenceScore,
-        diagnosis: blueprint.diagnosis,
-        heartRate: blueprint.heartRate,
-        interpretation: blueprint.interpretation,
+        aiVersion: `${AI_VERSION}:${engineResult.provider.name}:${engineResult.provider.modelVersion}`,
+        confidenceScore: engineResult.confidenceScore,
+        diagnosis: engineResult.primaryDiagnosis,
+        heartRate: engineResult.heartRate,
+        interpretation: engineResult.interpretation,
         processingTime: Date.now() - started,
-        recommendations: blueprint.recommendations,
-        rhythm: blueprint.rhythm,
-        severity: blueprint.severity,
+        recommendations: engineResult.recommendations,
+        rhythm: engineResult.rhythm,
+        severity: engineResult.severity,
         status: "COMPLETED",
-        urgentActions: blueprint.urgentActions,
+        urgentActions: engineResult.urgentActions,
       },
       where: { id: analysisId },
     });
@@ -313,7 +100,17 @@ async function completeAnalysis(analysisId: string, actorId: string) {
         actorId,
         caseId: queued.caseId,
         message: `AI analysis completed: ${analysis.diagnosis}.`,
-        metadata: { confidenceScore: analysis.confidenceScore, severity: analysis.severity },
+        metadata: {
+          confidenceScore: analysis.confidenceScore,
+          explainability: toJsonObject(explainability),
+          featureExtraction: toJsonObject(engineResult.featureExtraction),
+          provider: toJsonObject(engineResult.provider),
+          primaryDiagnosis: engineResult.primaryDiagnosis,
+          rationale: engineResult.interpretationRationale,
+          secondaryDiagnoses: toJsonObject(engineResult.secondaryDiagnoses),
+          severityBand: engineResult.clinicalSeverity,
+          severity: analysis.severity,
+        },
         patientId: queued.case.patientId,
       },
     });
@@ -324,6 +121,12 @@ async function completeAnalysis(analysisId: string, actorId: string) {
           analysisId: analysis.id,
           confidenceScore: analysis.confidenceScore,
           diagnosis: analysis.diagnosis,
+          explainability: toJsonObject(explainability),
+          featureExtraction: toJsonObject(engineResult.featureExtraction),
+          provider: toJsonObject(engineResult.provider),
+          rationale: engineResult.interpretationRationale,
+          secondaryDiagnoses: toJsonObject(engineResult.secondaryDiagnoses),
+          severityBand: engineResult.clinicalSeverity,
           severity: analysis.severity,
         },
         patientId: queued.case.patientId,

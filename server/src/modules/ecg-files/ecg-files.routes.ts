@@ -6,6 +6,7 @@ import { Router } from "express";
 import type { Prisma } from "@prisma/client";
 import { z } from "zod";
 import { prisma } from "../../config/prisma";
+import { buildPreprocessingArtifact, isSupportedImageOrPdfIngestionFile, mergeEcgMetadata, toJsonObject } from "../../ai/preprocessing.pipeline";
 import { requireAuth, requireRole } from "../../middleware/auth";
 import { AppError } from "../../middleware/error";
 import { assertResourceAccess, canAccessCase, canAccessPatient } from "../../utils/resource-access";
@@ -120,10 +121,15 @@ ecgFilesRouter.post("/files/upload", requireRole("DOCTOR"), upload.single("file"
       }
       assertResourceAccess(await canAccessCase(ecgCase.id, req.auth!));
     }
+    const preprocessing = isSupportedImageOrPdfIngestionFile(req.file.originalname)
+      ? buildPreprocessingArtifact(req.file.originalname, req.file.size, String(req.body?.source ?? "upload"))
+      : null;
     const file = await prisma.eCGFile.create({
       data: {
         caseId: body.caseId,
+        fileType: preprocessing ? (req.file.mimetype === "application/pdf" ? "PDF_REPORT" : "IMAGE") : undefined,
         fileName: req.file.originalname,
+        metadataJson: preprocessing ? mergeEcgMetadata(null, preprocessing) : undefined,
         mimeType: req.file.mimetype,
         organizationId: patient.organizationId,
         originalName: req.file.originalname,
@@ -138,7 +144,7 @@ ecgFilesRouter.post("/files/upload", requireRole("DOCTOR"), upload.single("file"
     await prisma.timelineEvent.create({
       data: {
         caseId: body.caseId,
-        metadata: { ecgFileId: file.id, originalName: file.originalName },
+        metadata: { ecgFileId: file.id, originalName: file.originalName, preprocessing: preprocessing ? toJsonObject(preprocessing) : null },
         patientId: patient.id,
         title: "Clinical ECG file uploaded",
         type: "ECG_UPLOADED",
@@ -150,7 +156,7 @@ ecgFilesRouter.post("/files/upload", requireRole("DOCTOR"), upload.single("file"
         actorId: req.auth!.id,
         caseId: body.caseId,
         message: `Clinical ECG file ${file.originalName} uploaded.`,
-        metadata: { ecgFileId: file.id, sizeBytes: file.sizeBytes },
+        metadata: { ecgFileId: file.id, preprocessing: preprocessing ? toJsonObject(preprocessing) : null, sizeBytes: file.sizeBytes },
         patientId: patient.id,
       },
     });

@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "expo-router";
 import React, { useMemo, useState } from "react";
-import { StyleSheet, Text, View } from "react-native";
+import { Platform, StyleSheet, Text, View } from "react-native";
 
 import { Badge, Card, EmptyState, Field, medicalTheme, PageSection, patientDisplayName, PrimaryButton, SectionHeader } from "@/components/enterprise/EnterpriseUI";
 import { useAuth } from "@/context/AuthContext";
@@ -14,6 +14,8 @@ export default function PatientsIndexScreen() {
   const token = authToken?.token;
   const [search, setSearch] = useState("");
   const [gender, setGender] = useState("all");
+  const [status, setStatus] = useState("active");
+  const [sortBy, setSortBy] = useState("fullName");
   const [page, setPage] = useState(1);
 
   const patientsQuery = useQuery({
@@ -22,9 +24,12 @@ export default function PatientsIndexScreen() {
       const params = new URLSearchParams({ page: String(page), pageSize: "12" });
       if (search.trim()) params.set("q", search.trim());
       if (gender !== "all") params.set("gender", gender);
+      if (status !== "all") params.set("status", status);
+      params.set("sortBy", sortBy);
+      params.set("sortDir", sortBy === "createdAt" ? "desc" : "asc");
       return listPatients(token!, params);
     },
-    queryKey: ["enterprise-patients", token, page, search, gender],
+    queryKey: ["enterprise-patients", token, page, search, gender, status, sortBy],
     retry: false,
   });
 
@@ -36,27 +41,48 @@ export default function PatientsIndexScreen() {
   const patients = patientsQuery.data?.patients ?? [];
   const totalPages = patientsQuery.data?.totalPages ?? 1;
   const highRiskCount = useMemo(() => patients.filter((patient) => patient.hypertension || patient.diabetes || patient.smokingStatus === "current").length, [patients]);
+  const lastEcgPatients = useMemo(() => patients.filter((patient) => patient.status === "active").length, [patients]);
 
   return (
     <PageSection>
       <View style={styles.summaryGrid}>
         <Summary label="Total Patients" value={String(patientsQuery.data?.total ?? patients.length)} />
         <Summary label="High Risk" value={String(highRiskCount)} tone="critical" />
+        <Summary label="Active Records" value={String(lastEcgPatients)} />
         <Summary label="Current Page" value={`${page}/${totalPages}`} />
       </View>
 
       <Card style={styles.controls}>
-        <Field label="Search" onChangeText={setSearch} placeholder="Name, MRN, employee ID, phone..." value={search} />
+        <SectionHeader title="Patient Command Search" subtitle="Search, filter, sort, export, print, and manage enterprise patient records." />
+        <Field label="Global Search" onChangeText={(value) => { setSearch(value); setPage(1); }} placeholder="Patient ID, employee ID, name, company, department, phone..." value={search} />
         <View style={styles.filterRow}>
           {["all", "male", "female", "other", "unknown"].map((value) => (
             <PrimaryButton key={value} label={value} onPress={() => { setGender(value); setPage(1); }} variant={gender === value ? "primary" : "outline"} />
           ))}
-          <PrimaryButton icon="user-plus" label="Create Patient" onPress={() => router.push("/patients/create" as never)} />
+        </View>
+        <View style={styles.filterRow}>
+          {["all", "active", "inactive"].map((value) => (
+            <PrimaryButton key={value} label={value} onPress={() => { setStatus(value); setPage(1); }} variant={status === value ? "primary" : "outline"} />
+          ))}
+          {["fullName", "patientCode", "employeeId", "status", "createdAt"].map((value) => (
+            <PrimaryButton key={value} label={`Sort ${value}`} onPress={() => setSortBy(value)} variant={sortBy === value ? "primary" : "outline"} />
+          ))}
+        </View>
+        <View style={styles.filterRow}>
+          <PrimaryButton icon="user-plus" label="Create Patient" onPress={() => router.push("/patients/new" as never)} />
+          <PrimaryButton label="Export CSV" onPress={() => exportRows(patients, "csv")} variant="outline" />
+          <PrimaryButton label="Export Excel" onPress={() => exportRows(patients, "xls")} variant="outline" />
+          <PrimaryButton label="Print" onPress={printPage} variant="outline" />
         </View>
       </Card>
 
       <Card style={styles.table}>
         <SectionHeader title="Patient Registry" subtitle="Search, filter, view, edit, and archive patient records." />
+        <View style={styles.tableHeader}>
+          {["Patient ID", "Employee ID", "Full Name", "Age", "Gender", "Company", "Department", "Phone", "Last ECG Date", "Status", "Actions"].map((item) => (
+            <Text key={item} style={styles.headerCell}>{item}</Text>
+          ))}
+        </View>
         {patientsQuery.isLoading ? <Text style={styles.muted}>Loading patients...</Text> : null}
         {patientsQuery.isError ? <Text style={styles.error}>Unable to load patients.</Text> : null}
         {!patientsQuery.isLoading && !patients.length ? (
@@ -66,6 +92,10 @@ export default function PatientsIndexScreen() {
           <PatientRow
             key={patient.id}
             onArchive={() => archiveMutation.mutate(patient.id)}
+            onCreateEcg={() => router.push("/upload-ecg" as never)}
+            onEdit={() => router.push(`/patients/${patient.id}/edit` as never)}
+            onGenerateReport={() => router.push(`/patients/${patient.id}` as never)}
+            onTimeline={() => router.push(`/patients/${patient.id}` as never)}
             onOpen={() => router.push(`/patients/${patient.id}` as never)}
             patient={patient}
           />
@@ -80,23 +110,73 @@ export default function PatientsIndexScreen() {
   );
 }
 
-function PatientRow({ onArchive, onOpen, patient }: { onArchive: () => void; onOpen: () => void; patient: ApiPatient }) {
+function PatientRow({
+  onArchive,
+  onCreateEcg,
+  onEdit,
+  onGenerateReport,
+  onOpen,
+  onTimeline,
+  patient,
+}: {
+  onArchive: () => void;
+  onCreateEcg: () => void;
+  onEdit: () => void;
+  onGenerateReport: () => void;
+  onOpen: () => void;
+  onTimeline: () => void;
+  patient: ApiPatient;
+}) {
   const risk = patient.hypertension || patient.diabetes || patient.smokingStatus === "current" ? "High Risk" : "Standard";
   return (
     <View style={styles.patientRow}>
       <View style={styles.avatar}><Text style={styles.avatarText}>{patient.firstName[0]}{patient.lastName[0]}</Text></View>
       <View style={styles.patientMain}>
         <Text style={styles.patientName}>{patientDisplayName(patient)}</Text>
-        <Text style={styles.patientMeta}>MRN {patient.medicalRecordNumber} • {patient.age}y • {patient.gender} • {patient.email ?? patient.phone ?? "No contact"}</Text>
-        <Text style={styles.patientMeta}>{patient.occupation ?? "Department not recorded"} • {patient.medicalHistory ?? "No medical history recorded"}</Text>
+        <Text style={styles.patientMeta}>{patient.patientCode ?? patient.medicalRecordNumber} • Employee {patient.employeeId ?? "N/A"} • {patient.age}y • {patient.gender}</Text>
+        <Text style={styles.patientMeta}>{patient.company ?? "Company N/A"} • {patient.department ?? "Department N/A"} • {patient.phone ?? "No phone"}</Text>
       </View>
       <Badge label={risk} tone={risk === "High Risk" ? "critical" : "success"} />
+      <Badge label={patient.status ?? "active"} tone={patient.status === "inactive" ? "muted" : "primary"} />
       <View style={styles.rowActions}>
         <PrimaryButton label="View" onPress={onOpen} variant="outline" />
-        <PrimaryButton label="Archive" onPress={onArchive} variant="danger" />
+        <PrimaryButton label="Edit" onPress={onEdit} variant="outline" />
+        <PrimaryButton label="Create ECG" onPress={onCreateEcg} variant="outline" />
+        <PrimaryButton label="Timeline" onPress={onTimeline} variant="outline" />
+        <PrimaryButton label="Report" onPress={onGenerateReport} variant="outline" />
+        <PrimaryButton label="Delete" onPress={onArchive} variant="danger" />
       </View>
     </View>
   );
+}
+
+function exportRows(patients: ApiPatient[], extension: "csv" | "xls") {
+  const header = ["Patient ID", "Employee ID", "Full Name", "Age", "Gender", "Company", "Department", "Phone", "Status"];
+  const rows = patients.map((patient) => [
+    patient.patientCode ?? patient.medicalRecordNumber,
+    patient.employeeId ?? "",
+    patient.fullName ?? patientDisplayName(patient),
+    patient.age,
+    patient.gender,
+    patient.company ?? "",
+    patient.department ?? "",
+    patient.phone ?? "",
+    patient.status ?? "active",
+  ]);
+  const csv = [header, ...rows].map((row) => row.map((value) => `"${String(value).replace(/"/g, '""')}"`).join(",")).join("\n");
+  if (Platform.OS === "web" && typeof document !== "undefined") {
+    const blob = new Blob([csv], { type: extension === "xls" ? "application/vnd.ms-excel" : "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `patients.${extension}`;
+    link.click();
+    URL.revokeObjectURL(url);
+  }
+}
+
+function printPage() {
+  if (Platform.OS === "web" && typeof window !== "undefined") window.print();
 }
 
 function Summary({ label, tone = "primary", value }: { label: string; tone?: "critical" | "primary"; value: string }) {
@@ -122,6 +202,8 @@ const styles = StyleSheet.create({
   patientRow: { alignItems: "center", borderBottomColor: medicalTheme.border, borderBottomWidth: 1, flexDirection: "row", flexWrap: "wrap", gap: 12, paddingVertical: 12 },
   rowActions: { flexDirection: "row", gap: 8 },
   summary: { flex: 1, minWidth: 160 },
+  headerCell: { color: medicalTheme.primary, flex: 1, fontSize: 11, fontWeight: "900", minWidth: 96, textTransform: "uppercase" },
+  tableHeader: { backgroundColor: medicalTheme.surface, borderColor: medicalTheme.border, borderRadius: 12, borderWidth: 1, flexDirection: "row", flexWrap: "wrap", gap: 8, padding: 10 },
   summaryGrid: { flexDirection: "row", flexWrap: "wrap", gap: 14 },
   summaryLabel: { color: medicalTheme.muted, fontSize: 12, fontWeight: "800" },
   summaryValue: { color: medicalTheme.text, fontSize: 24, fontWeight: "900" },

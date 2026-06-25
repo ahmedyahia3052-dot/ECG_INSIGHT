@@ -4,6 +4,7 @@ import { randomUUID } from "node:crypto";
 import multer from "multer";
 import { Router } from "express";
 import { prisma } from "../config/prisma";
+import { buildPreprocessingArtifact, isSupportedImageOrPdfIngestionFile, mergeEcgMetadata, toJsonObject } from "../ai/preprocessing.pipeline";
 import { queueAnalysis } from "../ai/ai.service";
 import { requireAuth, requireRole } from "../middleware/auth";
 import { AppError } from "../middleware/error";
@@ -77,9 +78,14 @@ uploadsRouter.post(
         throw new AppError(404, "ECG case not found.", "CASE_NOT_FOUND");
       }
 
+      const preprocessing = isSupportedImageOrPdfIngestionFile(req.file.originalname)
+        ? buildPreprocessingArtifact(req.file.originalname, req.file.size, String(req.body?.source ?? "upload"))
+        : null;
       const file = await prisma.eCGFile.create({
         data: {
           caseId: ecgCase.id,
+          fileType: preprocessing ? (req.file.mimetype === "application/pdf" ? "PDF_REPORT" : "IMAGE") : "UNKNOWN",
+          metadataJson: preprocessing ? mergeEcgMetadata(null, preprocessing) : undefined,
           mimeType: req.file.mimetype,
           originalName: req.file.originalname,
           sizeBytes: req.file.size,
@@ -97,6 +103,7 @@ uploadsRouter.post(
           message: `ECG file ${file.originalName} uploaded to case ${ecgCase.caseId}.`,
           metadata: {
             mimeType: file.mimeType,
+            preprocessing: preprocessing ? toJsonObject(preprocessing) : null,
             sizeBytes: file.sizeBytes,
             storedName: file.storedName,
           },

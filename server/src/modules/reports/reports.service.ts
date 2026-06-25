@@ -94,7 +94,9 @@ export async function generateClinicalReport(caseId: string, authorId: string) {
   const report = await prisma.clinicalReport.create({
     data: {
       acquisitionDate: ecgCase.uploadDate,
-      aiFindings: analysis?.interpretation ?? ecgCase.finalDiagnosis ?? undefined,
+      aiFindings: analysis
+        ? `${analysis.interpretation} Confidence score: ${Math.round(analysis.confidenceScore * 100)}%.`
+        : ecgCase.finalDiagnosis ?? undefined,
       authorId,
       caseId: ecgCase.id,
       clinicalIndication: ecgCase.clinicalNotes,
@@ -209,6 +211,7 @@ export function buildReportPdf(report: ClinicalReport, watermark = "ECG Insight"
     `Watermark: ${watermark}`,
     `Report Number: ${report.reportNumber}`,
     `Case ID: ${report.caseId}`,
+    `Patient ID: ${report.patientId}`,
     `Organization: ${report.organizationName ?? "N/A"}`,
     `Contractor: ${report.contractorName ?? "N/A"}`,
     `ECG Acquisition: ${report.acquisitionDate.toISOString()}`,
@@ -219,6 +222,7 @@ export function buildReportPdf(report: ClinicalReport, watermark = "ECG Insight"
     `Status: ${report.status}`,
     `Clinical Indication: ${report.clinicalIndication ?? "N/A"}`,
     `AI Findings: ${report.aiFindings ?? "N/A"}`,
+    `ECG Image/PDF: See persisted ECG case files and cardiovascular documents attached to this case.`,
     `Rhythm: ${report.rhythmInterpretation ?? "N/A"}`,
     `Severity: ${report.severityClassification ?? "N/A"}`,
     `Differential Diagnosis: ${report.differentialDiagnosis.join(", ") || "N/A"}`,

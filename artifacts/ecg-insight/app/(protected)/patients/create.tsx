@@ -51,15 +51,29 @@ export default function CreatePatientScreen() {
         {error ? <Text style={styles.error}>{error}</Text> : null}
         <View style={styles.grid}>
           <Field label="First Name" onChangeText={(value) => setForm((current) => ({ ...current, firstName: value }))} value={form.firstName} />
+          <Field label="Middle Name" onChangeText={(value) => setForm((current) => ({ ...current, middleName: value }))} value={form.middleName} />
           <Field label="Last Name" onChangeText={(value) => setForm((current) => ({ ...current, lastName: value }))} value={form.lastName} />
           <Field label="Employee ID / MRN" onChangeText={(value) => setForm((current) => ({ ...current, medicalRecordNumber: value }))} value={form.medicalRecordNumber} />
+          <Field label="Employee ID" onChangeText={(value) => setForm((current) => ({ ...current, employeeId: value }))} value={form.employeeId} />
           <Field label="DOB" onChangeText={(value) => setForm((current) => ({ ...current, dateOfBirth: value }))} value={form.dateOfBirth} />
           <Field label="Gender" onChangeText={(value) => setForm((current) => ({ ...current, gender: normalizeGender(value) }))} placeholder="male / female / other / unknown" value={form.gender} />
           <Field label="Phone" onChangeText={(value) => setForm((current) => ({ ...current, phone: value }))} value={form.phone} />
           <Field label="Email" onChangeText={(value) => setForm((current) => ({ ...current, email: value }))} value={form.email} />
           <Field label="National ID" onChangeText={(value) => setForm((current) => ({ ...current, nationalId: value }))} value={form.nationalId} />
-          <Field label="Company / Department" onChangeText={(value) => setForm((current) => ({ ...current, occupation: value }))} value={form.occupation} />
+          <Field label="Passport Number" onChangeText={(value) => setForm((current) => ({ ...current, passportNumber: value }))} value={form.passportNumber} />
+          <Field label="Company" onChangeText={(value) => setForm((current) => ({ ...current, company: value }))} value={form.company} />
+          <Field label="Department" onChangeText={(value) => setForm((current) => ({ ...current, departmentName: value }))} value={form.departmentName} />
+          <Field label="Contractor" onChangeText={(value) => setForm((current) => ({ ...current, contractorName: value }))} value={form.contractorName} />
+          <Field label="Job Title" onChangeText={(value) => setForm((current) => ({ ...current, jobTitle: value, occupation: value }))} value={form.jobTitle} />
+          <Field label="Blood Group" onChangeText={(value) => setForm((current) => ({ ...current, bloodGroup: value }))} value={form.bloodGroup} />
+          <Field label="Marital Status" onChangeText={(value) => setForm((current) => ({ ...current, maritalStatus: value }))} value={form.maritalStatus} />
+          <Field label="Emergency Contact Name" onChangeText={(value) => setForm((current) => ({ ...current, emergencyContactName: value }))} value={form.emergencyContactName} />
+          <Field label="Emergency Contact Phone" onChangeText={(value) => setForm((current) => ({ ...current, emergencyContactPhone: value }))} value={form.emergencyContactPhone} />
+          <Field label="Height CM" onChangeText={(value) => setForm((current) => ({ ...current, heightCm: Number(value) || undefined }))} value={form.heightCm ? String(form.heightCm) : ""} />
+          <Field label="Weight KG" onChangeText={(value) => setForm((current) => ({ ...current, weightKg: Number(value) || undefined }))} value={form.weightKg ? String(form.weightKg) : ""} />
+          <Field label="Known Allergies" onChangeText={(value) => setForm((current) => ({ ...current, knownAllergies: value, allergies: value }))} value={form.knownAllergies} />
           <Field label="Medical History" onChangeText={(value) => setForm((current) => ({ ...current, medicalHistory: value }))} value={form.medicalHistory} />
+          <Field label="Medications" onChangeText={(value) => setForm((current) => ({ ...current, medications: value }))} value={form.medications} />
           <Field label="Risk Factors / Notes" onChangeText={(value) => setForm((current) => ({ ...current, notes: value }))} value={form.notes} />
         </View>
         <View style={styles.actions}>

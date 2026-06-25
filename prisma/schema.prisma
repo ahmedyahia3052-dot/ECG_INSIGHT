@@ -115,6 +115,11 @@ enum Gender {
   UNKNOWN
 }
 
+enum PatientStatus {
+  ACTIVE
+  INACTIVE
+}
+
 enum ECGCaseStatus {
   PENDING
   PROCESSING
@@ -725,8 +730,11 @@ model User {
 
 model Patient {
   id                     String                 @id @default(cuid())
+  patientCode            String?                @unique
   firstName              String
+  middleName             String?
   lastName               String
+  fullName               String?
   gender                 Gender                 @default(UNKNOWN)
   dateOfBirth            DateTime
   employeeId             String?
@@ -735,24 +743,48 @@ model Patient {
   email                  String?
   medicalRecordNumber    String                 @unique
   nationalId             String?                @unique
+  passportNumber         String?                @unique
   organizationId         String?
   departmentId           String?
   contractorId           String?
   contractorCompanyId    String?
+  company                String?
+  departmentName         String?
+  contractorName         String?
   occupation             String?
+  jobTitle               String?
   hireDate               DateTime?
+  bloodGroup             String?
+  maritalStatus          String?
+  emergencyContactName   String?
+  emergencyContactPhone  String?
+  heightCm               Float?
+  weightKg               Float?
+  bmi                    Float?
   smokingStatus          SmokingStatus          @default(UNKNOWN)
+  alcoholStatus          String?
   hypertension           Boolean                @default(false)
   diabetes               Boolean                @default(false)
   dyslipidemia           Boolean                @default(false)
   obesity                Boolean                @default(false)
+  ischemicHeartDisease   Boolean                @default(false)
+  heartFailure           Boolean                @default(false)
+  arrhythmiaHistoryFlag  Boolean                @default(false)
+  previousMI             Boolean                @default(false)
+  previousCABG           Boolean                @default(false)
+  previousPCI            Boolean                @default(false)
+  stentsHistory          String?
   familyHistory          String?
   address                String?
   emergencyContact       String?
   allergies              String?
+  knownAllergies         String?
   medicalHistory         String?
   medications            String?
   notes                  String?
+  status                 PatientStatus          @default(ACTIVE)
+  createdById            String?
+  updatedById            String?
   archivedAt             DateTime?
   createdAt              DateTime               @default(now())
   updatedAt              DateTime               @updatedAt
@@ -801,6 +833,9 @@ model Patient {
   @@index([contractorId])
   @@index([contractorCompanyId])
   @@index([archivedAt])
+  @@index([patientCode])
+  @@index([status])
+  @@index([createdById])
 }
 
 model Organization {

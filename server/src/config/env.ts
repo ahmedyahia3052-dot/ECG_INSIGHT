@@ -9,6 +9,7 @@ dotenv.config({ path: path.join(workspaceRoot, ".env") });
 dotenv.config({ path: path.join(workspaceRoot, `.env.${nodeEnv}`), override: nodeEnv !== "production" });
 
 const developmentDefaults = {
+  AI_PROVIDER: "rule_based",
   CLIENT_ORIGIN: "http://localhost:8081",
   DATABASE_URL: "postgresql://postgres:postgres@localhost:5432/ecg_insight",
   EXPO_PUBLIC_API_URL: "http://localhost:3002/api",
@@ -47,6 +48,9 @@ const envSchema = z
       .refine(validateOriginList, {
         message: "CLIENT_ORIGIN must be one or more comma-separated frontend origins.",
       }),
+    AI_MODEL_API_KEY: z.string().optional(),
+    AI_MODEL_ENDPOINT: z.string().url().optional(),
+    AI_PROVIDER: z.enum(["deep_learning", "mock", "rule_based"]).default("rule_based"),
     COOKIE_DOMAIN: z.string().optional(),
     EXCEPTION_MONITORING_DSN: z.string().url().optional(),
     DATABASE_URL: z.string().url({
