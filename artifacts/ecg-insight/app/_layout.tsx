@@ -17,6 +17,7 @@ import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { GlobalQueryStatus } from "@/components/GlobalQueryStatus";
 import { AuthProvider } from "@/context/AuthContext";
 import { VisualExperienceProvider } from "@/context/VisualExperienceContext";
+import { ToastProvider } from "@/components/interaction/PremiumInteraction";
 import { ApiError } from "@/services/api";
 
 SplashScreen.preventAutoHideAsync();
@@ -35,7 +36,7 @@ const queryClient = new QueryClient({
 
 function RootLayoutNav() {
   return (
-    <Stack screenOptions={{ headerShown: false }}>
+    <Stack screenOptions={{ animation: "fade_from_bottom", contentStyle: { backgroundColor: "transparent" }, headerShown: false }}>
       <Stack.Screen name="index" options={{ headerShown: false }} />
       <Stack.Screen name="onboarding" options={{ headerShown: false }} />
       <Stack.Screen name="(auth)" options={{ headerShown: false }} />
@@ -71,8 +72,10 @@ export default function RootLayout() {
             <KeyboardProvider>
               <AuthProvider>
                 <VisualExperienceProvider>
-                  <RootLayoutNav />
-                  <GlobalQueryStatus />
+                  <ToastProvider>
+                    <RootLayoutNav />
+                    <GlobalQueryStatus />
+                  </ToastProvider>
                 </VisualExperienceProvider>
               </AuthProvider>
             </KeyboardProvider>

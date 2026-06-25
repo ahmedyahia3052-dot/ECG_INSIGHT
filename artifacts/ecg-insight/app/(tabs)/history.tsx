@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { useRouter } from "expo-router";
-import React, { useMemo, useState } from "react";
+import React, { useCallback, useMemo, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { useAuth } from "@/context/AuthContext";
 import { useColors } from "@/hooks/useColors";
@@ -16,6 +16,7 @@ import {
   BoltHero,
   BoltScreen,
 } from "@/components/bolt/BoltUI";
+import { PremiumRefreshControl, SkeletonPatient } from "@/components/interaction/PremiumInteraction";
 
 type FilterStatus = "all" | "normal" | "abnormal" | "critical";
 type WorkspaceTab = "summary" | "timeline" | "diagnoses" | "reports" | "medications" | "notes" | "ai";
@@ -28,6 +29,7 @@ export default function PatientsScreen() {
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<FilterStatus>("all");
   const [workspaceTab, setWorkspaceTab] = useState<WorkspaceTab>("summary");
+  const [refreshing, setRefreshing] = useState(false);
 
   const casesQuery = useQuery({
     enabled: !!token,
@@ -54,9 +56,14 @@ export default function PatientsScreen() {
   );
   const selected = filtered[0] ?? cases[0] ?? null;
   const reports = (reportsQuery.data as { reports?: unknown[] } | undefined)?.reports ?? [];
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await Promise.all([casesQuery.refetch(), reportsQuery.refetch()]);
+    setRefreshing(false);
+  }, [casesQuery, reportsQuery]);
 
   return (
-    <BoltScreen>
+    <BoltScreen refreshControl={<PremiumRefreshControl onRefresh={onRefresh} refreshing={refreshing} />}>
       <BoltHero
         actions={<BoltButton icon="upload-cloud" label="Upload New ECG" onPress={() => router.push("/(tabs)/upload")} />}
         eyebrow="Live patient records"
@@ -127,6 +134,10 @@ export default function PatientsScreen() {
 
       {casesQuery.isError ? (
         <BoltEmpty title="Unable to load patients" message="The live API returned an error. No mock data is displayed." />
+      ) : casesQuery.isLoading ? (
+        <View style={styles.skeletonList}>
+          {[0, 1, 2, 3].map((item) => <SkeletonPatient key={item} />)}
+        </View>
       ) : filtered.length === 0 ? (
         <BoltEmpty title={casesQuery.isLoading ? "Loading..." : "No patients found"} message="Upload an ECG or adjust search/filter criteria." />
       ) : (
@@ -271,6 +282,7 @@ const styles = StyleSheet.create({
   patientName: { fontFamily: "Inter_700Bold", fontSize: 15 },
   sectionHeader: { flexDirection: "row", justifyContent: "space-between" },
   sectionTitle: { fontFamily: "Inter_700Bold", fontSize: 18 },
+  skeletonList: { gap: 14 },
   tabRow: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   timelineItem: { borderBottomWidth: 1, gap: 3, paddingVertical: 8 },
   workspace: { gap: 12 },

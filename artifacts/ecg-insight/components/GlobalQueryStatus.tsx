@@ -2,6 +2,7 @@ import { ApiError } from "@/services/api";
 import { useIsFetching, useQueryClient } from "@tanstack/react-query";
 import React, { useEffect, useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
+import { useToast } from "@/components/interaction/PremiumInteraction";
 
 function messageFor(error: unknown) {
   if (error instanceof ApiError) return `${error.message} (${error.status})`;
@@ -13,15 +14,20 @@ export function GlobalQueryStatus() {
   const queryClient = useQueryClient();
   const isFetching = useIsFetching();
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const toast = useToast();
 
   useEffect(() => {
     return queryClient.getQueryCache().subscribe((event) => {
       if (event.type !== "updated") return;
       const error = event.query.state.error;
-      if (error) setErrorMessage(messageFor(error));
+      if (error) {
+        const message = messageFor(error);
+        setErrorMessage(message);
+        toast.error("Clinical data request failed", message);
+      }
       if (!error && event.query.state.status === "success") setErrorMessage(null);
     });
-  }, [queryClient]);
+  }, [queryClient, toast]);
 
   if (!errorMessage && isFetching === 0) return null;
 

@@ -25,6 +25,7 @@ import {
   BoltScreen,
 } from "@/components/bolt/BoltUI";
 import { type EcgSeverity, useVisualExperience } from "@/context/VisualExperienceContext";
+import { useToast } from "@/components/interaction/PremiumInteraction";
 
 function visualSeverity(value: string): EcgSeverity {
   const normalized = value.toLowerCase();
@@ -38,6 +39,7 @@ export default function UploadScreen() {
   const router = useRouter();
   const { authToken } = useAuth();
   const { setSeverity, triggerHaptic } = useVisualExperience();
+  const toast = useToast();
   const [patientName, setPatientName] = useState("");
   const [dateOfBirth, setDateOfBirth] = useState("1970-01-01");
   const [gender, setGender] = useState<"male" | "female" | "other" | "unknown">("unknown");
@@ -93,6 +95,7 @@ export default function UploadScreen() {
     onError: (loadError) => {
       setProgress(0);
       setError(loadError instanceof Error ? loadError.message : "Upload failed.");
+      toast.error("ECG upload failed", loadError instanceof Error ? loadError.message : "Upload failed.");
       void triggerHaptic("error");
     },
     onSuccess: (payload) => {
@@ -101,6 +104,7 @@ export default function UploadScreen() {
       setProgress(100);
       setError("");
       setSeverity(visualSeverity(payload.analysis.severity));
+      toast.success("ECG analysis complete", "The ECG was uploaded and queued for clinical review.");
       void triggerHaptic("upload");
     },
     retry: false,

@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Animated, Easing, Pressable, RefreshControl, StyleSheet, Text, TextInput, View, useWindowDimensions } from "react-native";
+import { Animated, Easing, Pressable, StyleSheet, Text, TextInput, View, useWindowDimensions } from "react-native";
 import { useAuth } from "@/context/AuthContext";
 import { useColors } from "@/hooks/useColors";
 import { useOfflineCache } from "@/hooks/useOfflineCache";
@@ -21,8 +21,9 @@ import {
   BoltNavCard,
   BoltScreen,
 } from "@/components/bolt/BoltUI";
-import { AnalyticsChartCard, EcgMonitorWidget, LiveEcgWave, PremiumMetricCard, ShimmerBlock } from "@/components/bolt/UltraPremium";
+import { AnalyticsChartCard, EcgMonitorWidget, LiveEcgWave, PremiumMetricCard } from "@/components/bolt/UltraPremium";
 import { useVisualExperience } from "@/context/VisualExperienceContext";
+import { PremiumRefreshControl, SkeletonDashboard } from "@/components/interaction/PremiumInteraction";
 
 export default function DashboardScreen() {
   const colors = useColors();
@@ -170,10 +171,8 @@ export default function DashboardScreen() {
   return (
     <BoltScreen
       refreshControl={
-        <RefreshControl
+        <PremiumRefreshControl
           refreshing={refreshing}
-          tintColor={colors.primary}
-          colors={[colors.primary, colors.accent]}
           onRefresh={onRefresh}
         />
       }
@@ -248,9 +247,7 @@ export default function DashboardScreen() {
       ) : null}
 
       {loading ? (
-        <View style={styles.loadingGrid}>
-          {[0, 1, 2, 3, 4, 5].map((item) => <ShimmerBlock key={item} style={styles.loadingCard} />)}
-        </View>
+        <SkeletonDashboard />
       ) : (
         <>
           <View style={styles.metricRow}>

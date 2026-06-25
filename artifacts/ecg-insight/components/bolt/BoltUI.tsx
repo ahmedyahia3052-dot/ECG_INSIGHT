@@ -18,6 +18,7 @@ import {
 import Svg, { Polyline } from "react-native-svg";
 import { useColors } from "@/hooks/useColors";
 import { severityAccent, useVisualExperience } from "@/context/VisualExperienceContext";
+import { PageTransition } from "@/components/interaction/PremiumInteraction";
 
 export type BoltIcon = keyof typeof Feather.glyphMap;
 
@@ -70,21 +71,6 @@ export function BoltScreen({
   refreshControl?: React.ReactElement<RefreshControlProps>;
 }) {
   const colors = useColors();
-  const { effectiveMotionEnabled } = useVisualExperience();
-  const fade = useRef(new Animated.Value(0)).current;
-  const translate = useRef(new Animated.Value(12)).current;
-
-  useEffect(() => {
-    if (!effectiveMotionEnabled) {
-      fade.setValue(1);
-      translate.setValue(0);
-      return;
-    }
-    Animated.parallel([
-      Animated.timing(fade, { duration: 280, easing: Easing.out(Easing.cubic), toValue: 1, useNativeDriver: true }),
-      Animated.timing(translate, { duration: 280, easing: Easing.out(Easing.cubic), toValue: 0, useNativeDriver: true }),
-    ]).start();
-  }, [effectiveMotionEnabled, fade, translate]);
 
   return (
     <LinearGradient
@@ -96,7 +82,7 @@ export function BoltScreen({
       style={styles.screen}
     >
       <MedicalBackground />
-      <Animated.View style={[styles.screen, { opacity: fade, transform: [{ translateY: translate }] }]}>
+      <PageTransition>
         <ScrollView
           contentContainerStyle={[styles.scroll, padded && styles.padded]}
           refreshControl={refreshControl}
@@ -104,7 +90,7 @@ export function BoltScreen({
         >
           {children}
         </ScrollView>
-      </Animated.View>
+      </PageTransition>
     </LinearGradient>
   );
 }

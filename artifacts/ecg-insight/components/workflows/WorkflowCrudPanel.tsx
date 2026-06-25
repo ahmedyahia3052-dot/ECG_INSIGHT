@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import React, { useMemo, useState } from "react";
 import { Alert, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { useColors } from "@/hooks/useColors";
+import { SkeletonList, useToast } from "@/components/interaction/PremiumInteraction";
 
 type WorkflowItem = { id?: string };
 
@@ -54,6 +55,7 @@ export function WorkflowCrudPanel<TItem extends WorkflowItem>({
   updateItem,
 }: WorkflowCrudPanelProps<TItem>) {
   const colors = useColors();
+  const toast = useToast();
   const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
   const [filterValues, setFilterValues] = useState<Record<string, string>>({});
@@ -90,8 +92,10 @@ export function WorkflowCrudPanel<TItem extends WorkflowItem>({
     onSuccess: async () => {
       setForm({});
       setMode(null);
+      toast.success("Record created", `${title} was created successfully.`);
       await invalidate();
     },
+    onError: (error) => toast.error("Create failed", errorMessage(error)),
   });
 
   const updateMutation = useMutation({
@@ -102,8 +106,10 @@ export function WorkflowCrudPanel<TItem extends WorkflowItem>({
     onSuccess: async () => {
       setForm({});
       setMode(null);
+      toast.success("Record updated", `${title} was updated successfully.`);
       await invalidate();
     },
+    onError: (error) => toast.error("Update failed", errorMessage(error)),
   });
 
   const deleteMutation = useMutation({
@@ -111,7 +117,11 @@ export function WorkflowCrudPanel<TItem extends WorkflowItem>({
       if (!deleteItem) return undefined;
       return deleteItem(id);
     },
-    onSuccess: invalidate,
+    onSuccess: async () => {
+      toast.info("Record archived", `${title} was removed from the active list.`);
+      await invalidate();
+    },
+    onError: (error) => toast.error("Delete failed", errorMessage(error)),
   });
 
   const items = itemsFromResponse(query.data);
@@ -197,9 +207,7 @@ export function WorkflowCrudPanel<TItem extends WorkflowItem>({
       ))}
 
       {query.isLoading ? (
-        <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-          <Text style={[styles.cardText, { color: colors.textSecondary }]}>Loading {title.toLowerCase()}...</Text>
-        </View>
+        <SkeletonList count={3} />
       ) : query.isError ? (
         <View style={[styles.card, { backgroundColor: colors.surface, borderColor: "#DC2626" }]}>
           <Text style={[styles.cardTitle, { color: "#DC2626" }]}>Unable to load</Text>
