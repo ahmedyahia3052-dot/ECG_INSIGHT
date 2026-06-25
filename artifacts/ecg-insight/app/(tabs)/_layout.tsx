@@ -3,8 +3,9 @@ import { Redirect, Tabs } from "expo-router";
 import { SymbolView } from "expo-symbols";
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Platform, Pressable, StyleSheet, TouchableOpacity, View, useColorScheme, useWindowDimensions } from "react-native";
+import { PanGestureHandler, State, type PanGestureHandlerStateChangeEvent } from "react-native-gesture-handler";
 import { useAuth } from "@/context/AuthContext";
 import { useColors } from "@/hooks/useColors";
 import { EnterpriseSidebar } from "@/components/bolt/EnterpriseSidebar";
@@ -20,7 +21,14 @@ function ClassicTabLayout() {
   const isIOS = Platform.OS === "ios";
   const isWeb = Platform.OS === "web";
   const isMobile = width < 768;
-  const useSidebar = !isMobile;
+  const isTablet = width >= 768 && width <= 1024;
+  const isDesktop = width > 1024;
+  const usePushSidebar = !isMobile;
+
+  useEffect(() => {
+    if (isTablet) setSidebarCollapsed(true);
+    if (isDesktop) setSidebarCollapsed(false);
+  }, [isDesktop, isTablet]);
 
   const tabIcon = (name: keyof typeof Feather.glyphMap, color: string, focused: boolean) => (
     <View style={[styles.tabIconWrap, { transform: [{ scale: focused ? 1.14 : 1 }] }]}>
@@ -29,12 +37,19 @@ function ClassicTabLayout() {
     </View>
   );
 
+  const handleDrawerSwipe = (event: PanGestureHandlerStateChangeEvent) => {
+    if (event.nativeEvent.state === State.END && event.nativeEvent.translationX < -70) {
+      setMobileDrawerOpen(false);
+    }
+  };
+
   return (
-    <>
-      {useSidebar ? (
+    <View style={styles.layoutRoot}>
+      {usePushSidebar ? (
         <EnterpriseSidebar
           collapsed={sidebarCollapsed}
           onToggleCollapse={() => setSidebarCollapsed((value) => !value)}
+          placement="push"
         />
       ) : mobileDrawerOpen ? (
         <>
@@ -44,79 +59,84 @@ function ClassicTabLayout() {
             onPress={() => setMobileDrawerOpen(false)}
             style={styles.drawerBackdrop}
           />
-          <EnterpriseSidebar collapsed={false} onClose={() => setMobileDrawerOpen(false)} />
+          <PanGestureHandler activeOffsetX={[-12, 12]} onHandlerStateChange={handleDrawerSwipe}>
+            <View style={styles.mobileDrawerPanel}>
+              <EnterpriseSidebar collapsed={false} onClose={() => setMobileDrawerOpen(false)} placement="overlay" />
+            </View>
+          </PanGestureHandler>
         </>
       ) : null}
-      {isMobile ? (
-        <TouchableOpacity
-          accessibilityRole="button"
-          accessibilityLabel="Open navigation drawer"
-          activeOpacity={0.84}
-          onPress={() => {
-            Haptics.selectionAsync().catch(() => {});
-            setMobileDrawerOpen(true);
+      <View style={styles.mainContent}>
+        {isMobile ? (
+          <TouchableOpacity
+            accessibilityRole="button"
+            accessibilityLabel="Open navigation drawer"
+            activeOpacity={0.84}
+            onPress={() => {
+              Haptics.selectionAsync().catch(() => {});
+              setMobileDrawerOpen(true);
+            }}
+            style={[styles.menuButton, { backgroundColor: colors.glass, borderColor: colors.gradientBorder }]}
+          >
+            <Feather name="menu" size={19} color={colors.primary} />
+          </TouchableOpacity>
+        ) : null}
+        <Tabs
+          screenOptions={{
+            tabBarActiveTintColor: colors.primary,
+            tabBarInactiveTintColor: colors.mutedForeground,
+            headerShown: false,
+            tabBarStyle: {
+              display: isMobile ? "flex" : "none",
+              position: "absolute",
+              backgroundColor: isIOS ? "transparent" : colors.glass,
+              borderTopWidth: 1,
+              borderTopColor: colors.gradientBorder,
+              borderRadius: isWeb ? 28 : 26,
+              bottom: isWeb ? 18 : 10,
+              elevation: 0,
+              height: isWeb ? 88 : 76,
+              left: 12,
+              paddingBottom: isWeb ? 14 : 10,
+              paddingTop: 8,
+              right: 12,
+              shadowColor: colors.shadow,
+              shadowOffset: { height: 12, width: 0 },
+              shadowOpacity: 0.26,
+              shadowRadius: 24,
+            },
+            tabBarBackground: () =>
+              !isMobile ? null : isIOS ? (
+                <BlurView
+                  intensity={100}
+                  tint={isDark ? "dark" : "light"}
+                  style={[StyleSheet.absoluteFill, styles.tabBlur]}
+                />
+              ) : isWeb ? (
+                <View
+                  style={[StyleSheet.absoluteFill, styles.tabBlur, { backgroundColor: colors.glass }]}
+                />
+              ) : null,
+            tabBarLabelStyle: {
+              fontFamily: "Inter_600SemiBold",
+              fontSize: 11,
+            },
           }}
-          style={[styles.menuButton, { backgroundColor: colors.glass, borderColor: colors.gradientBorder }]}
         >
-          <Feather name="menu" size={19} color={colors.primary} />
-        </TouchableOpacity>
-      ) : null}
-      <Tabs
-        screenOptions={{
-          tabBarActiveTintColor: colors.primary,
-          tabBarInactiveTintColor: colors.mutedForeground,
-          headerShown: false,
-          tabBarStyle: {
-            display: isMobile ? "flex" : "none",
-            position: "absolute",
-            backgroundColor: isIOS ? "transparent" : colors.glass,
-            borderTopWidth: 1,
-            borderTopColor: colors.gradientBorder,
-            borderRadius: isWeb ? 28 : 26,
-            bottom: isWeb ? 18 : 10,
-            elevation: 0,
-            height: isWeb ? 88 : 76,
-            left: 12,
-            paddingBottom: isWeb ? 14 : 10,
-            paddingTop: 8,
-            right: 12,
-            shadowColor: colors.shadow,
-            shadowOffset: { height: 12, width: 0 },
-            shadowOpacity: 0.26,
-            shadowRadius: 24,
-          },
-          tabBarBackground: () =>
-            !isMobile ? null : isIOS ? (
-              <BlurView
-                intensity={100}
-                tint={isDark ? "dark" : "light"}
-                style={[StyleSheet.absoluteFill, styles.tabBlur]}
-              />
-            ) : isWeb ? (
-              <View
-                style={[StyleSheet.absoluteFill, styles.tabBlur, { backgroundColor: colors.glass }]}
-              />
-            ) : null,
-          tabBarLabelStyle: {
-            fontFamily: "Inter_600SemiBold",
-            fontSize: 11,
-          },
-        }}
-      >
-      <Tabs.Screen
-        name="index"
-        options={{
-          title: "Home",
-          tabBarIcon: ({ color, focused }) =>
-            isIOS ? (
-              <View style={{ transform: [{ scale: focused ? 1.12 : 1 }] }}>
-                <SymbolView name="house" tintColor={color} size={focused ? 24 : 22} />
-              </View>
-            ) : (
-              tabIcon("home", color, focused)
-            ),
-        }}
-      />
+        <Tabs.Screen
+          name="index"
+          options={{
+            title: "Home",
+            tabBarIcon: ({ color, focused }) =>
+              isIOS ? (
+                <View style={{ transform: [{ scale: focused ? 1.12 : 1 }] }}>
+                  <SymbolView name="house" tintColor={color} size={focused ? 24 : 22} />
+                </View>
+              ) : (
+                tabIcon("home", color, focused)
+              ),
+          }}
+        />
       <Tabs.Screen
         name="history"
         options={{
@@ -208,10 +228,11 @@ function ClassicTabLayout() {
       <Tabs.Screen name="collaboration-dashboard" options={{ href: null, title: "Collaboration Dashboard" }} />
       <Tabs.Screen name="task-dashboard" options={{ href: null, title: "Task Dashboard" }} />
       <Tabs.Screen name="alert-dashboard" options={{ href: null, title: "Alert Dashboard" }} />
-      </Tabs>
-      {isMobile ? <FloatingEcgActionButton /> : null}
-      <FloatingAIAssistant compact={isMobile} />
-    </>
+        </Tabs>
+        {isMobile ? <FloatingEcgActionButton /> : null}
+        <FloatingAIAssistant compact={isMobile} />
+      </View>
+    </View>
   );
 }
 
@@ -231,6 +252,9 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(0,0,0,0.46)",
     zIndex: 40,
   },
+  layoutRoot: { flex: 1, flexDirection: "row", overflow: "hidden" },
+  mainContent: { flex: 1, minWidth: 0, position: "relative" },
+  mobileDrawerPanel: { ...StyleSheet.absoluteFillObject, zIndex: 50 },
   menuButton: {
     alignItems: "center",
     borderRadius: 16,
