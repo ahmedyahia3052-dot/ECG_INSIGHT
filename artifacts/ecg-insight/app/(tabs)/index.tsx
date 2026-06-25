@@ -3,15 +3,15 @@ import { useQuery } from "@tanstack/react-query";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Animated, Easing, Pressable, StyleSheet, Text, TextInput, View, useWindowDimensions } from "react-native";
-import { useAuth } from "@/context/AuthContext";
+import { Animated, Easing, Pressable, ScrollView, StyleSheet, Text, TextInput, View, useWindowDimensions } from "react-native";
+import { useAuth, type User } from "@/context/AuthContext";
 import { useColors } from "@/hooks/useColors";
 import { useOfflineCache } from "@/hooks/useOfflineCache";
 import { getAIHistory, getAIStatistics } from "@/services/ai";
 import { API_ROOT_URL } from "@/services/api";
-import { apiCaseToEcgCase, listCases } from "@/services/clinical";
+import { apiCaseToEcgCase, listCases, listPatients, type ApiPatient } from "@/services/clinical";
 import { listNotifications } from "@/services/collaboration";
-import { listReports } from "@/services/reports";
+import { listReports, type ClinicalReport } from "@/services/reports";
 import { getMySubscription, getSubscriptionAnalytics } from "@/services/subscriptions";
 import {
   BoltBadge,
@@ -21,7 +21,7 @@ import {
   BoltNavCard,
   BoltScreen,
 } from "@/components/bolt/BoltUI";
-import { AnalyticsChartCard, EcgMonitorWidget, LiveEcgWave, PremiumMetricCard } from "@/components/bolt/UltraPremium";
+import { LiveEcgWave, PremiumMetricCard } from "@/components/bolt/UltraPremium";
 import { useVisualExperience } from "@/context/VisualExperienceContext";
 import { PremiumRefreshControl, SkeletonDashboard } from "@/components/interaction/PremiumInteraction";
 
@@ -32,7 +32,7 @@ export default function DashboardScreen() {
   const { authToken, canAccess, isImpersonating, managedUsers, stopImpersonation, user } = useAuth();
   const token = authToken?.token;
   const [refreshing, setRefreshing] = useState(false);
-  const [now] = useState(() => new Date());
+  const [now, setNow] = useState(() => new Date());
   const [search, setSearch] = useState("");
 
   const casesQuery = useQuery({
@@ -56,6 +56,12 @@ export default function DashboardScreen() {
     enabled: !!token,
     queryFn: async () => listReports(token!, new URLSearchParams({ page: "1", pageSize: "100" })),
     queryKey: ["ultra-dashboard-reports", token],
+    retry: false,
+  });
+  const patientsQuery = useQuery({
+    enabled: !!token,
+    queryFn: async () => listPatients(token!, new URLSearchParams({ page: "1", pageSize: "8" })),
+    queryKey: ["enterprise-dashboard-patients", token],
     retry: false,
   });
   const subscriptionQuery = useQuery({
@@ -93,10 +99,10 @@ export default function DashboardScreen() {
   const notificationsCache = useOfflineCache("ecg-insight:mobile:notifications", notificationsQuery.data?.notifications);
   const liveCases = casesQuery.data?.cases ?? casesCache.cachedData ?? [];
   const cases = liveCases.map(apiCaseToEcgCase);
-  const reports = (reportsQuery.data as { reports?: unknown[] } | undefined)?.reports ?? [];
+  const reports = reportsQuery.data?.reports ?? [];
   const critical = cases.filter((item) => item.status === "critical").length;
-  const abnormal = cases.filter((item) => item.status === "abnormal").length;
-  const patients = new Set(cases.map((item) => item.patientName)).size;
+  const patientCount = patientsQuery.data?.total ?? new Set(cases.map((item) => item.patientName)).size;
+  const recentPatients = patientsQuery.data?.patients ?? [];
   const reviewed = cases.filter((item) => item.confidence > 0).length;
   const aiStats = aiStatsQuery.data?.statistics;
   const aiHistory = aiHistoryQuery.data?.analyses ?? [];
@@ -114,22 +120,26 @@ export default function DashboardScreen() {
   const monitorRhythm = aiHistory[0]?.rhythm ?? cases[0]?.rhythm ?? "Normal Sinus Rhythm";
   const monitorHeartRate = aiHistory[0]?.heartRate ?? cases[0]?.heartRate ?? 72;
   const isMobile = width < 768;
+  const greetingName = formatGreetingName(user, isMobile);
+  const roleTitle = userTitle(user);
+  const currentGreeting = greeting(now);
+  const fullDate = now.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" });
+  const currentTime = now.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" });
 
   useEffect(() => {
     if (__DEV__) console.info("[route-mount] DashboardPage", { isMobile });
   }, [isMobile]);
+
+  useEffect(() => {
+    const timer = setInterval(() => setNow(new Date()), 30_000);
+    return () => clearInterval(timer);
+  }, []);
 
   const weeklySeries = useMemo(() => {
     const base = Math.max(cases.length, 1);
     return [base, base + 1, base + 2, base + critical, base + reports.length, base + reviewed, base + cases.length];
   }, [cases.length, critical, reports.length, reviewed]);
   const criticalSeries = useMemo(() => [critical, Math.max(cases.length - critical, 0), reviewed, reports.length], [cases.length, critical, reports.length, reviewed]);
-  const usageSeries = useMemo(() => {
-    const quota = subscriptionQuery.data?.quota;
-    const used = quota?.used ?? 0;
-    const remaining = quota?.remaining ?? Math.max(0, 6 - used);
-    return [0, Math.ceil(used / 3), Math.ceil(used / 2), used, used + Math.ceil(remaining / 3), used + Math.ceil(remaining / 2)];
-  }, [subscriptionQuery.data?.quota]);
   const searchSuggestions = useMemo(() => {
     const query = search.trim().toLowerCase();
     if (!query) return [];
@@ -163,14 +173,15 @@ export default function DashboardScreen() {
     await Promise.all([
       casesQuery.refetch(),
       aiStatsQuery.refetch(),
+      patientsQuery.refetch(),
       reportsQuery.refetch(),
       subscriptionQuery.refetch(),
       notificationsQuery.refetch(),
     ]);
     setRefreshing(false);
-  }, [aiStatsQuery, casesQuery, notificationsQuery, reportsQuery, subscriptionQuery]);
+  }, [aiStatsQuery, casesQuery, notificationsQuery, patientsQuery, reportsQuery, subscriptionQuery]);
 
-  const loading = casesQuery.isLoading || reportsQuery.isLoading || subscriptionQuery.isLoading;
+  const loading = casesQuery.isLoading || patientsQuery.isLoading || reportsQuery.isLoading || subscriptionQuery.isLoading;
 
   return (
     <BoltScreen
@@ -190,10 +201,14 @@ export default function DashboardScreen() {
 
       <MobileHomeHeader
         avatar={user?.avatarInitials ?? "AY"}
-        greeting={greeting()}
+        currentDate={fullDate}
+        currentTime={currentTime}
+        displayName={greetingName}
+        greeting={currentGreeting}
         notifications={unread}
         onNotifications={() => router.push("/(tabs)/notification-center")}
         planName={String(planName)}
+        roleTitle={roleTitle}
       />
 
       <GlobalSearchBar
@@ -214,16 +229,16 @@ export default function DashboardScreen() {
           <View style={styles.heroMain}>
             <Text style={[styles.kicker, { color: colors.primary }]}>Enterprise Medical Command Center</Text>
             <Text style={[styles.heroTitle, { color: colors.text }]}>
-              {greeting()}, Dr. Ahmed
+              {currentGreeting}, {greetingName}
             </Text>
             <Text style={[styles.heroDate, { color: colors.textSecondary }]}>
-              {now.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" })} · {now.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })}
+              {roleTitle} · {fullDate} · {currentTime}
             </Text>
           </View>
           <BoltBadge icon="credit-card" label={String(planName)} tone={subscriptionQuery.data?.lifetimeAccess.granted ? "success" : "primary"} />
         </View>
         <Text style={[styles.heroSubtitle, { color: colors.textSecondary }]}>
-          Live ECG intelligence, secure subscriptions, reports, patients, and owner-protected administration in one Philips-grade medical workspace.
+          {cases.length} ECG analyses, {patientCount} patients, {reports.length} reports, and {unread} unread notifications in one Philips-grade medical workspace.
         </Text>
         <View style={styles.statusRow}>
           <StatusPill label="API Status" operational={status?.api ?? !systemStatusQuery.isError} />
@@ -231,12 +246,12 @@ export default function DashboardScreen() {
           <StatusPill label="AI Engine Status" operational={!aiStatsQuery.isError} />
         </View>
         <Text style={[styles.lastLogin, { color: colors.textSecondary }]}>
-          Last login: current secure session · {now.toLocaleString("en-US", { hour: "2-digit", minute: "2-digit", month: "short", day: "numeric" })}
+          Last login: current secure session · System summary refreshed {currentTime}
         </Text>
         <View style={styles.heroActions}>
           <BoltButton icon="upload-cloud" label="Upload ECG" onPress={() => router.push("/(tabs)/upload")} />
           <BoltButton icon="file-text" label="View Reports" onPress={() => router.push("/(tabs)/reports-dashboard")} variant="outline" />
-          <BoltButton icon="user-plus" label="Add Patient" onPress={() => router.push("/(tabs)/upload")} variant="outline" />
+          <BoltButton icon="user-plus" label="Add Patient" onPress={() => router.push("/(tabs)/history")} variant="outline" />
         </View>
       </BoltCard>
 
@@ -253,111 +268,81 @@ export default function DashboardScreen() {
       {loading ? (
         <SkeletonDashboard />
       ) : (
-        <>
-          <View style={styles.metricRow}>
+        <View style={styles.kpiGrid}>
+          <View style={styles.kpiCell}>
             <PremiumMetricCard icon="activity" label="Total ECG Analyses" sparkline={weeklySeries} trend="+12%" value={cases.length} />
+          </View>
+          <View style={styles.kpiCell}>
             <PremiumMetricCard icon="alert-triangle" label="Critical Cases" sparkline={criticalSeries} trend={critical ? "Review" : "Clear"} trendTone={critical ? "danger" : "success"} value={critical} />
           </View>
-          <View style={styles.metricRow}>
-            <PremiumMetricCard icon="trending-up" label="Abnormal ECGs" sparkline={[abnormal, reviewed, critical, cases.length]} trend={abnormal ? "+Risk" : "Clear"} trendTone={abnormal ? "warning" : "success"} value={abnormal} />
-            <PremiumMetricCard icon="clipboard" label="Pending Reviews" sparkline={criticalSeries} trend={pendingReviews ? "Queue" : "Clear"} trendTone={pendingReviews ? "warning" : "success"} value={pendingReviews} />
+          <View style={styles.kpiCell}>
+            <PremiumMetricCard icon="clipboard" label="Pending Reports" sparkline={[pendingReviews, reports.length, critical, reviewed]} trend={pendingReviews ? "Queue" : "Clear"} trendTone={pendingReviews ? "warning" : "success"} value={pendingReviews} />
           </View>
-          <View style={styles.metricRow}>
-            <PremiumMetricCard icon="users" label="Active Patients" sparkline={weeklySeries.slice().reverse()} trend="+8%" value={patients} />
-            <PremiumMetricCard icon="cpu" label="AI Accuracy" sparkline={criticalSeries} suffix="%" trend="AI" value={aiStats?.averageConfidence ?? 95} />
+          <View style={styles.kpiCell}>
+            <PremiumMetricCard icon="cpu" label="Diagnostic Accuracy" sparkline={criticalSeries} suffix="%" trend="AI" value={aiStats?.averageConfidence ?? 95} />
           </View>
-        </>
+        </View>
       )}
 
-      <View style={styles.quickActions}>
+      <ScrollView
+        contentContainerStyle={styles.quickActions}
+        horizontal
+        showsHorizontalScrollIndicator={false}
+      >
         <QuickActionCard icon="upload-cloud" label="Upload ECG" onPress={() => router.push("/(tabs)/upload?method=upload" as never)} />
-        <QuickActionCard icon="camera" label="Capture ECG" onPress={() => router.push("/(tabs)/upload?method=camera" as never)} />
-        <QuickActionCard icon="user-plus" label="Add Patient" onPress={() => router.push("/(tabs)/upload")} />
+        <QuickActionCard icon="user-plus" label="New Patient" onPress={() => router.push("/(tabs)/history")} />
+        <QuickActionCard icon="radio" label="Live Monitor" onPress={() => router.push("/(tabs)")} />
         <QuickActionCard icon="file-text" label="Reports" onPress={() => router.push("/(tabs)/reports-dashboard")} />
-        <QuickActionCard icon="message-circle" label="AI Assistant" onPress={() => router.push("/(tabs)/ai-assistant" as never)} />
+        <QuickActionCard icon="bell" label="Notifications" onPress={() => router.push("/(tabs)/notification-center")} />
+        <QuickActionCard icon="bar-chart-2" label="Analytics" onPress={() => router.push("/(tabs)/population-analytics" as never)} />
+      </ScrollView>
+
+      <View style={styles.commandGrid}>
+        <View style={styles.commandColumn}>
+          <EnterpriseMonitorPanel
+            heartRate={monitorHeartRate}
+            lastUpdate={currentTime}
+            rhythm={monitorRhythm}
+          />
+          <RecentPatientsPanel
+            error={patientsQuery.isError}
+            loading={patientsQuery.isLoading}
+            patients={recentPatients}
+          />
+          <AIInsightsPanel
+            critical={critical}
+            diagnosis={aiHistory[0]?.diagnosis ?? cases[0]?.diagnosis}
+            pendingReports={pendingReviews}
+            recommendations={aiHistory[0]?.recommendations ?? cases[0]?.recommendations ?? []}
+          />
+        </View>
+
+        <View style={styles.commandColumn}>
+          <CriticalAlertsCenter
+            cases={cases.slice(0, 5)}
+            critical={critical}
+            pendingReviews={pendingReviews}
+            subscriptionWarning={!!subscriptionQuery.data?.quota.warning}
+            unread={unread}
+          />
+          <RecentReportsPanel
+            error={reportsQuery.isError}
+            loading={reportsQuery.isLoading}
+            reports={reports.slice(0, 5)}
+          />
+          <RoleDashboardPanel
+            audits={notifications.length}
+            critical={critical}
+            licenses={subscriptionAnalyticsQuery.data?.analytics.subscriptionDistribution.reduce((sum, item) => sum + item.count, 0) ?? 0}
+            organizations={subscriptionAnalyticsQuery.data?.analytics.subscriptionDistribution.length ?? 0}
+            pendingReviews={pendingReviews}
+            revenueCents={revenueCents}
+            role={user?.isOwner ? "owner" : user?.role ?? "doctor"}
+            teamActivity={managedUsers.length}
+            totalUsers={subscriptionAnalyticsQuery.data?.analytics.totalUsers ?? managedUsers.length}
+          />
+        </View>
       </View>
-
-      <RoleDashboardPanel
-        audits={notifications.length}
-        critical={critical}
-        licenses={subscriptionAnalyticsQuery.data?.analytics.subscriptionDistribution.reduce((sum, item) => sum + item.count, 0) ?? 0}
-        organizations={subscriptionAnalyticsQuery.data?.analytics.subscriptionDistribution.length ?? 0}
-        pendingReviews={pendingReviews}
-        revenueCents={revenueCents}
-        role={user?.isOwner ? "owner" : user?.role ?? "doctor"}
-        teamActivity={managedUsers.length}
-        totalUsers={subscriptionAnalyticsQuery.data?.analytics.totalUsers ?? managedUsers.length}
-      />
-
-      <EcgMonitorWidget heartRate={monitorHeartRate} rhythm={monitorRhythm} />
-
-      <CriticalAlertsCenter
-        critical={critical}
-        pendingReviews={pendingReviews}
-        subscriptionWarning={!!subscriptionQuery.data?.quota.warning}
-        unread={unread}
-      />
-
-      <RecentEcgActivity cases={cases.slice(0, isMobile ? 5 : 8)} />
-
-      <ClinicalTimeline cases={cases.slice(0, 4)} reportsCount={reports.length} />
-
-      <RecentTimeline cases={cases.slice(0, isMobile ? 5 : 8)} />
-
-      <AIAssistantPanel
-        diagnosis={aiHistory[0]?.diagnosis ?? cases[0]?.diagnosis ?? "No diagnosis selected"}
-        recommendations={aiHistory[0]?.recommendations ?? cases[0]?.recommendations ?? []}
-      />
-
-      <View style={styles.chartGrid}>
-        <AnalyticsChartCard data={weeklySeries} icon="activity" title="Daily ECG Volume" />
-        <AnalyticsChartCard data={Object.values(aiStats?.diagnosisDistribution ?? { Normal: reviewed, Critical: critical, Pending: pendingReviews })} icon="pie-chart" title="Diagnostic Distribution" tone={colors.destructive} />
-        <AnalyticsChartCard data={[unread, notifications.length, reviewed, cases.length]} icon="users" title="User Activity" tone={colors.accent} />
-        <AnalyticsChartCard data={[0, Math.round(revenueCents / 600), Math.round(revenueCents / 400), Math.round(revenueCents / 250), Math.round(revenueCents / 100)]} icon="trending-up" title="Revenue Trends" tone={colors.success} />
-        <AnalyticsChartCard data={usageSeries} icon="credit-card" title="Subscription Usage" tone={colors.warning} />
-        <AnalyticsChartCard data={subscriptionAnalyticsQuery.data?.analytics.subscriptionDistribution.map((item) => item.count) ?? [1, 1, 1]} icon="bar-chart-2" title="Subscription Distribution" tone={colors.primary} />
-      </View>
-
-      <View style={styles.navGrid}>
-        <BoltNavCard description="Capture, scan, upload, and analyze ECG studies" icon="upload-cloud" route="/(tabs)/upload" title="Upload ECG" />
-        <BoltNavCard description="Search live patient ECG records" icon="users" route="/(tabs)/history" title="Patients" />
-        <BoltNavCard description="Generate and manage clinical reports" icon="file-text" route="/(tabs)/reports-dashboard" title="Reports" />
-        <BoltNavCard description={`${unread} unread live notifications`} icon="bell" route="/(tabs)/notification-center" title="Notifications" />
-      </View>
-
-      <View style={styles.sectionHeader}>
-        <Text style={[styles.sectionTitle, { color: colors.text }]}>Recent Cases</Text>
-        <BoltButton label="View all" onPress={() => router.push("/(tabs)/history")} variant="ghost" />
-      </View>
-      {casesQuery.isError ? (
-        <BoltEmpty
-          actionLabel="Retry"
-          message="The API returned an error. No fallback data is displayed in production UI."
-          onAction={() => void casesQuery.refetch()}
-          title="Live cases unavailable"
-        />
-      ) : cases.length === 0 ? (
-        <BoltEmpty
-          actionLabel="Upload ECG"
-          message="Upload an ECG to create the first live clinical case."
-          onAction={() => router.push("/(tabs)/upload")}
-          title="No ECG cases yet"
-        />
-      ) : (
-        cases.slice(0, 4).map((item) => (
-          <BoltCard key={item.id} style={styles.caseCard}>
-            <View style={styles.caseMain}>
-              <Text style={[styles.caseName, { color: colors.text }]}>{item.patientName}</Text>
-              <Text style={[styles.muted, { color: colors.textSecondary }]}>{item.diagnosis}</Text>
-            </View>
-            <BoltBadge
-              label={item.status}
-              tone={item.status === "critical" ? "danger" : item.status === "normal" ? "success" : "warning"}
-            />
-            <BoltButton label="Open" onPress={() => router.push(`/case/${item.id}` as never)} variant="outline" />
-          </BoltCard>
-        ))
-      )}
 
       {canAccess("admin") ? (
         <BoltNavCard description="Protected owner/admin revenue, users, plans, licenses, and audit tools" icon="shield" route="/admin/" title="Admin Dashboard" />
@@ -366,11 +351,35 @@ export default function DashboardScreen() {
   );
 }
 
-function greeting() {
-  const hour = new Date().getHours();
+function greeting(date: Date) {
+  const hour = date.getHours();
   if (hour < 12) return "Good Morning";
-  if (hour < 18) return "Good Afternoon";
+  if (hour < 17) return "Good Afternoon";
   return "Good Evening";
+}
+
+function formatDisplayName(name: string | undefined, mobile: boolean) {
+  const clean = (name ?? "Clinician").trim();
+  const withoutPrefix = clean.replace(/^(dr\.?|doctor)\s+/i, "");
+  if (mobile) return withoutPrefix.split(/\s+/)[0] ?? withoutPrefix;
+  return withoutPrefix;
+}
+
+function formatGreetingName(user: User | null | undefined, mobile: boolean) {
+  const base = formatDisplayName(user?.name, mobile);
+  const usesClinicalPrefix = !!user && (user.role === "doctor" || user.role === "admin" || user.role === "super_admin" || user.isOwner);
+  return usesClinicalPrefix ? `Dr. ${base}` : base;
+}
+
+function userTitle(user: User | null | undefined) {
+  if (!user) return "Clinical User";
+  if (user.specialization) return user.specialization;
+  if (user.isOwner || user.role === "super_admin") return "Medical Director";
+  if (user.role === "admin") return "Clinical Operations Lead";
+  if (user.role === "corporate_client") return "Food Safety Coordinator & Lead Auditor";
+  if (user.role === "doctor") return "Cardiology Consultant";
+  if (user.role === "student") return "Clinical Trainee";
+  return "Clinical User";
 }
 
 function StatusPill({ label, operational }: { label: string; operational: boolean }) {
@@ -444,26 +453,48 @@ function GlobalSearchBar({
 
 function MobileHomeHeader({
   avatar,
+  currentDate,
+  currentTime,
+  displayName,
   greeting,
   notifications,
   onNotifications,
   planName,
+  roleTitle,
 }: {
   avatar: string;
+  currentDate: string;
+  currentTime: string;
+  displayName: string;
   greeting: string;
   notifications: number;
   onNotifications: () => void;
   planName: string;
+  roleTitle: string;
 }) {
   const colors = useColors();
+  const opacity = useRef(new Animated.Value(0)).current;
+  const translateY = useRef(new Animated.Value(8)).current;
+
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(opacity, { duration: 260, easing: Easing.out(Easing.cubic), toValue: 1, useNativeDriver: true }),
+      Animated.timing(translateY, { duration: 260, easing: Easing.out(Easing.cubic), toValue: 0, useNativeDriver: true }),
+    ]).start();
+  }, [opacity, translateY]);
+
   return (
-    <View style={styles.mobileHeader}>
+    <Animated.View style={[styles.mobileHeader, { opacity, transform: [{ translateY }] }]}>
       <View style={[styles.avatar, { backgroundColor: colors.primary }]}>
         <Text style={styles.avatarText}>{avatar}</Text>
       </View>
       <View style={styles.mobileHeaderText}>
-        <Text style={[styles.mobileGreeting, { color: colors.text }]}>{greeting}, Dr. Ahmed</Text>
-        <BoltBadge icon="credit-card" label={planName} />
+        <Text style={[styles.mobileGreeting, { color: colors.text }]}>{greeting}, {displayName}</Text>
+        <View style={styles.headerMetaRow}>
+          <BoltBadge icon="credit-card" label={planName} />
+          <Text numberOfLines={1} style={[styles.headerRole, { color: colors.textSecondary }]}>{roleTitle}</Text>
+        </View>
+        <Text style={[styles.headerTime, { color: colors.textSecondary }]}>{currentDate} · {currentTime}</Text>
       </View>
       <Pressable
         accessibilityRole="button"
@@ -478,7 +509,7 @@ function MobileHomeHeader({
           </View>
         ) : null}
       </Pressable>
-    </View>
+    </Animated.View>
   );
 }
 
@@ -587,23 +618,120 @@ function RoleDashboardPanel({
   );
 }
 
+function EnterpriseMonitorPanel({
+  heartRate,
+  lastUpdate,
+  rhythm,
+}: {
+  heartRate: number;
+  lastUpdate: string;
+  rhythm: string;
+}) {
+  const colors = useColors();
+  return (
+    <BoltCard highlight style={styles.monitorPanel}>
+      <View style={styles.panelHeader}>
+        <View>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>Live ECG Monitor</Text>
+          <Text style={[styles.muted, { color: colors.textSecondary }]}>Lead II preview · future streaming ready</Text>
+        </View>
+        <BoltBadge icon="radio" label="Preview" tone="success" />
+      </View>
+      <LiveEcgWave height={86} />
+      <View style={styles.monitorStats}>
+        <MonitorStat label="Lead" value="Lead II" />
+        <MonitorStat label="Heart Rate" value={`${heartRate} BPM`} tone={colors.primary} />
+        <MonitorStat label="Rhythm" value={rhythm} />
+        <MonitorStat label="Last Update" value={lastUpdate} />
+      </View>
+    </BoltCard>
+  );
+}
+
+function MonitorStat({ label, tone, value }: { label: string; tone?: string; value: string }) {
+  const colors = useColors();
+  return (
+    <View style={[styles.monitorStat, { borderColor: colors.border }]}>
+      <Text style={[styles.monitorStatLabel, { color: colors.textSecondary }]}>{label}</Text>
+      <Text numberOfLines={1} style={[styles.monitorStatValue, { color: tone ?? colors.text }]}>{value}</Text>
+    </View>
+  );
+}
+
+function RecentPatientsPanel({
+  error,
+  loading,
+  patients,
+}: {
+  error: boolean;
+  loading: boolean;
+  patients: ApiPatient[];
+}) {
+  const colors = useColors();
+  const router = useRouter();
+  return (
+    <BoltCard style={styles.panel}>
+      <View style={styles.panelHeader}>
+        <Text style={[styles.sectionTitle, { color: colors.text }]}>Recent Patients</Text>
+        <BoltButton label="Manage" onPress={() => router.push("/(tabs)/history")} variant="ghost" />
+      </View>
+      <View style={[styles.tableHeader, { borderColor: colors.border }]}>
+        <Text style={[styles.tableHeadPatient, { color: colors.textSecondary }]}>Patient</Text>
+        <Text style={[styles.tableHeadSmall, { color: colors.textSecondary }]}>Age</Text>
+        <Text style={[styles.tableHeadSmall, { color: colors.textSecondary }]}>Gender</Text>
+        <Text style={[styles.tableHeadStatus, { color: colors.textSecondary }]}>Status</Text>
+      </View>
+      {loading ? (
+        <SkeletonDashboard />
+      ) : error ? (
+        <BoltEmpty actionLabel="Retry" message="Unable to load patient records from the API." onAction={() => router.replace("/(tabs)/history")} title="Patients unavailable" />
+      ) : patients.length ? (
+        patients.slice(0, 5).map((patient) => (
+          <View key={patient.id} style={[styles.tableRow, { borderColor: colors.border }]}>
+            <View style={styles.tableHeadPatient}>
+              <Text numberOfLines={1} style={[styles.tablePrimary, { color: colors.text }]}>{patient.firstName} {patient.lastName}</Text>
+              <Text numberOfLines={1} style={[styles.tableSecondary, { color: colors.textSecondary }]}>{patient.medicalRecordNumber}</Text>
+            </View>
+            <Text style={[styles.tableHeadSmall, styles.tablePrimary, { color: colors.text }]}>{patient.age}</Text>
+            <Text style={[styles.tableHeadSmall, styles.tablePrimary, { color: colors.text }]}>{patient.gender}</Text>
+            <View style={styles.tableHeadStatus}>
+              <BoltBadge label="Active" tone="success" />
+            </View>
+          </View>
+        ))
+      ) : (
+        <BoltEmpty actionLabel="Add Patient" message="Create a patient record to start ECG workflows." onAction={() => router.push("/(tabs)/history")} title="No patients yet" />
+      )}
+    </BoltCard>
+  );
+}
+
 function CriticalAlertsCenter({
+  cases,
   critical,
   pendingReviews,
   subscriptionWarning,
   unread,
 }: {
+  cases: ReturnType<typeof apiCaseToEcgCase>[];
   critical: number;
   pendingReviews: number;
   subscriptionWarning: boolean;
   unread: number;
 }) {
   const colors = useColors();
+  const router = useRouter();
   const alerts = [
-    ...(critical ? [{ label: "Critical STEMI or high-severity ECG findings", severity: "critical" as const, value: critical }] : []),
-    ...(pendingReviews ? [{ label: "Pending physician reviews awaiting sign-off", severity: "warning" as const, value: pendingReviews }] : []),
-    ...(unread ? [{ label: "Unread clinical notifications", severity: "info" as const, value: unread }] : []),
-    ...(subscriptionWarning ? [{ label: "Subscription quota warning", severity: "warning" as const, value: 1 }] : []),
+    ...cases.filter((item) => item.status === "critical").map((item) => ({
+      id: item.id,
+      label: item.diagnosis,
+      severity: "critical" as const,
+      timestamp: new Date(item.date).toLocaleString(),
+      value: item.patientName,
+    })),
+    ...(pendingReviews ? [{ id: "pending", label: "Reports awaiting physician signature", severity: "warning" as const, timestamp: "Queue", value: `${pendingReviews}` }] : []),
+    ...(unread ? [{ id: "unread", label: "Unread clinical notifications", severity: "warning" as const, timestamp: "Live", value: `${unread}` }] : []),
+    ...(subscriptionWarning ? [{ id: "quota", label: "Subscription quota warning", severity: "warning" as const, timestamp: "Live", value: "1" }] : []),
   ];
   return (
     <BoltCard style={styles.panel}>
@@ -613,18 +741,94 @@ function CriticalAlertsCenter({
       </View>
       {alerts.length ? (
         alerts.map((alert) => (
-          <View key={alert.label} style={[styles.alertRow, { borderColor: colors.border }]}>
+          <View key={alert.id} style={[styles.alertRow, { borderColor: colors.border }]}>
             <BoltBadge
-              label={alert.severity}
-              tone={alert.severity === "critical" ? "danger" : alert.severity === "warning" ? "warning" : "primary"}
+              label={alert.severity === "critical" ? "Critical" : "Warning"}
+              tone={alert.severity === "critical" ? "danger" : "warning"}
             />
-            <Text style={[styles.alertText, { color: colors.text }]}>{alert.label}</Text>
-            <Text style={[styles.alertCount, { color: colors.primary }]}>{alert.value}</Text>
+            <View style={styles.alertContent}>
+              <Text numberOfLines={1} style={[styles.alertText, { color: colors.text }]}>{alert.label}</Text>
+              <Text numberOfLines={1} style={[styles.tableSecondary, { color: colors.textSecondary }]}>{alert.value} · {alert.timestamp}</Text>
+            </View>
+            <BoltButton label="Review" onPress={() => router.push(alert.id === "pending" ? "/(tabs)/reports-dashboard" : `/case/${alert.id}` as never)} variant="outline" />
           </View>
         ))
       ) : (
         <BoltEmpty title="No critical alerts" message="All high-priority ECG findings, reviews, and subscription states are clear." />
       )}
+    </BoltCard>
+  );
+}
+
+function RecentReportsPanel({
+  error,
+  loading,
+  reports,
+}: {
+  error: boolean;
+  loading: boolean;
+  reports: ClinicalReport[];
+}) {
+  const colors = useColors();
+  const router = useRouter();
+  return (
+    <BoltCard style={styles.panel}>
+      <View style={styles.panelHeader}>
+        <Text style={[styles.sectionTitle, { color: colors.text }]}>Recent Reports</Text>
+        <BoltButton label="View all" onPress={() => router.push("/(tabs)/reports-dashboard")} variant="ghost" />
+      </View>
+      {loading ? (
+        <SkeletonDashboard />
+      ) : error ? (
+        <BoltEmpty actionLabel="Retry" message="Unable to load clinical reports." onAction={() => router.replace("/(tabs)/reports-dashboard")} title="Reports unavailable" />
+      ) : reports.length ? (
+        reports.map((report) => (
+          <View key={report.id} style={[styles.reportRow, { borderColor: colors.border }]}>
+            <View style={styles.caseMain}>
+              <Text numberOfLines={1} style={[styles.tablePrimary, { color: colors.text }]}>{report.reportNumber}</Text>
+              <Text numberOfLines={1} style={[styles.tableSecondary, { color: colors.textSecondary }]}>{report.physicianName} · {new Date(report.reportingDate).toLocaleDateString()}</Text>
+            </View>
+            <BoltBadge label={report.status.replace("_", " ")} tone={report.status === "signed" || report.status === "finalized" ? "success" : "warning"} />
+            <BoltButton label="Open" onPress={() => router.push("/(tabs)/reports-dashboard")} variant="outline" />
+          </View>
+        ))
+      ) : (
+        <BoltEmpty actionLabel="Create Report" message="Generate reports from analyzed ECG cases." onAction={() => router.push("/(tabs)/reports-dashboard")} title="No reports yet" />
+      )}
+    </BoltCard>
+  );
+}
+
+function AIInsightsPanel({
+  critical,
+  diagnosis,
+  pendingReports,
+  recommendations,
+}: {
+  critical: number;
+  diagnosis?: string;
+  pendingReports: number;
+  recommendations: string[];
+}) {
+  const colors = useColors();
+  const insights = [
+    critical ? `${critical} ECG case${critical === 1 ? "" : "s"} require urgent review.` : "No critical ECG cases are currently queued.",
+    diagnosis ? `Latest AI finding: ${diagnosis}.` : "AI findings will appear after the next analysis.",
+    pendingReports ? `${pendingReports} report${pendingReports === 1 ? "" : "s"} awaiting physician signature.` : "No reports are waiting for signature.",
+    ...(recommendations.length ? recommendations.slice(0, 2) : ["Continue monitoring high-priority workflows and unread clinical notifications."]),
+  ];
+  return (
+    <BoltCard highlight style={styles.panel}>
+      <View style={styles.panelHeader}>
+        <Text style={[styles.sectionTitle, { color: colors.text }]}>AI Insights</Text>
+        <BoltBadge icon="cpu" label="Clinical AI" />
+      </View>
+      {insights.map((insight, index) => (
+        <View key={`${insight}-${index}`} style={[styles.insightRow, { borderColor: colors.border }]}>
+          <Feather name={index === 0 && critical ? "alert-triangle" : "zap"} size={16} color={index === 0 && critical ? colors.destructive : colors.primary} />
+          <Text style={[styles.assistantText, { color: colors.textSecondary }]}>{insight}</Text>
+        </View>
+      ))}
     </BoltCard>
   );
 }
@@ -798,6 +1002,7 @@ const styles = StyleSheet.create({
   activityCard: { borderRadius: 18, borderWidth: 1, gap: 9, padding: 12 },
   activityTop: { alignItems: "center", flexDirection: "row", gap: 10, justifyContent: "space-between" },
   alertCount: { fontFamily: "Inter_700Bold", fontSize: 18 },
+  alertContent: { flex: 1, gap: 2 },
   alertRow: { alignItems: "center", borderRadius: 16, borderWidth: 1, flexDirection: "row", gap: 10, padding: 12 },
   alertText: { flex: 1, fontFamily: "Inter_600SemiBold", fontSize: 13, lineHeight: 18 },
   assistantDiagnosis: { fontFamily: "Inter_700Bold", fontSize: 16, lineHeight: 22 },
@@ -811,7 +1016,12 @@ const styles = StyleSheet.create({
   caseName: { fontFamily: "Inter_700Bold", fontSize: 15 },
   chartGrid: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
   clinicalTimelineItem: { alignItems: "flex-start", flexDirection: "row", gap: 10, minHeight: 50 },
-  hero: { gap: 14, overflow: "hidden" },
+  commandColumn: { flex: 1, gap: 10, minWidth: 320 },
+  commandGrid: { alignItems: "flex-start", flexDirection: "row", flexWrap: "wrap", gap: 10 },
+  headerMetaRow: { alignItems: "center", flexDirection: "row", flexWrap: "wrap", gap: 8 },
+  headerRole: { flexShrink: 1, fontFamily: "Inter_600SemiBold", fontSize: 12 },
+  headerTime: { fontFamily: "Inter_500Medium", fontSize: 12 },
+  hero: { gap: 10, maxHeight: 300, overflow: "hidden" },
   heroActions: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
   heroDate: { fontFamily: "Inter_500Medium", fontSize: 13 },
   heroMain: { flex: 1, gap: 3 },
@@ -821,6 +1031,8 @@ const styles = StyleSheet.create({
   heroTop: { alignItems: "center", flexDirection: "row", gap: 12 },
   heroWave: { left: 0, opacity: 0.35, position: "absolute", right: 0, top: 10 },
   kicker: { fontFamily: "Inter_700Bold", fontSize: 11, letterSpacing: 1.1, textTransform: "uppercase" },
+  kpiCell: { flex: 1, minWidth: 250 },
+  kpiGrid: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
   loadingCard: { flex: 1, height: 132, minWidth: "47%" },
   loadingGrid: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
   metricRow: { flexDirection: "row", gap: 10 },
@@ -828,15 +1040,20 @@ const styles = StyleSheet.create({
   mobileGreeting: { fontFamily: "Inter_700Bold", fontSize: 20, letterSpacing: -0.4 },
   mobileHeader: { alignItems: "center", flexDirection: "row", gap: 12, minHeight: 58 },
   mobileHeaderText: { flex: 1, gap: 5 },
+  monitorPanel: { gap: 10, overflow: "hidden" },
+  monitorStat: { borderRadius: 14, borderWidth: 1, flex: 1, gap: 4, minWidth: "47%", padding: 10 },
+  monitorStatLabel: { fontFamily: "Inter_600SemiBold", fontSize: 11 },
+  monitorStats: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+  monitorStatValue: { fontFamily: "Inter_700Bold", fontSize: 13 },
   navGrid: { gap: 10 },
   notificationButton: { alignItems: "center", borderRadius: 16, borderWidth: 1, height: 48, justifyContent: "center", width: 48 },
   notificationDot: { alignItems: "center", borderRadius: 999, height: 18, justifyContent: "center", position: "absolute", right: -4, top: -5, width: 18 },
   notificationText: { color: "#fff", fontFamily: "Inter_700Bold", fontSize: 10 },
   offlineCard: { gap: 8 },
   panel: { gap: 12 },
-  quickActionCard: { alignItems: "center", borderRadius: 22, borderWidth: 1, flex: 1, gap: 10, justifyContent: "center", minHeight: 104, minWidth: "30%", padding: 14 },
+  quickActionCard: { alignItems: "center", borderRadius: 22, borderWidth: 1, gap: 10, justifyContent: "center", minHeight: 92, minWidth: 132, padding: 14 },
   quickActionIcon: { alignItems: "center", borderRadius: 18, height: 48, justifyContent: "center", width: 48 },
-  quickActions: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
+  quickActions: { flexDirection: "row", gap: 10, paddingRight: 8 },
   quickActionText: { fontFamily: "Inter_700Bold", fontSize: 13, textAlign: "center" },
   panelHeader: { alignItems: "center", flexDirection: "row", justifyContent: "space-between" },
   roleCard: { borderRadius: 16, borderWidth: 1, flex: 1, gap: 6, minHeight: 92, minWidth: "30%", padding: 12 },
@@ -858,6 +1075,15 @@ const styles = StyleSheet.create({
   suggestionList: { gap: 8 },
   suggestionMeta: { fontFamily: "Inter_400Regular", fontSize: 12, lineHeight: 17 },
   suggestionText: { flex: 1, gap: 2 },
+  insightRow: { alignItems: "flex-start", borderRadius: 14, borderWidth: 1, flexDirection: "row", gap: 10, padding: 10 },
+  reportRow: { alignItems: "center", borderRadius: 14, borderWidth: 1, flexDirection: "row", gap: 10, padding: 10 },
+  tableHeadPatient: { flex: 1.35, fontFamily: "Inter_700Bold", fontSize: 11, textTransform: "uppercase" },
+  tableHeadSmall: { flex: 0.52, fontFamily: "Inter_700Bold", fontSize: 11, textTransform: "uppercase" },
+  tableHeadStatus: { flex: 0.9, fontFamily: "Inter_700Bold", fontSize: 11, textTransform: "uppercase" },
+  tableHeader: { borderBottomWidth: 1, flexDirection: "row", gap: 8, paddingBottom: 8 },
+  tablePrimary: { fontFamily: "Inter_700Bold", fontSize: 13, textTransform: "none" },
+  tableRow: { alignItems: "center", borderBottomWidth: 1, flexDirection: "row", gap: 8, paddingVertical: 9 },
+  tableSecondary: { fontFamily: "Inter_500Medium", fontSize: 11, lineHeight: 16, textTransform: "none" },
   timelineConfidence: { fontFamily: "Inter_700Bold", fontSize: 13, minWidth: 44 },
   timelineContent: { flex: 1, gap: 2, paddingBottom: 12 },
   timelineDot: { borderRadius: 999, height: 12, marginTop: 4, width: 12 },
