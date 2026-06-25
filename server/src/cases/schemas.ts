@@ -1,22 +1,48 @@
 import { z } from "zod";
 
+export const caseStatusSchema = z.enum(["uploaded", "processing", "ai_completed", "under_review", "approved", "rejected", "finalized", "pending", "reviewed"]);
+export const caseSeveritySchema = z.enum(["normal", "abnormal", "critical"]);
+
 export const caseCreateSchema = z.object({
+  acquisitionDate: z.coerce.date().optional(),
   assignedDoctorId: z.string().optional(),
   clinicalNotes: z.string().trim().max(3000).optional(),
+  confidenceScore: z.coerce.number().min(0).max(100).optional(),
+  doctorDiagnosis: z.string().trim().max(500).optional(),
   ecgType: z.string().trim().min(1).max(120),
   finalDiagnosis: z.string().trim().max(500).optional(),
+  heartRate: z.coerce.number().int().min(0).max(350).optional(),
   patientId: z.string().min(1),
+  prInterval: z.coerce.number().int().min(0).max(1000).optional(),
   priority: z.enum(["low", "medium", "high", "critical"]).default("medium"),
-  status: z.enum(["pending", "processing", "reviewed", "finalized"]).default("pending"),
+  qrsDuration: z.coerce.number().int().min(0).max(1000).optional(),
+  qtInterval: z.coerce.number().int().min(0).max(1000).optional(),
+  qtcInterval: z.coerce.number().int().min(0).max(1000).optional(),
+  recommendations: z.string().trim().max(3000).optional(),
+  rhythm: z.string().trim().max(160).optional(),
+  severity: caseSeveritySchema.default("normal"),
+  status: caseStatusSchema.default("uploaded"),
 });
 
 export const caseUpdateSchema = z.object({
+  acquisitionDate: z.coerce.date().optional(),
   assignedDoctorId: z.string().nullable().optional(),
+  clinicalComments: z.string().trim().max(3000).nullable().optional(),
   clinicalNotes: z.string().trim().max(3000).nullable().optional(),
+  confidenceScore: z.coerce.number().min(0).max(100).nullable().optional(),
+  doctorDiagnosis: z.string().trim().max(500).nullable().optional(),
   ecgType: z.string().trim().min(1).max(120).optional(),
   finalDiagnosis: z.string().trim().max(500).nullable().optional(),
+  heartRate: z.coerce.number().int().min(0).max(350).nullable().optional(),
+  prInterval: z.coerce.number().int().min(0).max(1000).nullable().optional(),
   priority: z.enum(["low", "medium", "high", "critical"]).optional(),
-  status: z.enum(["pending", "processing", "reviewed", "finalized"]).optional(),
+  qrsDuration: z.coerce.number().int().min(0).max(1000).nullable().optional(),
+  qtInterval: z.coerce.number().int().min(0).max(1000).nullable().optional(),
+  qtcInterval: z.coerce.number().int().min(0).max(1000).nullable().optional(),
+  recommendations: z.string().trim().max(3000).nullable().optional(),
+  rhythm: z.string().trim().max(160).nullable().optional(),
+  severity: caseSeveritySchema.optional(),
+  status: caseStatusSchema.optional(),
 });
 
 export const caseListSchema = z.object({
@@ -26,7 +52,8 @@ export const caseListSchema = z.object({
   patientId: z.string().optional(),
   priority: z.enum(["low", "medium", "high", "critical"]).optional(),
   q: z.string().trim().optional(),
-  status: z.enum(["pending", "processing", "reviewed", "finalized"]).optional(),
+  severity: caseSeveritySchema.optional(),
+  status: caseStatusSchema.optional(),
 });
 
 export const assignDoctorSchema = z.object({
@@ -34,5 +61,17 @@ export const assignDoctorSchema = z.object({
 });
 
 export const updateStatusSchema = z.object({
-  status: z.enum(["pending", "processing", "reviewed", "finalized"]),
+  status: caseStatusSchema,
+});
+
+export const reviewCaseSchema = z.object({
+  clinicalComments: z.string().trim().max(3000).optional(),
+  doctorDiagnosis: z.string().trim().max(500).optional(),
+  recommendations: z.string().trim().max(3000).optional(),
+  severity: caseSeveritySchema.optional(),
+});
+
+export const rejectCaseSchema = z.object({
+  clinicalComments: z.string().trim().max(3000).optional(),
+  reason: z.string().trim().max(1000).optional(),
 });

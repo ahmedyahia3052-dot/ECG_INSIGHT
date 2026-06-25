@@ -55,6 +55,7 @@ export interface ApiPatient {
 }
 
 export interface ApiECGFile {
+  createdAt?: string;
   downloadUrl: string;
   id: string;
   mimeType: string;
@@ -63,16 +64,38 @@ export interface ApiECGFile {
 }
 
 export interface ApiECGCase {
+  acquisitionDate: string;
+  aiDiagnosis?: string;
   aiStatus: string;
   caseId: string;
+  caseNumber?: string;
+  clinicalComments?: string;
   clinicalNotes?: string;
+  confidenceScore?: number;
+  doctorDiagnosis?: string;
   ecgType: string;
   files: ApiECGFile[];
   finalDiagnosis?: string;
+  finalizedAt?: string;
+  heartRate?: number;
   id: string;
+  imagePath?: string;
+  originalFileUrl?: string;
   patient: ApiPatient;
+  pdfPath?: string;
+  preprocessedImagePath?: string;
+  prInterval?: number;
   priority: "low" | "medium" | "high" | "critical";
-  status: "pending" | "processing" | "reviewed" | "finalized";
+  qrsDuration?: number;
+  qtInterval?: number;
+  qtcInterval?: number;
+  recommendations?: string;
+  reportCount?: number;
+  reviewedAt?: string;
+  reviewedById?: string;
+  rhythm?: string;
+  severity?: "normal" | "abnormal" | "critical";
+  status: "ai_completed" | "approved" | "finalized" | "pending" | "processing" | "rejected" | "reviewed" | "under_review" | "uploaded";
   uploadDate: string;
   uploadedById: string;
 }
@@ -146,9 +169,13 @@ export interface PatientDetailResponse {
       aiDiagnosis?: string;
       aiSeverity?: string;
       caseId: string;
+      caseNumber?: string;
       finalDiagnosis?: string;
+      heartRate?: number;
       id: string;
       priority: string;
+      rhythm?: string;
+      severity?: string;
       status: string;
       uploadDate: string;
     }>;
@@ -242,11 +269,66 @@ export async function getPatient(accessToken: string, patientId: string) {
 }
 
 export async function createCase(accessToken: string, input: {
+  acquisitionDate?: string;
+  confidenceScore?: number;
+  doctorDiagnosis?: string;
   ecgType: string;
+  heartRate?: number;
   patientId: string;
+  prInterval?: number;
   priority: "low" | "medium" | "high" | "critical";
+  qrsDuration?: number;
+  qtInterval?: number;
+  qtcInterval?: number;
+  recommendations?: string;
+  rhythm?: string;
+  severity?: "normal" | "abnormal" | "critical";
 }) {
   return apiRequest<{ case: ApiECGCase }>("/cases", {
+    accessToken,
+    body: JSON.stringify(input),
+    method: "POST",
+  });
+}
+
+export async function updateCase(accessToken: string, caseId: string, input: Partial<ApiECGCase>) {
+  return apiRequest<{ case: ApiECGCase }>(`/cases/${caseId}`, {
+    accessToken,
+    body: JSON.stringify(input),
+    method: "PATCH",
+  });
+}
+
+export async function updateCaseStatus(accessToken: string, caseId: string, status: ApiECGCase["status"]) {
+  return apiRequest<{ case: ApiECGCase }>(`/cases/${caseId}/status`, {
+    accessToken,
+    body: JSON.stringify({ status }),
+    method: "POST",
+  });
+}
+
+export async function reviewCase(accessToken: string, caseId: string, input: {
+  clinicalComments?: string;
+  doctorDiagnosis?: string;
+  recommendations?: string;
+  severity?: "normal" | "abnormal" | "critical";
+}) {
+  return apiRequest<{ case: ApiECGCase }>(`/cases/${caseId}/review`, {
+    accessToken,
+    body: JSON.stringify(input),
+    method: "POST",
+  });
+}
+
+export async function approveCase(accessToken: string, caseId: string) {
+  return apiRequest<{ case: ApiECGCase }>(`/cases/${caseId}/approve`, {
+    accessToken,
+    method: "POST",
+  });
+}
+
+export async function rejectCase(accessToken: string, caseId: string, input: { clinicalComments?: string; reason?: string }) {
+  return apiRequest<{ case: ApiECGCase }>(`/cases/${caseId}/reject`, {
     accessToken,
     body: JSON.stringify(input),
     method: "POST",

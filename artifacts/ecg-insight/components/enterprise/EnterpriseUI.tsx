@@ -44,6 +44,7 @@ type NavItem = {
 const NAV_ITEMS: NavItem[] = [
   { group: "CLINICAL", href: "/dashboard", icon: "grid", title: "Dashboard" },
   { group: "CLINICAL", href: "/ecg-analysis", icon: "activity", title: "ECG Analysis" },
+  { group: "CLINICAL", href: "/ecg-cases", icon: "clipboard", title: "ECG Cases" },
   { group: "CLINICAL", href: "/upload-ecg", icon: "upload-cloud", title: "Upload ECG" },
   { group: "CLINICAL", href: "/patients", icon: "users", title: "Patients" },
   { group: "CLINICAL", href: "/reports", icon: "file-text", title: "Reports" },
@@ -62,6 +63,7 @@ const PAGE_TITLES: Record<string, { subtitle: string; title: string }> = {
   "/billing-subscription": { subtitle: "Subscription plan, quota, billing, and license status.", title: "Billing & Subscription" },
   "/dashboard": { subtitle: "Executive medical command center for ECG operations.", title: "Dashboard" },
   "/ecg-analysis": { subtitle: "Review cases, AI findings, validation, and report generation.", title: "ECG Analysis" },
+  "/ecg-cases": { subtitle: "Enterprise ECG case workflow, review, approval, and reports.", title: "ECG Cases" },
   "/notifications": { subtitle: "Clinical alerts, workflow events, and collaboration updates.", title: "Notifications" },
   "/patients": { subtitle: "Enterprise patient registry, risk profile, and ECG history.", title: "Patients" },
   "/profile": { subtitle: "Account, role, institution, and secure session details.", title: "Profile" },
@@ -83,6 +85,7 @@ function pageMeta(pathname: string) {
   const exact = PAGE_TITLES[pathname];
   if (exact) return exact;
   if (pathname.startsWith("/patients/")) return { title: "Patient Profile", subtitle: "Demographics, ECG history, documents, and timeline." };
+  if (pathname.startsWith("/ecg-cases/")) return { title: "ECG Case", subtitle: "Viewer, measurements, AI findings, doctor review, and report workflow." };
   if (pathname.startsWith("/reports/")) return { title: "Report Detail", subtitle: "Clinical report review, finalization, signing, and export." };
   return { title: "ECG Insight", subtitle: "Enterprise Medical AI Platform." };
 }

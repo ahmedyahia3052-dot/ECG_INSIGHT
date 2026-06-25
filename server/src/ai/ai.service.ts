@@ -87,9 +87,15 @@ async function completeAnalysis(analysisId: string, actorId: string) {
     await prisma.eCGCase.update({
       data: {
         aiStatus: "COMPLETED",
+        aiDiagnosis: analysis.diagnosis,
+        confidenceScore: analysis.confidenceScore,
         finalDiagnosis: analysis.diagnosis,
+        heartRate: analysis.heartRate,
         priority: isCritical(analysis) ? "CRITICAL" : queued.case.priority,
-        status: "REVIEWED",
+        recommendations: analysis.recommendations.join("\n"),
+        rhythm: analysis.rhythm,
+        severity: isCritical(analysis) ? "CRITICAL" : analysis.severity === "NORMAL" ? "NORMAL" : "ABNORMAL",
+        status: "AI_COMPLETED",
       },
       where: { id: queued.caseId },
     });

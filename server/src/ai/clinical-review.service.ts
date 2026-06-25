@@ -39,9 +39,18 @@ export async function submitClinicalReview(
   const diagnosis = review.diagnosis ?? latestAnalysis?.diagnosis ?? ecgCase.finalDiagnosis ?? "Doctor review completed";
   await prisma.eCGCase.update({
     data: {
+      clinicalComments: review.comments,
+      clinicalNotes: review.comments,
+      doctorDiagnosis: diagnosis,
       finalDiagnosis: diagnosis,
+      finalizedAt: review.approved ? new Date() : undefined,
+      approvedAt: review.approved ? new Date() : undefined,
       priority: review.severity === "CRITICAL" ? "CRITICAL" : ecgCase.priority,
-      status: review.approved ? "FINALIZED" : "REVIEWED",
+      recommendations: latestAnalysis?.recommendations.join("\n"),
+      reviewedAt: new Date(),
+      reviewedById: doctorId,
+      severity: review.severity === "CRITICAL" ? "CRITICAL" : review.severity && review.severity !== "NORMAL" ? "ABNORMAL" : undefined,
+      status: review.approved ? "APPROVED" : "UNDER_REVIEW",
     },
     where: { id: caseId },
   });

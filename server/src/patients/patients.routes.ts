@@ -201,12 +201,16 @@ patientsRouter.get("/:patientId", async (req, res, next) => {
       patient: serializePatient(patient),
       related: {
         cases: patient.cases.map((item) => ({
-          aiDiagnosis: item.analyses[0]?.diagnosis,
-          aiSeverity: item.analyses[0]?.severity?.toLowerCase(),
+          aiDiagnosis: item.aiDiagnosis ?? item.analyses[0]?.diagnosis,
+          aiSeverity: item.severity.toLowerCase(),
           caseId: item.caseId,
+          caseNumber: item.caseNumber ?? item.caseId,
           finalDiagnosis: item.finalDiagnosis,
+          heartRate: item.heartRate ?? item.analyses[0]?.heartRate,
           id: item.id,
           priority: item.priority.toLowerCase(),
+          rhythm: item.rhythm ?? item.analyses[0]?.rhythm,
+          severity: item.severity.toLowerCase(),
           status: item.status.toLowerCase(),
           uploadDate: item.uploadDate.toISOString(),
         })),

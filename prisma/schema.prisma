@@ -122,9 +122,20 @@ enum PatientStatus {
 
 enum ECGCaseStatus {
   PENDING
+  UPLOADED
   PROCESSING
+  AI_COMPLETED
+  UNDER_REVIEW
   REVIEWED
+  APPROVED
+  REJECTED
   FINALIZED
+}
+
+enum ECGCaseSeverity {
+  NORMAL
+  ABNORMAL
+  CRITICAL
 }
 
 enum ECGPriority {
@@ -683,6 +694,7 @@ model User {
   notifications               Notification[]
   uploadedCases               ECGCase[]                 @relation("UploadedCases")
   assignedCases               ECGCase[]                 @relation("AssignedCases")
+  reviewedCases               ECGCase[]                 @relation("ReviewedCases")
   auditLogs                   AuditLog[]
   fitnessDecisions            FitnessDecision[]
   authoredReports             ClinicalReport[]          @relation("AuthoredReports")
@@ -1300,21 +1312,44 @@ model FitnessDecision {
 model ECGCase {
   id                    String                 @id @default(cuid())
   caseId                String                 @unique
+  caseNumber            String?                @unique
   patientId             String
   uploadedById          String
   assignedDoctorId      String?
+  reviewedById          String?
   uploadDate            DateTime               @default(now())
+  acquisitionDate       DateTime               @default(now())
   ecgType               String
   status                ECGCaseStatus          @default(PENDING)
   priority              ECGPriority            @default(MEDIUM)
+  severity              ECGCaseSeverity        @default(NORMAL)
   aiStatus              AIStatus               @default(QUEUED)
+  imagePath             String?
+  pdfPath               String?
+  preprocessedImagePath String?
+  heartRate             Int?
+  prInterval            Int?
+  qrsDuration           Int?
+  qtInterval            Int?
+  qtcInterval           Int?
+  rhythm                String?
+  aiDiagnosis           String?
+  doctorDiagnosis       String?
   finalDiagnosis        String?
+  clinicalComments      String?
   clinicalNotes         String?
+  recommendations       String?
+  confidenceScore       Float?
+  reviewedAt            DateTime?
+  approvedAt            DateTime?
+  rejectedAt            DateTime?
+  finalizedAt           DateTime?
   createdAt             DateTime               @default(now())
   updatedAt             DateTime               @updatedAt
   patient               Patient                @relation(fields: [patientId], references: [id])
   uploadedBy            User                   @relation("UploadedCases", fields: [uploadedById], references: [id])
   assignedDoctor        User?                  @relation("AssignedCases", fields: [assignedDoctorId], references: [id])
+  reviewedBy            User?                  @relation("ReviewedCases", fields: [reviewedById], references: [id])
   files                 ECGFile[]
   analyses              AIAnalysis[]
   measurements          ECGMeasurement[]
@@ -1332,9 +1367,13 @@ model ECGCase {
   @@index([patientId])
   @@index([uploadedById])
   @@index([assignedDoctorId])
+  @@index([reviewedById])
   @@index([status])
+  @@index([severity])
   @@index([priority])
+  @@index([caseNumber])
   @@index([uploadDate])
+  @@index([acquisitionDate])
 }
 
 model ClinicalReport {

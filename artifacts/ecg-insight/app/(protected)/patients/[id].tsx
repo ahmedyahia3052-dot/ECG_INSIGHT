@@ -118,7 +118,7 @@ export default function PatientProfileScreen() {
       </Card>
 
       {activeTab === "overview" ? <OverviewTab patient={patient} cases={cases} reports={reports} criticalCases={criticalCases} abnormalCases={abnormalCases} pendingReviews={pendingReviews} /> : null}
-      {activeTab === "ecg" ? <EcgCasesTab cases={cases} onGenerateReport={(caseId) => reportMutation.mutate(caseId)} onNew={() => router.push("/upload-ecg" as never)} onReview={() => router.push("/ecg-analysis" as never)} /> : null}
+      {activeTab === "ecg" ? <EcgCasesTab cases={cases} onGenerateReport={(caseId) => reportMutation.mutate(caseId)} onNew={() => router.push("/ecg-cases/new" as never)} onOpen={(caseId) => router.push(`/ecg-cases/${caseId}` as never)} onReview={(caseId) => router.push(`/ecg-cases/${caseId}/review` as never)} /> : null}
       {activeTab === "timeline" ? <TimelineTab timeline={timeline} /> : null}
       {activeTab === "documents" ? (
         <DocumentsTab
@@ -205,25 +205,27 @@ function OverviewTab({ abnormalCases, cases, criticalCases, patient, pendingRevi
   );
 }
 
-function EcgCasesTab({ cases, onGenerateReport, onNew, onReview }: {
-  cases: Array<{ aiDiagnosis?: string; aiSeverity?: string; caseId: string; finalDiagnosis?: string; id: string; priority: string; status: string; uploadDate: string }>;
+function EcgCasesTab({ cases, onGenerateReport, onNew, onOpen, onReview }: {
+  cases: Array<{ aiDiagnosis?: string; aiSeverity?: string; caseId: string; caseNumber?: string; finalDiagnosis?: string; heartRate?: number; id: string; priority: string; rhythm?: string; severity?: string; status: string; uploadDate: string }>;
   onGenerateReport: (caseId: string) => void;
   onNew: () => void;
-  onReview: () => void;
+  onOpen: (caseId: string) => void;
+  onReview: (caseId: string) => void;
 }) {
   return (
     <Card style={styles.panelFull}>
       <SectionHeader title="ECG Cases" subtitle="All ECG cases linked to this patient." action={<PrimaryButton label="+ New ECG Case" onPress={onNew} />} />
       {cases.length ? cases.map((item) => (
         <View key={item.id} style={styles.tableRow}>
-          <Info label="Case ID" value={item.caseId} />
+          <Info label="Case ID" value={item.caseNumber ?? item.caseId} />
           <Info label="Date" value={formatDate(item.uploadDate)} />
           <Info label="AI Diagnosis" value={item.aiDiagnosis ?? item.finalDiagnosis ?? "Pending"} />
-          <Badge label={item.aiSeverity ?? item.priority} tone={item.priority === "critical" || item.aiSeverity === "critical" ? "critical" : "primary"} />
+          <Info label="Measurements" value={`HR ${item.heartRate ?? "N/A"} • ${item.rhythm ?? "Rhythm pending"}`} />
+          <Badge label={item.severity ?? item.aiSeverity ?? item.priority} tone={item.priority === "critical" || item.aiSeverity === "critical" || item.severity === "critical" ? "critical" : item.severity === "normal" ? "success" : "primary"} />
           <Info label="Doctor Status" value={item.status} />
           <View style={styles.actions}>
-            <PrimaryButton label="Open" onPress={onReview} variant="outline" />
-            <PrimaryButton label="Review" onPress={onReview} variant="outline" />
+            <PrimaryButton label="Open" onPress={() => onOpen(item.id)} variant="outline" />
+            <PrimaryButton label="Review" onPress={() => onReview(item.id)} variant="outline" />
             <PrimaryButton label="Generate Report" onPress={() => onGenerateReport(item.id)} variant="outline" />
           </View>
         </View>

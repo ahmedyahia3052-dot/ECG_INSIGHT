@@ -1,8 +1,12 @@
 import type {
+  AIAnalysis,
   AuditLog,
+  ClinicalReport,
   ECGCase,
+  ECGCaseSeverity,
   ECGCaseStatus,
   ECGFile,
+  ECGMeasurement,
   ECGPriority,
   Gender,
   Patient,
@@ -12,8 +16,9 @@ import type {
 import { toApiRole } from "./users";
 
 export type ApiGender = "male" | "female" | "other" | "unknown";
-export type ApiCaseStatus = "pending" | "processing" | "reviewed" | "finalized";
+export type ApiCaseStatus = "ai_completed" | "approved" | "finalized" | "pending" | "processing" | "rejected" | "reviewed" | "under_review" | "uploaded";
 export type ApiPriority = "low" | "medium" | "high" | "critical";
+export type ApiCaseSeverity = "abnormal" | "critical" | "normal";
 export type ApiSmokingStatus = "never" | "former" | "current" | "unknown";
 
 const genderToApi: Record<Gender, ApiGender> = {
@@ -31,17 +36,33 @@ const genderFromApi: Record<ApiGender, Gender> = {
 };
 
 const statusToApi: Record<ECGCaseStatus, ApiCaseStatus> = {
+  AI_COMPLETED: "ai_completed",
+  APPROVED: "approved",
   FINALIZED: "finalized",
   PENDING: "pending",
   PROCESSING: "processing",
+  REJECTED: "rejected",
   REVIEWED: "reviewed",
+  UNDER_REVIEW: "under_review",
+  UPLOADED: "uploaded",
 };
 
 const statusFromApi: Record<ApiCaseStatus, ECGCaseStatus> = {
+  ai_completed: "AI_COMPLETED",
+  approved: "APPROVED",
   finalized: "FINALIZED",
   pending: "PENDING",
   processing: "PROCESSING",
+  rejected: "REJECTED",
   reviewed: "REVIEWED",
+  under_review: "UNDER_REVIEW",
+  uploaded: "UPLOADED",
+};
+
+const severityToApi: Record<ECGCaseSeverity, ApiCaseSeverity> = {
+  ABNORMAL: "abnormal",
+  CRITICAL: "critical",
+  NORMAL: "normal",
 };
 
 const priorityToApi: Record<ECGPriority, ApiPriority> = {
@@ -160,14 +181,24 @@ export function serializePatient(patient: Patient) {
 
 export function serializeCase(
   ecgCase: ECGCase & {
+    analyses?: AIAnalysis[];
     assignedDoctor?: Pick<User, "email" | "id" | "name" | "role"> | null;
     files?: ECGFile[];
+    measurements?: ECGMeasurement[];
     patient: Patient;
+    reports?: ClinicalReport[];
+    reviewedBy?: Pick<User, "email" | "id" | "name" | "role"> | null;
     uploadedBy?: Pick<User, "email" | "id" | "name" | "role">;
   },
 ) {
+  const latestAnalysis = ecgCase.analyses?.[0];
+  const latestMeasurement = ecgCase.measurements?.[0];
+  const originalFile = ecgCase.files?.[0];
+  const imageFile = ecgCase.files?.find((file) => file.mimeType.startsWith("image/"));
+  const pdfFile = ecgCase.files?.find((file) => file.mimeType === "application/pdf");
   return {
     aiStatus: ecgCase.aiStatus.toLowerCase(),
+    aiDiagnosis: ecgCase.aiDiagnosis ?? latestAnalysis?.diagnosis ?? undefined,
     assignedDoctor: ecgCase.assignedDoctor
       ? {
           email: ecgCase.assignedDoctor.email,
@@ -177,17 +208,48 @@ export function serializeCase(
         }
       : null,
     assignedDoctorId: ecgCase.assignedDoctorId,
+    approvedAt: ecgCase.approvedAt?.toISOString(),
+    acquisitionDate: ecgCase.acquisitionDate.toISOString(),
     caseId: ecgCase.caseId,
+    caseNumber: ecgCase.caseNumber ?? ecgCase.caseId,
     clinicalNotes: ecgCase.clinicalNotes ?? undefined,
+    clinicalComments: ecgCase.clinicalComments ?? ecgCase.clinicalNotes ?? undefined,
+    confidenceScore: ecgCase.confidenceScore ?? latestAnalysis?.confidenceScore ?? undefined,
     createdAt: ecgCase.createdAt.toISOString(),
+    doctorDiagnosis: ecgCase.doctorDiagnosis ?? ecgCase.finalDiagnosis ?? undefined,
     ecgType: ecgCase.ecgType,
     files: ecgCase.files?.map(serializeFile) ?? [],
     finalDiagnosis: ecgCase.finalDiagnosis ?? undefined,
+    finalizedAt: ecgCase.finalizedAt?.toISOString(),
+    heartRate: ecgCase.heartRate ?? latestMeasurement?.heartRate ?? latestAnalysis?.heartRate ?? undefined,
     id: ecgCase.id,
+    imagePath: ecgCase.imagePath ?? (imageFile ? `/api/uploads/ecg/${imageFile.storedName}` : undefined),
+    originalFileUrl: originalFile ? `/api/uploads/ecg/${originalFile.storedName}` : undefined,
     patient: serializePatient(ecgCase.patient),
     patientId: ecgCase.patientId,
+    pdfPath: ecgCase.pdfPath ?? (pdfFile ? `/api/uploads/ecg/${pdfFile.storedName}` : undefined),
+    preprocessedImagePath: ecgCase.preprocessedImagePath ?? undefined,
+    prInterval: ecgCase.prInterval ?? latestMeasurement?.prInterval ?? undefined,
     priority: priorityToApi[ecgCase.priority],
+    qrsDuration: ecgCase.qrsDuration ?? latestMeasurement?.qrsDuration ?? undefined,
+    qtInterval: ecgCase.qtInterval ?? latestMeasurement?.qtInterval ?? undefined,
+    qtcInterval: ecgCase.qtcInterval ?? latestMeasurement?.qtcInterval ?? undefined,
+    recommendations: ecgCase.recommendations ?? latestAnalysis?.recommendations.join("\n") ?? undefined,
+    rejectedAt: ecgCase.rejectedAt?.toISOString(),
+    reviewedAt: ecgCase.reviewedAt?.toISOString(),
+    reviewedBy: ecgCase.reviewedBy
+      ? {
+          email: ecgCase.reviewedBy.email,
+          id: ecgCase.reviewedBy.id,
+          name: ecgCase.reviewedBy.name,
+          role: toApiRole(ecgCase.reviewedBy.role),
+        }
+      : null,
+    reviewedById: ecgCase.reviewedById ?? undefined,
+    rhythm: ecgCase.rhythm ?? latestAnalysis?.rhythm ?? undefined,
+    severity: severityToApi[ecgCase.severity],
     status: statusToApi[ecgCase.status],
+    reportCount: ecgCase.reports?.length ?? 0,
     updatedAt: ecgCase.updatedAt.toISOString(),
     uploadDate: ecgCase.uploadDate.toISOString(),
     uploadedBy: ecgCase.uploadedBy

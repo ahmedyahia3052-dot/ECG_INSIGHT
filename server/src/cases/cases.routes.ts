@@ -17,6 +17,8 @@ import {
   caseCreateSchema,
   caseListSchema,
   caseUpdateSchema,
+  rejectCaseSchema,
+  reviewCaseSchema,
   updateStatusSchema,
 } from "./schemas";
 
@@ -25,9 +27,13 @@ export const casesRouter = Router();
 casesRouter.use(requireAuth);
 
 const caseInclude = {
+  analyses: { orderBy: { createdAt: "desc" }, take: 1 },
   assignedDoctor: { select: { email: true, id: true, name: true, role: true } },
   files: true,
+  measurements: { orderBy: { createdAt: "desc" }, take: 1 },
   patient: true,
+  reports: { orderBy: { createdAt: "desc" }, take: 3 },
+  reviewedBy: { select: { email: true, id: true, name: true, role: true } },
   uploadedBy: { select: { email: true, id: true, name: true, role: true } },
 } satisfies Prisma.ECGCaseInclude;
 
@@ -35,6 +41,24 @@ function nextCaseId() {
   return `ECG-${new Date().toISOString().slice(0, 10).replace(/-/g, "")}-${Date.now()
     .toString()
     .slice(-6)}`;
+}
+
+async function nextCaseNumber() {
+  const total = await prisma.eCGCase.count();
+  return `ECGCASE-${String(total + 1).padStart(6, "0")}`;
+}
+
+function severityFromApi(severity?: "abnormal" | "critical" | "normal") {
+  if (severity === "critical") return "CRITICAL" as const;
+  if (severity === "abnormal") return "ABNORMAL" as const;
+  return "NORMAL" as const;
+}
+
+async function findCaseForRoute(caseId: string) {
+  return prisma.eCGCase.findFirst({
+    include: caseInclude,
+    where: { OR: [{ id: caseId }, { caseId }, { caseNumber: caseId }] },
+  });
 }
 
 async function audit(input: {
@@ -65,9 +89,13 @@ casesRouter.get("/", async (req, res, next) => {
     if (query.assignedDoctorId) where.assignedDoctorId = query.assignedDoctorId;
     if (query.status) where.status = fromApiCaseStatus(query.status);
     if (query.priority) where.priority = fromApiPriority(query.priority);
+    if (query.severity) where.severity = severityFromApi(query.severity);
     if (query.q) {
       where.OR = [
         { caseId: { contains: query.q, mode: "insensitive" } },
+        { caseNumber: { contains: query.q, mode: "insensitive" } },
+        { aiDiagnosis: { contains: query.q, mode: "insensitive" } },
+        { doctorDiagnosis: { contains: query.q, mode: "insensitive" } },
         { finalDiagnosis: { contains: query.q, mode: "insensitive" } },
         { patient: { firstName: { contains: query.q, mode: "insensitive" } } },
         { patient: { lastName: { contains: query.q, mode: "insensitive" } } },
@@ -121,12 +149,24 @@ casesRouter.post("/", requireRole("DOCTOR"), validateBody(caseCreateSchema), asy
     const ecgCase = await prisma.eCGCase.create({
       data: {
         assignedDoctorId: req.body.assignedDoctorId,
+        acquisitionDate: req.body.acquisitionDate,
         caseId: nextCaseId(),
+        caseNumber: await nextCaseNumber(),
         clinicalNotes: req.body.clinicalNotes,
+        confidenceScore: req.body.confidenceScore,
+        doctorDiagnosis: req.body.doctorDiagnosis,
         ecgType: req.body.ecgType,
         finalDiagnosis: req.body.finalDiagnosis,
+        heartRate: req.body.heartRate,
         patientId: req.body.patientId,
+        prInterval: req.body.prInterval,
         priority: fromApiPriority(req.body.priority),
+        qrsDuration: req.body.qrsDuration,
+        qtInterval: req.body.qtInterval,
+        qtcInterval: req.body.qtcInterval,
+        recommendations: req.body.recommendations,
+        rhythm: req.body.rhythm,
+        severity: severityFromApi(req.body.severity),
         status: fromApiCaseStatus(req.body.status),
         uploadedById: req.auth!.id,
       },
@@ -171,7 +211,7 @@ casesRouter.get("/:caseId", async (req, res, next) => {
     const ecgCase = await prisma.eCGCase.findUnique({
       include: caseInclude,
       where: { id: String(req.params.caseId) },
-    });
+    }) ?? await findCaseForRoute(String(req.params.caseId));
     if (!ecgCase) {
       throw new AppError(404, "ECG case not found.", "CASE_NOT_FOUND");
     }
@@ -191,11 +231,23 @@ casesRouter.patch("/:caseId", requireRole("DOCTOR"), validateBody(caseUpdateSche
 
     const ecgCase = await prisma.eCGCase.update({
       data: {
+        acquisitionDate: req.body.acquisitionDate,
         assignedDoctorId: req.body.assignedDoctorId,
+        clinicalComments: req.body.clinicalComments,
         clinicalNotes: req.body.clinicalNotes,
+        confidenceScore: req.body.confidenceScore,
+        doctorDiagnosis: req.body.doctorDiagnosis,
         ecgType: req.body.ecgType,
         finalDiagnosis: req.body.finalDiagnosis,
+        heartRate: req.body.heartRate,
+        prInterval: req.body.prInterval,
         priority: req.body.priority ? fromApiPriority(req.body.priority) : undefined,
+        qrsDuration: req.body.qrsDuration,
+        qtInterval: req.body.qtInterval,
+        qtcInterval: req.body.qtcInterval,
+        recommendations: req.body.recommendations,
+        rhythm: req.body.rhythm,
+        severity: req.body.severity ? severityFromApi(req.body.severity) : undefined,
         status: req.body.status ? fromApiCaseStatus(req.body.status) : undefined,
       },
       include: caseInclude,
@@ -258,7 +310,14 @@ casesRouter.post(
     try {
       assertResourceAccess(await canAccessCase(String(req.params.caseId), req.auth!));
       const ecgCase = await prisma.eCGCase.update({
-        data: { status: fromApiCaseStatus(req.body.status) },
+        data: {
+          approvedAt: req.body.status === "approved" ? new Date() : undefined,
+          finalizedAt: req.body.status === "finalized" ? new Date() : undefined,
+          rejectedAt: req.body.status === "rejected" ? new Date() : undefined,
+          reviewedAt: req.body.status === "under_review" || req.body.status === "reviewed" ? new Date() : undefined,
+          reviewedById: req.body.status === "under_review" || req.body.status === "reviewed" || req.body.status === "approved" || req.body.status === "rejected" ? req.auth!.id : undefined,
+          status: fromApiCaseStatus(req.body.status),
+        },
         include: caseInclude,
         where: { id: String(req.params.caseId) },
       });
@@ -284,6 +343,109 @@ casesRouter.post(
     }
   },
 );
+
+casesRouter.post("/:caseId/review", requireRole("DOCTOR"), validateBody(reviewCaseSchema), async (req, res, next) => {
+  try {
+    const current = await findCaseForRoute(String(req.params.caseId));
+    if (!current) throw new AppError(404, "ECG case not found.", "CASE_NOT_FOUND");
+    assertResourceAccess(await canAccessCase(current.id, req.auth!));
+    const ecgCase = await prisma.eCGCase.update({
+      data: {
+        clinicalComments: req.body.clinicalComments,
+        clinicalNotes: req.body.clinicalComments,
+        doctorDiagnosis: req.body.doctorDiagnosis,
+        finalDiagnosis: req.body.doctorDiagnosis,
+        recommendations: req.body.recommendations,
+        reviewedAt: new Date(),
+        reviewedById: req.auth!.id,
+        severity: req.body.severity ? severityFromApi(req.body.severity) : undefined,
+        status: "UNDER_REVIEW",
+      },
+      include: caseInclude,
+      where: { id: current.id },
+    });
+    await audit({
+      action: "CASE_UPDATED",
+      actorId: req.auth!.id,
+      caseId: ecgCase.id,
+      message: `Doctor review started for ECG case ${ecgCase.caseNumber ?? ecgCase.caseId}.`,
+      metadata: { status: ecgCase.status },
+      patientId: ecgCase.patientId,
+    });
+    await prisma.timelineEvent.create({
+      data: {
+        caseId: ecgCase.id,
+        metadata: { diagnosis: ecgCase.doctorDiagnosis, severity: ecgCase.severity },
+        patientId: ecgCase.patientId,
+        title: "Doctor review completed",
+        type: "CLINICAL_NOTE_ADDED",
+      },
+    });
+    res.json({ case: serializeCase(ecgCase) });
+  } catch (error) {
+    next(error);
+  }
+});
+
+casesRouter.post("/:caseId/approve", requireRole("DOCTOR"), async (req, res, next) => {
+  try {
+    const current = await findCaseForRoute(String(req.params.caseId));
+    if (!current) throw new AppError(404, "ECG case not found.", "CASE_NOT_FOUND");
+    assertResourceAccess(await canAccessCase(current.id, req.auth!));
+    const ecgCase = await prisma.eCGCase.update({
+      data: {
+        approvedAt: new Date(),
+        reviewedAt: current.reviewedAt ?? new Date(),
+        reviewedById: req.auth!.id,
+        status: "APPROVED",
+      },
+      include: caseInclude,
+      where: { id: current.id },
+    });
+    await audit({
+      action: "CASE_STATUS_CHANGED",
+      actorId: req.auth!.id,
+      caseId: ecgCase.id,
+      message: `ECG case ${ecgCase.caseNumber ?? ecgCase.caseId} approved.`,
+      metadata: { status: ecgCase.status },
+      patientId: ecgCase.patientId,
+    });
+    res.json({ case: serializeCase(ecgCase) });
+  } catch (error) {
+    next(error);
+  }
+});
+
+casesRouter.post("/:caseId/reject", requireRole("DOCTOR"), validateBody(rejectCaseSchema), async (req, res, next) => {
+  try {
+    const current = await findCaseForRoute(String(req.params.caseId));
+    if (!current) throw new AppError(404, "ECG case not found.", "CASE_NOT_FOUND");
+    assertResourceAccess(await canAccessCase(current.id, req.auth!));
+    const comments = req.body.clinicalComments ?? req.body.reason ?? current.clinicalComments;
+    const ecgCase = await prisma.eCGCase.update({
+      data: {
+        clinicalComments: comments,
+        rejectedAt: new Date(),
+        reviewedAt: current.reviewedAt ?? new Date(),
+        reviewedById: req.auth!.id,
+        status: "REJECTED",
+      },
+      include: caseInclude,
+      where: { id: current.id },
+    });
+    await audit({
+      action: "CASE_STATUS_CHANGED",
+      actorId: req.auth!.id,
+      caseId: ecgCase.id,
+      message: `ECG case ${ecgCase.caseNumber ?? ecgCase.caseId} rejected.`,
+      metadata: { reason: comments, status: ecgCase.status },
+      patientId: ecgCase.patientId,
+    });
+    res.json({ case: serializeCase(ecgCase) });
+  } catch (error) {
+    next(error);
+  }
+});
 
 casesRouter.delete("/:caseId", requireRole("DOCTOR"), async (req, res, next) => {
   try {
