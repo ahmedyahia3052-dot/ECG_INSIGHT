@@ -1,5 +1,4 @@
 import { Feather } from "@expo/vector-icons";
-import * as Haptics from "expo-haptics";
 import { BlurView } from "expo-blur";
 import { usePathname, useRouter } from "expo-router";
 import { LinearGradient } from "expo-linear-gradient";
@@ -8,6 +7,7 @@ import { Animated, Easing, Platform, Pressable, ScrollView, StyleSheet, Text, Vi
 import { useAuth } from "@/context/AuthContext";
 import { useColors } from "@/hooks/useColors";
 import { type BoltIcon } from "./BoltUI";
+import { useVisualExperience } from "@/context/VisualExperienceContext";
 
 interface NavItem {
   icon: BoltIcon;
@@ -48,6 +48,7 @@ export function EnterpriseSidebar({
   const pathname = usePathname();
   const router = useRouter();
   const { canAccess, logout, user } = useAuth();
+  const { triggerHaptic } = useVisualExperience();
   const { width: windowWidth } = useWindowDimensions();
   const activePulse = useRef(new Animated.Value(0)).current;
   const entry = useRef(new Animated.Value(placement === "overlay" ? 0 : 1)).current;
@@ -176,7 +177,7 @@ export function EnterpriseSidebar({
               accessibilityRole="button"
               accessibilityLabel={item.label}
               onPress={() => {
-                Haptics.selectionAsync().catch(() => {});
+                void triggerHaptic("selection");
                 router.push(item.route as never);
                 onClose?.();
               }}
@@ -229,7 +230,7 @@ export function EnterpriseSidebar({
         <Pressable
           accessibilityRole="button"
           onPress={() => {
-            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch(() => {});
+            void triggerHaptic("warning");
             logout().catch(() => {});
             onClose?.();
           }}

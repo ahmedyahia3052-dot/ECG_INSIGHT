@@ -8,7 +8,7 @@ import {
   BoltBadge,
   BoltButton,
   BoltCard,
-  BoltEcgLine,
+  BoltEcgLoader,
   BoltHero,
   BoltScreen,
   BoltStat,
@@ -48,10 +48,7 @@ export default function LandingScreen() {
     return (
       <BoltScreen>
         <View style={styles.loading}>
-          <BoltEcgLine height={86} opacity={0.32} />
-          <Text style={[styles.loadingText, { color: colors.textSecondary }]}>
-            Preparing ECG Insight
-          </Text>
+          <BoltEcgLoader label="Preparing ECG Insight" />
         </View>
       </BoltScreen>
     );

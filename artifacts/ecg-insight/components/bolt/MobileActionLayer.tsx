@@ -1,26 +1,28 @@
 import { Feather } from "@expo/vector-icons";
-import * as Haptics from "expo-haptics";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
 import React, { useEffect, useRef, useState } from "react";
 import { Animated, Pressable, StyleSheet, Text, View } from "react-native";
 import { useColors } from "@/hooks/useColors";
 import { BoltBadge } from "./BoltUI";
+import { useVisualExperience } from "@/context/VisualExperienceContext";
 
 export function FloatingEcgActionButton() {
   const colors = useColors();
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const scale = useRef(new Animated.Value(1)).current;
+  const { effectiveMotionEnabled, triggerHaptic } = useVisualExperience();
 
   useEffect(() => {
+    if (!effectiveMotionEnabled) return;
     Animated.spring(scale, {
       friction: 5,
       tension: 80,
       toValue: open ? 1.04 : 1,
       useNativeDriver: true,
     }).start();
-  }, [open, scale]);
+  }, [effectiveMotionEnabled, open, scale]);
 
   const actions = [
     { icon: "upload-cloud" as const, label: "Upload ECG", route: "/(tabs)/upload?method=upload" },
@@ -39,7 +41,7 @@ export function FloatingEcgActionButton() {
               key={action.label}
               accessibilityRole="button"
               onPress={() => {
-                Haptics.selectionAsync().catch(() => {});
+                void triggerHaptic("selection");
                 setOpen(false);
                 router.push(action.route as never);
               }}
@@ -62,7 +64,7 @@ export function FloatingEcgActionButton() {
         accessibilityRole="button"
         accessibilityLabel="ECG quick actions"
         onPress={() => {
-          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+          void triggerHaptic("selection");
           setOpen((value) => !value);
         }}
       >
@@ -81,9 +83,25 @@ export function FloatingAIAssistant({ compact }: { compact: boolean }) {
   const colors = useColors();
   const router = useRouter();
   const [open, setOpen] = useState(false);
+  const { effectiveMotionEnabled, triggerHaptic } = useVisualExperience();
+  const idle = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    if (!effectiveMotionEnabled) return;
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(idle, { duration: 2600, toValue: 1, useNativeDriver: true }),
+        Animated.timing(idle, { duration: 2600, toValue: 0, useNativeDriver: true }),
+      ]),
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [effectiveMotionEnabled, idle]);
+
+  const float = idle.interpolate({ inputRange: [0, 1], outputRange: [0, -5] });
 
   return (
-    <View pointerEvents="box-none" style={[styles.aiLayer, compact ? styles.aiLayerMobile : styles.aiLayerDesktop]}>
+    <Animated.View pointerEvents="box-none" style={[styles.aiLayer, compact ? styles.aiLayerMobile : styles.aiLayerDesktop, { transform: [{ translateY: float }] }]}>
       {open ? (
         <View style={[styles.aiPanel, { backgroundColor: colors.glass, borderColor: colors.gradientBorder }]}>
           <View style={styles.aiHeader}>
@@ -95,7 +113,7 @@ export function FloatingAIAssistant({ compact }: { compact: boolean }) {
               key={item}
               accessibilityRole="button"
               onPress={() => {
-                Haptics.selectionAsync().catch(() => {});
+                void triggerHaptic("selection");
                 router.push("/(tabs)/ai-assistant" as never);
               }}
               style={({ pressed }) => [styles.aiAction, { borderColor: colors.border, opacity: pressed ? 0.78 : 1 }]}
@@ -110,7 +128,7 @@ export function FloatingAIAssistant({ compact }: { compact: boolean }) {
         accessibilityRole="button"
         accessibilityLabel="Open AI assistant"
         onPress={() => {
-          Haptics.selectionAsync().catch(() => {});
+          void triggerHaptic("selection");
           setOpen((value) => !value);
         }}
         style={[styles.aiButton, { backgroundColor: colors.glass, borderColor: colors.gradientBorder }]}
@@ -118,7 +136,7 @@ export function FloatingAIAssistant({ compact }: { compact: boolean }) {
         <Feather name={open ? "x" : "message-circle"} size={18} color={colors.primary} />
         {!compact ? <Text style={[styles.aiButtonText, { color: colors.text }]}>AI Assistant</Text> : null}
       </Pressable>
-    </View>
+    </Animated.View>
   );
 }
 

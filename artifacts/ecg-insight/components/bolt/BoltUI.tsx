@@ -4,7 +4,6 @@ import { useRouter } from "expo-router";
 import React, { useEffect, useRef } from "react";
 import {
   Animated,
-  ActivityIndicator,
   Easing,
   Pressable,
   RefreshControlProps,
@@ -18,8 +17,48 @@ import {
 } from "react-native";
 import Svg, { Polyline } from "react-native-svg";
 import { useColors } from "@/hooks/useColors";
+import { severityAccent, useVisualExperience } from "@/context/VisualExperienceContext";
 
 export type BoltIcon = keyof typeof Feather.glyphMap;
+
+function MedicalBackground() {
+  const colors = useColors();
+  const { effectiveMotionEnabled, settings } = useVisualExperience();
+  const drift = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    if (!settings.animatedBackgrounds || !effectiveMotionEnabled) return;
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(drift, { duration: 45000, easing: Easing.inOut(Easing.quad), toValue: 1, useNativeDriver: true }),
+        Animated.timing(drift, { duration: 45000, easing: Easing.inOut(Easing.quad), toValue: 0, useNativeDriver: true }),
+      ]),
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [drift, effectiveMotionEnabled, settings.animatedBackgrounds]);
+
+  const translateX = drift.interpolate({ inputRange: [0, 1], outputRange: [-36, 36] });
+  const translateY = drift.interpolate({ inputRange: [0, 1], outputRange: [24, -24] });
+
+  return (
+    <View pointerEvents="none" style={StyleSheet.absoluteFill}>
+      <View style={[styles.medicalGrid, { borderColor: colors.primary + "08" }]}>
+        {Array.from({ length: 14 }).map((_, index) => (
+          <View key={`v-${index}`} style={[styles.gridLineVertical, { backgroundColor: colors.primary + "06", left: `${index * 8}%` }]} />
+        ))}
+        {Array.from({ length: 10 }).map((_, index) => (
+          <View key={`h-${index}`} style={[styles.gridLineHorizontal, { backgroundColor: colors.primary + "05", top: `${index * 10}%` }]} />
+        ))}
+      </View>
+      {settings.animatedBackgrounds ? (
+        <Animated.View style={[styles.auroraLayer, { opacity: 0.045, transform: [{ translateX }, { translateY }] }]}>
+          <LinearGradient colors={["#00E5FF", "#14B8A6", "#0EA5E9"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.auroraBlob} />
+        </Animated.View>
+      ) : null}
+    </View>
+  );
+}
 
 export function BoltScreen({
   children,
@@ -31,15 +70,21 @@ export function BoltScreen({
   refreshControl?: React.ReactElement<RefreshControlProps>;
 }) {
   const colors = useColors();
+  const { effectiveMotionEnabled } = useVisualExperience();
   const fade = useRef(new Animated.Value(0)).current;
   const translate = useRef(new Animated.Value(12)).current;
 
   useEffect(() => {
+    if (!effectiveMotionEnabled) {
+      fade.setValue(1);
+      translate.setValue(0);
+      return;
+    }
     Animated.parallel([
       Animated.timing(fade, { duration: 280, easing: Easing.out(Easing.cubic), toValue: 1, useNativeDriver: true }),
       Animated.timing(translate, { duration: 280, easing: Easing.out(Easing.cubic), toValue: 0, useNativeDriver: true }),
     ]).start();
-  }, [fade, translate]);
+  }, [effectiveMotionEnabled, fade, translate]);
 
   return (
     <LinearGradient
@@ -50,6 +95,7 @@ export function BoltScreen({
       }
       style={styles.screen}
     >
+      <MedicalBackground />
       <Animated.View style={[styles.screen, { opacity: fade, transform: [{ translateY: translate }] }]}>
         <ScrollView
           contentContainerStyle={[styles.scroll, padded && styles.padded]}
@@ -80,10 +126,24 @@ export function BoltBrand({ compact = false }: { compact?: boolean }) {
   );
 }
 
-export function BoltEcgLine({ height = 74, opacity = 0.14 }: { height?: number; opacity?: number }) {
+export function BoltEcgLine({ animated = false, height = 74, opacity = 0.14 }: { animated?: boolean; height?: number; opacity?: number }) {
   const colors = useColors();
+  const { effectiveMotionEnabled, settings } = useVisualExperience();
+  const slide = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    if (!animated || !settings.animatedBackgrounds || !effectiveMotionEnabled) return;
+    const loop = Animated.loop(
+      Animated.timing(slide, { duration: 14000, easing: Easing.linear, toValue: 1, useNativeDriver: true }),
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [animated, effectiveMotionEnabled, settings.animatedBackgrounds, slide]);
+
+  const translateX = slide.interpolate({ inputRange: [0, 1], outputRange: [-60, 60] });
+
   return (
-    <View style={{ height, opacity }}>
+    <Animated.View style={{ height, opacity: animated ? Math.min(opacity, 0.05) : opacity, transform: [{ translateX }] }}>
       <Svg height="100%" viewBox="0 0 1200 100" width="100%">
         <Polyline
           fill="none"
@@ -92,7 +152,7 @@ export function BoltEcgLine({ height = 74, opacity = 0.14 }: { height?: number; 
           strokeWidth="3"
         />
       </Svg>
-    </View>
+    </Animated.View>
   );
 }
 
@@ -135,15 +195,34 @@ export function BoltHero({
   title: string;
 }) {
   const colors = useColors();
+  const { effectiveMotionEnabled } = useVisualExperience();
+  const float = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    if (!effectiveMotionEnabled) return;
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(float, { duration: 3600, easing: Easing.inOut(Easing.quad), toValue: 1, useNativeDriver: true }),
+        Animated.timing(float, { duration: 3600, easing: Easing.inOut(Easing.quad), toValue: 0, useNativeDriver: true }),
+      ]),
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [effectiveMotionEnabled, float]);
+
+  const translateY = float.interpolate({ inputRange: [0, 1], outputRange: [0, -4] });
+
   return (
+    <Animated.View style={{ transform: [{ translateY }] }}>
     <BoltCard highlight style={styles.hero}>
       <BoltBrand />
-      <BoltEcgLine />
+      <BoltEcgLine animated height={74} opacity={0.05} />
       {eyebrow ? <BoltBadge icon="zap" label={eyebrow} /> : null}
       <Text style={[styles.heroTitle, { color: colors.text }]}>{title}</Text>
       <Text style={[styles.heroSub, { color: colors.textSecondary }]}>{subtitle}</Text>
       {actions ? <View style={styles.heroActions}>{actions}</View> : null}
     </BoltCard>
+    </Animated.View>
   );
 }
 
@@ -163,12 +242,14 @@ export function BoltButton({
   variant?: "primary" | "outline" | "ghost" | "danger";
 }) {
   const colors = useColors();
+  const { severity, triggerHaptic } = useVisualExperience();
   const isPrimary = variant === "primary" || variant === "danger";
+  const accent = variant === "primary" ? severityAccent(severity) : colors.primary;
   const backgroundColor =
     variant === "danger"
       ? colors.destructive
       : variant === "primary"
-        ? colors.primary
+        ? accent
         : variant === "outline"
           ? "transparent"
           : colors.muted;
@@ -178,7 +259,10 @@ export function BoltButton({
       accessibilityRole="button"
       android_ripple={{ color: isPrimary ? "rgba(255,255,255,0.25)" : colors.primary + "22" }}
       disabled={disabled || loading}
-      onPress={onPress}
+      onPress={() => {
+        void triggerHaptic(variant === "danger" ? "warning" : "selection");
+        onPress?.();
+      }}
       style={({ pressed }) => [
         styles.button,
         {
@@ -189,9 +273,70 @@ export function BoltButton({
         },
       ]}
     >
-      {loading ? <ActivityIndicator color={textColor} /> : icon ? <Feather name={icon} size={16} color={textColor} /> : null}
+      {loading ? <BoltEcgLoader compact color={textColor} /> : icon ? <Feather name={icon} size={16} color={textColor} /> : null}
       <Text style={[styles.buttonText, { color: textColor }]}>{label}</Text>
     </Pressable>
+  );
+}
+
+export function BoltEcgLoader({ color, compact = false, label = "Analyzing ECG..." }: { color?: string; compact?: boolean; label?: string }) {
+  const colors = useColors();
+  const { effectiveMotionEnabled } = useVisualExperience();
+  const phase = useRef(new Animated.Value(0)).current;
+  const tint = color ?? colors.primary;
+
+  useEffect(() => {
+    if (!effectiveMotionEnabled) return;
+    const loop = Animated.loop(
+      Animated.timing(phase, { duration: 1500, easing: Easing.linear, toValue: 1, useNativeDriver: true }),
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [effectiveMotionEnabled, phase]);
+
+  const translateX = phase.interpolate({ inputRange: [0, 1], outputRange: [-28, 28] });
+
+  return (
+    <View style={[styles.ecgLoader, compact && styles.ecgLoaderCompact]}>
+      <Animated.View style={{ transform: [{ translateX }] }}>
+        <Svg height={compact ? 18 : 28} viewBox="0 0 180 42" width={compact ? 52 : 120}>
+          <Polyline
+            fill="none"
+            points="0,22 28,22 36,22 42,8 50,36 58,6 66,22 104,22 112,14 120,30 128,22 180,22"
+            stroke={tint}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={compact ? 4 : 3}
+          />
+        </Svg>
+      </Animated.View>
+      {!compact ? <Text style={[styles.ecgLoaderText, { color: colors.textSecondary }]}>{label}</Text> : null}
+    </View>
+  );
+}
+
+export function BoltSkeleton({ height = 96, style }: { height?: number; style?: StyleProp<ViewStyle> }) {
+  const colors = useColors();
+  const { effectiveMotionEnabled } = useVisualExperience();
+  const shimmer = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    if (!effectiveMotionEnabled) return;
+    const loop = Animated.loop(
+      Animated.timing(shimmer, { duration: 1600, easing: Easing.inOut(Easing.quad), toValue: 1, useNativeDriver: true }),
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [effectiveMotionEnabled, shimmer]);
+
+  const translateX = shimmer.interpolate({ inputRange: [0, 1], outputRange: [-180, 260] });
+
+  return (
+    <View style={[styles.skeleton, { backgroundColor: colors.muted, height }, style]}>
+      <Animated.View style={[styles.skeletonShimmer, { transform: [{ translateX }] }]}>
+        <LinearGradient colors={["transparent", colors.primary + "16", "transparent"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={StyleSheet.absoluteFill} />
+      </Animated.View>
+    </View>
   );
 }
 
@@ -297,7 +442,12 @@ export function BoltNavCard({
   const colors = useColors();
   const router = useRouter();
   return (
-    <Pressable accessibilityRole="button" onPress={() => router.push(route as never)}>
+    <Pressable
+      accessibilityRole="button"
+      android_ripple={{ color: colors.primary + "16" }}
+      onPress={() => router.push(route as never)}
+      style={({ pressed }) => ({ transform: [{ scale: pressed ? 0.985 : 1 }] })}
+    >
       <BoltCard style={styles.navCard}>
         <View style={[styles.navIcon, { backgroundColor: colors.primary + "18" }]}>
           <Feather name={icon} size={18} color={colors.primary} />
@@ -374,6 +524,11 @@ const styles = StyleSheet.create({
     shadowRadius: 22,
   },
   empty: { alignItems: "center", gap: 10, paddingVertical: 28 },
+  auroraBlob: { borderRadius: 220, height: 420, width: 420 },
+  auroraLayer: { position: "absolute", right: -120, top: -80 },
+  ecgLoader: { alignItems: "center", gap: 6, justifyContent: "center" },
+  ecgLoaderCompact: { height: 18, overflow: "hidden", width: 52 },
+  ecgLoaderText: { fontFamily: "Inter_700Bold", fontSize: 12 },
   emptyIllustration: {
     alignItems: "center",
     borderRadius: 24,
@@ -389,6 +544,8 @@ const styles = StyleSheet.create({
   heroActions: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
   heroSub: { fontFamily: "Inter_400Regular", fontSize: 15, lineHeight: 22 },
   heroTitle: { fontFamily: "Inter_700Bold", fontSize: 34, letterSpacing: -1.1, lineHeight: 39 },
+  gridLineHorizontal: { height: 1, left: 0, position: "absolute", right: 0 },
+  gridLineVertical: { bottom: 0, position: "absolute", top: 0, width: 1 },
   input: { flex: 1, fontFamily: "Inter_400Regular", fontSize: 14, minHeight: 24 },
   inputWrap: {
     alignItems: "center",
@@ -400,6 +557,7 @@ const styles = StyleSheet.create({
     paddingVertical: 11,
   },
   logo: { alignItems: "center", borderRadius: 10, height: 38, justifyContent: "center", width: 38 },
+  medicalGrid: { ...StyleSheet.absoluteFillObject, borderWidth: 1, opacity: 1 },
   multiline: { minHeight: 72, textAlignVertical: "top" },
   navCard: { alignItems: "center", flexDirection: "row", gap: 12 },
   navDescription: { fontFamily: "Inter_400Regular", fontSize: 12, lineHeight: 17 },
@@ -409,6 +567,8 @@ const styles = StyleSheet.create({
   padded: { padding: 16, paddingBottom: 112, paddingTop: 62 },
   screen: { flex: 1 },
   scroll: { flexGrow: 1, gap: 14 },
+  skeleton: { borderRadius: 18, overflow: "hidden" },
+  skeletonShimmer: { bottom: 0, position: "absolute", top: 0, width: 120 },
   stat: { flex: 1, gap: 7, minWidth: "46%" },
   statIcon: { alignItems: "center", borderRadius: 10, height: 38, justifyContent: "center", width: 38 },
   statLabel: { fontFamily: "Inter_600SemiBold", fontSize: 12 },

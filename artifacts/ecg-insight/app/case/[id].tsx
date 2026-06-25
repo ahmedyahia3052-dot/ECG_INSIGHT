@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import React from "react";
+import React, { useEffect } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import { useAuth } from "@/context/AuthContext";
 import { useColors } from "@/hooks/useColors";
@@ -18,12 +18,21 @@ import {
   BoltStat,
 } from "@/components/bolt/BoltUI";
 import { WaveformViewer } from "@/components/ecg/WaveformViewer";
+import { type EcgSeverity, useVisualExperience } from "@/context/VisualExperienceContext";
+
+function visualSeverity(value: string): EcgSeverity {
+  const normalized = value.toLowerCase();
+  if (normalized === "critical" || normalized === "severe") return "critical";
+  if (normalized === "normal") return "normal";
+  return "abnormal";
+}
 
 export default function CaseDetailScreen() {
   const colors = useColors();
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
   const { authToken } = useAuth();
+  const { setSeverity } = useVisualExperience();
   const token = authToken?.token;
 
   const caseQuery = useQuery({
@@ -63,6 +72,11 @@ export default function CaseDetailScreen() {
   const severity = ai?.severity ?? ecgCase?.status ?? "normal";
   const severityTone = severity === "critical" || severity === "severe" ? "danger" : severity === "normal" ? "success" : "warning";
   const isCritical = severityTone === "danger";
+
+  useEffect(() => {
+    setSeverity(visualSeverity(severity));
+    return () => setSeverity("normal");
+  }, [setSeverity, severity]);
 
   if (caseQuery.isError) {
     return (

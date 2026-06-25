@@ -1,9 +1,10 @@
 import { useAuth } from "@/context/AuthContext";
 import { useColors } from "@/hooks/useColors";
 import { BrandLogo, PremiumCard, PremiumScreenBackground } from "@/components/ui/Premium";
+import { BoltEcgLoader } from "@/components/bolt/BoltUI";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useState } from "react";
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 
 export default function ResetPasswordScreen() {
   const colors = useColors();
@@ -61,7 +62,7 @@ export default function ResetPasswordScreen() {
           secureTextEntry
         />
         <Pressable style={[styles.primary, { backgroundColor: colors.primary }]} onPress={handleReset} disabled={loading}>
-          {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.primaryText}>Reset Password</Text>}
+          {loading ? <BoltEcgLoader compact color="#fff" /> : <Text style={styles.primaryText}>Reset Password</Text>}
         </Pressable>
       </PremiumCard>
     </ScrollView>

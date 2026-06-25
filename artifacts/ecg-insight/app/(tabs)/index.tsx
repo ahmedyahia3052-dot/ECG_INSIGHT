@@ -1,5 +1,4 @@
 import { Feather } from "@expo/vector-icons";
-import * as Haptics from "expo-haptics";
 import { useQuery } from "@tanstack/react-query";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
@@ -23,6 +22,7 @@ import {
   BoltScreen,
 } from "@/components/bolt/BoltUI";
 import { AnalyticsChartCard, EcgMonitorWidget, LiveEcgWave, PremiumMetricCard, ShimmerBlock } from "@/components/bolt/UltraPremium";
+import { useVisualExperience } from "@/context/VisualExperienceContext";
 
 export default function DashboardScreen() {
   const colors = useColors();
@@ -398,6 +398,7 @@ function GlobalSearchBar({
 }) {
   const colors = useColors();
   const router = useRouter();
+  const { triggerHaptic } = useVisualExperience();
   return (
     <BoltCard style={styles.searchCard}>
       <View style={[styles.searchInputWrap, { borderColor: colors.gradientBorder }]}>
@@ -419,7 +420,7 @@ function GlobalSearchBar({
               key={`${item.route}-${item.label}`}
               accessibilityRole="button"
               onPress={() => {
-                Haptics.selectionAsync().catch(() => {});
+                void triggerHaptic("selection");
                 router.push(item.route as never);
               }}
               style={({ pressed }) => [styles.suggestionItem, { borderColor: colors.border, opacity: pressed ? 0.78 : 1 }]}
@@ -490,11 +491,12 @@ function QuickActionCard({
   onPress: () => void;
 }) {
   const colors = useColors();
+  const { triggerHaptic } = useVisualExperience();
   return (
     <Pressable
       accessibilityRole="button"
       onPress={() => {
-        Haptics.selectionAsync().catch(() => {});
+        void triggerHaptic("selection");
         onPress();
       }}
       style={({ pressed }) => [

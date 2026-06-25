@@ -2,7 +2,6 @@ import { BlurView } from "expo-blur";
 import { Redirect, Tabs } from "expo-router";
 import { SymbolView } from "expo-symbols";
 import { Feather } from "@expo/vector-icons";
-import * as Haptics from "expo-haptics";
 import React, { useEffect, useState } from "react";
 import { Platform, Pressable, StyleSheet, TouchableOpacity, View, useColorScheme, useWindowDimensions } from "react-native";
 import { PanGestureHandler, State, type PanGestureHandlerStateChangeEvent } from "react-native-gesture-handler";
@@ -10,10 +9,12 @@ import { useAuth } from "@/context/AuthContext";
 import { useColors } from "@/hooks/useColors";
 import { EnterpriseSidebar } from "@/components/bolt/EnterpriseSidebar";
 import { FloatingAIAssistant, FloatingEcgActionButton } from "@/components/bolt/MobileActionLayer";
+import { useVisualExperience } from "@/context/VisualExperienceContext";
 
 function ClassicTabLayout() {
   const colors = useColors();
   const colorScheme = useColorScheme();
+  const { triggerHaptic } = useVisualExperience();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
   const { width } = useWindowDimensions();
@@ -73,7 +74,7 @@ function ClassicTabLayout() {
             accessibilityLabel="Open navigation drawer"
             activeOpacity={0.84}
             onPress={() => {
-              Haptics.selectionAsync().catch(() => {});
+              void triggerHaptic("selection");
               setMobileDrawerOpen(true);
             }}
             style={[styles.menuButton, { backgroundColor: colors.glass, borderColor: colors.gradientBorder }]}

@@ -24,11 +24,20 @@ import {
   BoltHero,
   BoltScreen,
 } from "@/components/bolt/BoltUI";
+import { type EcgSeverity, useVisualExperience } from "@/context/VisualExperienceContext";
+
+function visualSeverity(value: string): EcgSeverity {
+  const normalized = value.toLowerCase();
+  if (normalized === "critical" || normalized === "severe") return "critical";
+  if (normalized === "normal") return "normal";
+  return "abnormal";
+}
 
 export default function UploadScreen() {
   const colors = useColors();
   const router = useRouter();
   const { authToken } = useAuth();
+  const { setSeverity, triggerHaptic } = useVisualExperience();
   const [patientName, setPatientName] = useState("");
   const [dateOfBirth, setDateOfBirth] = useState("1970-01-01");
   const [gender, setGender] = useState<"male" | "female" | "other" | "unknown">("unknown");
@@ -84,15 +93,23 @@ export default function UploadScreen() {
     onError: (loadError) => {
       setProgress(0);
       setError(loadError instanceof Error ? loadError.message : "Upload failed.");
+      void triggerHaptic("error");
     },
     onSuccess: (payload) => {
       setAnalysisResult(payload.analysis);
       setCaseId(payload.caseId);
       setProgress(100);
       setError("");
+      setSeverity(visualSeverity(payload.analysis.severity));
+      void triggerHaptic("upload");
     },
     retry: false,
   });
+
+  useEffect(() => {
+    setSeverity(analysisResult ? visualSeverity(analysisResult.severity) : priority === "critical" ? "critical" : priority === "high" ? "abnormal" : "normal");
+    return () => setSeverity("normal");
+  }, [analysisResult, priority, setSeverity]);
 
   useEffect(() => {
     if (!mutation.isPending) return;

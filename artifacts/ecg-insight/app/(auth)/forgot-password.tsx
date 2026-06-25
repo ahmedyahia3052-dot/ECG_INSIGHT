@@ -3,7 +3,6 @@ import { useColors } from "@/hooks/useColors";
 import { useRouter } from "expo-router";
 import { useState } from "react";
 import {
-  ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -14,6 +13,7 @@ import {
   View,
 } from "react-native";
 import { BrandLogo, PremiumCard, PremiumScreenBackground } from "@/components/ui/Premium";
+import { BoltEcgLoader } from "@/components/bolt/BoltUI";
 
 type Step = "email" | "code" | "password" | "success";
 
@@ -308,7 +308,7 @@ export default function ForgotPasswordScreen() {
               </View>
               <Pressable style={styles.btn} onPress={handleEmail} disabled={loading}>
                 {loading ? (
-                  <ActivityIndicator color="#fff" />
+                  <BoltEcgLoader compact color="#fff" />
                 ) : (
                   <Text style={styles.btnText}>Send Reset Code</Text>
                 )}
@@ -349,7 +349,7 @@ export default function ForgotPasswordScreen() {
               />
               <Pressable style={styles.btn} onPress={handleCode} disabled={loading}>
                 {loading ? (
-                  <ActivityIndicator color="#fff" />
+                  <BoltEcgLoader compact color="#fff" />
                 ) : (
                   <Text style={styles.btnText}>Verify Code</Text>
                 )}
@@ -388,7 +388,7 @@ export default function ForgotPasswordScreen() {
                 disabled={loading}
               >
                 {loading ? (
-                  <ActivityIndicator color="#fff" />
+                  <BoltEcgLoader compact color="#fff" />
                 ) : (
                   <Text style={styles.btnText}>Reset Password</Text>
                 )}
