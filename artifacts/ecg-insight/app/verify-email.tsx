@@ -3,7 +3,7 @@ import React, { useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import { z } from "zod";
 
-import { Field, medicalTheme, PrimaryButton } from "@/components/enterprise/EnterpriseUI";
+import { AuthCard, AuthMessage, AuthPrimaryButton, AuthTextField, PremiumAuthShell, premiumAuthTheme } from "@/components/auth/PremiumAuth";
 import { useAuth } from "@/context/AuthContext";
 
 const schema = z.object({ email: z.string().email("Enter a valid email address.") });
@@ -32,25 +32,28 @@ export default function VerifyEmailScreen() {
   };
 
   return (
-    <View style={styles.root}>
-      <View style={styles.panel}>
-        <Text style={styles.title}>Verify Email</Text>
-        <Text style={styles.subtitle}>Request a fresh verification message for your ECG Insight account.</Text>
-        <Field autoCapitalize="none" keyboardType="email-address" label="Email Address" onChangeText={setEmail} placeholder="doctor@hospital.com" value={email} />
-        {error ? <Text style={styles.error}>{error}</Text> : null}
-        {message ? <Text style={styles.message}>{message}</Text> : null}
-        <PrimaryButton icon="mail" label="Send Verification" onPress={submit} />
-        <PrimaryButton label="Back to Login" onPress={() => router.replace("/login" as never)} variant="outline" />
-      </View>
-    </View>
+    <PremiumAuthShell
+      eyebrow="Identity assurance"
+      subtitle="Request a fresh verification message while preserving the existing email verification backend contract."
+      title="Verify your clinical identity."
+    >
+      <AuthCard>
+        <View style={styles.headerBlock}>
+          <Text style={styles.title}>Verify Email</Text>
+          <Text style={styles.subtitle}>Keep your ECG Insight account trusted for clinical review, reports, audit trails, and collaboration.</Text>
+        </View>
+        <AuthTextField autoCapitalize="none" icon="mail" keyboardType="email-address" label="Email Address" onChangeText={setEmail} placeholder="doctor@hospital.com" value={email} />
+        {error ? <AuthMessage message={error} tone="error" /> : null}
+        {message ? <AuthMessage message={message} tone="success" /> : null}
+        <AuthPrimaryButton icon="mail" label="Send Verification" onPress={submit} />
+        <AuthPrimaryButton label="Back to Login" onPress={() => router.replace("/login" as never)} variant="outline" />
+      </AuthCard>
+    </PremiumAuthShell>
   );
 }
 
 const styles = StyleSheet.create({
-  error: { color: medicalTheme.critical, fontSize: 13, fontWeight: "800" },
-  message: { color: medicalTheme.success, fontSize: 13, fontWeight: "800" },
-  panel: { backgroundColor: medicalTheme.card, borderColor: medicalTheme.border, borderRadius: 24, borderWidth: 1, gap: 16, maxWidth: 520, padding: 22, width: "100%" },
-  root: { alignItems: "center", backgroundColor: medicalTheme.background, flex: 1, justifyContent: "center", padding: 18 },
-  subtitle: { color: medicalTheme.muted, fontSize: 14, lineHeight: 21 },
-  title: { color: medicalTheme.text, fontSize: 30, fontWeight: "900" },
+  headerBlock: { gap: 8 },
+  subtitle: { color: premiumAuthTheme.muted, fontSize: 14, fontWeight: "700", lineHeight: 21 },
+  title: { color: premiumAuthTheme.text, fontSize: 30, fontWeight: "900" },
 });

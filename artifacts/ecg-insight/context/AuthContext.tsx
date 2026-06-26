@@ -52,7 +52,9 @@ interface AuthContextType {
     email: string,
     password: string,
     role: "corporate_client" | "doctor" | "student" | "user",
-    phoneNumber?: string
+    phoneNumber?: string,
+    institution?: string,
+    specialization?: string
   ) => Promise<{ success: boolean; error?: string }>;
   requestPhoneOtp: (phoneNumber: string, purpose?: "LOGIN" | "REGISTER", name?: string) => Promise<{ success: boolean; otp?: string; error?: string }>;
   verifyPhoneOtp: (phoneNumber: string, otp: string, rememberMe?: boolean) => Promise<{ success: boolean; error?: string }>;
@@ -261,11 +263,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       email: string,
       password: string,
       role: "corporate_client" | "doctor" | "student" | "user",
-      phoneNumber?: string
+      phoneNumber?: string,
+      institution?: string,
+      specialization?: string
     ) => {
       try {
         const payload = await apiRequest<AuthPayload>("/auth/register", {
-          body: JSON.stringify({ email: email || undefined, name, password: password || undefined, phoneNumber, role }),
+          body: JSON.stringify({ email: email || undefined, institution, name, password: password || undefined, phoneNumber, role, specialization }),
           method: "POST",
         });
         setState({
