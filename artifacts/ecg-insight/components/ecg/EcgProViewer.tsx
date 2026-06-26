@@ -12,6 +12,8 @@ import type { DigitalEcg, DigitalEcgLead } from "@/services/ecgProcessing";
 type GridColor = "gray" | "red";
 type PaperSpeed = 25 | 50;
 type ViewerMode = "comparison" | "digitized" | "monitor" | "original";
+type CaliperKey = "heartRate" | "horizontal" | "pr" | "qrs" | "qt" | "qtc" | "vertical";
+type MonitorSettings = { frozen: boolean; gain: 5 | 10 | 20; speed: 25 | 50 };
 type EcgAnnotation = {
   confidence: number;
   evidence: string[];
@@ -39,6 +41,7 @@ export function EcgProViewer({
 }) {
   const [mode, setMode] = useState<ViewerMode>("original");
   const [zoom, setZoom] = useState(1);
+  const [pan, setPan] = useState({ x: 0, y: 0 });
   const [rotation, setRotation] = useState(0);
   const [gridVisible, setGridVisible] = useState(true);
   const [gridOpacity, setGridOpacity] = useState(0.75);
@@ -47,7 +50,16 @@ export function EcgProViewer({
   const [focusedLead, setFocusedLead] = useState<string | null>(null);
   const [selectedLead, setSelectedLead] = useState<string>("ALL");
   const [fullscreen, setFullscreen] = useState(false);
-  const [calipers, setCalipers] = useState({ pr: 160, qrs: 92, qt: 390, qtc: ecgCase.qtcInterval ?? 420, rr: 820 });
+  const [monitorSettings, setMonitorSettings] = useState<MonitorSettings>({ frozen: false, gain: 10, speed: 25 });
+  const [calipers, setCalipers] = useState<Record<CaliperKey, number>>({
+    heartRate: ecgCase.heartRate ?? analysis?.heartRate ?? 72,
+    horizontal: 200,
+    pr: ecgCase.prInterval ?? 160,
+    qrs: ecgCase.qrsDuration ?? 92,
+    qt: ecgCase.qtInterval ?? 390,
+    qtc: ecgCase.qtcInterval ?? 420,
+    vertical: 10,
+  });
 
   const originalUrl = absoluteUrl(ecgCase.imagePath ?? ecgCase.originalFileUrl ?? ecgCase.files.find((file) => file.mimeType.startsWith("image/"))?.downloadUrl);
   const pdfUrl = absoluteUrl(ecgCase.pdfPath ?? ecgCase.files.find((file) => file.mimeType.includes("pdf"))?.downloadUrl);
@@ -81,7 +93,11 @@ export function EcgProViewer({
       <View style={styles.toolbar}>
         <PrimaryButton label="Zoom In" onPress={() => setZoom((value) => Math.min(value + 0.2, 3))} variant="outline" />
         <PrimaryButton label="Zoom Out" onPress={() => setZoom((value) => Math.max(value - 0.2, 0.5))} variant="outline" />
-        <PrimaryButton label="Fit" onPress={() => setZoom(1)} variant="outline" />
+        <PrimaryButton label="Fit" onPress={() => { setZoom(1); setPan({ x: 0, y: 0 }); }} variant="outline" />
+        <PrimaryButton label="Pan ←" onPress={() => setPan((value) => ({ ...value, x: value.x - 28 }))} variant="outline" />
+        <PrimaryButton label="Pan →" onPress={() => setPan((value) => ({ ...value, x: value.x + 28 }))} variant="outline" />
+        <PrimaryButton label="Pan ↑" onPress={() => setPan((value) => ({ ...value, y: value.y - 28 }))} variant="outline" />
+        <PrimaryButton label="Pan ↓" onPress={() => setPan((value) => ({ ...value, y: value.y + 28 }))} variant="outline" />
         <PrimaryButton label="Rotate" onPress={() => setRotation((value) => (value + 90) % 360)} variant="outline" />
         <PrimaryButton label={fullscreen ? "Exit Full Screen" : "Full Screen"} onPress={() => setFullscreen((value) => !value)} variant="outline" />
         <PrimaryButton label="Download Original" onPress={() => openUrl(originalUrl ?? pdfUrl)} variant="outline" />
@@ -103,7 +119,7 @@ export function EcgProViewer({
             <View style={styles.originalCanvas}>
               {gridVisible ? <GridOverlay color={gridColor} opacity={gridOpacity} speed={paperSpeed} /> : null}
               {originalUrl ? (
-                <Image resizeMode="contain" source={{ uri: originalUrl }} style={[styles.originalImage, { transform: [{ scale: zoom }, { rotate: `${rotation}deg` }] }]} />
+                <Image resizeMode="contain" source={{ uri: originalUrl }} style={[styles.originalImage, { transform: [{ translateX: pan.x }, { translateY: pan.y }, { scale: zoom }, { rotate: `${rotation}deg` }] }]} />
               ) : pdfUrl ? (
                 <PrimaryButton label="Open Original PDF" onPress={() => openUrl(pdfUrl)} />
               ) : (
@@ -150,7 +166,8 @@ export function EcgProViewer({
             <Text style={styles.monitorMetric}>HR {ecgCase.heartRate ?? analysis?.heartRate ?? "--"} BPM</Text>
             <Text style={styles.monitorMetric}>{ecgCase.rhythm ?? analysis?.rhythm ?? "Rhythm pending"}</Text>
           </View>
-          <MonitorWaveform leadData={leadData.find((item) => item.lead === "II") ?? leadData[0]} />
+          <MonitorControls settings={monitorSettings} onChange={setMonitorSettings} />
+          <MonitorWaveform leadData={leadData.find((item) => item.lead === "II") ?? leadData[0]} settings={monitorSettings} />
         </View>
       ) : null}
     </View>
@@ -310,16 +327,37 @@ function pathForLead(lead: DigitalEcgLead, width: number, height: number) {
   }).join(" ");
 }
 
-function CaliperPanel({ calipers, onChange }: { calipers: Record<"pr" | "qrs" | "qt" | "qtc" | "rr", number>; onChange: (value: Record<"pr" | "qrs" | "qt" | "qtc" | "rr", number>) => void }) {
+function pathForMonitorLead(lead: DigitalEcgLead, width: number, height: number, gainScale: number) {
+  const samples = lead.samples.slice(0, Math.min(lead.samples.length, 1600));
+  if (samples.length < 2) return "";
+  const step = Math.max(1, Math.ceil(samples.length / 520));
+  const reduced = samples.filter((_sample, index) => index % step === 0);
+  return reduced.map((sample, index) => {
+    const x = (index / Math.max(reduced.length - 1, 1)) * width;
+    const y = height / 2 - sample * (height * 0.28) * gainScale;
+    return `${index === 0 ? "M" : "L"} ${x.toFixed(2)} ${y.toFixed(2)}`;
+  }).join(" ");
+}
+
+function CaliperPanel({ calipers, onChange }: { calipers: Record<CaliperKey, number>; onChange: (value: Record<CaliperKey, number>) => void }) {
+  const descriptors: Array<{ key: CaliperKey; label: string; step: number; suffix: string }> = [
+    { key: "horizontal", label: "Horizontal", step: 10, suffix: "ms" },
+    { key: "vertical", label: "Vertical", step: 1, suffix: "mm/mV" },
+    { key: "heartRate", label: "Heart Rate", step: 1, suffix: "BPM" },
+    { key: "pr", label: "PR Interval", step: 5, suffix: "ms" },
+    { key: "qrs", label: "QRS Duration", step: 5, suffix: "ms" },
+    { key: "qt", label: "QT Interval", step: 5, suffix: "ms" },
+    { key: "qtc", label: "QTc", step: 5, suffix: "ms" },
+  ];
   return (
     <View style={styles.calipers}>
-      {(Object.keys(calipers) as Array<keyof typeof calipers>).map((key) => (
-        <View key={key} style={styles.caliper}>
-          <Text style={styles.caliperLabel}>{key.toUpperCase()}</Text>
-          <Text style={styles.caliperValue}>{calipers[key]} ms</Text>
+      {descriptors.map((item) => (
+        <View key={item.key} style={styles.caliper}>
+          <Text style={styles.caliperLabel}>{item.label}</Text>
+          <Text style={styles.caliperValue}>{calipers[item.key]} {item.suffix}</Text>
           <View style={styles.caliperActions}>
-            <Pressable onPress={() => onChange({ ...calipers, [key]: Math.max(0, calipers[key] - 5) })}><Text style={styles.caliperButton}>-</Text></Pressable>
-            <Pressable onPress={() => onChange({ ...calipers, [key]: calipers[key] + 5 })}><Text style={styles.caliperButton}>+</Text></Pressable>
+            <Pressable onPress={() => onChange({ ...calipers, [item.key]: Math.max(0, calipers[item.key] - item.step) })}><Text style={styles.caliperButton}>-</Text></Pressable>
+            <Pressable onPress={() => onChange({ ...calipers, [item.key]: calipers[item.key] + item.step })}><Text style={styles.caliperButton}>+</Text></Pressable>
           </View>
         </View>
       ))}
@@ -363,13 +401,29 @@ function ComparisonPane({ title, url }: { title: string; url?: string }) {
   );
 }
 
-function MonitorWaveform({ leadData }: { leadData?: DigitalEcgLead }) {
+function MonitorControls({ onChange, settings }: { onChange: (settings: MonitorSettings) => void; settings: MonitorSettings }) {
+  return (
+    <View style={styles.monitorControls}>
+      <PrimaryButton label={settings.frozen ? "Resume" : "Freeze"} onPress={() => onChange({ ...settings, frozen: !settings.frozen })} variant={settings.frozen ? "primary" : "outline"} />
+      <PrimaryButton label={`Speed ${settings.speed} mm/s`} onPress={() => onChange({ ...settings, speed: settings.speed === 25 ? 50 : 25 })} variant="outline" />
+      <PrimaryButton label={`Gain ${settings.gain} mm/mV`} onPress={() => onChange({ ...settings, gain: settings.gain === 5 ? 10 : settings.gain === 10 ? 20 : 5 })} variant="outline" />
+    </View>
+  );
+}
+
+function MonitorWaveform({ leadData, settings }: { leadData?: DigitalEcgLead; settings: MonitorSettings }) {
   if (!leadData) return <Text style={styles.monitorText}>Live waveform unavailable. Digitize ECG to preview monitor trace.</Text>;
+  const sweepX = settings.frozen ? 850 : settings.speed === 50 ? 680 : 820;
+  const gainScale = settings.gain / 10;
   return (
     <Svg width="100%" height={260} viewBox="0 0 900 260">
       <Rect x={0} y={0} width={900} height={260} fill="#020617" />
-      <Path d={pathForLead(leadData, 850, 220)} fill="none" stroke="#22C55E" strokeLinecap="round" strokeWidth={2.4} transform="translate(25 20)" />
-      <Circle cx={850} cy={38} r={5} fill="#22C55E" />
+      {Array.from({ length: 18 }).map((_, index) => <Line key={`monitor-v-${index}`} x1={index * 50} x2={index * 50} y1={0} y2={260} stroke="#064E3B" strokeWidth={0.5} />)}
+      {Array.from({ length: 6 }).map((_, index) => <Line key={`monitor-h-${index}`} x1={0} x2={900} y1={index * 50} y2={index * 50} stroke="#064E3B" strokeWidth={0.5} />)}
+      <Path d={pathForMonitorLead(leadData, 850, 220, gainScale)} fill="none" stroke="#22C55E" strokeLinecap="round" strokeWidth={2.4} transform="translate(25 20)" />
+      <Line x1={sweepX} x2={sweepX} y1={8} y2={252} stroke="#DCFCE7" strokeOpacity={settings.frozen ? 0.28 : 0.9} strokeWidth={2} />
+      <Circle cx={sweepX} cy={38} r={5} fill={settings.frozen ? "#FACC15" : "#22C55E"} />
+      <SvgText x={26} y={244} fill="#86EFAC" fontSize={12}>{settings.frozen ? "FROZEN" : "LIVE SWEEP"} · {settings.speed} mm/s · {settings.gain} mm/mV</SvgText>
     </Svg>
   );
 }
@@ -547,6 +601,7 @@ const styles = StyleSheet.create({
   measurementValue: { color: medicalTheme.text, fontSize: 12, fontWeight: "900" },
   modeTabs: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   monitor: { backgroundColor: "#020617", borderColor: "#14532D", borderRadius: 18, borderWidth: 1, gap: 10, padding: 14 },
+  monitorControls: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   monitorHeader: { alignItems: "center", flexDirection: "row", flexWrap: "wrap", gap: 16 },
   monitorMetric: { color: "#22C55E", fontSize: 18, fontWeight: "900" },
   monitorText: { color: "#22C55E", fontSize: 14, fontWeight: "800" },
