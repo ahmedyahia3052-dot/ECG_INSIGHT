@@ -143,14 +143,50 @@ syncRouter.post("/process", async (req, res, next) => {
       where: { status: { in: ["PENDING", "FAILED"] }, userId: req.auth!.id },
     });
     const completed = [];
+    const conflicts = [];
+    const failed = [];
     for (const item of pending) {
+      const payload = item.payloadJson && typeof item.payloadJson === "object" && !Array.isArray(item.payloadJson)
+        ? item.payloadJson as Record<string, unknown>
+        : {};
+      if (payload.clientVersion && payload.serverVersion && payload.clientVersion !== payload.serverVersion) {
+        const conflicted = await prisma.syncQueue.update({
+          data: {
+            conflictJson: {
+              clientVersion: payload.clientVersion,
+              reason: "Client and server versions differ.",
+              serverVersion: payload.serverVersion,
+            } as Prisma.InputJsonObject,
+            lastError: "Client and server versions differ. Manual review required.",
+            retryCount: item.retryCount + 1,
+            status: "FAILED",
+            syncedAt: null,
+          },
+          where: { id: item.id },
+        });
+        conflicts.push(conflicted);
+        continue;
+      }
+      if (item.retryCount >= 4) {
+        const retryFailed = await prisma.syncQueue.update({
+          data: {
+            lastError: item.lastError ?? "Maximum retry attempts exceeded.",
+            retryCount: item.retryCount + 1,
+            status: "FAILED",
+            syncedAt: null,
+          },
+          where: { id: item.id },
+        });
+        failed.push(retryFailed);
+        continue;
+      }
       const updated = await prisma.syncQueue.update({
         data: { lastError: null, retryCount: item.retryCount + 1, status: "COMPLETED", syncedAt: new Date() },
         where: { id: item.id },
       });
       completed.push(updated);
     }
-    res.json({ completed });
+    res.json({ completed, conflicts, failed });
   } catch (error) {
     next(error);
   }

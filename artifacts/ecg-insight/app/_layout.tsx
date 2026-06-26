@@ -14,6 +14,7 @@ import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
 import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { MobileSyncStatus } from "@/components/mobile/MobileSyncStatus";
 import { AuthProvider } from "@/context/AuthContext";
 import { ApiError } from "@/services/api";
 
@@ -73,6 +74,7 @@ export default function RootLayout() {
           <GestureHandlerRootView style={{ flex: 1 }}>
             <AuthProvider>
               <RootLayoutNav />
+              <MobileSyncStatus />
             </AuthProvider>
           </GestureHandlerRootView>
         </QueryClientProvider>

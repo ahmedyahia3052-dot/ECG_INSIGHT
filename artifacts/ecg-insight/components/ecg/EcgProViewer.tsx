@@ -1,6 +1,7 @@
 import { Feather } from "@expo/vector-icons";
-import React, { useMemo, useState } from "react";
-import { Image, Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import React, { useMemo, useRef, useState } from "react";
+import { Image, Platform, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from "react-native";
+import { PanGestureHandler, PinchGestureHandler, State } from "react-native-gesture-handler";
 import Svg, { Circle, Line, Path, Rect, Text as SvgText } from "react-native-svg";
 
 import { Badge, EmptyState, medicalTheme, PrimaryButton, SectionHeader } from "@/components/enterprise/EnterpriseUI";
@@ -51,6 +52,10 @@ export function EcgProViewer({
   const [selectedLead, setSelectedLead] = useState<string>("ALL");
   const [fullscreen, setFullscreen] = useState(false);
   const [monitorSettings, setMonitorSettings] = useState<MonitorSettings>({ frozen: false, gain: 10, speed: 25 });
+  const { width: viewportWidth } = useWindowDimensions();
+  const mobileMode = viewportWidth < 768;
+  const pinchBaseZoom = useRef(1);
+  const panBase = useRef({ x: 0, y: 0 });
   const [calipers, setCalipers] = useState<Record<CaliperKey, number>>({
     heartRate: ecgCase.heartRate ?? analysis?.heartRate ?? 72,
     horizontal: 200,
@@ -70,7 +75,7 @@ export function EcgProViewer({
   const visibleAnnotations = selectedLead === "ALL" ? annotations : annotations.filter((annotation) => annotation.lead === selectedLead);
 
   return (
-    <View style={[styles.workstation, fullscreen && styles.fullscreen]}>
+    <View style={[styles.workstation, mobileMode && styles.mobileWorkstation, fullscreen && styles.fullscreen]}>
       {criticalAlert ? (
         <View style={styles.criticalBanner}>
           <Feather name="alert-triangle" size={18} color="#fff" />
@@ -78,12 +83,12 @@ export function EcgProViewer({
         </View>
       ) : null}
 
-      <View style={styles.header}>
+      <View style={[styles.header, mobileMode && styles.mobileHeader]}>
         <View>
           <Text style={styles.title}>ECG Pro Review Workstation</Text>
           <Text style={styles.subtitle}>Original ECG, paper grid, 12-lead waveform, calipers, AI overlays, comparison, and monitor mode.</Text>
         </View>
-        <View style={styles.modeTabs}>
+        <View style={[styles.modeTabs, mobileMode && styles.mobileTabs]}>
           {(["original", "digitized", "comparison", "monitor"] as const).map((item) => (
             <PrimaryButton key={item} label={item} onPress={() => setMode(item)} variant={mode === item ? "primary" : "outline"} />
           ))}
@@ -111,23 +116,41 @@ export function EcgProViewer({
         setSelectedLead(lead);
         if (lead !== "ALL") setFocusedLead(lead);
       }} />
+      {mobileMode ? <Text style={styles.mobileHint}>Mobile mode: pinch to zoom, drag to pan, and tap lead chips to swipe through focused leads.</Text> : null}
 
       {mode === "original" ? (
         <View style={styles.viewerPanel}>
           <SectionHeader title="ECG Explainability Engine" subtitle="Transparent annotation layer, heatmap overlays, clinical labels, measurement markers, and AI evidence." />
           <View style={styles.explainabilityLayout}>
-            <View style={styles.originalCanvas}>
-              {gridVisible ? <GridOverlay color={gridColor} opacity={gridOpacity} speed={paperSpeed} /> : null}
-              {originalUrl ? (
-                <Image resizeMode="contain" source={{ uri: originalUrl }} style={[styles.originalImage, { transform: [{ translateX: pan.x }, { translateY: pan.y }, { scale: zoom }, { rotate: `${rotation}deg` }] }]} />
-              ) : pdfUrl ? (
-                <PrimaryButton label="Open Original PDF" onPress={() => openUrl(pdfUrl)} />
-              ) : (
-                <EmptyState title="No original ECG" message="Upload an ECG image or PDF to enable original review." />
-              )}
-              <AnnotationLayer annotations={visibleAnnotations} heatmap={explainability?.heatmap.points ?? []} selectedLead={selectedLead} />
-              <AiOverlay analysis={analysis} findings={aiFindings} />
-            </View>
+            <PinchGestureHandler
+              onGestureEvent={(event) => setZoom(Math.max(0.5, Math.min(pinchBaseZoom.current * event.nativeEvent.scale, mobileMode ? 4 : 3)))}
+              onHandlerStateChange={(event) => {
+                if (event.nativeEvent.state === State.BEGAN) pinchBaseZoom.current = zoom;
+                if (event.nativeEvent.oldState === State.ACTIVE) pinchBaseZoom.current = zoom;
+              }}
+            >
+              <PanGestureHandler
+                minPointers={1}
+                onGestureEvent={(event) => setPan({ x: panBase.current.x + event.nativeEvent.translationX, y: panBase.current.y + event.nativeEvent.translationY })}
+                onHandlerStateChange={(event) => {
+                  if (event.nativeEvent.state === State.BEGAN) panBase.current = pan;
+                  if (event.nativeEvent.oldState === State.ACTIVE) panBase.current = pan;
+                }}
+              >
+                <View style={[styles.originalCanvas, mobileMode && styles.mobileCanvas]}>
+                  {gridVisible ? <GridOverlay color={gridColor} opacity={gridOpacity} speed={paperSpeed} /> : null}
+                  {originalUrl ? (
+                    <Image resizeMode="contain" source={{ uri: originalUrl }} style={[styles.originalImage, mobileMode && styles.mobileOriginalImage, { transform: [{ translateX: pan.x }, { translateY: pan.y }, { scale: zoom }, { rotate: `${rotation}deg` }] }]} />
+                  ) : pdfUrl ? (
+                    <PrimaryButton label="Open Original PDF" onPress={() => openUrl(pdfUrl)} />
+                  ) : (
+                    <EmptyState title="No original ECG" message="Upload an ECG image or PDF to enable original review." />
+                  )}
+                  <AnnotationLayer annotations={visibleAnnotations} heatmap={explainability?.heatmap.points ?? []} selectedLead={selectedLead} />
+                  <AiOverlay analysis={analysis} findings={aiFindings} />
+                </View>
+              </PanGestureHandler>
+            </PinchGestureHandler>
             <ExplainabilityPanel analysis={analysis} annotations={visibleAnnotations} ecgCase={ecgCase} onExplain={openCopilotFinding} />
           </View>
         </View>
@@ -635,6 +658,12 @@ const styles = StyleSheet.create({
   monitorMetric: { color: "#22C55E", fontSize: 18, fontWeight: "900" },
   monitorText: { color: "#22C55E", fontSize: 14, fontWeight: "800" },
   monitorTitle: { color: "#DCFCE7", fontSize: 13, fontWeight: "900", letterSpacing: 1.2 },
+  mobileCanvas: { minHeight: 420 },
+  mobileHeader: { flexDirection: "column" },
+  mobileHint: { color: medicalTheme.primary, fontSize: 12, fontWeight: "800", lineHeight: 18 },
+  mobileOriginalImage: { height: 390 },
+  mobileTabs: { width: "100%" },
+  mobileWorkstation: { borderRadius: 16, padding: 10 },
   originalCanvas: { alignItems: "center", backgroundColor: "#FFF7F7", borderColor: medicalTheme.border, borderRadius: 16, borderWidth: 1, justifyContent: "center", minHeight: 520, overflow: "hidden", position: "relative" },
   originalImage: { height: 500, width: "100%" },
   panelDiagnosis: { color: medicalTheme.text, fontSize: 20, fontWeight: "900" },

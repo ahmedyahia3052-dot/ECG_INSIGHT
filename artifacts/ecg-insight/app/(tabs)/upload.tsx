@@ -26,6 +26,7 @@ import {
 } from "@/components/bolt/BoltUI";
 import { type EcgSeverity, useVisualExperience } from "@/context/VisualExperienceContext";
 import { useToast } from "@/components/interaction/PremiumInteraction";
+import { cachePatientSnapshot, networkIsOnline, queueOfflineEcgUpload } from "@/services/mobileOffline";
 
 function visualSeverity(value: string): EcgSeverity {
   const normalized = value.toLowerCase();
@@ -64,6 +65,26 @@ export default function UploadScreen() {
     mutationFn: async () => {
       if (!authToken?.token) throw new Error("You must be signed in.");
       if (!selectedFile) throw new Error("Select or capture an ECG image first.");
+      if (!networkIsOnline()) {
+        const queued = await queueOfflineEcgUpload({
+          asset: selectedFile,
+          clinicalNotes,
+          dateOfBirth,
+          gender,
+          medicalRecordNumber: mrn.trim() || `MRN-${Date.now()}`,
+          patientName: patientName.trim(),
+          priority,
+        });
+        await cachePatientSnapshot(`draft-patient-${queued.id}`, {
+          clinicalNotes,
+          dateOfBirth,
+          gender,
+          medicalRecordNumber: queued.medicalRecordNumber,
+          patientName: patientName.trim(),
+          priority,
+        });
+        return { analysis: null, caseId: null, queuedId: queued.id };
+      }
       const [firstName, ...rest] = patientName.trim().split(/\s+/);
       const patient = await createPatient(authToken.token, {
         dateOfBirth,
@@ -90,7 +111,7 @@ export default function UploadScreen() {
       );
       await uploadClinicalEcgFile(authToken.token, formData);
       const analysis = await analyzeCase(authToken.token, ecgCase.case.id);
-      return { analysis: analysis.analysis, caseId: ecgCase.case.id };
+      return { analysis: analysis.analysis, caseId: ecgCase.case.id, queuedId: null };
     },
     onError: (loadError) => {
       setProgress(0);
@@ -99,6 +120,14 @@ export default function UploadScreen() {
       void triggerHaptic("error");
     },
     onSuccess: (payload) => {
+      if (payload.queuedId) {
+        setProgress(100);
+        setError("");
+        toast.success("ECG queued offline", "The upload will sync automatically when the device is online.");
+        void triggerHaptic("upload");
+        return;
+      }
+      if (!payload.analysis || !payload.caseId) return;
       setAnalysisResult(payload.analysis);
       setCaseId(payload.caseId);
       setProgress(100);

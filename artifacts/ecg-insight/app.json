@@ -3,7 +3,7 @@
     "name": "ECG Insight",
     "slug": "ecg-insight",
     "version": "1.0.0",
-    "orientation": "portrait",
+    "orientation": "default",
     "icon": "./assets/images/icon.png",
     "scheme": "ecg-insight",
     "userInterfaceStyle": "automatic",
@@ -14,11 +14,18 @@
       "backgroundColor": "#0D9488"
     },
     "ios": {
-      "supportsTablet": false
+      "supportsTablet": true
     },
     "android": {},
     "web": {
-      "favicon": "./assets/images/icon.png"
+      "bundler": "metro",
+      "display": "standalone",
+      "favicon": "./assets/images/icon.png",
+      "manifest": "./public/manifest.json",
+      "name": "ECG Insight Enterprise",
+      "shortName": "ECG Insight",
+      "themeColor": "#0D9488",
+      "backgroundColor": "#050816"
     },
     "plugins": [
       [

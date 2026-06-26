@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="112" fill="#050816"/>
+  <circle cx="256" cy="256" r="202" fill="#0D9488" opacity="0.18"/>
+  <path d="M70 267h74l30-82 47 172 47-246 38 156h136" fill="none" stroke="#67E8F9" stroke-width="28" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M116 378h280" stroke="#F8FAFC" stroke-width="22" stroke-linecap="round" opacity="0.92"/>
+  <text x="256" y="122" fill="#F8FAFC" font-family="Arial, Helvetica, sans-serif" font-size="54" font-weight="800" text-anchor="middle">ECG</text>
+</svg>
