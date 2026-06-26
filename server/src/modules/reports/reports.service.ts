@@ -97,7 +97,7 @@ export async function generateClinicalReport(caseId: string, authorId: string) {
     data: {
       acquisitionDate: ecgCase.uploadDate,
       aiFindings: analysis
-        ? `${analysis.interpretation} Confidence score: ${Math.round(analysis.confidenceScore * 100)}%.`
+        ? `AI diagnosis: ${analysis.diagnosis}. ${analysis.interpretation} Confidence score: ${Math.round(analysis.confidenceScore * 100)}%. Model version: ${analysis.aiVersion}.`
         : ecgCase.finalDiagnosis ?? undefined,
       authorId,
       caseId: ecgCase.id,

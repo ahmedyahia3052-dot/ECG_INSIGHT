@@ -144,81 +144,86 @@ export class LocalOnnxProvider implements AIProvider {
   name = "onnx_runtime" as const;
 
   async analyze(input: ECGAnalysisInput & { actorId?: string }): Promise<ECGAnalysisOutput> {
-    const session = await loadSession();
-    if (!session) return fallbackAnalysis(input);
-    const inputName = session.inputNames[0];
-    const outputName = session.outputNames[0];
-    if (!inputName || !outputName) return fallbackAnalysis(input);
+    try {
+      const session = await loadSession();
+      if (!session) return fallbackAnalysis(input);
+      const inputName = session.inputNames[0];
+      const outputName = session.outputNames[0];
+      if (!inputName || !outputName) return fallbackAnalysis(input);
 
-    const targetLength = inputSampleCount(session);
-    const tensorValues = await loadCaseTensor(input, input.actorId ?? input.case.uploadedById, targetLength);
-    if (!tensorValues) {
-      const fallback = fallbackAnalysis(input);
-      return {
-        ...fallback,
-        interpretationRationale: [
-          ...fallback.interpretationRationale,
-          "Local ONNX model found, but digitized 12-lead signal extraction was unavailable; rule-based engine used.",
-        ],
+      const targetLength = inputSampleCount(session);
+      const tensorValues = await loadCaseTensor(input, input.actorId ?? input.case.uploadedById, targetLength);
+      if (!tensorValues) {
+        return fallbackWithReason(input, "Local ONNX model found, but digitized 12-lead signal extraction was unavailable; rule-based engine used.");
+      }
+
+      const ort = await loadRuntime();
+      const started = Date.now();
+      const feeds = {
+        [inputName]: new ort.Tensor("float32", tensorValues, [1, 12, targetLength]),
       };
+      const outputs = await session.run(feeds);
+      const output = outputs[outputName];
+      const logits = Array.from(output.data as Float32Array | number[]).slice(0, LABELS.length);
+      const probabilities = logits.map(sigmoid);
+      const bestIndex = probabilities.reduce((best, value, index) => (value > probabilities[best] ? index : best), 0);
+      const label = LABELS[bestIndex] ?? "normal_ecg";
+      const diagnosis = DIAGNOSIS_BY_LABEL[label];
+      const confidenceScore = Number((probabilities[bestIndex] ?? 0).toFixed(4));
+      const severity = severityForDiagnosis(diagnosis);
+      const featureExtraction = featureExtractionFor(input, diagnosis);
+      const positiveLabels = LABELS
+        .map((candidate, index) => ({ confidenceScore: probabilities[index] ?? 0, diagnosis: DIAGNOSIS_BY_LABEL[candidate] }))
+        .filter((candidate) => candidate.confidenceScore >= 0.5 && candidate.diagnosis !== diagnosis);
+
+      return {
+        clinicalSeverity: severity === "SEVERE" || severity === "CRITICAL" ? "HIGH" : severity === "MODERATE" ? "MODERATE" : "LOW",
+        confidenceScore,
+        confidenceScorePercent: Math.round(confidenceScore * 100),
+        detectedAbnormalities: diagnosis === "Normal ECG" ? [] : [diagnosis],
+        featureExtraction,
+        heartRate: featureExtraction.heartRate,
+        interpretation:
+          `Local ONNX ECG model predicted ${diagnosis} with ${Math.round(confidenceScore * 100)}% confidence. ` +
+          "This result must be reviewed by a qualified clinician before clinical use.",
+        interpretationRationale: [
+          `Model path: ${cachedModelPath}`,
+          `ONNX Runtime inference completed in ${Date.now() - started}ms.`,
+          ...LABELS.map((candidate, index) => `${DIAGNOSIS_BY_LABEL[candidate]}: ${Math.round((probabilities[index] ?? 0) * 100)}%`),
+        ],
+        primaryDiagnosis: diagnosis,
+        provider: {
+          modelVersion: `${this.modelVersion}:${path.basename(cachedModelPath ?? "model.onnx")}`,
+          name: this.name,
+        },
+        recommendations: [
+          "Review AI prediction alongside the original ECG image and extracted measurements.",
+          "Confirm diagnosis and management plan by physician review.",
+        ],
+        rhythm: diagnosis === "Atrial Fibrillation" ? "Irregularly irregular" : "Model-derived rhythm assessment",
+        secondaryDiagnoses: positiveLabels.map((candidate) => ({
+          confidenceScore: Number(candidate.confidenceScore.toFixed(4)),
+          diagnosis: candidate.diagnosis,
+          evidence: ["Secondary ONNX model probability above threshold."],
+          severity: severityForDiagnosis(candidate.diagnosis),
+        })),
+        severity,
+        urgentActions: severity === "SEVERE" ? ["Expedite clinician review for possible ischemic ECG pattern."] : [],
+      };
+    } catch (error) {
+      return fallbackWithReason(input, `Local ONNX inference failed: ${error instanceof Error ? error.message : "unknown error"}. Rule-based engine used.`);
     }
-
-    const ort = await loadRuntime();
-    const started = Date.now();
-    const feeds = {
-      [inputName]: new ort.Tensor("float32", tensorValues, [1, 12, targetLength]),
-    };
-    const outputs = await session.run(feeds);
-    const output = outputs[outputName];
-    const logits = Array.from(output.data as Float32Array | number[]).slice(0, LABELS.length);
-    const probabilities = logits.map(sigmoid);
-    const bestIndex = probabilities.reduce((best, value, index) => (value > probabilities[best] ? index : best), 0);
-    const label = LABELS[bestIndex] ?? "normal_ecg";
-    const diagnosis = DIAGNOSIS_BY_LABEL[label];
-    const confidenceScore = Number((probabilities[bestIndex] ?? 0).toFixed(4));
-    const severity = severityForDiagnosis(diagnosis);
-    const featureExtraction = featureExtractionFor(input, diagnosis);
-    const positiveLabels = LABELS
-      .map((candidate, index) => ({ confidenceScore: probabilities[index] ?? 0, diagnosis: DIAGNOSIS_BY_LABEL[candidate] }))
-      .filter((candidate) => candidate.confidenceScore >= 0.5 && candidate.diagnosis !== diagnosis);
-
-    return {
-      clinicalSeverity: severity === "SEVERE" || severity === "CRITICAL" ? "HIGH" : severity === "MODERATE" ? "MODERATE" : "LOW",
-      confidenceScore,
-      confidenceScorePercent: Math.round(confidenceScore * 100),
-      detectedAbnormalities: diagnosis === "Normal ECG" ? [] : [diagnosis],
-      featureExtraction,
-      heartRate: featureExtraction.heartRate,
-      interpretation:
-        `Local ONNX ECG model predicted ${diagnosis} with ${Math.round(confidenceScore * 100)}% confidence. ` +
-        "This result must be reviewed by a qualified clinician before clinical use.",
-      interpretationRationale: [
-        `Model path: ${cachedModelPath}`,
-        `ONNX Runtime inference completed in ${Date.now() - started}ms.`,
-        ...LABELS.map((candidate, index) => `${DIAGNOSIS_BY_LABEL[candidate]}: ${Math.round((probabilities[index] ?? 0) * 100)}%`),
-      ],
-      primaryDiagnosis: diagnosis,
-      provider: {
-        modelVersion: `${this.modelVersion}:${path.basename(cachedModelPath ?? "model.onnx")}`,
-        name: this.name,
-      },
-      recommendations: [
-        "Review AI prediction alongside the original ECG image and extracted measurements.",
-        "Confirm diagnosis and management plan by physician review.",
-      ],
-      rhythm: diagnosis === "Atrial Fibrillation" ? "Irregularly irregular" : "Model-derived rhythm assessment",
-      secondaryDiagnoses: positiveLabels.map((candidate) => ({
-        confidenceScore: Number(candidate.confidenceScore.toFixed(4)),
-        diagnosis: candidate.diagnosis,
-        evidence: ["Secondary ONNX model probability above threshold."],
-        severity: severityForDiagnosis(candidate.diagnosis),
-      })),
-      severity,
-      urgentActions: severity === "SEVERE" ? ["Expedite clinician review for possible ischemic ECG pattern."] : [],
-    };
   }
 }
 
 function fallbackAnalysis(input: ECGAnalysisInput): ECGAnalysisOutput {
   return analyzeECG(input);
+}
+
+function fallbackWithReason(input: ECGAnalysisInput, reason: string): ECGAnalysisOutput {
+  const fallback = fallbackAnalysis(input);
+  return {
+    ...fallback,
+    interpretationRationale: [...fallback.interpretationRationale, reason],
+  };
 }

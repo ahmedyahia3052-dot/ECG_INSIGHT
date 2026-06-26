@@ -6,10 +6,10 @@ import { Image, Platform, Pressable, ScrollView, StyleSheet, Text, View } from "
 
 import { Badge, Card, Field, medicalTheme, PageSection, patientDisplayName, PrimaryButton, SectionHeader } from "@/components/enterprise/EnterpriseUI";
 import { useAuth } from "@/context/AuthContext";
-import { analyzeCase, getAIResult, type AIAnalysisResult } from "@/services/ai";
+import { analyzeCaseWithRealAI, type AIAnalysisResult } from "@/services/ai";
 import { createCase, createPatient, listPatients } from "@/services/clinical";
 import { uploadClinicalEcgFile } from "@/services/ecgFiles";
-import { generateReport, type ClinicalReport } from "@/services/reports";
+import type { ClinicalReport } from "@/services/reports";
 
 type SelectedAsset = {
   file?: Blob;
@@ -109,12 +109,10 @@ export default function UploadEcgScreen() {
       setStage("preprocessing");
       await wait(300);
       setStage("analyzing");
-      await analyzeCase(token, ecgCase.case.id);
-      const completed = await waitForAnalysis(token, ecgCase.case.id);
+      const realAiResult = await analyzeCaseWithRealAI(token, ecgCase.case.id);
       setStage("reporting");
-      const generated = await generateReport(token, ecgCase.case.id);
       setStage("complete");
-      return { analysis: completed, caseId: ecgCase.case.id, report: generated.report };
+      return { analysis: realAiResult.analysis, caseId: ecgCase.case.id, report: realAiResult.report };
     },
     onError: (uploadError) => setError(uploadError instanceof Error ? uploadError.message : "Upload failed."),
     onSuccess: (payload) => {
@@ -283,9 +281,13 @@ export default function UploadEcgScreen() {
           <View style={styles.resultRow}>
             <Badge label={severityBand(analysis.severity)} tone={analysis.severity === "critical" || analysis.severity === "severe" ? "critical" : "success"} />
             <Text style={styles.resultTitle}>{analysis.diagnosis}</Text>
-            <Text style={styles.muted}>Case {caseId} • HR {analysis.heartRate} • Confidence {confidencePercent(analysis.confidenceScore)}%</Text>
+            <Text style={styles.muted}>Case {caseId} • HR {analysis.heartRate} • Confidence {confidencePercent(analysis.confidenceScore)}% • {modelVersionLabel(analysis.aiVersion)}</Text>
           </View>
           <Text style={styles.body}>{analysis.interpretation}</Text>
+          <View style={styles.disclaimerBox}>
+            <Text style={styles.disclaimerTitle}>Clinical Disclaimer</Text>
+            <Text style={styles.disclaimerText}>AI analysis is decision support only and must be reviewed by a qualified physician before diagnosis, treatment, or occupational fitness decisions.</Text>
+          </View>
           {report ? <Text style={styles.muted}>Enterprise report generated: {report.reportNumber}</Text> : null}
         </Card>
       ) : null}
@@ -295,6 +297,13 @@ export default function UploadEcgScreen() {
 
 function confidencePercent(value: number) {
   return Math.round(value <= 1 ? value * 100 : value);
+}
+
+function modelVersionLabel(value: string) {
+  if (value.includes("onnx_runtime")) return value.split(":").slice(-2).join(" • ");
+  if (value.includes("rule")) return "Rule-based fallback";
+  if (value.includes("mock")) return "Mock provider";
+  return value;
 }
 
 function progressIndex(stage: WorkflowStage) {
@@ -322,17 +331,6 @@ function stageLabel(stage: WorkflowStage) {
 
 function wait(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-async function waitForAnalysis(token: string, id: string) {
-  for (let attempt = 0; attempt < 8; attempt++) {
-    await wait(250);
-    const result = await getAIResult(token, id);
-    if (result.analysis?.status === "completed") return result.analysis;
-  }
-  const latest = await getAIResult(token, id);
-  if (latest.analysis) return latest.analysis;
-  throw new Error("AI analysis did not return a result.");
 }
 
 function genderLabel(value: "child" | "female" | "male" | "other" | "unknown") {
@@ -363,6 +361,9 @@ const styles = StyleSheet.create({
   assetCard: { backgroundColor: medicalTheme.card, borderColor: medicalTheme.border, borderRadius: 14, borderWidth: 1, gap: 8, padding: 10, width: 190 },
   assetName: { color: medicalTheme.text, fontSize: 12, fontWeight: "900" },
   body: { color: medicalTheme.text, fontSize: 14, lineHeight: 21 },
+  disclaimerBox: { backgroundColor: "#2A1D08", borderColor: medicalTheme.warning, borderRadius: 12, borderWidth: 1, gap: 4, padding: 12 },
+  disclaimerText: { color: medicalTheme.text, fontSize: 12, lineHeight: 18 },
+  disclaimerTitle: { color: medicalTheme.warning, fontSize: 12, fontWeight: "900", textTransform: "uppercase" },
   dropTitle: { color: medicalTheme.text, fontSize: 18, fontWeight: "900" },
   dropzone: { alignItems: "center", backgroundColor: medicalTheme.surface, borderColor: medicalTheme.border, borderRadius: 18, borderStyle: "dashed", borderWidth: 1, gap: 10, justifyContent: "center", minHeight: 260, overflow: "hidden", padding: 18 },
   error: { color: medicalTheme.critical, fontSize: 13, fontWeight: "800" },

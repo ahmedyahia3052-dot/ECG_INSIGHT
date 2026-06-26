@@ -17,6 +17,7 @@ export default function EcgAnalysisScreen() {
   const [selectedCaseId, setSelectedCaseId] = useState("");
   const [doctorDiagnosis, setDoctorDiagnosis] = useState("");
   const [doctorComments, setDoctorComments] = useState("");
+  const [lastAnalyzeCaseId, setLastAnalyzeCaseId] = useState("");
   const [reviewReport, setReviewReport] = useState<ClinicalReport | null>(null);
   const [reviewMessage, setReviewMessage] = useState("");
 
@@ -47,8 +48,14 @@ export default function EcgAnalysisScreen() {
 
   const analyzeMutation = useMutation({
     mutationFn: (caseId: string) => analyzeCaseWithRealAI(token!, caseId),
+    onMutate: (caseId) => {
+      setLastAnalyzeCaseId(caseId);
+      setReviewMessage("");
+    },
     onSuccess: (payload) => {
       setReviewReport(payload.report);
+      setSelectedCaseId(payload.analysis.caseId);
+      setDoctorDiagnosis(payload.analysis.diagnosis);
       setReviewMessage(`Real AI analysis completed. Report generated: ${payload.report.reportNumber}`);
       void queryClient.invalidateQueries({ queryKey: ["enterprise-analysis-cases", token] });
       void queryClient.invalidateQueries({ queryKey: ["enterprise-ai-history", token] });
@@ -118,6 +125,13 @@ export default function EcgAnalysisScreen() {
         <Card style={styles.panel}>
           <SectionHeader title="Cases Ready For Review" />
           {casesQuery.isLoading ? <Text style={styles.muted}>Loading cases...</Text> : null}
+          {casesQuery.isError ? <ErrorState message="Unable to load ECG cases." onRetry={() => void casesQuery.refetch()} /> : null}
+          {analyzeMutation.isError ? (
+            <ErrorState
+              message={errorMessage(analyzeMutation.error, "Real AI analysis failed.")}
+              onRetry={lastAnalyzeCaseId ? () => analyzeMutation.mutate(lastAnalyzeCaseId) : undefined}
+            />
+          ) : null}
           {!casesQuery.isLoading && !cases.length ? <EmptyState title="No ECG cases" message="Upload an ECG to begin analysis." /> : null}
           {cases.map((item) => (
             <View key={item.id} style={styles.caseRow}>
@@ -127,7 +141,7 @@ export default function EcgAnalysisScreen() {
               </View>
               <Badge label={item.priority} tone={item.priority === "critical" ? "critical" : item.priority === "high" ? "warning" : "primary"} />
               <View style={styles.actions}>
-                <PrimaryButton label={analyzeMutation.isPending ? "Analyzing..." : "Analyze Real AI"} onPress={() => analyzeMutation.mutate(item.id)} variant="outline" />
+                <PrimaryButton disabled={analyzeMutation.isPending} label={analyzeMutation.isPending && lastAnalyzeCaseId === item.id ? "Analyzing..." : "Analyze Real AI"} onPress={() => analyzeMutation.mutate(item.id)} variant="outline" />
                 <PrimaryButton label="Review" onPress={() => {
                   setSelectedCaseId(item.id);
                   setDoctorDiagnosis(item.finalDiagnosis ?? "");
@@ -139,6 +153,8 @@ export default function EcgAnalysisScreen() {
         </Card>
         <Card style={styles.panel}>
           <SectionHeader title="AI Results" subtitle="Latest AI interpretations and confidence scores." />
+          {historyQuery.isLoading ? <Text style={styles.muted}>Loading AI history...</Text> : null}
+          {historyQuery.isError ? <ErrorState message="Unable to load AI history." onRetry={() => void historyQuery.refetch()} /> : null}
           {analyses.length ? analyses.slice(0, 8).map((analysis) => (
             <View key={analysis.id} style={styles.caseRow}>
               <View style={styles.rowMain}>
@@ -165,6 +181,7 @@ export default function EcgAnalysisScreen() {
                 <Badge label={workflowStateForAnalysis(selectedAnalysis)} tone="primary" />
                 {selectedAnalysis ? <Badge label={severityBand(selectedAnalysis.severity)} tone={selectedAnalysis.severity === "critical" || selectedAnalysis.severity === "severe" ? "critical" : "warning"} /> : null}
               </View>
+              {selectedAnalysisQuery.isError ? <ErrorState message="Unable to load selected AI result." onRetry={() => void selectedAnalysisQuery.refetch()} /> : null}
               {selectedAnalysis ? <AnalysisSummary analysis={selectedAnalysis} /> : <Text style={styles.muted}>Analysis result is loading or still queued.</Text>}
               <View style={styles.grid}>
                 <Field label="Doctor Diagnosis" onChangeText={setDoctorDiagnosis} value={doctorDiagnosis} />
@@ -185,6 +202,7 @@ export default function EcgAnalysisScreen() {
           <SectionHeader title="AI Explainability Panel" subtitle="Abnormal leads, detected features, interpretation rationale, and clinical reasoning." />
           {!selectedCaseId ? <EmptyState title="No explainability selected" message="Select a reviewed AI result to inspect clinical reasoning." /> : null}
           {selectedCaseId && explainabilityQuery.isLoading ? <Text style={styles.muted}>Loading explainability...</Text> : null}
+          {selectedCaseId && explainabilityQuery.isError ? <ErrorState message="Unable to load explainability details." onRetry={() => void explainabilityQuery.refetch()} /> : null}
           {explainability ? (
             <View style={styles.reviewStack}>
               <View style={styles.leadGrid}>
@@ -207,6 +225,19 @@ export default function EcgAnalysisScreen() {
       </View>
     </PageSection>
   );
+}
+
+function ErrorState({ message, onRetry }: { message: string; onRetry?: () => void }) {
+  return (
+    <View style={styles.errorBox}>
+      <Text style={styles.errorText}>{message}</Text>
+      {onRetry ? <PrimaryButton label="Retry" onPress={onRetry} variant="outline" /> : null}
+    </View>
+  );
+}
+
+function errorMessage(error: unknown, fallback: string) {
+  return error instanceof Error ? error.message : fallback;
 }
 
 function AnalysisSummary({ analysis }: { analysis: AIAnalysisResult }) {
@@ -267,6 +298,8 @@ const styles = StyleSheet.create({
   disclaimerBox: { backgroundColor: "#2A1D08", borderColor: medicalTheme.warning, borderRadius: 12, borderWidth: 1, gap: 4, padding: 12 },
   disclaimerText: { color: medicalTheme.text, fontSize: 12, lineHeight: 18 },
   disclaimerTitle: { color: medicalTheme.warning, fontSize: 12, fontWeight: "900", textTransform: "uppercase" },
+  errorBox: { backgroundColor: "#351018", borderColor: medicalTheme.critical, borderRadius: 12, borderWidth: 1, gap: 8, padding: 12 },
+  errorText: { color: medicalTheme.critical, fontSize: 13, fontWeight: "800", lineHeight: 19 },
   grid: { flexDirection: "row", flexWrap: "wrap", gap: 16 },
   leadCard: { backgroundColor: "#0B2134", borderColor: medicalTheme.primary, borderRadius: 12, borderWidth: 1, minWidth: 74, padding: 10 },
   leadGrid: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
