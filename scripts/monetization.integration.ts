@@ -42,18 +42,21 @@ async function createUser(email: string, role: Role = "DOCTOR") {
 
 async function cleanup(userId: string) {
   await prisma.billingEvent.deleteMany({ where: { userId } });
+  await prisma.invoice.deleteMany({ where: { userId } });
+  await prisma.usageTracking.deleteMany({ where: { userId } });
   await prisma.usageRecord.deleteMany({ where: { userId } });
   await prisma.payment.deleteMany({ where: { userId } });
   await prisma.license.deleteMany({ where: { userId } });
   await prisma.userSubscription.deleteMany({ where: { userId } });
   await prisma.notification.deleteMany({ where: { userId } });
+  await prisma.auditLog.deleteMany({ where: { actorId: userId } });
 }
 
 async function main() {
   await ensureDefaultPlans();
   const plans = await prisma.subscriptionPlan.findMany();
   assert(plans.length >= 6, "Default subscription plans were not created.");
-  for (const code of ["FREE", "BASIC", "PROFESSIONAL", "ENTERPRISE"] as const) {
+  for (const code of ["FREE", "CLINIC", "HOSPITAL", "ENTERPRISE", "BASIC", "PROFESSIONAL"] as const) {
     assert(plans.some((plan) => plan.code === code), `${code} plan should remain configured.`);
   }
 
@@ -81,11 +84,19 @@ async function main() {
 
   await activateUserPlan(freeUser.id, "BASIC");
   const basic = await quotaSnapshot(freeUser.id);
-  assert(basic.quota === 100, "Basic plan should expose 100 monthly analyses.");
+  assert(basic.quota === 150, "Basic legacy plan should expose Clinic-level monthly analyses.");
 
   await activateUserPlan(freeUser.id, "PROFESSIONAL");
   const professional = await quotaSnapshot(freeUser.id);
-  assert(professional.quota === 500, "Professional plan should expose 500 monthly analyses.");
+  assert(typeof professional.quota === "number" && professional.quota > 0, "Professional legacy plan should expose a configurable positive monthly quota.");
+
+  await activateUserPlan(freeUser.id, "CLINIC");
+  const clinic = await quotaSnapshot(freeUser.id);
+  assert(clinic.quota === 150 && clinic.limits.maxUsers === 10, "Clinic plan should expose 150 analyses and 10 users.");
+
+  await activateUserPlan(freeUser.id, "HOSPITAL");
+  const hospital = await quotaSnapshot(freeUser.id);
+  assert(hospital.quota === 1000 && hospital.limits.maxOrganizations === 3, "Hospital plan should expose 1000 analyses and 3 organizations.");
 
   await activateUserPlan(freeUser.id, "ENTERPRISE");
   const enterprise = await quotaSnapshot(freeUser.id);

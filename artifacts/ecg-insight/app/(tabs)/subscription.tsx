@@ -30,7 +30,7 @@ export default function SubscriptionScreen() {
     <BoltScreen>
       <BoltHero
         eyebrow="Commercial subscription platform"
-        subtitle="Public plans, user quota, and lifetime access state are loaded from existing subscription APIs. Lifetime remains hidden from public plans."
+        subtitle="Pricing, plan limits, billing status, usage quota, and lifetime access are loaded from live subscription APIs."
         title="Subscription"
       />
 
@@ -52,7 +52,7 @@ export default function SubscriptionScreen() {
             <Text style={[styles.meta, { color: colors.textSecondary }]}>
               {mine?.lifetimeAccess.granted
                 ? "Unlimited analyses with no expiration."
-                : `Next reset: ${mine?.quota.nextResetAt?.slice(0, 10) ?? "pending"}`}
+                : `Next reset: ${mine?.quota.nextResetAt?.slice(0, 10) ?? "pending"} · Users ${mine?.quota.limits?.maxUsers ?? "Unlimited"} · Storage ${mine?.quota.limits?.storageQuotaMb ?? "Unlimited"} MB`}
             </Text>
           </BoltCard>
         </>
@@ -74,7 +74,10 @@ export default function SubscriptionScreen() {
               ${(plan.priceCents / 100).toLocaleString()} {plan.currency} · {plan.billingCycle}
             </Text>
             <Text style={[styles.meta, { color: colors.textSecondary }]}>
-              {plan.analysisQuota === null ? "Unlimited analyses" : `${plan.analysisQuota} analyses`} · {plan.multiUser ? "Multi-user" : "Single user"}
+              {plan.analysisQuota === null ? "Unlimited analyses" : `${plan.analysisQuota} analyses/month`} · {plan.maxUsers ?? "Unlimited"} users · {plan.maxOrganizations ?? "Unlimited"} orgs · {plan.storageQuotaMb ?? "Unlimited"} MB
+            </Text>
+            <Text style={[styles.meta, { color: colors.textSecondary }]}>
+              Trial {plan.trialDays} days · Grace {plan.gracePeriodDays} days · AI {Object.entries(plan.aiFeatureAccess ?? {}).filter(([, enabled]) => Boolean(enabled)).map(([feature]) => feature).join(", ") || "basic"}
             </Text>
           </BoltCard>
         ))

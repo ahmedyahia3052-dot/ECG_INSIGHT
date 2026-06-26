@@ -349,7 +349,7 @@ superAdminRouter.post("/users/:userId/subscription/extend", async (req, res, nex
     const subscription = await prisma.userSubscription.findFirst({
       include: { plan: true },
       orderBy: { updatedAt: "desc" },
-      where: { status: "ACTIVE", userId },
+      where: { status: { in: ["ACTIVE", "TRIALING", "PAST_DUE"] }, userId },
     });
     if (!subscription) throw new AppError(404, "Active subscription not found.", "SUBSCRIPTION_NOT_FOUND");
     if (subscription.plan.code === "LIFETIME") throw new AppError(400, "Lifetime access has no expiration date.", "LIFETIME_NO_EXPIRATION");

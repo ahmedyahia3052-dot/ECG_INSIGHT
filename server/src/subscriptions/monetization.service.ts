@@ -4,22 +4,30 @@ import { AppError } from "../middleware/error";
 import { paymentProvider } from "../services/payments";
 
 const defaultPlans: Array<{
+  aiFeatureAccess?: Prisma.InputJsonObject;
   analysisQuota: number | null;
   billingCycle: "DAILY" | "LIFETIME" | "MONTHLY";
   code: SubscriptionTier;
   description: string;
+  gracePeriodDays?: number;
+  maxOrganizations?: number | null;
+  maxUsers?: number | null;
   multiUser?: boolean;
   name: string;
   priceCents: number;
   quotaWindowHours: number | null;
+  storageQuotaMb?: number | null;
   teamManagement?: boolean;
+  trialDays?: number;
 }> = [
-  { analysisQuota: 5, billingCycle: "DAILY", code: "FREE", description: "5 ECG analyses every 24 hours.", name: "Free", priceCents: 0, quotaWindowHours: 24 },
-  { analysisQuota: 100, billingCycle: "MONTHLY", code: "BASIC", description: "100 ECG analyses per month.", name: "Basic", priceCents: 1900, quotaWindowHours: 720 },
-  { analysisQuota: 500, billingCycle: "MONTHLY", code: "PROFESSIONAL", description: "500 ECG analyses per month.", name: "Professional", priceCents: 4900, quotaWindowHours: 720 },
-  { analysisQuota: null, billingCycle: "MONTHLY", code: "UNLIMITED", description: "Unlimited ECG analyses.", name: "Unlimited", priceCents: 9900, quotaWindowHours: 720 },
-  { analysisQuota: null, billingCycle: "LIFETIME", code: "LIFETIME", description: "Owner-granted permanent unlimited access.", name: "Lifetime Premium", priceCents: 0, quotaWindowHours: null },
-  { analysisQuota: null, billingCycle: "MONTHLY", code: "ENTERPRISE", description: "Unlimited analyses with team management.", multiUser: true, name: "Enterprise", priceCents: 19900, quotaWindowHours: 720, teamManagement: true },
+  { aiFeatureAccess: { basicAi: true, copilot: false, realAi: false }, analysisQuota: 5, billingCycle: "MONTHLY", code: "FREE", description: "Starter plan with 5 ECG analyses per month.", maxOrganizations: 1, maxUsers: 1, name: "Free", priceCents: 0, quotaWindowHours: 720, storageQuotaMb: 512, trialDays: 0 },
+  { aiFeatureAccess: { basicAi: true, copilot: true, realAi: false }, analysisQuota: 150, billingCycle: "MONTHLY", code: "CLINIC", description: "Clinic plan for small cardiology teams.", maxOrganizations: 1, maxUsers: 10, multiUser: true, name: "Clinic", priceCents: 4900, quotaWindowHours: 720, storageQuotaMb: 10_240, teamManagement: true, trialDays: 14 },
+  { aiFeatureAccess: { advancedReporting: true, basicAi: true, copilot: true, realAi: true }, analysisQuota: 1_000, billingCycle: "MONTHLY", code: "HOSPITAL", description: "Hospital plan with advanced AI and larger quotas.", maxOrganizations: 3, maxUsers: 75, multiUser: true, name: "Hospital", priceCents: 14900, quotaWindowHours: 720, storageQuotaMb: 102_400, teamManagement: true, trialDays: 14 },
+  { aiFeatureAccess: { advancedReporting: true, apiAccess: true, basicAi: true, copilot: true, realAi: true }, analysisQuota: null, billingCycle: "MONTHLY", code: "ENTERPRISE", description: "Enterprise plan with unlimited analyses and organization management.", maxOrganizations: null, maxUsers: null, multiUser: true, name: "Enterprise", priceCents: 29900, quotaWindowHours: 720, storageQuotaMb: null, teamManagement: true, trialDays: 30 },
+  { aiFeatureAccess: { basicAi: true, copilot: true, realAi: false }, analysisQuota: 150, billingCycle: "MONTHLY", code: "BASIC", description: "Legacy alias for Clinic.", maxOrganizations: 1, maxUsers: 10, multiUser: true, name: "Basic", priceCents: 4900, quotaWindowHours: 720, storageQuotaMb: 10_240, teamManagement: true, trialDays: 14 },
+  { aiFeatureAccess: { advancedReporting: true, basicAi: true, copilot: true, realAi: true }, analysisQuota: 1_000, billingCycle: "MONTHLY", code: "PROFESSIONAL", description: "Legacy alias for Hospital.", maxOrganizations: 3, maxUsers: 75, multiUser: true, name: "Professional", priceCents: 14900, quotaWindowHours: 720, storageQuotaMb: 102_400, teamManagement: true, trialDays: 14 },
+  { aiFeatureAccess: { advancedReporting: true, apiAccess: true, basicAi: true, copilot: true, realAi: true }, analysisQuota: null, billingCycle: "MONTHLY", code: "UNLIMITED", description: "Legacy unlimited enterprise plan.", maxOrganizations: null, maxUsers: null, multiUser: true, name: "Unlimited", priceCents: 29900, quotaWindowHours: 720, storageQuotaMb: null, teamManagement: true, trialDays: 30 },
+  { aiFeatureAccess: { advancedReporting: true, apiAccess: true, basicAi: true, copilot: true, realAi: true }, analysisQuota: null, billingCycle: "LIFETIME", code: "LIFETIME", description: "Owner-granted permanent unlimited access.", maxOrganizations: null, maxUsers: null, name: "Lifetime Premium", priceCents: 0, quotaWindowHours: null, storageQuotaMb: null },
 ];
 
 export async function ensureDefaultPlans() {
@@ -28,17 +36,30 @@ export async function ensureDefaultPlans() {
       prisma.subscriptionPlan.upsert({
         create: {
           active: true,
+          aiFeatureAccess: plan.aiFeatureAccess,
           analysisQuota: plan.analysisQuota,
           billingCycle: plan.billingCycle,
           code: plan.code,
           description: plan.description,
+          gracePeriodDays: plan.gracePeriodDays ?? 7,
+          maxOrganizations: plan.maxOrganizations,
+          maxUsers: plan.maxUsers,
           multiUser: plan.multiUser ?? false,
           name: plan.name,
           priceCents: plan.priceCents,
           quotaWindowHours: plan.quotaWindowHours,
+          storageQuotaMb: plan.storageQuotaMb,
           teamManagement: plan.teamManagement ?? false,
+          trialDays: plan.trialDays ?? 0,
         },
-        update: {},
+        update: {
+          aiFeatureAccess: plan.aiFeatureAccess,
+          gracePeriodDays: plan.gracePeriodDays ?? 7,
+          maxOrganizations: plan.maxOrganizations,
+          maxUsers: plan.maxUsers,
+          storageQuotaMb: plan.storageQuotaMb,
+          trialDays: plan.trialDays ?? 0,
+        },
         where: { code: plan.code },
       }),
     ),
@@ -61,6 +82,7 @@ function windowFor(plan: { billingCycle: string; quotaWindowHours: number | null
 }
 
 async function latestCommercialSubscription(userId: string) {
+  await reconcileSubscriptionLifecycle(userId);
   return prisma.userSubscription.findFirst({
     include: { plan: true },
     orderBy: { updatedAt: "desc" },
@@ -69,6 +91,46 @@ async function latestCommercialSubscription(userId: string) {
       userId,
     },
   });
+}
+
+export async function reconcileSubscriptionLifecycle(userId: string, now = new Date()) {
+  const subscriptions = await prisma.userSubscription.findMany({
+    include: { plan: true },
+    where: { status: { in: ["ACTIVE", "TRIALING", "PAST_DUE"] }, userId },
+  });
+  for (const subscription of subscriptions) {
+    if (subscription.status === "TRIALING" && subscription.trialEndsAt) {
+      const daysLeft = Math.ceil((subscription.trialEndsAt.getTime() - now.getTime()) / (24 * 60 * 60 * 1000));
+      if (daysLeft <= 3 && daysLeft >= 0) {
+        await notifyUser(userId, "Trial ending soon", `Your ${subscription.plan.name} trial ends in ${daysLeft} day(s).`, "WARNING");
+        await createBillingEvent({ message: "Trial ending notification generated.", metadata: { daysLeft, plan: subscription.plan.code }, subscriptionId: subscription.id, type: "TRIAL_ENDING", userId });
+      }
+      if (subscription.trialEndsAt <= now) {
+        const graceEndsAt = new Date(now.getTime() + subscription.plan.gracePeriodDays * 24 * 60 * 60 * 1000);
+        await prisma.userSubscription.update({
+          data: { graceEndsAt, status: "PAST_DUE" },
+          where: { id: subscription.id },
+        });
+        await notifyUser(userId, "Payment required", `Your ${subscription.plan.name} trial ended. Payment is required before ${graceEndsAt.toISOString()}.`, "WARNING");
+        await createBillingEvent({ message: "Subscription moved from trial to grace period.", metadata: { graceEndsAt: graceEndsAt.toISOString(), plan: subscription.plan.code }, subscriptionId: subscription.id, type: "PAYMENT_REQUIRED", userId });
+      }
+    }
+    const graceExpired = subscription.status === "PAST_DUE" && subscription.graceEndsAt && subscription.graceEndsAt <= now;
+    const periodExpired = subscription.status === "ACTIVE" && subscription.expirationDate && subscription.expirationDate <= now;
+    if (graceExpired || periodExpired) {
+      await prisma.userSubscription.update({
+        data: { status: "EXPIRED" },
+        where: { id: subscription.id },
+      });
+      await prisma.subscription.upsert({
+        create: { status: "EXPIRED", tier: subscription.plan.code, userId },
+        update: { status: "EXPIRED", tier: subscription.plan.code },
+        where: { userId },
+      });
+      await notifyUser(userId, "Subscription expired", `Your ${subscription.plan.name} subscription has expired.`, "CRITICAL");
+      await createBillingEvent({ message: "Subscription expired.", metadata: { plan: subscription.plan.code }, subscriptionId: subscription.id, type: "SUBSCRIPTION_EXPIRED", userId });
+    }
+  }
 }
 
 async function activeLifetimeLicense(userId: string) {
@@ -122,6 +184,12 @@ export async function quotaSnapshot(userId: string) {
       }).then((result) => result._sum.quantity ?? 0);
 
   const quota = summary.plan.analysisQuota;
+  const limits = {
+    aiFeatureAccess: summary.plan.aiFeatureAccess,
+    maxOrganizations: summary.plan.maxOrganizations,
+    maxUsers: summary.plan.maxUsers,
+    storageQuotaMb: summary.plan.storageQuotaMb,
+  };
   return {
     canAnalyze: unlimited || used < (quota ?? 0),
     isUnlimited: unlimited,
@@ -129,6 +197,7 @@ export async function quotaSnapshot(userId: string) {
     plan: summary.plan,
     quota,
     remaining: unlimited ? null : Math.max((quota ?? 0) - used, 0),
+    limits,
     subscription: summary.subscription,
     used,
     warning: !unlimited && quota ? used >= Math.floor(quota * 0.8) : false,
@@ -188,6 +257,25 @@ export async function recordAnalysisUsage(userId: string, metadata: Prisma.Input
       windowStart: start,
     },
   });
+  await prisma.usageTracking.upsert({
+    create: {
+      exceeded: !snapshot.isUnlimited && snapshot.quota !== null && 1 > snapshot.quota,
+      metadata: { action: "ECG_ANALYSIS", plan: snapshot.plan.code } as Prisma.InputJsonObject,
+      metric: "ECG_ANALYSIS",
+      quantity: 1,
+      quota: snapshot.quota,
+      subscriptionId,
+      userId,
+      windowEnd: end,
+      windowStart: start,
+    },
+    update: {
+      exceeded: !snapshot.isUnlimited && snapshot.quota !== null ? snapshot.used + 1 > snapshot.quota : false,
+      quantity: { increment: 1 },
+      quota: snapshot.quota,
+    },
+    where: { userId_metric_windowStart_windowEnd: { metric: "ECG_ANALYSIS", userId, windowEnd: end, windowStart: start } },
+  });
   const updated = await quotaSnapshot(userId);
 
   if (updated.warning && updated.quota && updated.used === Math.floor(updated.quota * 0.8)) {
@@ -210,6 +298,64 @@ export async function recordAnalysisUsage(userId: string, metadata: Prisma.Input
   });
 
   return usage;
+}
+
+function invoiceNumber() {
+  const random = Math.random().toString(36).slice(2, 8).toUpperCase();
+  return `INV-${new Date().toISOString().slice(0, 10).replace(/-/g, "")}-${random}`;
+}
+
+export async function createInvoiceForSubscription(subscriptionId: string) {
+  const subscription = await prisma.userSubscription.findUnique({
+    include: { plan: true, user: true },
+    where: { id: subscriptionId },
+  });
+  if (!subscription) throw new AppError(404, "Subscription not found.", "SUBSCRIPTION_NOT_FOUND");
+  const dueAt = new Date(Date.now() + subscription.plan.gracePeriodDays * 24 * 60 * 60 * 1000);
+  const invoice = await prisma.invoice.create({
+    data: {
+      amountCents: subscription.plan.priceCents,
+      currency: subscription.plan.currency,
+      dueAt,
+      invoiceNumber: invoiceNumber(),
+      lineItems: {
+        items: [
+          {
+            amountCents: subscription.plan.priceCents,
+            description: `${subscription.plan.name} subscription`,
+            planCode: subscription.plan.code,
+            quantity: 1,
+          },
+        ],
+      } as Prisma.InputJsonObject,
+      planId: subscription.planId,
+      status: subscription.plan.priceCents === 0 ? "PAID" : "PENDING",
+      subscriptionId: subscription.id,
+      userId: subscription.userId,
+      paidAt: subscription.plan.priceCents === 0 ? new Date() : undefined,
+    },
+  });
+  await createBillingEvent({
+    message: `Invoice ${invoice.invoiceNumber} generated for ${subscription.plan.name}.`,
+    metadata: { amountCents: invoice.amountCents, invoiceId: invoice.id, plan: subscription.plan.code } as Prisma.InputJsonObject,
+    subscriptionId: subscription.id,
+    type: "PAYMENT_REQUIRED",
+    userId: subscription.userId,
+  });
+  await prisma.auditLog.create({
+    data: {
+      action: "INVOICE_CREATED",
+      actorId: subscription.userId,
+      entityId: invoice.id,
+      entityType: "Invoice",
+      message: `Invoice ${invoice.invoiceNumber} generated.`,
+      metadata: { subscriptionId: subscription.id, userId: subscription.userId } as Prisma.InputJsonObject,
+    },
+  });
+  if (invoice.status === "PENDING") {
+    await notifyUser(subscription.userId, "Payment required", `Invoice ${invoice.invoiceNumber} is due by ${dueAt.toISOString()}.`, "WARNING");
+  }
+  return invoice;
 }
 
 export async function grantLifetimeLicense(userId: string, grantedById: string, reason?: string) {
@@ -267,6 +413,7 @@ export async function activateUserPlan(userId: string, planCode: SubscriptionTie
   if (!plan) throw new AppError(404, "Subscription plan not found.", "PLAN_NOT_FOUND");
   const now = new Date();
   const { end } = windowFor(plan, now);
+  const trialEndsAt = plan.trialDays > 0 ? new Date(now.getTime() + plan.trialDays * 24 * 60 * 60 * 1000) : null;
   const subscription = await prisma.userSubscription.create({
     data: {
       currentPeriodEnd: plan.billingCycle === "LIFETIME" ? null : end,
@@ -274,22 +421,25 @@ export async function activateUserPlan(userId: string, planCode: SubscriptionTie
       expirationDate: plan.billingCycle === "LIFETIME" ? null : end,
       planId: plan.id,
       renewalDate: plan.billingCycle === "LIFETIME" ? null : end,
-      status: "ACTIVE",
+      status: trialEndsAt ? "TRIALING" : "ACTIVE",
+      trialEndsAt,
       userId,
     },
   });
   await prisma.subscription.upsert({
-    create: { status: "ACTIVE", tier: plan.code, userId },
-    update: { status: "ACTIVE", tier: plan.code },
+    create: { currentPeriodEnd: end, currentPeriodStart: now, status: trialEndsAt ? "TRIALING" : "ACTIVE", tier: plan.code, userId },
+    update: { currentPeriodEnd: end, currentPeriodStart: now, status: trialEndsAt ? "TRIALING" : "ACTIVE", tier: plan.code },
     where: { userId },
   });
+  const invoice = await createInvoiceForSubscription(subscription.id);
   await createBillingEvent({
-    message: `Subscription activated for ${plan.name}.`,
-    metadata: { plan: plan.code },
+    message: trialEndsAt ? `Trial started for ${plan.name}.` : `Subscription activated for ${plan.name}.`,
+    metadata: { invoiceId: invoice.id, plan: plan.code, trialEndsAt: trialEndsAt?.toISOString() },
     subscriptionId: subscription.id,
     type: "SUBSCRIPTION_UPDATED",
     userId,
   });
+  await notifyUser(userId, trialEndsAt ? "Trial started" : "Subscription activated", trialEndsAt ? `Your ${plan.name} trial ends on ${trialEndsAt.toISOString()}.` : `Your ${plan.name} subscription is active.`, "SUCCESS");
   return subscription;
 }
 
