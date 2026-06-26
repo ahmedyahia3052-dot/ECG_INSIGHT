@@ -45,6 +45,13 @@ python -m training.train_first_ptbxl_model --prepare --max-records 40 --epochs 4
 
 This downloads a tiny PTB-XL subset, writes a 70/15/15 manifest, trains the baseline CNN, evaluates test metrics, exports `model.onnx`, and saves `sample_predictions.json`.
 
+Google Colab training workflow:
+
+```bash
+# Open the repository-root train_ecg_colab.ipynb in Google Colab.
+# See GOOGLE_COLAB_TRAINING_GUIDE.md for the full T4 GPU workflow.
+```
+
 ## Current Status
 
 Scaffold only. Models, training weights, dataset manifests, and production integration are intentionally absent until clinical validation assets are available.
