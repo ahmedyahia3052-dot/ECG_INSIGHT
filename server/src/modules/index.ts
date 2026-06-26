@@ -38,6 +38,7 @@ import { superAdminRouter } from "./super-admin/super-admin.routes";
 import { uploadsRouter } from "../uploads/uploads.routes";
 import { usersRouter } from "../users/users.routes";
 import {
+  companiesRouter,
   contractorsRouter,
   departmentsRouter,
   employeesRouter,
@@ -60,6 +61,7 @@ modulesRouter.use("/assistant", assistantRouter);
 modulesRouter.use("/ai", aiRouter);
 modulesRouter.use("/alerts", alertsRouter);
 modulesRouter.use("/clinical-alerts", clinicalAlertsRouter);
+modulesRouter.use("/companies", companiesRouter);
 modulesRouter.use("/analytics", populationAnalyticsRouter);
 modulesRouter.use("/backup", backupRouter);
 modulesRouter.use("/cases", casesRouter);

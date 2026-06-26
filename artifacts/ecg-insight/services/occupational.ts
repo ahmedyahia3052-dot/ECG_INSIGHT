@@ -1,6 +1,7 @@
 import { apiRequest } from "./api";
 
 export interface OccupationalRiskProfile {
+  customProfileName?: string;
   diabetes: boolean;
   dyslipidemia: boolean;
   employeeId: string;
@@ -9,6 +10,15 @@ export interface OccupationalRiskProfile {
   hypertension: boolean;
   id: string;
   obesity: boolean;
+  profileType:
+    | "driver"
+    | "crane_operator"
+    | "heavy_equipment_operator"
+    | "work_at_heights"
+    | "confined_spaces"
+    | "office_worker"
+    | "food_handler"
+    | "custom";
   previousMI: boolean;
   previousStroke: boolean;
   riskScore: number;

@@ -1,12 +1,23 @@
 import { z } from "zod";
 
 export const occupationalRiskSchema = z.object({
+  customProfileName: z.string().trim().max(160).optional(),
   diabetes: z.boolean().default(false),
   dyslipidemia: z.boolean().default(false),
   familyHistory: z.boolean().default(false),
   hypertension: z.boolean().default(false),
   obesity: z.boolean().default(false),
   occupationalExposure: z.record(z.string(), z.unknown()).optional(),
+  profileType: z.enum([
+    "driver",
+    "crane_operator",
+    "heavy_equipment_operator",
+    "work_at_heights",
+    "confined_spaces",
+    "office_worker",
+    "food_handler",
+    "custom",
+  ]).default("office_worker"),
   previousMI: z.boolean().default(false),
   previousStroke: z.boolean().default(false),
   smoking: z.boolean().default(false),

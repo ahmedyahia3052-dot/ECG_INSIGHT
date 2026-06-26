@@ -5,20 +5,24 @@ import { useAuth } from "@/context/AuthContext";
 import { useColors } from "@/hooks/useColors";
 import {
   createContractorCompany,
+  createCompany,
   createDepartment,
   createEmployee,
   createWorkforceOrganization,
   deleteContractorCompany,
+  deleteCompany,
   deleteDepartment,
   deleteEmployee,
   deleteWorkforceOrganization,
   listContractorCompanies,
+  listCompanies,
   listDepartments,
   listEmployees,
   listWorkforceOrganizations,
   updateEmployee,
   type ContractorCompany,
   type Employee,
+  type WorkforceCompany,
   type WorkforceDepartment,
   type WorkforceOrganization,
 } from "@/services/workforce";
@@ -67,12 +71,47 @@ export default function WorkforceDashboardScreen() {
           titleForItem={(organization) => organization.name}
         />
 
+        <WorkflowCrudPanel<WorkforceCompany>
+          createFields={[
+            { key: "name", label: "Company name" },
+            { key: "organizationId", label: "Organization ID" },
+            { key: "registrationNumber", label: "Registration number" },
+            { key: "email", label: "Email" },
+            { key: "phone", label: "Phone" },
+          ]}
+          createItem={(input) =>
+            createCompany(authToken!.token, {
+              email: input.email,
+              name: input.name,
+              organizationId: input.organizationId,
+              phone: input.phone,
+              registrationNumber: input.registrationNumber,
+              status: "active",
+            })
+          }
+          deleteItem={(id) => deleteCompany(authToken!.token, id)}
+          detailText={(company) => `${company.status} · Org ${company.organizationId} · ${company.registrationNumber ?? "No registration"}`}
+          emptyText="No companies match the current search and filters."
+          filters={[{ key: "status", label: "Status", options: [
+            { label: "Active", value: "active" },
+            { label: "Inactive", value: "inactive" },
+          ] }]}
+          itemsFromResponse={(response) => (response as { companies?: WorkforceCompany[] } | undefined)?.companies ?? []}
+          listItems={(params) => listCompanies(authToken!.token, params)}
+          queryKey={["workforce-companies", authToken?.token]}
+          searchPlaceholder="Search companies"
+          subtitle="Create and manage companies beneath enterprise organizations."
+          title="Companies"
+          titleForItem={(company) => company.name}
+        />
+
         <WorkflowCrudPanel<WorkforceDepartment>
           createFields={[
             { key: "name", label: "Name" },
             { key: "organizationId", label: "Organization ID" },
+            { key: "companyId", label: "Company ID" },
           ]}
-          createItem={(input) => createDepartment(authToken!.token, { name: input.name, organizationId: input.organizationId })}
+          createItem={(input) => createDepartment(authToken!.token, { companyId: input.companyId, name: input.name, organizationId: input.organizationId })}
           deleteItem={(id) => deleteDepartment(authToken!.token, id)}
           detailText={(department) => `Organization ${department.organizationId}`}
           emptyText="No departments match the current search and filters."
@@ -89,12 +128,14 @@ export default function WorkforceDashboardScreen() {
           createFields={[
             { key: "name", label: "Name" },
             { key: "organizationId", label: "Organization ID" },
+            { key: "companyId", label: "Company ID" },
             { key: "email", label: "Email" },
             { key: "phone", label: "Phone" },
           ]}
           createItem={(input) =>
             createContractorCompany(authToken!.token, {
               email: input.email,
+              companyId: input.companyId,
               name: input.name,
               organizationId: input.organizationId,
               phone: input.phone,
@@ -123,15 +164,22 @@ export default function WorkforceDashboardScreen() {
             { key: "employeeId", label: "Employee ID" },
             { key: "nationalId", label: "National ID" },
             { key: "organizationId", label: "Organization ID" },
+            { key: "companyId", label: "Company ID" },
             { key: "departmentId", label: "Department ID" },
+            { key: "contractorCompanyId", label: "Contractor ID" },
             { key: "dateOfBirth", label: "Date of birth", placeholder: "YYYY-MM-DD" },
             { key: "gender", label: "Gender", placeholder: "male, female, other, or unknown" },
             { key: "jobTitle", label: "Job title" },
+            { key: "workLocation", label: "Work location" },
+            { key: "riskCategory", label: "Risk category" },
+            { key: "medicalRestrictions", label: "Medical restrictions", placeholder: "Comma-separated restrictions" },
             { key: "email", label: "Email" },
           ]}
           createItem={(input) =>
             createEmployee(authToken!.token, {
               dateOfBirth: input.dateOfBirth,
+              companyId: input.companyId,
+              contractorCompanyId: input.contractorCompanyId,
               departmentId: input.departmentId,
               email: input.email,
               employeeId: input.employeeId,
@@ -139,9 +187,12 @@ export default function WorkforceDashboardScreen() {
               fullName: input.fullName,
               gender: (input.gender || "unknown") as Employee["gender"],
               jobTitle: input.jobTitle,
+              medicalRestrictions: input.medicalRestrictions ? input.medicalRestrictions.split(",").map((item) => item.trim()).filter(Boolean) : [],
               medicalFitnessStatus: "unknown",
               nationalId: input.nationalId,
               organizationId: input.organizationId,
+              riskCategory: input.riskCategory,
+              workLocation: input.workLocation,
             })
           }
           deleteItem={(id) => deleteEmployee(authToken!.token, id)}
@@ -166,6 +217,8 @@ export default function WorkforceDashboardScreen() {
             { key: "phone", label: "Phone" },
             { key: "employmentStatus", label: "Employment status" },
             { key: "medicalFitnessStatus", label: "Medical fitness status" },
+            { key: "workLocation", label: "Work location" },
+            { key: "riskCategory", label: "Risk category" },
           ]}
           updateItem={(id, input) => updateEmployee(authToken!.token, id, input)}
         />

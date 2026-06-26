@@ -220,6 +220,17 @@ enum WorkCategory {
   EMERGENCY_RESPONSE
 }
 
+enum OccupationalRiskProfileType {
+  DRIVER
+  CRANE_OPERATOR
+  HEAVY_EQUIPMENT_OPERATOR
+  WORK_AT_HEIGHTS
+  CONFINED_SPACES
+  OFFICE_WORKER
+  FOOD_HANDLER
+  CUSTOM
+}
+
 enum OccupationalFitnessDecision {
   FIT_FOR_WORK
   FIT_WITH_RESTRICTIONS
@@ -625,6 +636,9 @@ enum AuditAction {
   ORGANIZATION_DELETED
   DEPARTMENT_DELETED
   CONTRACTOR_DELETED
+  COMPANY_CREATED
+  COMPANY_UPDATED
+  COMPANY_DELETED
   ECG_FILE_DELETED
   NOTIFICATION_UPDATED
   NOTIFICATION_DELETED
@@ -780,6 +794,7 @@ model Patient {
   nationalId             String?                @unique
   passportNumber         String?                @unique
   organizationId         String?
+  companyId              String?
   departmentId           String?
   contractorId           String?
   contractorCompanyId    String?
@@ -788,7 +803,11 @@ model Patient {
   contractorName         String?
   occupation             String?
   jobTitle               String?
+  workLocation           String?
   hireDate               DateTime?
+  riskCategory           String?
+  fitnessStatus          String?
+  medicalRestrictions    String[]               @default([])
   bloodGroup             String?
   maritalStatus          String?
   emergencyContactName   String?
@@ -825,6 +844,7 @@ model Patient {
   createdAt              DateTime               @default(now())
   updatedAt              DateTime               @updatedAt
   organization           Organization?          @relation(fields: [organizationId], references: [id])
+  companyRelation        Company?               @relation(fields: [companyId], references: [id])
   department             Department?            @relation(fields: [departmentId], references: [id])
   contractor             Contractor?            @relation(fields: [contractorId], references: [id])
   contractorCompany      ContractorCompany?     @relation(fields: [contractorCompanyId], references: [id])
@@ -865,6 +885,7 @@ model Patient {
   @@index([employeeId])
   @@index([medicalRecordNumber])
   @@index([organizationId])
+  @@index([companyId])
   @@index([departmentId])
   @@index([contractorId])
   @@index([contractorCompanyId])
@@ -884,6 +905,7 @@ model Organization {
   logo                   String?
   status                 OrganizationStatus       @default(ACTIVE)
   createdAt              DateTime                 @default(now())
+  companies              Company[]
   departments            Department[]
   contractors            Contractor[]
   contractorCompanies    ContractorCompany[]
@@ -910,11 +932,35 @@ model Organization {
   @@index([type])
 }
 
+model Company {
+  id                  String              @id @default(cuid())
+  organizationId      String
+  name                String
+  registrationNumber  String?
+  address             String?
+  phone               String?
+  email               String?
+  status              OrganizationStatus  @default(ACTIVE)
+  createdAt           DateTime            @default(now())
+  updatedAt           DateTime            @updatedAt
+  organization        Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  contractors         ContractorCompany[]
+  departments         Department[]
+  employees           Employee[]
+  patients            Patient[]
+
+  @@unique([organizationId, name])
+  @@index([organizationId])
+  @@index([status])
+}
+
 model Department {
   id                     String          @id @default(cuid())
   organizationId         String
+  companyId              String?
   name                   String
   organization           Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  company                Company?        @relation(fields: [companyId], references: [id], onDelete: SetNull)
   employees              Employee[]
   patients               Patient[]
   clinicalDecisionAlerts ClinicalAlert[]
@@ -923,11 +969,13 @@ model Department {
 
   @@unique([organizationId, name])
   @@index([organizationId])
+  @@index([companyId])
 }
 
 model ContractorCompany {
   id                     String             @id @default(cuid())
   organizationId         String
+  companyId              String?
   name                   String
   address                String?
   phone                  String?
@@ -935,6 +983,7 @@ model ContractorCompany {
   status                 OrganizationStatus @default(ACTIVE)
   createdAt              DateTime           @default(now())
   organization           Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  company                Company?           @relation(fields: [companyId], references: [id], onDelete: SetNull)
   employees              Employee[]
   patients               Patient[]
   clinicalDecisionAlerts ClinicalAlert[]
@@ -942,12 +991,14 @@ model ContractorCompany {
 
   @@unique([organizationId, name])
   @@index([organizationId])
+  @@index([companyId])
   @@index([status])
 }
 
 model Employee {
   id                      String                   @id @default(cuid())
   organizationId          String
+  companyId               String?
   departmentId            String
   contractorCompanyId     String?
   employeeId              String
@@ -958,10 +1009,13 @@ model Employee {
   phone                   String?
   email                   String?
   jobTitle                String?
+  workLocation            String?
   employmentStatus        EmploymentStatus         @default(ACTIVE)
   hiringDate              DateTime?
   retirementDate          DateTime?
   medicalFitnessStatus    MedicalFitnessStatus     @default(UNKNOWN)
+  riskCategory            String?
+  medicalRestrictions     String[]                 @default([])
   workCategory            WorkCategory             @default(MODERATE)
   criticalJob             Boolean                  @default(false)
   shiftWorker             Boolean                  @default(false)
@@ -975,6 +1029,7 @@ model Employee {
   createdAt               DateTime                 @default(now())
   updatedAt               DateTime                 @updatedAt
   organization            Organization             @relation(fields: [organizationId], references: [id])
+  company                 Company?                 @relation(fields: [companyId], references: [id], onDelete: SetNull)
   department              Department               @relation(fields: [departmentId], references: [id])
   contractorCompany       ContractorCompany?       @relation(fields: [contractorCompanyId], references: [id])
   patient                 Patient?
@@ -986,6 +1041,7 @@ model Employee {
   @@unique([organizationId, employeeId])
   @@unique([nationalId])
   @@index([organizationId])
+  @@index([companyId])
   @@index([departmentId])
   @@index([contractorCompanyId])
   @@index([employmentStatus])
@@ -998,6 +1054,8 @@ model Employee {
 model OccupationalRiskProfile {
   id                   String   @id @default(cuid())
   employeeId           String   @unique
+  profileType          OccupationalRiskProfileType @default(OFFICE_WORKER)
+  customProfileName    String?
   smoking              Boolean  @default(false)
   diabetes             Boolean  @default(false)
   hypertension         Boolean  @default(false)

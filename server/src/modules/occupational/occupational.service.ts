@@ -2,6 +2,7 @@ import type {
   Employee,
   FitnessAssessment,
   OccupationalFitnessDecision,
+  OccupationalRiskProfileType,
   OccupationalRiskProfile,
   Patient,
   Prisma,
@@ -32,6 +33,17 @@ export const decisionMap = {
 
 export type RestrictionInput = keyof typeof restrictionMap;
 export type DecisionInput = keyof typeof decisionMap;
+
+export const profileTypeMap: Record<string, OccupationalRiskProfileType> = {
+  confined_spaces: "CONFINED_SPACES",
+  crane_operator: "CRANE_OPERATOR",
+  custom: "CUSTOM",
+  driver: "DRIVER",
+  food_handler: "FOOD_HANDLER",
+  heavy_equipment_operator: "HEAVY_EQUIPMENT_OPERATOR",
+  office_worker: "OFFICE_WORKER",
+  work_at_heights: "WORK_AT_HEIGHTS",
+};
 
 function recommendationText(decision: OccupationalFitnessDecision) {
   return decision
@@ -66,9 +78,10 @@ export function calculateRiskScore(profile: {
   obesity?: boolean;
   previousMI?: boolean;
   previousStroke?: boolean;
+  profileType?: OccupationalRiskProfileType | string;
   smoking?: boolean;
 }) {
-  return [
+  const medicalScore = [
     profile.smoking,
     profile.diabetes,
     profile.hypertension,
@@ -78,6 +91,17 @@ export function calculateRiskScore(profile: {
     profile.previousMI,
     profile.previousStroke,
   ].reduce((score, value, index) => score + (value ? (index >= 6 ? 3 : 1) : 0), 0);
+  const exposureScore: Record<string, number> = {
+    CONFINED_SPACES: 2,
+    CRANE_OPERATOR: 3,
+    CUSTOM: 1,
+    DRIVER: 2,
+    FOOD_HANDLER: 1,
+    HEAVY_EQUIPMENT_OPERATOR: 3,
+    OFFICE_WORKER: 0,
+    WORK_AT_HEIGHTS: 3,
+  };
+  return medicalScore + (exposureScore[String(profile.profileType ?? "OFFICE_WORKER").toUpperCase()] ?? 0);
 }
 
 export async function getAssessmentInputs(employeeId: string) {
@@ -132,6 +156,7 @@ export function recommendFitness(input: Awaited<ReturnType<typeof getAssessmentI
     obesity: profile?.obesity ?? cardiacHistory?.obesity,
     previousMI: profile?.previousMI ?? cardiacHistory?.myocardialInfarctionHistory,
     previousStroke: profile?.previousStroke ?? cardiacHistory?.previousStroke,
+    profileType: profile?.profileType,
     smoking: profile?.smoking ?? cardiacHistory?.smokingStatus === "CURRENT",
   });
   const safetySensitive =
@@ -140,17 +165,22 @@ export function recommendFitness(input: Awaited<ReturnType<typeof getAssessmentI
     input.workAtHeight ||
     input.confinedSpace ||
     input.heavyEquipmentOperator ||
+    profile?.profileType === "DRIVER" ||
+    profile?.profileType === "CRANE_OPERATOR" ||
+    profile?.profileType === "HEAVY_EQUIPMENT_OPERATOR" ||
+    profile?.profileType === "WORK_AT_HEIGHTS" ||
+    profile?.profileType === "CONFINED_SPACES" ||
     input.offshoreWorker ||
     input.firefighter ||
     input.emergencyResponder;
 
   const restrictions: RestrictionType[] = [];
-  if (input.workAtHeight) restrictions.push("NO_WORK_AT_HEIGHT");
-  if (input.drivingDuty) restrictions.push("NO_DRIVING");
-  if (input.confinedSpace) restrictions.push("NO_CONFINED_SPACE");
+  if (input.workAtHeight || profile?.profileType === "WORK_AT_HEIGHTS") restrictions.push("NO_WORK_AT_HEIGHT");
+  if (input.drivingDuty || profile?.profileType === "DRIVER") restrictions.push("NO_DRIVING");
+  if (input.confinedSpace || profile?.profileType === "CONFINED_SPACES") restrictions.push("NO_CONFINED_SPACE");
   if (input.shiftWorker) restrictions.push("NO_NIGHT_SHIFTS");
   if (input.offshoreWorker) restrictions.push("NO_OFFSHORE_DUTY");
-  if (input.heavyEquipmentOperator) restrictions.push("NO_HEAVY_EQUIPMENT");
+  if (input.heavyEquipmentOperator || profile?.profileType === "HEAVY_EQUIPMENT_OPERATOR" || profile?.profileType === "CRANE_OPERATOR") restrictions.push("NO_HEAVY_EQUIPMENT");
   if (input.firefighter || input.emergencyResponder) restrictions.push("NO_EMERGENCY_RESPONSE");
 
   let decision: OccupationalFitnessDecision = "FIT_FOR_WORK";
@@ -193,6 +223,7 @@ export function recommendFitness(input: Awaited<ReturnType<typeof getAssessmentI
         shiftWorker: input.shiftWorker,
         workAtHeight: input.workAtHeight,
         workCategory: input.workCategory,
+        workLocation: input.workLocation,
       },
       latestAnalysis,
       latestMeasurement,
@@ -202,6 +233,7 @@ export function recommendFitness(input: Awaited<ReturnType<typeof getAssessmentI
     },
     occupationalReportSection: {
       finalFitnessDecision: recommendationText(decision),
+      jobRiskProfile: profile?.profileType ?? "OFFICE_WORKER",
       physicianJustification: reasons.join(" "),
       restrictions: outputRestrictions.map(defaultRestrictionDescription),
       reviewDate: decision === "FIT_FOR_WORK" ? null : new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString(),
@@ -254,6 +286,7 @@ export function serializeAssessment(assessment: FitnessAssessment & { restrictio
 
 export function serializeRiskProfile(profile: OccupationalRiskProfile) {
   return {
+    customProfileName: profile.customProfileName ?? undefined,
     createdAt: profile.createdAt.toISOString(),
     diabetes: profile.diabetes,
     dyslipidemia: profile.dyslipidemia,
@@ -266,6 +299,7 @@ export function serializeRiskProfile(profile: OccupationalRiskProfile) {
     occupationalExposure: profile.occupationalExposure,
     previousMI: profile.previousMI,
     previousStroke: profile.previousStroke,
+    profileType: profile.profileType.toLowerCase(),
     riskScore: profile.riskScore,
     smoking: profile.smoking,
     updatedAt: profile.updatedAt.toISOString(),

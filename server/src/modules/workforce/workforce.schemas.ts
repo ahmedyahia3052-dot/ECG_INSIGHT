@@ -13,16 +13,19 @@ export const organizationBodySchema = z.object({
 export const organizationUpdateSchema = organizationBodySchema.partial();
 
 export const departmentBodySchema = z.object({
+  companyId: z.string().trim().optional(),
   name: z.string().trim().min(1).max(160),
   organizationId: z.string().trim().min(1),
 });
 
 export const departmentUpdateSchema = z.object({
+  companyId: z.string().trim().optional(),
   name: z.string().trim().min(1).max(160).optional(),
 });
 
 export const contractorBodySchema = z.object({
   address: z.string().trim().max(500).optional(),
+  companyId: z.string().trim().optional(),
   email: z.string().email().optional(),
   name: z.string().trim().min(1).max(160),
   organizationId: z.string().trim().min(1),
@@ -32,7 +35,20 @@ export const contractorBodySchema = z.object({
 
 export const contractorUpdateSchema = contractorBodySchema.omit({ organizationId: true }).partial();
 
+export const companyBodySchema = z.object({
+  address: z.string().trim().max(500).optional(),
+  email: z.string().email().optional(),
+  name: z.string().trim().min(1).max(160),
+  organizationId: z.string().trim().min(1),
+  phone: z.string().trim().max(40).optional(),
+  registrationNumber: z.string().trim().max(120).optional(),
+  status: z.enum(["active", "inactive"]).default("active"),
+});
+
+export const companyUpdateSchema = companyBodySchema.omit({ organizationId: true }).partial();
+
 export const employeeBodySchema = z.object({
+  companyId: z.string().trim().optional(),
   confinedSpace: z.boolean().default(false),
   contractorCompanyId: z.string().trim().optional(),
   criticalJob: z.boolean().default(false),
@@ -49,6 +65,7 @@ export const employeeBodySchema = z.object({
   heavyEquipmentOperator: z.boolean().default(false),
   hiringDate: z.coerce.date().optional(),
   jobTitle: z.string().trim().max(160).optional(),
+  medicalRestrictions: z.array(z.string().trim().min(1).max(240)).default([]),
   medicalFitnessStatus: z
     .enum(["fit", "fit_with_restrictions", "temporarily_unfit", "permanently_unfit", "refer_to_cardiologist", "unknown"])
     .default("unknown"),
@@ -57,9 +74,11 @@ export const employeeBodySchema = z.object({
   organizationId: z.string().trim().min(1),
   phone: z.string().trim().max(40).optional(),
   retirementDate: z.coerce.date().optional(),
+  riskCategory: z.string().trim().max(120).optional(),
   shiftWorker: z.boolean().default(false),
   workAtHeight: z.boolean().default(false),
   workCategory: z.enum(["administrative", "light", "moderate", "heavy", "safety_critical", "offshore", "emergency_response"]).default("moderate"),
+  workLocation: z.string().trim().max(160).optional(),
 });
 
 export const employeeUpdateSchema = employeeBodySchema.partial();
@@ -72,6 +91,7 @@ export const listQuerySchema = z.object({
 
 export const employeeListQuerySchema = listQuerySchema.extend({
   contractorCompanyId: z.string().trim().optional(),
+  companyId: z.string().trim().optional(),
   departmentId: z.string().trim().optional(),
   employmentStatus: z.enum(["active", "inactive", "retired", "terminated", "on_leave"]).optional(),
   medicalFitnessStatus: z

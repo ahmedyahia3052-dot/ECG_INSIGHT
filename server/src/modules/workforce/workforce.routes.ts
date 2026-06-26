@@ -1,4 +1,5 @@
 import type {
+  Company,
   Employee,
   EmploymentStatus,
   Gender,
@@ -15,6 +16,8 @@ import { AppError } from "../../middleware/error";
 import { validateBody } from "../../middleware/validate";
 import { assertResourceAccess, canAccessEmployee } from "../../utils/resource-access";
 import {
+  companyBodySchema,
+  companyUpdateSchema,
   contractorBodySchema,
   contractorUpdateSchema,
   departmentBodySchema,
@@ -30,11 +33,12 @@ import {
 } from "./workforce.schemas";
 
 export const organizationsRouter = Router();
+export const companiesRouter = Router();
 export const departmentsRouter = Router();
 export const contractorsRouter = Router();
 export const employeesRouter = Router();
 
-const routers = [organizationsRouter, departmentsRouter, contractorsRouter, employeesRouter];
+const routers = [organizationsRouter, companiesRouter, departmentsRouter, contractorsRouter, employeesRouter];
 for (const router of routers) router.use(requireAuth);
 
 const genderMap: Record<"female" | "male" | "other" | "unknown", Gender> = {
@@ -81,6 +85,7 @@ function organizationStatus(value: string): OrganizationStatus {
 
 function serializeEmployee(employee: Employee) {
   return {
+    companyId: employee.companyId ?? undefined,
     contractorCompanyId: employee.contractorCompanyId ?? undefined,
     confinedSpace: employee.confinedSpace,
     createdAt: employee.createdAt.toISOString(),
@@ -99,22 +104,46 @@ function serializeEmployee(employee: Employee) {
     hiringDate: employee.hiringDate?.toISOString().slice(0, 10),
     id: employee.id,
     jobTitle: employee.jobTitle ?? undefined,
+    medicalRestrictions: employee.medicalRestrictions,
     medicalFitnessStatus: employee.medicalFitnessStatus.toLowerCase(),
     nationalId: employee.nationalId,
     offshoreWorker: employee.offshoreWorker,
     organizationId: employee.organizationId,
     phone: employee.phone ?? undefined,
+    riskCategory: employee.riskCategory ?? undefined,
     retirementDate: employee.retirementDate?.toISOString().slice(0, 10),
     shiftWorker: employee.shiftWorker,
     updatedAt: employee.updatedAt.toISOString(),
     workAtHeight: employee.workAtHeight,
     workCategory: employee.workCategory.toLowerCase(),
+    workLocation: employee.workLocation ?? undefined,
+  };
+}
+
+function serializeCompany(company: Company) {
+  return {
+    address: company.address ?? undefined,
+    createdAt: company.createdAt.toISOString(),
+    email: company.email ?? undefined,
+    id: company.id,
+    name: company.name,
+    organizationId: company.organizationId,
+    phone: company.phone ?? undefined,
+    registrationNumber: company.registrationNumber ?? undefined,
+    status: company.status.toLowerCase(),
+    updatedAt: company.updatedAt.toISOString(),
   };
 }
 
 async function assertDepartmentBelongsToOrganization(departmentId: string, organizationId: string) {
   const department = await prisma.department.findFirst({ where: { id: departmentId, organizationId } });
   if (!department) throw new AppError(400, "Department does not belong to this organization.", "INVALID_DEPARTMENT");
+}
+
+async function assertCompanyBelongsToOrganization(companyId: string | undefined, organizationId: string) {
+  if (!companyId) return;
+  const company = await prisma.company.findFirst({ where: { id: companyId, organizationId } });
+  if (!company) throw new AppError(400, "Company does not belong to this organization.", "INVALID_COMPANY");
 }
 
 async function assertContractorBelongsToOrganization(contractorCompanyId: string | undefined, organizationId: string) {
@@ -129,6 +158,7 @@ async function assertContractorBelongsToOrganization(contractorCompanyId: string
 
 function employeeCreateData(body: EmployeeBody) {
   return {
+    companyId: body.companyId,
     confinedSpace: body.confinedSpace,
     contractorCompanyId: body.contractorCompanyId,
     criticalJob: body.criticalJob,
@@ -145,20 +175,24 @@ function employeeCreateData(body: EmployeeBody) {
     heavyEquipmentOperator: body.heavyEquipmentOperator,
     hiringDate: body.hiringDate,
     jobTitle: body.jobTitle,
+    medicalRestrictions: body.medicalRestrictions,
     medicalFitnessStatus: fitnessStatusMap[body.medicalFitnessStatus],
     nationalId: body.nationalId,
     offshoreWorker: body.offshoreWorker,
     organizationId: body.organizationId,
     phone: body.phone,
+    riskCategory: body.riskCategory,
     retirementDate: body.retirementDate,
     shiftWorker: body.shiftWorker,
     workAtHeight: body.workAtHeight,
     workCategory: workCategoryMap[body.workCategory],
+    workLocation: body.workLocation,
   };
 }
 
 function employeeUpdateData(body: EmployeeUpdateBody) {
   return {
+    companyId: body.companyId,
     confinedSpace: body.confinedSpace,
     contractorCompanyId: body.contractorCompanyId,
     criticalJob: body.criticalJob,
@@ -175,15 +209,18 @@ function employeeUpdateData(body: EmployeeUpdateBody) {
     heavyEquipmentOperator: body.heavyEquipmentOperator,
     hiringDate: body.hiringDate,
     jobTitle: body.jobTitle,
+    medicalRestrictions: body.medicalRestrictions,
     medicalFitnessStatus: body.medicalFitnessStatus ? fitnessStatusMap[body.medicalFitnessStatus] : undefined,
     nationalId: body.nationalId,
     offshoreWorker: body.offshoreWorker,
     organizationId: body.organizationId,
     phone: body.phone,
+    riskCategory: body.riskCategory,
     retirementDate: body.retirementDate,
     shiftWorker: body.shiftWorker,
     workAtHeight: body.workAtHeight,
     workCategory: body.workCategory ? workCategoryMap[body.workCategory] : undefined,
+    workLocation: body.workLocation,
   };
 }
 
@@ -270,6 +307,140 @@ organizationsRouter.delete("/:organizationId", requireRole("ADMIN"), async (req,
   }
 });
 
+companiesRouter.get("/", async (req, res, next) => {
+  try {
+    const query = listQuerySchema.parse(req.query);
+    const organizationId = typeof req.query.organizationId === "string" ? req.query.organizationId : undefined;
+    const status = typeof req.query.status === "string" ? req.query.status : undefined;
+    const where: Prisma.CompanyWhereInput = {
+      ...(organizationId ? { organizationId } : {}),
+      ...(status ? { status: organizationStatus(status) } : {}),
+      ...(query.q
+        ? {
+            OR: [
+              { name: { contains: query.q, mode: "insensitive" } },
+              { registrationNumber: { contains: query.q, mode: "insensitive" } },
+              { email: { contains: query.q, mode: "insensitive" } },
+            ],
+          }
+        : {}),
+    };
+    const [total, companies] = await Promise.all([
+      prisma.company.count({ where }),
+      prisma.company.findMany({
+        include: { contractors: true, departments: true },
+        orderBy: { name: "asc" },
+        skip: (query.page - 1) * query.pageSize,
+        take: query.pageSize,
+        where,
+      }),
+    ]);
+    res.json({ companies: companies.map(serializeCompany), page: query.page, pageSize: query.pageSize, total, totalPages: Math.ceil(total / query.pageSize) });
+  } catch (error) {
+    next(error);
+  }
+});
+
+companiesRouter.post("/", requireRole("ADMIN"), validateBody(companyBodySchema), async (req, res, next) => {
+  try {
+    const organization = await prisma.organization.findUnique({ where: { id: req.body.organizationId } });
+    if (!organization) throw new AppError(404, "Organization not found.", "ORGANIZATION_NOT_FOUND");
+    const company = await prisma.company.create({
+      data: {
+        address: req.body.address,
+        email: req.body.email,
+        name: req.body.name,
+        organizationId: req.body.organizationId,
+        phone: req.body.phone,
+        registrationNumber: req.body.registrationNumber,
+        status: organizationStatus(req.body.status),
+      },
+    });
+    await prisma.auditLog.create({
+      data: {
+        action: "COMPANY_CREATED",
+        actorId: req.auth!.id,
+        entityId: company.id,
+        entityType: "Company",
+        message: `Company created: ${company.name}.`,
+        organizationId: company.organizationId,
+      },
+    });
+    res.status(201).json({ company: serializeCompany(company) });
+  } catch (error) {
+    next(error);
+  }
+});
+
+companiesRouter.get("/:companyId", async (req, res, next) => {
+  try {
+    const company = await prisma.company.findUnique({
+      include: {
+        contractors: true,
+        departments: true,
+        employees: { take: 50, orderBy: { updatedAt: "desc" } },
+        organization: true,
+      },
+      where: { id: String(req.params.companyId) },
+    });
+    if (!company) throw new AppError(404, "Company not found.", "COMPANY_NOT_FOUND");
+    res.json({ company: { ...serializeCompany(company), contractors: company.contractors, departments: company.departments, employees: company.employees.map(serializeEmployee), organization: company.organization } });
+  } catch (error) {
+    next(error);
+  }
+});
+
+companiesRouter.patch("/:companyId", requireRole("ADMIN"), validateBody(companyUpdateSchema), async (req, res, next) => {
+  try {
+    const company = await prisma.company.update({
+      data: {
+        address: req.body.address,
+        email: req.body.email,
+        name: req.body.name,
+        phone: req.body.phone,
+        registrationNumber: req.body.registrationNumber,
+        status: req.body.status ? organizationStatus(req.body.status) : undefined,
+      },
+      where: { id: String(req.params.companyId) },
+    });
+    await prisma.auditLog.create({
+      data: {
+        action: "COMPANY_UPDATED",
+        actorId: req.auth!.id,
+        entityId: company.id,
+        entityType: "Company",
+        message: `Company updated: ${company.name}.`,
+        organizationId: company.organizationId,
+      },
+    });
+    res.json({ company: serializeCompany(company) });
+  } catch (error) {
+    next(error);
+  }
+});
+
+companiesRouter.delete("/:companyId", requireRole("ADMIN"), async (req, res, next) => {
+  try {
+    const company = await prisma.company.update({
+      data: { status: "INACTIVE" },
+      where: { id: String(req.params.companyId) },
+    });
+    await prisma.auditLog.create({
+      data: {
+        action: "COMPANY_DELETED",
+        actorId: req.auth!.id,
+        entityId: company.id,
+        entityType: "Company",
+        message: `Company deactivated: ${company.name}.`,
+        organizationId: company.organizationId,
+      },
+    });
+    res.json({ company: serializeCompany(company) });
+  } catch (error) {
+    next(error);
+  }
+});
+
 organizationsRouter.get("/:organizationId/analytics", requireRole("ADMIN"), async (req, res, next) => {
   try {
     const organizationId = String(req.params.organizationId);
@@ -315,6 +486,7 @@ departmentsRouter.get("/", async (req, res, next) => {
     const query = listQuerySchema.parse(req.query);
     const organizationId = typeof req.query.organizationId === "string" ? req.query.organizationId : undefined;
     const where: Prisma.DepartmentWhereInput = {
+      ...(typeof req.query.companyId === "string" ? { companyId: req.query.companyId } : {}),
       ...(organizationId ? { organizationId } : {}),
       ...(query.q ? { name: { contains: query.q, mode: "insensitive" } } : {}),
     };
@@ -335,8 +507,9 @@ departmentsRouter.get("/", async (req, res, next) => {
 
 departmentsRouter.post("/", requireRole("ADMIN"), validateBody(departmentBodySchema), async (req, res, next) => {
   try {
+    await assertCompanyBelongsToOrganization(req.body.companyId, req.body.organizationId);
     const department = await prisma.department.create({
-      data: { name: req.body.name, organizationId: req.body.organizationId },
+      data: { companyId: req.body.companyId, name: req.body.name, organizationId: req.body.organizationId },
     });
     res.status(201).json({ department });
   } catch (error) {
@@ -347,7 +520,7 @@ departmentsRouter.post("/", requireRole("ADMIN"), validateBody(departmentBodySch
 departmentsRouter.patch("/:departmentId", requireRole("ADMIN"), validateBody(departmentUpdateSchema), async (req, res, next) => {
   try {
     const department = await prisma.department.update({
-      data: { name: req.body.name },
+      data: { companyId: req.body.companyId, name: req.body.name },
       where: { id: String(req.params.departmentId) },
     });
     res.json({ department });
@@ -380,6 +553,7 @@ contractorsRouter.get("/", async (req, res, next) => {
     const query = listQuerySchema.parse(req.query);
     const organizationId = typeof req.query.organizationId === "string" ? req.query.organizationId : undefined;
     const where: Prisma.ContractorCompanyWhereInput = {
+      ...(typeof req.query.companyId === "string" ? { companyId: req.query.companyId } : {}),
       ...(organizationId ? { organizationId } : {}),
       ...(query.q ? { name: { contains: query.q, mode: "insensitive" } } : {}),
     };
@@ -400,9 +574,11 @@ contractorsRouter.get("/", async (req, res, next) => {
 
 contractorsRouter.post("/", requireRole("ADMIN"), validateBody(contractorBodySchema), async (req, res, next) => {
   try {
+    await assertCompanyBelongsToOrganization(req.body.companyId, req.body.organizationId);
     const contractor = await prisma.contractorCompany.create({
       data: {
         address: req.body.address,
+        companyId: req.body.companyId,
         email: req.body.email,
         name: req.body.name,
         organizationId: req.body.organizationId,
@@ -418,9 +594,13 @@ contractorsRouter.post("/", requireRole("ADMIN"), validateBody(contractorBodySch
 
 contractorsRouter.patch("/:contractorId", requireRole("ADMIN"), validateBody(contractorUpdateSchema), async (req, res, next) => {
   try {
+    const previous = await prisma.contractorCompany.findUnique({ where: { id: String(req.params.contractorId) } });
+    if (!previous) throw new AppError(404, "Contractor company not found.", "CONTRACTOR_NOT_FOUND");
+    await assertCompanyBelongsToOrganization(req.body.companyId, previous.organizationId);
     const contractor = await prisma.contractorCompany.update({
       data: {
         address: req.body.address,
+        companyId: req.body.companyId,
         email: req.body.email,
         name: req.body.name,
         phone: req.body.phone,
@@ -460,6 +640,7 @@ employeesRouter.get("/", async (req, res, next) => {
   try {
     const query = employeeListQuerySchema.parse(req.query);
     const where: Prisma.EmployeeWhereInput = {
+      ...(query.companyId ? { companyId: query.companyId } : {}),
       ...(query.contractorCompanyId ? { contractorCompanyId: query.contractorCompanyId } : {}),
       ...(query.departmentId ? { departmentId: query.departmentId } : {}),
       ...(query.employmentStatus ? { employmentStatus: employmentStatusMap[query.employmentStatus] } : {}),
@@ -523,6 +704,7 @@ employeesRouter.get("/", async (req, res, next) => {
 
 employeesRouter.post("/", requireRole("DOCTOR"), validateBody(employeeBodySchema), async (req, res, next) => {
   try {
+    await assertCompanyBelongsToOrganization(req.body.companyId, req.body.organizationId);
     await assertDepartmentBelongsToOrganization(req.body.departmentId, req.body.organizationId);
     await assertContractorBelongsToOrganization(req.body.contractorCompanyId, req.body.organizationId);
     const employee = await prisma.employee.create({ data: employeeCreateData(req.body) });
@@ -561,12 +743,14 @@ employeesRouter.patch("/:employeeId", requireRole("DOCTOR"), validateBody(employ
     if (!previous) throw new AppError(404, "Employee not found.", "EMPLOYEE_NOT_FOUND");
     assertResourceAccess(await canAccessEmployee(previous.id, req.auth!));
     const organizationId = req.body.organizationId ?? previous.organizationId;
+    const companyId = req.body.companyId ?? previous.companyId ?? undefined;
     const departmentId = req.body.departmentId ?? previous.departmentId;
     const contractorCompanyId = req.body.contractorCompanyId ?? previous.contractorCompanyId ?? undefined;
+    await assertCompanyBelongsToOrganization(companyId, organizationId);
     await assertDepartmentBelongsToOrganization(departmentId, organizationId);
     await assertContractorBelongsToOrganization(contractorCompanyId, organizationId);
     const employee = await prisma.employee.update({
-      data: { ...employeeUpdateData(req.body), contractorCompanyId, departmentId, organizationId },
+      data: { ...employeeUpdateData(req.body), companyId, contractorCompanyId, departmentId, organizationId },
       where: { id: previous.id },
     });
     res.json({ employee: serializeEmployee(employee) });
@@ -610,6 +794,7 @@ employeesRouter.post("/:employeeId/link-patient", requireRole("DOCTOR"), async (
     const lastName = names.slice(1).join(" ") || "Employee";
     const patient = await prisma.patient.upsert({
       create: {
+        companyId: employee.companyId,
         contractorCompanyId: employee.contractorCompanyId,
         dateOfBirth: employee.dateOfBirth,
         departmentId: employee.departmentId,
@@ -619,22 +804,30 @@ employeesRouter.post("/:employeeId/link-patient", requireRole("DOCTOR"), async (
         firstName,
         gender: employee.gender,
         lastName,
+        medicalRestrictions: employee.medicalRestrictions,
         medicalRecordNumber: `EMP-${employee.employeeId}`,
         nationalId: employee.nationalId,
         organizationId: employee.organizationId,
         phone: employee.phone,
+        riskCategory: employee.riskCategory,
+        workLocation: employee.workLocation,
       },
       update: {
+        companyId: employee.companyId,
         contractorCompanyId: employee.contractorCompanyId,
         departmentId: employee.departmentId,
         email: employee.email,
         employeeId: employee.employeeId,
         employeeProfileId: employee.id,
         firstName,
+        fitnessStatus: employee.medicalFitnessStatus,
         gender: employee.gender,
         lastName,
+        medicalRestrictions: employee.medicalRestrictions,
         organizationId: employee.organizationId,
         phone: employee.phone,
+        riskCategory: employee.riskCategory,
+        workLocation: employee.workLocation,
       },
       where: { nationalId: employee.nationalId },
     });

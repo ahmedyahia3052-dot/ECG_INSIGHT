@@ -99,6 +99,19 @@ function riskFactors(patient: Pick<Patient, "diabetes" | "dyslipidemia" | "heart
   ].filter(Boolean) as string[];
 }
 
+function occupationalSection(value: Prisma.JsonValue | null | undefined) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return "<p>No occupational cardiology decision recorded.</p>";
+  const section = value as Record<string, unknown>;
+  const restrictions = Array.isArray(section["restrictions"]) ? section["restrictions"].filter((item): item is string => typeof item === "string") : [];
+  return [
+    `<div class="kv"><b>Fitness Decision</b><span>${escapeHtml(text(section["finalFitnessDecision"], "Pending"))}</span></div>`,
+    `<div class="kv"><b>Job Risk Profile</b><span>${escapeHtml(text(section["jobRiskProfile"], "Not recorded"))}</span></div>`,
+    `<div class="kv"><b>Review Date</b><span>${escapeHtml(text(section["reviewDate"], "Not scheduled"))}</span></div>`,
+    `<p>${escapeHtml(text(section["physicianJustification"], "No physician justification recorded."))}</p>`,
+    `<ul>${restrictions.length ? restrictions.map((restriction) => `<li>${escapeHtml(restriction)}</li>`).join("") : "<li>No active work restrictions recorded.</li>"}</ul>`,
+  ].join("");
+}
+
 function pseudoQrSvg(payload: string) {
   const size = 148;
   const modules = 21;
@@ -456,6 +469,10 @@ export async function buildReportHtml(reportIdOrReport: string | ClinicalReport,
         <div class="kv"><b>Cardiovascular History</b><span>${escapeHtml(cardiovascularHistory)}</span></div>
         <div class="kv"><b>Medications</b><span>${escapeHtml(medications)}</span></div>
         <div class="kv"><b>Risk Factors</b><span>${escapeHtml(risks.join(", ") || "None recorded")}</span></div>
+      </div>
+      <div class="section full">
+        <h2>Occupational Cardiology Decision</h2>
+        ${occupationalSection(report.occupationalReportSection)}
       </div>
       <div class="section disclaimer full">
         <h2>Clinical Disclaimer</h2>

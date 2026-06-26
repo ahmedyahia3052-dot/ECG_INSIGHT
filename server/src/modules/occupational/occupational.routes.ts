@@ -20,6 +20,7 @@ import {
   type DecisionInput,
   getAssessmentInputs,
   patientIdForEmployee,
+  profileTypeMap,
   recommendFitness,
   restrictionMap,
   type RestrictionInput,
@@ -385,15 +386,18 @@ occupationalRiskRouter.put("/:employeeId", requireRole("DOCTOR"), validateBody(o
     if (!employee) throw new AppError(404, "Employee not found.", "EMPLOYEE_NOT_FOUND");
     assertResourceAccess(await canAccessEmployee(employee.id, req.auth!));
     const riskScore = calculateRiskScore(req.body);
+    const profileType = profileTypeMap[req.body.profileType];
     const profile = await prisma.occupationalRiskProfile.upsert({
       create: {
         ...req.body,
         employeeId: employee.id,
+        profileType,
         highRisk: riskScore >= 5 || req.body.previousMI || req.body.previousStroke,
         riskScore,
       },
       update: {
         ...req.body,
+        profileType,
         highRisk: riskScore >= 5 || req.body.previousMI || req.body.previousStroke,
         riskScore,
       },

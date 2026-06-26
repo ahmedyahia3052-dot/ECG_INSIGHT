@@ -12,13 +12,26 @@ export interface WorkforceOrganization {
 }
 
 export interface WorkforceDepartment {
+  companyId?: string;
   id: string;
   name: string;
   organizationId: string;
 }
 
+export interface WorkforceCompany {
+  address?: string;
+  email?: string;
+  id: string;
+  name: string;
+  organizationId: string;
+  phone?: string;
+  registrationNumber?: string;
+  status: "active" | "inactive";
+}
+
 export interface ContractorCompany {
   address?: string;
+  companyId?: string;
   email?: string;
   id: string;
   name: string;
@@ -28,6 +41,7 @@ export interface ContractorCompany {
 }
 
 export interface Employee {
+  companyId?: string;
   contractorCompanyId?: string;
   dateOfBirth: string;
   departmentId: string;
@@ -38,6 +52,7 @@ export interface Employee {
   gender: "male" | "female" | "other" | "unknown";
   id: string;
   jobTitle?: string;
+  medicalRestrictions: string[];
   medicalFitnessStatus:
     | "fit"
     | "fit_with_restrictions"
@@ -48,6 +63,8 @@ export interface Employee {
   nationalId: string;
   organizationId: string;
   phone?: string;
+  riskCategory?: string;
+  workLocation?: string;
 }
 
 export interface WorkforceAnalytics {
@@ -79,6 +96,23 @@ export async function deleteWorkforceOrganization(accessToken: string, organizat
 
 export async function getWorkforceAnalytics(accessToken: string, organizationId: string) {
   return apiRequest<{ analytics: WorkforceAnalytics }>(`/organizations/${organizationId}/analytics`, { accessToken });
+}
+
+export async function listCompanies(accessToken: string, params = new URLSearchParams()) {
+  const suffix = params.toString() ? `?${params.toString()}` : "";
+  return apiRequest<{ companies: WorkforceCompany[] }>(`/companies${suffix}`, { accessToken });
+}
+
+export async function createCompany(accessToken: string, input: Omit<WorkforceCompany, "id">) {
+  return apiRequest<{ company: WorkforceCompany }>("/companies", {
+    accessToken,
+    body: JSON.stringify(input),
+    method: "POST",
+  });
+}
+
+export async function deleteCompany(accessToken: string, companyId: string) {
+  return apiRequest<{ company: WorkforceCompany }>(`/companies/${companyId}`, { accessToken, method: "DELETE" });
 }
 
 export async function listDepartments(accessToken: string, params = new URLSearchParams()) {
