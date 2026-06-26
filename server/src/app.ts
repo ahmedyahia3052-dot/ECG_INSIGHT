@@ -109,6 +109,7 @@ export function createApp() {
   });
 
   app.use("/api", modulesRouter);
+  app.use("/api/v1", modulesRouter);
 
   app.use(notFoundHandler);
   app.use(errorHandler);

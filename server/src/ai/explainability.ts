@@ -4,7 +4,7 @@ import type { ECGExplainabilityArtifact } from "./domain";
 const leads = ["I", "II", "III", "aVR", "aVL", "aVF", "V1", "V2", "V3", "V4", "V5", "V6"];
 
 function affectedLeads(diagnosis: string) {
-  if (diagnosis === "STEMI" || diagnosis === "NSTEMI") return ["II", "III", "aVF", "V2", "V3", "V4"];
+  if (diagnosis === "STEMI" || diagnosis === "NSTEMI" || diagnosis === "Myocardial Infarction") return ["II", "III", "aVF", "V2", "V3", "V4"];
   if (diagnosis === "RBBB") return ["V1", "V2", "V5", "V6"];
   if (diagnosis === "LBBB") return ["I", "aVL", "V5", "V6"];
   if (diagnosis === "LVH") return ["I", "aVL", "V5", "V6"];

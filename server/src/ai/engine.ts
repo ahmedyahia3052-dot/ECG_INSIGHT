@@ -93,6 +93,16 @@ const diagnosisBlueprints: Record<ECGDiagnosis, DiagnosisBlueprint> = {
     severity: "SEVERE",
     urgentActions: ["Expedite clinician review if symptomatic."],
   },
+  "Myocardial Infarction": {
+    diagnosis: "Myocardial Infarction",
+    evidence: ["Model class indicates myocardial infarction pattern", "Ischemic ECG pattern requires clinician correlation"],
+    heartRate: 88,
+    interpretation: "Model output is compatible with myocardial infarction pattern. STEMI/NSTEMI localization requires physician review and clinical correlation.",
+    recommendations: ["Correlate with symptoms, serial ECGs, and troponin.", "Urgent clinician review is required for ischemic ECG patterns."],
+    rhythm: "Sinus rhythm with ischemic pattern",
+    severity: "SEVERE",
+    urgentActions: ["Expedite physician review and acute coronary syndrome pathway if clinically indicated."],
+  },
   "Normal ECG": {
     diagnosis: "Normal ECG",
     evidence: ["Normal rate", "Regular rhythm", "No acute abnormality detected"],

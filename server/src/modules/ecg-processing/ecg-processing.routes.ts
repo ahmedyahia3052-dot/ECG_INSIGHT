@@ -1,8 +1,11 @@
 import { Router } from "express";
 import { z } from "zod";
 import { prisma } from "../../config/prisma";
+import { runAnalysisNow, serializeAnalysis } from "../../ai/ai.service";
 import { requireAuth, requireRole } from "../../middleware/auth";
 import { AppError } from "../../middleware/error";
+import { generateClinicalReport, serializeReport } from "../reports/reports.service";
+import { assertCanRunAnalysis, recordAnalysisUsage } from "../../subscriptions/monetization.service";
 import { assertResourceAccess, canAccessCase, canAccessPatient } from "../../utils/resource-access";
 import { exportDigitalEcg, getDigitalEcg, reconstructCaseEcg } from "./ecg-digitization.service";
 import { analyzeEcgImage, getEcgImageAnalysisResults } from "./ecg-image-analysis.service";
@@ -59,6 +62,10 @@ const imageAnalysisSchema = z.object({
   message: "caseId or ecgFileId is required.",
 });
 
+const realAiAnalysisSchema = z.object({
+  caseId: z.string().trim().min(1),
+});
+
 ecgProcessingRouter.post("/analyze", requireRole("DOCTOR"), async (req, res, next) => {
   try {
     const body = imageAnalysisSchema.parse(req.body);
@@ -70,6 +77,24 @@ ecgProcessingRouter.post("/analyze", requireRole("DOCTOR"), async (req, res, nex
     }
     const result = await analyzeEcgImage({ actorId: req.auth!.id, caseId: body.caseId, ecgFileId: body.ecgFileId });
     res.status(202).json({ result });
+  } catch (error) {
+    next(error);
+  }
+});
+
+ecgProcessingRouter.post("/analyze-real-ai", requireRole("DOCTOR"), async (req, res, next) => {
+  try {
+    const body = realAiAnalysisSchema.parse(req.body);
+    assertResourceAccess(await canAccessCase(body.caseId, req.auth!));
+    await assertCanRunAnalysis(req.auth!.id);
+    const analysis = await runAnalysisNow(body.caseId, req.auth!.id);
+    if (!analysis || analysis.status === "FAILED") throw new AppError(500, "Real AI ECG analysis failed.", "REAL_AI_ANALYSIS_FAILED");
+    await recordAnalysisUsage(req.auth!.id, { analysisId: analysis.id, caseId: body.caseId });
+    const report = await generateClinicalReport(body.caseId, req.auth!.id);
+    res.status(201).json({
+      analysis: serializeAnalysis(analysis),
+      report: serializeReport(report),
+    });
   } catch (error) {
     next(error);
   }

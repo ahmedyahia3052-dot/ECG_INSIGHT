@@ -76,7 +76,7 @@ async function completeAnalysis(analysisId: string, actorId: string) {
       where: { caseId: queued.caseId },
     });
     const provider = getAIProvider();
-    const engineResult = await provider.analyze({ case: queued.case, measurement });
+    const engineResult = await provider.analyze({ actorId, case: queued.case, measurement });
     const explainability = generateExplainabilityArtifact({
       confidenceScore: engineResult.confidenceScore,
       detectedAbnormalities: engineResult.detectedAbnormalities,
@@ -198,8 +198,9 @@ async function completeAnalysis(analysisId: string, actorId: string) {
         type: "CRITICAL",
       });
     }
+    return analysis;
   } catch (error) {
-    await prisma.aIAnalysis.update({
+    const failed = await prisma.aIAnalysis.update({
       data: { status: "FAILED", processingTime: Date.now() - started },
       where: { id: analysisId },
     });
@@ -217,12 +218,13 @@ async function completeAnalysis(analysisId: string, actorId: string) {
         patientId: queued.case.patientId,
       },
     });
+    return failed;
   } finally {
     activeJobs.delete(analysisId);
   }
 }
 
-export async function queueAnalysis(caseId: string, actorId: string) {
+async function createQueuedAnalysis(caseId: string, actorId: string) {
   const ecgCase = await prisma.eCGCase.findUnique({ where: { id: caseId } });
   if (!ecgCase) throw new AppError(404, "ECG case not found.", "CASE_NOT_FOUND");
   assertCaseCanAcceptAnalysis(ecgCase);
@@ -269,8 +271,18 @@ export async function queueAnalysis(caseId: string, actorId: string) {
     },
   });
 
+  return analysis;
+}
+
+export async function queueAnalysis(caseId: string, actorId: string) {
+  const analysis = await createQueuedAnalysis(caseId, actorId);
   setTimeout(() => void completeAnalysis(analysis.id, actorId), 25);
   return analysis;
+}
+
+export async function runAnalysisNow(caseId: string, actorId: string) {
+  const analysis = await createQueuedAnalysis(caseId, actorId);
+  return completeAnalysis(analysis.id, actorId);
 }
 
 export async function getLatestAnalysis(caseId: string) {

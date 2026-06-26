@@ -5,7 +5,7 @@ import { StyleSheet, Text, View } from "react-native";
 
 import { Badge, Card, EmptyState, Field, formatDate, medicalTheme, PageSection, patientDisplayName, PrimaryButton, SectionHeader } from "@/components/enterprise/EnterpriseUI";
 import { useAuth } from "@/context/AuthContext";
-import { analyzeCase, getAIExplainability, getAIHistory, getAIResult, submitDoctorReview, type AIAnalysisResult } from "@/services/ai";
+import { analyzeCaseWithRealAI, getAIExplainability, getAIHistory, getAIResult, submitDoctorReview, type AIAnalysisResult } from "@/services/ai";
 import { listCases } from "@/services/clinical";
 import { finalizeReport, generateReport, type ClinicalReport } from "@/services/reports";
 
@@ -46,11 +46,14 @@ export default function EcgAnalysisScreen() {
   });
 
   const analyzeMutation = useMutation({
-    mutationFn: (caseId: string) => analyzeCase(token!, caseId),
-    onSuccess: () => {
+    mutationFn: (caseId: string) => analyzeCaseWithRealAI(token!, caseId),
+    onSuccess: (payload) => {
+      setReviewReport(payload.report);
+      setReviewMessage(`Real AI analysis completed. Report generated: ${payload.report.reportNumber}`);
       void queryClient.invalidateQueries({ queryKey: ["enterprise-analysis-cases", token] });
       void queryClient.invalidateQueries({ queryKey: ["enterprise-ai-history", token] });
       void queryClient.invalidateQueries({ queryKey: ["enterprise-ai-result", token] });
+      void queryClient.invalidateQueries({ queryKey: ["enterprise-ai-explainability", token] });
     },
   });
   const reportMutation = useMutation({
@@ -124,7 +127,7 @@ export default function EcgAnalysisScreen() {
               </View>
               <Badge label={item.priority} tone={item.priority === "critical" ? "critical" : item.priority === "high" ? "warning" : "primary"} />
               <View style={styles.actions}>
-                <PrimaryButton label="Analyze" onPress={() => analyzeMutation.mutate(item.id)} variant="outline" />
+                <PrimaryButton label={analyzeMutation.isPending ? "Analyzing..." : "Analyze Real AI"} onPress={() => analyzeMutation.mutate(item.id)} variant="outline" />
                 <PrimaryButton label="Review" onPress={() => {
                   setSelectedCaseId(item.id);
                   setDoctorDiagnosis(item.finalDiagnosis ?? "");
@@ -140,7 +143,7 @@ export default function EcgAnalysisScreen() {
             <View key={analysis.id} style={styles.caseRow}>
               <View style={styles.rowMain}>
                 <Text style={styles.rowTitle}>{analysis.diagnosis}</Text>
-                <Text style={styles.rowMeta}>{analysis.rhythm} • HR {analysis.heartRate} • Confidence {confidencePercent(analysis.confidenceScore)}%</Text>
+                <Text style={styles.rowMeta}>{analysis.rhythm} • HR {analysis.heartRate} • Confidence {confidencePercent(analysis.confidenceScore)}% • {modelVersionLabel(analysis.aiVersion)}</Text>
               </View>
               <Badge label={severityBand(analysis.severity)} tone={analysis.severity === "critical" || analysis.severity === "severe" ? "critical" : analysis.severity === "normal" ? "success" : "warning"} />
               <PrimaryButton label="Open Review" onPress={() => {
@@ -210,14 +213,26 @@ function AnalysisSummary({ analysis }: { analysis: AIAnalysisResult }) {
   return (
     <View style={styles.analysisCard}>
       <Text style={styles.rowTitle}>{analysis.diagnosis}</Text>
-      <Text style={styles.rowMeta}>Primary Diagnosis • {analysis.rhythm} • HR {analysis.heartRate} • Confidence {confidencePercent(analysis.confidenceScore)}%</Text>
+      <Text style={styles.rowMeta}>AI Diagnosis • {analysis.rhythm} • HR {analysis.heartRate} • Confidence {confidencePercent(analysis.confidenceScore)}%</Text>
+      <Text style={styles.rowMeta}>Model Version • {modelVersionLabel(analysis.aiVersion)}</Text>
       <Text style={styles.body}>{analysis.interpretation}</Text>
+      <View style={styles.disclaimerBox}>
+        <Text style={styles.disclaimerTitle}>Clinical Disclaimer</Text>
+        <Text style={styles.disclaimerText}>AI predictions are decision-support only and require physician review before diagnosis, treatment, or occupational fitness decisions.</Text>
+      </View>
       <View style={styles.recommendationList}>
         {analysis.recommendations.map((item) => <Text key={item} style={styles.recommendation}>• {item}</Text>)}
         {analysis.urgentActions.map((item) => <Text key={item} style={styles.urgent}>• {item}</Text>)}
       </View>
     </View>
   );
+}
+
+function modelVersionLabel(value: string) {
+  if (value.includes("onnx_runtime")) return value.split(":").slice(-2).join(" • ");
+  if (value.includes("rule")) return "Rule-based fallback";
+  if (value.includes("mock")) return "Mock provider";
+  return value;
 }
 
 function confidencePercent(value: number) {
@@ -249,6 +264,9 @@ const styles = StyleSheet.create({
   analysisCard: { backgroundColor: medicalTheme.surface, borderColor: medicalTheme.border, borderRadius: 14, borderWidth: 1, gap: 8, padding: 14 },
   body: { color: medicalTheme.text, fontSize: 13, lineHeight: 20 },
   caseRow: { alignItems: "center", borderBottomColor: medicalTheme.border, borderBottomWidth: 1, flexDirection: "row", flexWrap: "wrap", gap: 12, paddingVertical: 12 },
+  disclaimerBox: { backgroundColor: "#2A1D08", borderColor: medicalTheme.warning, borderRadius: 12, borderWidth: 1, gap: 4, padding: 12 },
+  disclaimerText: { color: medicalTheme.text, fontSize: 12, lineHeight: 18 },
+  disclaimerTitle: { color: medicalTheme.warning, fontSize: 12, fontWeight: "900", textTransform: "uppercase" },
   grid: { flexDirection: "row", flexWrap: "wrap", gap: 16 },
   leadCard: { backgroundColor: "#0B2134", borderColor: medicalTheme.primary, borderRadius: 12, borderWidth: 1, minWidth: 74, padding: 10 },
   leadGrid: { flexDirection: "row", flexWrap: "wrap", gap: 8 },

@@ -1,4 +1,5 @@
 import { apiRequest } from "./api";
+import type { ClinicalReport } from "./reports";
 
 export interface AIAnalysisResult {
   aiVersion: string;
@@ -57,6 +58,14 @@ export interface AIStatistics {
 export async function analyzeCase(accessToken: string, caseId: string) {
   return apiRequest<{ analysis: AIAnalysisResult }>(`/ai/analyze/${caseId}`, {
     accessToken,
+    method: "POST",
+  });
+}
+
+export async function analyzeCaseWithRealAI(accessToken: string, caseId: string) {
+  return apiRequest<{ analysis: AIAnalysisResult; report: ClinicalReport }>("/ecg/analyze-real-ai", {
+    accessToken,
+    body: JSON.stringify({ caseId }),
     method: "POST",
   });
 }

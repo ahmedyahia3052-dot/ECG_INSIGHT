@@ -33,6 +33,7 @@ export const ECG_DIAGNOSES = [
   "LBBB",
   "STEMI",
   "NSTEMI",
+  "Myocardial Infarction",
   "LVH",
   "RVH",
   "Hyperkalemia",
@@ -80,7 +81,7 @@ export interface ECGAnalysisOutput {
   primaryDiagnosis: ECGDiagnosis;
   provider: {
     modelVersion: string;
-    name: "deep_learning" | "mock" | "rule_based";
+    name: "deep_learning" | "mock" | "onnx_runtime" | "rule_based";
   };
   recommendations: string[];
   rhythm: string;
