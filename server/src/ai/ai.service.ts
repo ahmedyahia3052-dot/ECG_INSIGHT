@@ -109,7 +109,9 @@ async function completeAnalysis(analysisId: string, actorId: string) {
         data: {
           aiStatus: "COMPLETED",
           aiDiagnosis: analysis.diagnosis,
+          aiModelVersion: analysis.aiVersion,
           confidenceScore: analysis.confidenceScore,
+          explainabilityData: toJsonObject(explainability),
           finalDiagnosis: analysis.diagnosis,
           heartRate: analysis.heartRate,
           priority: isCritical(analysis) ? "CRITICAL" : latestCase.priority,
@@ -135,6 +137,9 @@ async function completeAnalysis(analysisId: string, actorId: string) {
         data: {
           aiStatus: "COMPLETED",
           aiDiagnosis: analysis.diagnosis,
+          aiModelVersion: analysis.aiVersion,
+          confidenceScore: analysis.confidenceScore,
+          explainabilityData: toJsonObject(explainability),
         },
         where: { id: queued.caseId },
       });

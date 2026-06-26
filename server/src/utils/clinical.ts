@@ -136,6 +136,7 @@ export function serializePatient(patient: Patient) {
     bloodGroup: patient.bloodGroup ?? undefined,
     bmi: patient.bmi ?? undefined,
     company: patient.company ?? undefined,
+    cardiovascularHistory: patient.cardiovascularHistory ?? undefined,
     contractor: patient.contractorName ?? undefined,
     dateOfBirth: patient.dateOfBirth.toISOString().slice(0, 10),
     contractorCompanyId: patient.contractorCompanyId ?? undefined,
@@ -220,15 +221,21 @@ export function serializeCase(
     caseNumber: ecgCase.caseNumber ?? ecgCase.caseId,
     clinicalNotes: ecgCase.clinicalNotes ?? undefined,
     clinicalComments: ecgCase.clinicalComments ?? ecgCase.clinicalNotes ?? undefined,
+    confidence: ecgCase.confidenceScore ?? latestAnalysis?.confidenceScore ?? undefined,
     confidenceScore: ecgCase.confidenceScore ?? latestAnalysis?.confidenceScore ?? undefined,
     createdAt: ecgCase.createdAt.toISOString(),
     doctorDiagnosis: ecgCase.doctorDiagnosis ?? ecgCase.finalDiagnosis ?? undefined,
+    diagnosis: ecgCase.aiDiagnosis ?? latestAnalysis?.diagnosis ?? ecgCase.finalDiagnosis ?? undefined,
     ecgType: ecgCase.ecgType,
+    interpretation: latestAnalysis?.interpretation ?? ecgCase.clinicalComments ?? undefined,
+    aiModelVersion: ecgCase.aiModelVersion ?? latestAnalysis?.aiVersion ?? undefined,
+    explainabilityData: ecgCase.explainabilityData ?? undefined,
     files: ecgCase.files?.map(serializeFile) ?? [],
     finalDiagnosis: ecgCase.finalDiagnosis ?? undefined,
     finalizedAt: ecgCase.finalizedAt?.toISOString(),
     heartRate: ecgCase.heartRate ?? latestMeasurement?.heartRate ?? latestAnalysis?.heartRate ?? undefined,
     id: ecgCase.id,
+    ecgImage: ecgCase.imagePath ?? (imageFile ? `/api/uploads/ecg/${imageFile.storedName}` : undefined),
     imagePath: ecgCase.imagePath ?? (imageFile ? `/api/uploads/ecg/${imageFile.storedName}` : undefined),
     originalFileUrl: originalFile ? `/api/uploads/ecg/${originalFile.storedName}` : undefined,
     patient: serializePatient(ecgCase.patient),
@@ -267,6 +274,7 @@ export function serializeCase(
         }
       : undefined,
     uploadedById: ecgCase.uploadedById,
+    uploadedByDoctorId: ecgCase.uploadedById,
   };
 }
 

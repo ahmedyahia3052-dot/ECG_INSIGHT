@@ -139,7 +139,7 @@ export default function PatientProfileScreen() {
 
 function OverviewTab({ abnormalCases, cases, criticalCases, patient, pendingReviews, reports }: {
   abnormalCases: number;
-  cases: Array<{ aiDiagnosis?: string; caseId: string; finalDiagnosis?: string; id: string; priority: string; uploadDate: string }>;
+  cases: Array<{ aiDiagnosis?: string; aiModelVersion?: string; caseId: string; confidenceScore?: number; finalDiagnosis?: string; id: string; priority: string; uploadDate: string }>;
   criticalCases: number;
   patient: NonNullable<Awaited<ReturnType<typeof getPatient>>["patient"]>;
   pendingReviews: number;
@@ -168,6 +168,7 @@ function OverviewTab({ abnormalCases, cases, criticalCases, patient, pendingRevi
         <Card style={styles.panel}>
           <SectionHeader title="Medical History" />
           <Info label="Medical History" value={patient.medicalHistory ?? "None recorded"} />
+          <Info label="Cardiovascular History" value={patient.cardiovascularHistory ?? "None recorded"} />
           <Info label="Risk Factors" value={riskFactors(patient)} />
           <Info label="Previous Interventions" value={[patient.previousMI ? "Previous MI" : null, patient.previousCABG ? "CABG" : null, patient.previousPCI ? "PCI" : null, patient.stentsHistory].filter(Boolean).join(", ") || "None recorded"} />
         </Card>
@@ -190,7 +191,7 @@ function OverviewTab({ abnormalCases, cases, criticalCases, patient, pendingRevi
         <Card style={styles.panel}>
           <SectionHeader title="ECG History" />
           {cases.length ? cases.map((item) => (
-            <Info key={item.id} label={item.caseId} value={`${item.aiDiagnosis ?? item.finalDiagnosis ?? "Pending"} • ${item.priority} • ${formatDate(item.uploadDate)}`} />
+            <Info key={item.id} label={item.caseId} value={`${item.aiDiagnosis ?? item.finalDiagnosis ?? "Pending"} • ${confidenceLabel(item.confidenceScore)} • ${item.aiModelVersion ?? "model pending"} • ${formatDate(item.uploadDate)}`} />
           )) : <Text style={styles.muted}>No ECG history yet.</Text>}
         </Card>
         <Card style={styles.panel}>
@@ -206,7 +207,7 @@ function OverviewTab({ abnormalCases, cases, criticalCases, patient, pendingRevi
 }
 
 function EcgCasesTab({ cases, onGenerateReport, onNew, onOpen, onReview }: {
-  cases: Array<{ aiDiagnosis?: string; aiSeverity?: string; caseId: string; caseNumber?: string; finalDiagnosis?: string; heartRate?: number; id: string; priority: string; rhythm?: string; severity?: string; status: string; uploadDate: string }>;
+  cases: Array<{ aiDiagnosis?: string; aiModelVersion?: string; aiSeverity?: string; caseId: string; caseNumber?: string; confidenceScore?: number; explainabilityData?: unknown; finalDiagnosis?: string; heartRate?: number; id: string; priority: string; rhythm?: string; severity?: string; status: string; uploadDate: string }>;
   onGenerateReport: (caseId: string) => void;
   onNew: () => void;
   onOpen: (caseId: string) => void;
@@ -220,7 +221,10 @@ function EcgCasesTab({ cases, onGenerateReport, onNew, onOpen, onReview }: {
           <Info label="Case ID" value={item.caseNumber ?? item.caseId} />
           <Info label="Date" value={formatDate(item.uploadDate)} />
           <Info label="AI Diagnosis" value={item.aiDiagnosis ?? item.finalDiagnosis ?? "Pending"} />
+          <Info label="Confidence" value={confidenceLabel(item.confidenceScore)} />
+          <Info label="Model" value={item.aiModelVersion ?? "Pending"} />
           <Info label="Measurements" value={`HR ${item.heartRate ?? "N/A"} • ${item.rhythm ?? "Rhythm pending"}`} />
+          <Info label="Explainability" value={item.explainabilityData ? "Available" : "Pending"} />
           <Badge label={item.severity ?? item.aiSeverity ?? item.priority} tone={item.priority === "critical" || item.aiSeverity === "critical" || item.severity === "critical" ? "critical" : item.severity === "normal" ? "success" : "primary"} />
           <Info label="Doctor Status" value={item.status} />
           <View style={styles.actions}>
@@ -235,7 +239,7 @@ function EcgCasesTab({ cases, onGenerateReport, onNew, onOpen, onReview }: {
 }
 
 function TimelineTab({ cases, timeline }: {
-  cases: Array<{ aiDiagnosis?: string; caseId: string; caseNumber?: string; finalDiagnosis?: string; id: string; severity?: string; uploadDate: string }>;
+  cases: Array<{ aiDiagnosis?: string; aiModelVersion?: string; caseId: string; caseNumber?: string; confidenceScore?: number; finalDiagnosis?: string; id: string; severity?: string; uploadDate: string }>;
   timeline: Array<{ createdAt: string; id: string; notes?: string; title: string; type: string }>;
 }) {
   return (
@@ -248,7 +252,7 @@ function TimelineTab({ cases, timeline }: {
             <Text style={styles.timelineYear}>{new Date(item.uploadDate).getFullYear()}</Text>
             <View style={[styles.timelineDot, item.severity === "critical" && styles.timelineDotCritical]} />
             <Text style={styles.infoLabel}>{item.caseNumber ?? item.caseId}</Text>
-            <Text style={styles.infoValue}>{item.aiDiagnosis ?? item.finalDiagnosis ?? "Pending interpretation"}</Text>
+            <Text style={styles.infoValue}>{item.aiDiagnosis ?? item.finalDiagnosis ?? "Pending interpretation"} • {confidenceLabel(item.confidenceScore)} • {item.aiModelVersion ?? "model pending"}</Text>
           </View>
         )) : <Text style={styles.muted}>No ECG trend history yet.</Text>}
       </View>
@@ -323,6 +327,7 @@ function MedicalHistoryTab({ onEdit, patient }: { onEdit: () => void; patient: N
         <Info label="Previous CABG" value={patient.previousCABG ? "Yes" : "No"} />
         <Info label="Previous PCI" value={patient.previousPCI ? "Yes" : "No"} />
         <Info label="Stents" value={patient.stentsHistory ?? "None recorded"} />
+        <Info label="Cardiovascular History" value={patient.cardiovascularHistory ?? "None recorded"} />
         <Info label="Medications" value={patient.medications ?? "None recorded"} />
         <Info label="Allergies" value={patient.knownAllergies ?? patient.allergies ?? "None recorded"} />
       </View>
@@ -341,6 +346,7 @@ function AiSummaryTab({ abnormalCases, cases, criticalCases, patient }: {
       <SectionHeader title="AI Clinical Summary" subtitle="Automatic clinical summary from patient risk factors, ECG cases, AI analyses, and reports." />
       <Info label="Major Diagnoses" value={Array.from(new Set(cases.map((item) => item.aiDiagnosis ?? item.finalDiagnosis).filter(Boolean))).join(", ") || "No AI diagnoses yet"} />
       <Info label="Risk Factors" value={riskFactors(patient)} />
+      <Info label="Cardiovascular History" value={patient.cardiovascularHistory ?? "None recorded"} />
       <Info label="Past Cardiac Procedures" value={[patient.previousMI ? "MI" : null, patient.previousCABG ? "CABG" : null, patient.previousPCI ? "PCI" : null, patient.stentsHistory].filter(Boolean).join(", ") || "None recorded"} />
       <Info label="Clinical Trends" value={`${cases.length} ECG cases, ${abnormalCases} abnormal findings, ${criticalCases} critical findings.`} />
       <Info label="Recommended Follow-up" value={clinicalRecommendations(patient, criticalCases, abnormalCases)} />
@@ -415,6 +421,11 @@ function clinicalRecommendations(patient: { diabetes?: boolean; hypertension?: b
   if (abnormalCases > 0) return "Continue physician follow-up and correlate ECG findings with symptoms.";
   if (patient.hypertension || patient.diabetes || patient.ischemicHeartDisease) return "Routine cardiovascular risk surveillance recommended.";
   return "Routine ECG monitoring according to occupational health protocol.";
+}
+
+function confidenceLabel(value?: number) {
+  if (value === undefined || value === null) return "Confidence pending";
+  return `${Math.round(value <= 1 ? value * 100 : value)}% confidence`;
 }
 
 function Stat({ label, tone = "primary", value }: { label: string; tone?: "critical" | "primary" | "warning"; value: string }) {

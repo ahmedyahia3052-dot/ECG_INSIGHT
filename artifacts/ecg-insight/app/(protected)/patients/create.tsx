@@ -105,6 +105,7 @@ export default function CreatePatientScreen() {
           <Field label="Weight KG" onChangeText={(value) => setForm((current) => ({ ...current, weightKg: Number(value) || undefined }))} value={form.weightKg ? String(form.weightKg) : ""} />
           <Field label="Known Allergies" onChangeText={(value) => setForm((current) => ({ ...current, knownAllergies: value, allergies: value }))} value={form.knownAllergies} />
           <Field label="Medical History" onChangeText={(value) => setForm((current) => ({ ...current, medicalHistory: value }))} value={form.medicalHistory} />
+          <Field label="Cardiovascular History" onChangeText={(value) => setForm((current) => ({ ...current, cardiovascularHistory: value }))} value={form.cardiovascularHistory} />
           <Field label="Medications" onChangeText={(value) => setForm((current) => ({ ...current, medications: value }))} value={form.medications} />
           <Field label="Risk Factors / Notes" onChangeText={(value) => setForm((current) => ({ ...current, notes: value }))} value={form.notes} />
         </View>

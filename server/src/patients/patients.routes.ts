@@ -4,7 +4,7 @@ import { prisma } from "../config/prisma";
 import { requireAuth, requireRole } from "../middleware/auth";
 import { AppError } from "../middleware/error";
 import { validateBody } from "../middleware/validate";
-import { fromApiGender, fromApiSmokingStatus, serializePatient } from "../utils/clinical";
+import { fromApiGender, fromApiSmokingStatus, serializeCase, serializePatient } from "../utils/clinical";
 import { assertResourceAccess, canAccessPatient } from "../utils/resource-access";
 import { patientBodySchema, patientListSchema, patientUpdateSchema } from "./schemas";
 
@@ -182,6 +182,27 @@ patientsRouter.post("/", requireRole("DOCTOR"), validateBody(patientBodySchema),
   }
 });
 
+patientsRouter.get("/:patientId/ecg-history", async (req, res, next) => {
+  try {
+    const patientId = String(req.params.patientId);
+    assertResourceAccess(await canAccessPatient(patientId, req.auth!));
+    const cases = await prisma.eCGCase.findMany({
+      include: {
+        analyses: { orderBy: { createdAt: "desc" }, take: 1 },
+        files: true,
+        measurements: { orderBy: { createdAt: "desc" }, take: 1 },
+        patient: true,
+        reports: { orderBy: { createdAt: "desc" }, take: 3 },
+      },
+      orderBy: { uploadDate: "desc" },
+      where: { patientId },
+    });
+    res.json({ cases: cases.map(serializeCase) });
+  } catch (error) {
+    next(error);
+  }
+});
+
 patientsRouter.get("/:patientId", async (req, res, next) => {
   try {
     const patient = await prisma.patient.findUnique({
@@ -202,12 +223,16 @@ patientsRouter.get("/:patientId", async (req, res, next) => {
       related: {
         cases: patient.cases.map((item) => ({
           aiDiagnosis: item.aiDiagnosis ?? item.analyses[0]?.diagnosis,
+          aiModelVersion: item.aiModelVersion ?? item.analyses[0]?.aiVersion,
           aiSeverity: item.severity.toLowerCase(),
           caseId: item.caseId,
           caseNumber: item.caseNumber ?? item.caseId,
+          confidenceScore: item.confidenceScore ?? item.analyses[0]?.confidenceScore,
+          explainabilityData: item.explainabilityData,
           finalDiagnosis: item.finalDiagnosis,
           heartRate: item.heartRate ?? item.analyses[0]?.heartRate,
           id: item.id,
+          interpretation: item.analyses[0]?.interpretation,
           priority: item.priority.toLowerCase(),
           rhythm: item.rhythm ?? item.analyses[0]?.rhythm,
           severity: item.severity.toLowerCase(),

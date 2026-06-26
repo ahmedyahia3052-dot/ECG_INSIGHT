@@ -11,6 +11,7 @@ export interface ApiPatient {
   bloodGroup?: string;
   bmi?: number;
   company?: string;
+  cardiovascularHistory?: string;
   contractor?: string;
   dateOfBirth: string;
   diabetes?: boolean;
@@ -21,7 +22,7 @@ export interface ApiPatient {
   emergencyContact?: string;
   emergencyContactName?: string;
   emergencyContactPhone?: string;
-  familyHistory?: boolean;
+  familyHistory?: string;
   firstName: string;
   fullName?: string;
   gender: "child" | "child_female" | "child_male" | "female" | "male" | "other" | "unknown";
@@ -67,19 +68,25 @@ export interface ApiECGCase {
   acquisitionDate: string;
   aiDiagnosis?: string;
   aiStatus: string;
+  aiModelVersion?: string;
   caseId: string;
   caseNumber?: string;
   clinicalComments?: string;
   clinicalNotes?: string;
+  confidence?: number;
   confidenceScore?: number;
+  diagnosis?: string;
   doctorDiagnosis?: string;
+  ecgImage?: string;
   ecgType: string;
   files: ApiECGFile[];
   finalDiagnosis?: string;
+  explainabilityData?: unknown;
   finalizedAt?: string;
   heartRate?: number;
   id: string;
   imagePath?: string;
+  interpretation?: string;
   originalFileUrl?: string;
   patient: ApiPatient;
   pdfPath?: string;
@@ -98,6 +105,7 @@ export interface ApiECGCase {
   status: "ai_completed" | "approved" | "finalized" | "pending" | "processing" | "rejected" | "reviewed" | "under_review" | "uploaded";
   uploadDate: string;
   uploadedById: string;
+  uploadedByDoctorId?: string;
 }
 
 export interface CasesResponse {
@@ -127,6 +135,7 @@ export type PatientInput = {
   bloodGroup?: string;
   bmi?: number;
   company?: string;
+  cardiovascularHistory?: string;
   contractorName?: string;
   departmentName?: string;
   diabetes?: boolean;
@@ -167,12 +176,16 @@ export interface PatientDetailResponse {
   related: {
     cases: Array<{
       aiDiagnosis?: string;
+      aiModelVersion?: string;
       aiSeverity?: string;
       caseId: string;
       caseNumber?: string;
+      confidenceScore?: number;
+      explainabilityData?: unknown;
       finalDiagnosis?: string;
       heartRate?: number;
       id: string;
+      interpretation?: string;
       priority: string;
       rhythm?: string;
       severity?: string;
@@ -266,6 +279,10 @@ export async function getCase(accessToken: string, caseId: string) {
 
 export async function getPatient(accessToken: string, patientId: string) {
   return apiRequest<PatientDetailResponse>(`/patients/${patientId}`, { accessToken });
+}
+
+export async function getPatientEcgHistory(accessToken: string, patientId: string) {
+  return apiRequest<{ cases: ApiECGCase[] }>(`/patients/${patientId}/ecg-history`, { accessToken });
 }
 
 export async function createCase(accessToken: string, input: {

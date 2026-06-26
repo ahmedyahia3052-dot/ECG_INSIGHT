@@ -810,6 +810,7 @@ model Patient {
   previousPCI            Boolean                @default(false)
   stentsHistory          String?
   familyHistory          String?
+  cardiovascularHistory  String?
   address                String?
   emergencyContact       String?
   allergies              String?
@@ -1362,6 +1363,8 @@ model ECGCase {
   clinicalNotes         String?
   recommendations       String?
   confidenceScore       Float?
+  aiModelVersion        String?
+  explainabilityData    Json?
   reviewedAt            DateTime?
   approvedAt            DateTime?
   rejectedAt            DateTime?

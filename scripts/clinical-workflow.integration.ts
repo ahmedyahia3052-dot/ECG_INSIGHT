@@ -152,24 +152,55 @@ async function main() {
 
   response = await request("/patients", {
     body: {
+      allergies: "No known drug allergies",
+      cardiovascularHistory: "Hypertension under surveillance",
+      company: "Workflow Company",
+      contractorName: "Workflow Contractor",
       contractorCompanyId: contractor.id,
       dateOfBirth: "1978-03-03",
+      departmentName: "Workflow Department",
       departmentId: department.id,
+      email: `workflow.patient.${stamp}@example.com`,
+      employeeId: `WF-PAT-${stamp}`,
       firstName: "Workflow",
       gender: "male",
+      jobTitle: "Safety Critical Operator",
       lastName: "Patient",
+      medicalHistory: "Occupational health baseline record",
       medicalRecordNumber: `WF-MRN-${stamp}`,
+      medications: "Amlodipine",
+      nationalId: `WF-PAT-NID-${stamp}`,
+      notes: "Enterprise patient contract test record",
       organizationId: organization.id,
+      phone: "+201000000000",
+      smokingStatus: "former",
     },
     method: "POST",
     token: doctor.token,
   });
   expectStatus(response, 201, "patient create");
-  const patient = (response.body as { patient: { gender: string; id: string } }).patient;
+  const patient = (response.body as { patient: { cardiovascularHistory?: string; company?: string; contractor?: string; department?: string; employeeId?: string; gender: string; id: string; jobTitle?: string; medicalHistory?: string; medications?: string; nationalId?: string; phone?: string; smokingStatus?: string } }).patient;
   assert(patient.gender === "male", "Created patient gender must persist as male in API response.");
+  assert(patient.employeeId === `WF-PAT-${stamp}`, "Patient employee ID must persist.");
+  assert(patient.company === "Workflow Company", "Patient company must persist.");
+  assert(patient.contractor === "Workflow Contractor", "Patient contractor must persist.");
+  assert(patient.department === "Workflow Department", "Patient department must persist.");
+  assert(patient.jobTitle === "Safety Critical Operator", "Patient job title must persist.");
+  assert(patient.phone === "+201000000000", "Patient phone must persist.");
+  assert(patient.nationalId === `WF-PAT-NID-${stamp}`, "Patient national ID must persist.");
+  assert(patient.medicalHistory === "Occupational health baseline record", "Patient medical history must persist.");
+  assert(patient.cardiovascularHistory === "Hypertension under surveillance", "Patient cardiovascular history must persist.");
+  assert(patient.medications === "Amlodipine", "Patient medications must persist.");
+  assert(patient.smokingStatus === "former", "Patient smoking status must persist.");
   const persistedPatient = await prisma.patient.findUnique({ where: { id: patient.id } });
   assert(persistedPatient?.gender === "MALE", "Created patient gender must persist as MALE in PostgreSQL.");
   expectStatus(await request(`/patients/${patient.id}`, { token: other.token }), 403, "other doctor patient access denied");
+  response = await request(`/patients?q=${encodeURIComponent(`WF-PAT-${stamp}`)}&page=1&pageSize=5`, { token: doctor.token });
+  expectStatus(response, 200, "patient search");
+  assert((response.body as { patients: Array<{ id: string }> }).patients.some((item) => item.id === patient.id), "Patient search must find employee ID.");
+  response = await request(`/patients/${patient.id}`, { token: doctor.token });
+  expectStatus(response, 200, "patient details");
+  assert((response.body as { patient: { id: string }; related: { cases: unknown[] } }).patient.id === patient.id, "Patient details must return patient.");
 
   response = await request("/cases", {
     body: { ecgType: "12-lead workflow ECG", patientId: patient.id, priority: "high", status: "pending" },
@@ -177,7 +208,13 @@ async function main() {
     token: doctor.token,
   });
   expectStatus(response, 201, "case create");
-  const ecgCase = (response.body as { case: { id: string } }).case;
+  const ecgCase = (response.body as { case: { id: string; patientId?: string; status?: string; uploadedByDoctorId?: string } }).case;
+  assert(ecgCase.patientId === patient.id, "ECG case must link to the patient record.");
+  assert(ecgCase.uploadedByDoctorId === doctor.user.id, "ECG case must expose uploadedByDoctorId.");
+  assert(ecgCase.status === "uploaded", "Pending case creation should normalize to uploaded.");
+  response = await request(`/cases/${ecgCase.id}`, { token: doctor.token });
+  expectStatus(response, 200, "case details");
+  assert((response.body as { case: { patientId?: string } }).case.patientId === patient.id, "Case details must include patient linkage.");
 
   const ecgForm = new FormData();
   ecgForm.append("patientId", patient.id);
@@ -197,6 +234,13 @@ async function main() {
     await new Promise((resolve) => setTimeout(resolve, 50));
   }
   assert((response.body as { analysis?: { status?: string } }).analysis?.status === "completed", "AI analysis must complete before approval.");
+  response = await request(`/patients/${patient.id}/ecg-history`, { token: doctor.token });
+  expectStatus(response, 200, "patient ECG history");
+  assert((response.body as { cases: Array<{ id: string; patientId?: string }> }).cases.some((item) => item.id === ecgCase.id && item.patientId === patient.id), "Patient ECG history must include the linked case.");
+  response = await request(`/cases/${ecgCase.id}`, { token: doctor.token });
+  expectStatus(response, 200, "case details after AI");
+  assert(typeof (response.body as { case: { aiModelVersion?: string; diagnosis?: string; explainabilityData?: unknown } }).case.aiModelVersion === "string", "Case details must include AI model version after analysis.");
+  assert((response.body as { case: { explainabilityData?: unknown } }).case.explainabilityData, "Case details must include explainability data after analysis.");
 
   response = await request(`/reports/cases/${ecgCase.id}/generate`, { method: "POST", token: doctor.token });
   expectStatus(response, 201, "report generate");

@@ -8,6 +8,7 @@ export const patientBodySchema = z.object({
   bloodGroup: z.string().trim().max(20).optional(),
   bmi: z.coerce.number().positive().optional(),
   company: z.string().trim().max(160).optional(),
+  cardiovascularHistory: z.string().trim().max(3000).optional(),
   contractorName: z.string().trim().max(160).optional(),
   contractorCompanyId: z.string().trim().optional(),
   contractorId: z.string().trim().optional(),

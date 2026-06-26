@@ -31,6 +31,7 @@ export default function EditPatientScreen() {
       alcoholStatus: patient.alcoholStatus,
       bloodGroup: patient.bloodGroup,
       company: patient.company,
+      cardiovascularHistory: patient.cardiovascularHistory,
       dateOfBirth: patient.dateOfBirth,
       departmentName: patient.department,
       diabetes: patient.diabetes,
@@ -100,6 +101,7 @@ export default function EditPatientScreen() {
           <PatientField label="Weight KG" name="weightKg" numeric setForm={setForm} value={form.weightKg} />
           <PatientField label="Known Allergies" name="knownAllergies" setForm={setForm} value={form.knownAllergies} />
           <PatientField label="Medical History" name="medicalHistory" setForm={setForm} value={form.medicalHistory} />
+          <PatientField label="Cardiovascular History" name="cardiovascularHistory" setForm={setForm} value={form.cardiovascularHistory} />
           <PatientField label="Medications" name="medications" setForm={setForm} value={form.medications} />
           <PatientField label="Notes" name="notes" setForm={setForm} value={form.notes} />
         </View>
