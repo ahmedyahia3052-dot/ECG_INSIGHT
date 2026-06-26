@@ -15,6 +15,7 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { MobileSyncStatus } from "@/components/mobile/MobileSyncStatus";
+import { LiveNotificationBell } from "@/components/notifications/LiveNotificationBell";
 import { AuthProvider } from "@/context/AuthContext";
 import { ApiError } from "@/services/api";
 
@@ -74,6 +75,7 @@ export default function RootLayout() {
           <GestureHandlerRootView style={{ flex: 1 }}>
             <AuthProvider>
               <RootLayoutNav />
+              <LiveNotificationBell />
               <MobileSyncStatus />
             </AuthProvider>
           </GestureHandlerRootView>

@@ -153,6 +153,45 @@ enum NotificationType {
   CRITICAL
 }
 
+enum NotificationCategory {
+  CRITICAL_ECG_ALERT
+  SUBSCRIPTION_EVENT
+  PAYMENT_EVENT
+  REPORT_GENERATION
+  USER_INVITATION
+  OCCUPATIONAL_CLEARANCE
+  SYSTEM_ALERT
+}
+
+enum NotificationChannel {
+  IN_APP
+  EMAIL
+  PUSH
+  SMS
+}
+
+enum NotificationFrequency {
+  IMMEDIATE
+  DAILY_DIGEST
+  WEEKLY_DIGEST
+  MUTED
+}
+
+enum NotificationDeliveryStatus {
+  QUEUED
+  SENT
+  FAILED
+  SKIPPED
+}
+
+enum NotificationProvider {
+  IN_APP
+  SMTP
+  SENDGRID
+  FIREBASE_PUSH
+  TWILIO_SMS
+}
+
 enum Gender {
   MALE
   FEMALE
@@ -763,6 +802,8 @@ model User {
   usageTracking               UsageTracking[]
   billingEvents               BillingEvent[]
   notifications               Notification[]
+  notificationPreferences     NotificationPreference[]
+  notificationDeliveryLogs    NotificationDeliveryLog[]
   preferences                 UserPreference?
   uploadedCases               ECGCase[]                 @relation("UploadedCases")
   assignedCases               ECGCase[]                 @relation("AssignedCases")
@@ -2873,6 +2914,8 @@ model Notification {
   caseId      String?
   patientId   String?
   reportId    String?
+  templateId  String?
+  category    NotificationCategory @default(SYSTEM_ALERT)
   actionUrl   String?
   entityType  String?
   entityId    String?
@@ -2883,14 +2926,93 @@ model Notification {
   read        Boolean          @default(false)
   priority    TaskPriority     @default(MEDIUM)
   pushToken   String?
+  locale      String            @default("en")
+  scheduledAt DateTime?
+  sentAt      DateTime?
   preferences Json?
   createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
   user        User?            @relation(fields: [userId], references: [id], onDelete: Cascade)
   case        ECGCase?         @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  template    NotificationTemplate? @relation(fields: [templateId], references: [id], onDelete: SetNull)
+  deliveryLogs NotificationDeliveryLog[]
 
   @@index([userId])
   @@index([caseId])
   @@index([patientId])
   @@index([reportId])
+  @@index([templateId])
+  @@index([category])
   @@index([targetRole])
+  @@index([read])
+  @@index([scheduledAt])
+  @@index([createdAt])
+}
+
+model NotificationTemplate {
+  id            String               @id @default(cuid())
+  key           String
+  locale        String               @default("en")
+  category      NotificationCategory @default(SYSTEM_ALERT)
+  titleTemplate String
+  bodyTemplate  String
+  htmlTemplate  String?
+  smsTemplate   String?
+  pushTemplate  String?
+  variables     Json?
+  active        Boolean              @default(true)
+  createdAt     DateTime             @default(now())
+  updatedAt     DateTime             @updatedAt
+  notifications Notification[]
+
+  @@unique([key, locale])
+  @@index([category])
+  @@index([active])
+}
+
+model NotificationPreference {
+  id             String                @id @default(cuid())
+  userId         String
+  category       NotificationCategory
+  emailEnabled   Boolean               @default(true)
+  pushEnabled    Boolean               @default(true)
+  smsEnabled     Boolean               @default(false)
+  inAppEnabled   Boolean               @default(true)
+  frequency      NotificationFrequency @default(IMMEDIATE)
+  quietHoursJson Json?
+  locale         String                @default("en")
+  createdAt      DateTime              @default(now())
+  updatedAt      DateTime              @updatedAt
+  user           User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, category])
+  @@index([userId])
+  @@index([category])
+  @@index([frequency])
+}
+
+model NotificationDeliveryLog {
+  id             String                     @id @default(cuid())
+  notificationId String
+  userId         String?
+  channel        NotificationChannel
+  provider       NotificationProvider
+  status         NotificationDeliveryStatus @default(QUEUED)
+  recipient      String?
+  subject        String?
+  payloadJson    Json?
+  errorMessage   String?
+  attemptCount   Int                        @default(0)
+  deliveredAt    DateTime?
+  createdAt      DateTime                   @default(now())
+  updatedAt      DateTime                   @updatedAt
+  notification   Notification               @relation(fields: [notificationId], references: [id], onDelete: Cascade)
+  user           User?                      @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([notificationId])
+  @@index([userId])
+  @@index([channel])
+  @@index([provider])
+  @@index([status])
+  @@index([createdAt])
 }

@@ -8,6 +8,8 @@ export type RealtimeEvent =
   | "ecg.critical"
   | "report.generated"
   | "notification.created"
+  | "notification.count.updated"
+  | "notification.updated"
   | "task.assigned"
   | "alert.created";
 
@@ -21,6 +23,12 @@ export function initializeRealtime(server: HttpServer) {
   io.on("connection", (socket) => {
     socket.on("join", (room: string) => {
       if (room) socket.join(room);
+    });
+    socket.on("join:user", (userId: string) => {
+      if (userId) socket.join(`user:${userId}`);
+    });
+    socket.on("join:role", (role: string) => {
+      if (role) socket.join(`role:${role}`);
     });
   });
   return io;

@@ -3,6 +3,7 @@ import { apiRequest } from "./api";
 export interface NotificationRecord {
   actionUrl?: string;
   caseId?: string;
+  category?: NotificationCategory;
   entityId?: string;
   entityType?: string;
   id: string;
@@ -13,6 +14,50 @@ export interface NotificationRecord {
   timestamp?: string;
   title: string;
   type: string;
+}
+
+export type NotificationCategory =
+  | "CRITICAL_ECG_ALERT"
+  | "OCCUPATIONAL_CLEARANCE"
+  | "PAYMENT_EVENT"
+  | "REPORT_GENERATION"
+  | "SUBSCRIPTION_EVENT"
+  | "SYSTEM_ALERT"
+  | "USER_INVITATION";
+
+export type NotificationChannel = "EMAIL" | "IN_APP" | "PUSH" | "SMS";
+export type NotificationFrequency = "DAILY_DIGEST" | "IMMEDIATE" | "MUTED" | "WEEKLY_DIGEST";
+
+export interface NotificationPreferenceRecord {
+  category: NotificationCategory;
+  emailEnabled: boolean;
+  frequency: NotificationFrequency;
+  id: string;
+  inAppEnabled: boolean;
+  locale: string;
+  pushEnabled: boolean;
+  smsEnabled: boolean;
+}
+
+export interface NotificationDeliveryLogRecord {
+  channel: NotificationChannel;
+  createdAt: string;
+  deliveredAt?: string | null;
+  id: string;
+  provider: string;
+  status: string;
+  subject?: string | null;
+}
+
+export interface NotificationTemplateRecord {
+  active: boolean;
+  bodyTemplate: string;
+  category: NotificationCategory;
+  htmlTemplate?: string | null;
+  id: string;
+  key: string;
+  locale: string;
+  titleTemplate: string;
 }
 
 export interface NotificationsResponse {
@@ -26,6 +71,62 @@ export interface NotificationsResponse {
 export async function listNotifications(accessToken: string, params = new URLSearchParams()) {
   const suffix = params.toString() ? `?${params.toString()}` : "";
   return apiRequest<NotificationsResponse>(`/notifications${suffix}`, { accessToken });
+}
+
+export async function getUnreadNotificationCount(accessToken: string) {
+  return apiRequest<{ unreadCount: number }>("/notifications/unread-count", { accessToken });
+}
+
+export async function listNotificationHistory(accessToken: string) {
+  return apiRequest<{ logs: NotificationDeliveryLogRecord[] }>("/notifications/history", { accessToken });
+}
+
+export async function listNotificationPreferences(accessToken: string) {
+  return apiRequest<{ preferences: NotificationPreferenceRecord[] }>("/notifications/preferences", { accessToken });
+}
+
+export async function updateNotificationPreferences(accessToken: string, preferences: Array<Partial<NotificationPreferenceRecord> & { category: NotificationCategory }>) {
+  return apiRequest<{ preferences: NotificationPreferenceRecord[] }>("/notifications/preferences", {
+    accessToken,
+    body: JSON.stringify({ preferences }),
+    method: "PUT",
+  });
+}
+
+export async function listNotificationTemplates(accessToken: string) {
+  return apiRequest<{ templates: NotificationTemplateRecord[] }>("/notifications/templates", { accessToken });
+}
+
+export async function upsertNotificationTemplate(accessToken: string, input: {
+  active?: boolean;
+  bodyTemplate: string;
+  category: NotificationCategory;
+  htmlTemplate?: string;
+  key: string;
+  locale?: string;
+  titleTemplate: string;
+}) {
+  return apiRequest<{ template: NotificationTemplateRecord }>("/notifications/templates", {
+    accessToken,
+    body: JSON.stringify(input),
+    method: "POST",
+  });
+}
+
+export async function broadcastNotification(accessToken: string, input: {
+  category: NotificationCategory;
+  channels: NotificationChannel[];
+  message: string;
+  scheduledAt?: string;
+  targetRole?: string;
+  title: string;
+  type?: "CRITICAL" | "INFO" | "SUCCESS" | "WARNING";
+}) {
+  return apiRequest<{ notifications: NotificationRecord[] }>("/notifications/admin/broadcast", {
+    accessToken,
+    body: JSON.stringify(input),
+    method: "POST",
+  });
 }
 
 export async function markNotificationRead(accessToken: string, notificationId: string) {
