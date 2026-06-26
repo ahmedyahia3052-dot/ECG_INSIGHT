@@ -491,6 +491,45 @@ enum CDSSFindingType {
   TREND
 }
 
+enum LongitudinalComparisonScope {
+  PREVIOUS
+  BASELINE
+  HISTORICAL
+}
+
+enum LongitudinalChangeType {
+  IMPROVEMENT
+  WORSENING
+  NEW_ABNORMALITY
+  RESOLVED_ABNORMALITY
+  PERSISTENT_ABNORMALITY
+  NO_SIGNIFICANT_CHANGE
+}
+
+enum OccupationalSurveillanceType {
+  PRE_EMPLOYMENT
+  PERIODIC_EXAMINATION
+  RETURN_TO_WORK
+  POST_INCIDENT
+  EXIT_EXAMINATION
+}
+
+enum LongitudinalFindingCategory {
+  HEART_RATE_TREND
+  RHYTHM_TREND
+  QT_TREND
+  PR_TREND
+  QRS_TREND
+  AXIS_TREND
+  AV_BLOCK_PROGRESSION
+  ISCHEMIA_PROGRESSION
+  PERSISTENT_AF
+  RECURRENT_ARRHYTHMIA
+  CONDUCTION_DISEASE
+  RISK_PROGRESSION
+  OCCUPATIONAL_SURVEILLANCE
+}
+
 enum MFAType {
   EMAIL_OTP
   TOTP
@@ -806,6 +845,7 @@ enum AuditAction {
   COLLABORATION_LOCK_RELEASED
   COLLABORATION_VERSION_RESTORED
   CDSS_DECISION_GENERATED
+  LONGITUDINAL_ECG_COMPARISON_COMPLETED
 }
 
 enum CollaborationPresenceStatus {
@@ -964,6 +1004,7 @@ model User {
   createdCaseVersions         CaseVersion[]
   authoredCdssRules           ClinicalDecisionRule[]
   cdssRuns                    ClinicalDecisionSupportRun[]
+  longitudinalComparisons     LongitudinalECGComparison[]
 
   @@index([role])
   @@index([isActive])
@@ -1088,6 +1129,7 @@ model Patient {
   collaborationAlerts    Alert[]
   auditLogs              AuditLog[]
   cdssRuns               ClinicalDecisionSupportRun[]
+  longitudinalComparisons LongitudinalECGComparison[]
 
   @@unique([organizationId, employeeId])
   @@index([lastName, firstName])
@@ -1663,6 +1705,8 @@ model ECGCase {
   collaborationLocks    CaseLock[]
   collaborationVersions CaseVersion[]
   cdssRuns              ClinicalDecisionSupportRun[]
+  longitudinalComparisons LongitudinalECGComparison[] @relation("CurrentLongitudinalCase")
+  baselineComparisons    LongitudinalECGComparison[] @relation("BaselineLongitudinalCase")
 
   @@index([patientId])
   @@index([uploadedById])
@@ -1930,6 +1974,57 @@ model ClinicalDecisionFinding {
   @@index([ruleId])
   @@index([severity])
   @@index([priority])
+}
+
+model LongitudinalECGComparison {
+  id                  String                         @id @default(cuid())
+  patientId           String
+  currentCaseId       String
+  baselineCaseId      String?
+  comparedCaseIds     String[]                       @default([])
+  evaluatedById       String
+  scope               LongitudinalComparisonScope
+  surveillanceType    OccupationalSurveillanceType?
+  overallChange       LongitudinalChangeType
+  aiTrendStatement    String
+  clinicalDisclaimer  String
+  trendMetrics        Json
+  abnormalityTimeline Json
+  riskProgression     Json
+  occupationalSummary Json?
+  createdAt           DateTime                       @default(now())
+  patient             Patient                        @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  currentCase         ECGCase                        @relation("CurrentLongitudinalCase", fields: [currentCaseId], references: [id], onDelete: Cascade)
+  baselineCase        ECGCase?                       @relation("BaselineLongitudinalCase", fields: [baselineCaseId], references: [id], onDelete: SetNull)
+  evaluatedBy         User                           @relation(fields: [evaluatedById], references: [id])
+  findings            LongitudinalECGFinding[]
+
+  @@index([patientId])
+  @@index([currentCaseId])
+  @@index([baselineCaseId])
+  @@index([evaluatedById])
+  @@index([scope])
+  @@index([surveillanceType])
+  @@index([overallChange])
+  @@index([createdAt])
+}
+
+model LongitudinalECGFinding {
+  id           String                       @id @default(cuid())
+  comparisonId String
+  category     LongitudinalFindingCategory
+  changeType   LongitudinalChangeType
+  title        String
+  statement    String
+  severity     AISeverity                   @default(MILD)
+  evidence     Json
+  createdAt    DateTime                     @default(now())
+  comparison   LongitudinalECGComparison    @relation(fields: [comparisonId], references: [id], onDelete: Cascade)
+
+  @@index([comparisonId])
+  @@index([category])
+  @@index([changeType])
+  @@index([severity])
 }
 
 model ClinicalReport {

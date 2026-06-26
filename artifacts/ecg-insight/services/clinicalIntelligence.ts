@@ -103,3 +103,89 @@ export async function listCDSSRuns(accessToken: string, caseId: string) {
 export async function listCDSSRules(accessToken: string) {
   return apiRequest<{ rules: unknown[] }>("/cdss/rules", { accessToken });
 }
+
+export type LongitudinalChangeType =
+  | "IMPROVEMENT"
+  | "NEW_ABNORMALITY"
+  | "NO_SIGNIFICANT_CHANGE"
+  | "PERSISTENT_ABNORMALITY"
+  | "RESOLVED_ABNORMALITY"
+  | "WORSENING";
+export type LongitudinalComparisonScope = "BASELINE" | "HISTORICAL" | "PREVIOUS";
+export type OccupationalSurveillanceType = "EXIT_EXAMINATION" | "PERIODIC_EXAMINATION" | "POST_INCIDENT" | "PRE_EMPLOYMENT" | "RETURN_TO_WORK";
+
+export interface LongitudinalFinding {
+  category: string;
+  changeType: LongitudinalChangeType;
+  evidence: unknown;
+  id: string;
+  severity: string;
+  statement: string;
+  title: string;
+}
+
+export interface LongitudinalComparison {
+  abnormalityTimeline: LongitudinalAbnormalityPoint[];
+  aiTrendStatement: string;
+  clinicalDisclaimer: string;
+  createdAt: string;
+  findings: LongitudinalFinding[];
+  id: string;
+  occupationalSummary?: Record<string, unknown>;
+  overallChange: LongitudinalChangeType;
+  riskProgression: LongitudinalRiskPoint[];
+  scope: LongitudinalComparisonScope;
+  surveillanceType?: OccupationalSurveillanceType;
+  trendMetrics: LongitudinalTrendPoint[];
+}
+
+export interface LongitudinalTrendPoint {
+  axis?: number | null;
+  caseId?: string;
+  date?: string;
+  heartRate?: number | null;
+  prInterval?: number | null;
+  qrsDuration?: number | null;
+  qtInterval?: number | null;
+  qtcInterval?: number | null;
+  rhythm?: string;
+  risk?: string;
+}
+
+export interface LongitudinalAbnormalityPoint {
+  abnormalities?: string[];
+  caseId?: string;
+  date?: string;
+  severity?: string;
+}
+
+export interface LongitudinalRiskPoint {
+  caseId?: string;
+  date?: string;
+  priority?: string;
+  score?: number;
+  severity?: string;
+}
+
+export async function compareLongitudinalECG(accessToken: string, caseId: string, input: {
+  baselineCaseId?: string;
+  scope?: LongitudinalComparisonScope;
+  surveillanceType?: OccupationalSurveillanceType;
+}) {
+  return apiRequest<{ comparison: LongitudinalComparison }>(`/longitudinal-ecg/cases/${caseId}/compare`, {
+    accessToken,
+    body: JSON.stringify(input),
+    method: "POST",
+  });
+}
+
+export async function listLongitudinalComparisons(accessToken: string, caseId: string) {
+  return apiRequest<{ comparisons: LongitudinalComparison[] }>(`/longitudinal-ecg/cases/${caseId}/comparisons`, { accessToken });
+}
+
+export async function getLongitudinalDashboard(accessToken: string, patientId: string) {
+  return apiRequest<{ dashboard: { abnormalityTimeline: LongitudinalAbnormalityPoint[]; comparisons: LongitudinalComparison[]; riskProgression: LongitudinalRiskPoint[]; trendMetrics: LongitudinalTrendPoint[] } }>(
+    `/longitudinal-ecg/patients/${patientId}/dashboard`,
+    { accessToken },
+  );
+}

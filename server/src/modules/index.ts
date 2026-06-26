@@ -10,6 +10,7 @@ import {
   trendsRouter,
 } from "./clinical-intelligence/clinical-intelligence.routes";
 import { cdssRouter } from "./clinical-intelligence/cdss.routes";
+import { longitudinalEcgRouter } from "./clinical-intelligence/longitudinal-ecg.routes";
 import { auditRouter } from "./audit/audit.routes";
 import { backupRouter } from "./backup/backup.routes";
 import { caseCollaborationRouter } from "./collaboration/case-collaboration.routes";
@@ -62,6 +63,7 @@ modulesRouter.use("/ai", aiRouter);
 modulesRouter.use("/alerts", alertsRouter);
 modulesRouter.use("/clinical-alerts", clinicalAlertsRouter);
 modulesRouter.use("/cdss", cdssRouter);
+modulesRouter.use("/longitudinal-ecg", longitudinalEcgRouter);
 modulesRouter.use("/companies", companiesRouter);
 modulesRouter.use("/analytics", populationAnalyticsRouter);
 modulesRouter.use("/backup", backupRouter);
