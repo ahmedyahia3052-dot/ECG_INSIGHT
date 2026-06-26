@@ -443,6 +443,54 @@ enum ClinicalDecisionAlertStatus {
   RESOLVED
 }
 
+enum CDSSRuleCategory {
+  RHYTHM
+  QT_INTERVAL
+  ISCHEMIA
+  ARRHYTHMIA
+  CONDUCTION
+  RISK
+  OCCUPATIONAL_FITNESS
+  RECOMMENDATION
+  RED_FLAG
+  TREND
+}
+
+enum CDSSRiskCategory {
+  LOW_RISK
+  MODERATE_RISK
+  HIGH_RISK
+  CRITICAL
+}
+
+enum CDSSRecommendationPriority {
+  ROUTINE
+  SOON
+  URGENT
+  EMERGENCY
+}
+
+enum CDSSOccupationalDecision {
+  FIT
+  FIT_WITH_RESTRICTIONS
+  TEMPORARILY_UNFIT
+  PERMANENTLY_UNFIT
+}
+
+enum CDSSRunStatus {
+  COMPLETED
+  FAILED
+}
+
+enum CDSSFindingType {
+  RULE_TRIGGER
+  RISK_FACTOR
+  RECOMMENDATION
+  RED_FLAG
+  OCCUPATIONAL_DECISION
+  TREND
+}
+
 enum MFAType {
   EMAIL_OTP
   TOTP
@@ -757,6 +805,7 @@ enum AuditAction {
   COLLABORATION_LOCK_ACQUIRED
   COLLABORATION_LOCK_RELEASED
   COLLABORATION_VERSION_RESTORED
+  CDSS_DECISION_GENERATED
 }
 
 enum CollaborationPresenceStatus {
@@ -913,6 +962,8 @@ model User {
   assignedByCollaborations    CaseAssignment[]           @relation("CaseAssignmentAssignedBy")
   caseLocks                   CaseLock[]
   createdCaseVersions         CaseVersion[]
+  authoredCdssRules           ClinicalDecisionRule[]
+  cdssRuns                    ClinicalDecisionSupportRun[]
 
   @@index([role])
   @@index([isActive])
@@ -1036,6 +1087,7 @@ model Patient {
   conversations          Conversation[]
   collaborationAlerts    Alert[]
   auditLogs              AuditLog[]
+  cdssRuns               ClinicalDecisionSupportRun[]
 
   @@unique([organizationId, employeeId])
   @@index([lastName, firstName])
@@ -1610,6 +1662,7 @@ model ECGCase {
   collaborationAssignments CaseAssignment[]
   collaborationLocks    CaseLock[]
   collaborationVersions CaseVersion[]
+  cdssRuns              ClinicalDecisionSupportRun[]
 
   @@index([patientId])
   @@index([uploadedById])
@@ -1808,6 +1861,75 @@ model CaseVersion {
   @@index([caseId])
   @@index([createdById])
   @@index([createdAt])
+}
+
+model ClinicalDecisionRule {
+  id          String           @id @default(cuid())
+  ruleId      String           @unique
+  category    CDSSRuleCategory
+  name        String
+  description String
+  enabled     Boolean          @default(true)
+  thresholdJson Json?
+  evidenceLevel String         @default("enterprise-consensus")
+  version     String           @default("1.0")
+  createdById String?
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+  createdBy   User?            @relation(fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@index([ruleId])
+  @@index([category])
+  @@index([enabled])
+}
+
+model ClinicalDecisionSupportRun {
+  id                    String                   @id @default(cuid())
+  caseId                String
+  patientId             String
+  evaluatedById         String
+  status                CDSSRunStatus            @default(COMPLETED)
+  riskCategory          CDSSRiskCategory
+  riskScore             Float
+  occupationalDecision  CDSSOccupationalDecision
+  occupationalProfile   String?
+  summary               String
+  trendSummary          String?
+  explainabilityJson    Json
+  inputSnapshot         Json
+  createdAt             DateTime                 @default(now())
+  case                  ECGCase                  @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  patient               Patient                  @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  evaluatedBy           User                     @relation(fields: [evaluatedById], references: [id])
+  findings              ClinicalDecisionFinding[]
+
+  @@index([caseId])
+  @@index([patientId])
+  @@index([evaluatedById])
+  @@index([riskCategory])
+  @@index([createdAt])
+}
+
+model ClinicalDecisionFinding {
+  id              String                     @id @default(cuid())
+  runId           String
+  findingType     CDSSFindingType
+  ruleId          String
+  title           String
+  message         String
+  severity        AISeverity                 @default(MILD)
+  confidenceScore Float
+  evidence        Json
+  recommendation  String?
+  priority        CDSSRecommendationPriority?
+  createdAt       DateTime                   @default(now())
+  run             ClinicalDecisionSupportRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+
+  @@index([runId])
+  @@index([findingType])
+  @@index([ruleId])
+  @@index([severity])
+  @@index([priority])
 }
 
 model ClinicalReport {

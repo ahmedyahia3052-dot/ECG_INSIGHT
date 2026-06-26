@@ -5,6 +5,7 @@ import { StyleSheet, Text, View } from "react-native";
 
 import { Badge, Card, EmptyState, formatDate, medicalTheme, PageSection, patientDisplayName, PrimaryButton, SectionHeader } from "@/components/enterprise/EnterpriseUI";
 import { CaseCollaborationPanel } from "@/components/collaboration/CaseCollaborationPanel";
+import { CDSSDecisionPanel } from "@/components/clinical/CDSSDecisionPanel";
 import { EcgProViewer } from "@/components/ecg/EcgProViewer";
 import { useAuth } from "@/context/AuthContext";
 import { analyzeCase, getAIExplainability, getAIResult } from "@/services/ai";
@@ -98,6 +99,8 @@ export default function EcgCaseDetailScreen() {
       </Card>
 
       <EcgProViewer analysis={analysis} digitalEcg={digitalEcg} ecgCase={ecgCase} explainability={explainability} />
+
+      {token ? <CDSSDecisionPanel accessToken={token} caseId={ecgCase.id} /> : null}
 
       {token ? <CaseCollaborationPanel accessToken={token} caseId={ecgCase.id} defaultAssigneeId={ecgCase.assignedDoctorId} /> : null}
 
