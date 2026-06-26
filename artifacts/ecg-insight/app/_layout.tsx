@@ -41,6 +41,10 @@ function RootLayoutNav() {
       <Stack.Screen name="register" options={{ headerShown: false }} />
       <Stack.Screen name="forgot-password" options={{ headerShown: false }} />
       <Stack.Screen name="verify-email" options={{ headerShown: false }} />
+      <Stack.Screen name="privacy-policy" options={{ headerShown: false }} />
+      <Stack.Screen name="terms-of-service" options={{ headerShown: false }} />
+      <Stack.Screen name="contact-support" options={{ headerShown: false }} />
+      <Stack.Screen name="system-status" options={{ headerShown: false }} />
       <Stack.Screen name="(protected)" options={{ headerShown: false }} />
     </Stack>
   );
@@ -54,7 +58,11 @@ function AuthenticatedChrome() {
     routeRoot === "login" ||
     routeRoot === "register" ||
     routeRoot === "forgot-password" ||
-    routeRoot === "verify-email";
+    routeRoot === "verify-email" ||
+    routeRoot === "privacy-policy" ||
+    routeRoot === "terms-of-service" ||
+    routeRoot === "contact-support" ||
+    routeRoot === "system-status";
 
   if (!isAuthenticated || isAuthRoute) return null;
 

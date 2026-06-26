@@ -51,7 +51,7 @@ interface AuthContextType {
     name: string,
     email: string,
     password: string,
-    role: "corporate_client" | "doctor" | "student" | "user",
+    role: "admin" | "corporate_client" | "doctor" | "student" | "user",
     phoneNumber?: string,
     institution?: string,
     specialization?: string
@@ -262,7 +262,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       name: string,
       email: string,
       password: string,
-      role: "corporate_client" | "doctor" | "student" | "user",
+      role: "admin" | "corporate_client" | "doctor" | "student" | "user",
       phoneNumber?: string,
       institution?: string,
       specialization?: string

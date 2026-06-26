@@ -1,6 +1,7 @@
 import { Feather } from "@expo/vector-icons";
 import { BlurView } from "expo-blur";
 import { LinearGradient } from "expo-linear-gradient";
+import { useRouter } from "expo-router";
 import React, { useEffect, useRef } from "react";
 import {
   Animated,
@@ -42,7 +43,12 @@ export const accountTypes = [
   { description: "Medical education and supervised learning", icon: "book-open" as AuthIcon, label: "Student", role: "student" as const },
 ];
 
-const complianceLinks = ["Privacy Policy", "Terms of Service", "HIPAA", "GDPR", "Cookie Policy", "Contact Support", "System Status"];
+const complianceLinks = [
+  { href: "/privacy-policy", label: "Privacy Policy" },
+  { href: "/terms-of-service", label: "Terms of Service" },
+  { href: "/contact-support", label: "Contact Support" },
+  { href: "/system-status", label: "System Status" },
+];
 
 function AnimatedMedicalBackground() {
   const pulse = useRef(new Animated.Value(0)).current;
@@ -138,6 +144,8 @@ export function PremiumAuthShell({
   subtitle: string;
   title: string;
 }) {
+  const router = useRouter();
+
   return (
     <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={styles.root}>
       <AnimatedMedicalBackground />
@@ -163,8 +171,8 @@ export function PremiumAuthShell({
         </View>
         <View style={styles.complianceFooter}>
           {complianceLinks.map((item) => (
-            <Pressable accessibilityRole="link" key={item} onPress={() => {}}>
-              <Text style={styles.complianceLink}>{item}</Text>
+            <Pressable accessibilityRole="link" key={item.href} onPress={() => router.push(item.href as never)}>
+              <Text style={styles.complianceLink}>{item.label}</Text>
             </Pressable>
           ))}
         </View>

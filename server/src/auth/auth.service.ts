@@ -210,7 +210,7 @@ export async function registerUser(
     name: string;
     password?: string;
     phoneNumber?: string;
-    role: "corporate_client" | "doctor" | "student" | "user";
+    role: "admin" | "corporate_client" | "doctor" | "student" | "user";
     specialization?: string;
   },
   req: Request,
