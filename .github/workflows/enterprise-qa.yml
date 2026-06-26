@@ -1,0 +1,94 @@
+name: Enterprise QA Automation
+
+on:
+  pull_request:
+  push:
+
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: ecg_insight_qa
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_USER: postgres
+        options: >-
+          --health-cmd "pg_isready -U postgres -d ecg_insight_qa"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+    env:
+      CLIENT_ORIGIN: http://127.0.0.1:8081
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/ecg_insight_qa
+      EXPO_NO_DOCTOR: "1"
+      EXPO_OFFLINE: "1"
+      EXPO_PUBLIC_API_URL: http://127.0.0.1:3002/api
+      JWT_REFRESH_SECRET: qa-refresh-secret-000000000000000000000000000000
+      JWT_SECRET: qa-access-secret-00000000000000000000000000000000
+      NODE_ENV: test
+      PLAYWRIGHT_API_URL: http://127.0.0.1:3002/api
+      PLAYWRIGHT_BASE_URL: http://127.0.0.1:8081
+      PORT: 3002
+      RATE_LIMIT_MAX: 900
+      RATE_LIMIT_WINDOW_MS: 900000
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+
+      - name: Generate Prisma client
+        run: npm run prisma:generate
+
+      - name: Apply database migrations
+        run: npx prisma migrate deploy
+
+      - name: Seed QA database
+        run: npm run db:seed
+
+      - name: Build
+        run: npm run build
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Integration tests
+        run: npm run test
+
+      - name: Playwright enterprise regression
+        run: npm run qa:e2e -- --project=chromium-desktop
+
+      - name: Playwright mobile viewport smoke
+        run: npm run qa:smoke -- --project=mobile-iphone --project=tablet-ipad
+
+      - name: Upload Playwright HTML report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-html-report
+          path: playwright-report
+          retention-days: 14
+
+      - name: Upload Playwright artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-artifacts
+          path: test-results
+          retention-days: 14

@@ -11,6 +11,11 @@
     "build:production": "npm run build && npm run build:frontend",
     "db:seed": "tsx prisma/seed.ts",
     "lint": "eslint server/src prisma artifacts/ecg-insight/app artifacts/ecg-insight/components artifacts/ecg-insight/context artifacts/ecg-insight/data artifacts/ecg-insight/hooks artifacts/ecg-insight/services --no-error-on-unmatched-pattern",
+    "qa:accessibility": "playwright test --grep @accessibility",
+    "qa:e2e": "playwright test",
+    "qa:e2e:headed": "playwright test --headed",
+    "qa:report": "playwright show-report playwright-report",
+    "qa:smoke": "playwright test --grep @smoke",
     "prisma:generate": "prisma generate",
     "smoke:production": "tsx scripts/production-smoke.ts",
     "test": "npm run typecheck && tsx scripts/ecg-acquisition.test.ts && tsx scripts/ecg-digitization.integration.ts && tsx scripts/monetization.integration.ts && tsx scripts/super-admin.integration.ts && tsx scripts/owner-security.integration.ts && tsx scripts/enterprise-auth.integration.ts && tsx scripts/clinical-workflow.integration.ts",
@@ -70,7 +75,9 @@
     "zustand": "^5.0.14"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.12.1",
     "@eslint/js": "^10.0.1",
+    "@playwright/test": "^1.61.1",
     "@types/cookie-parser": "^1.4.10",
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",
