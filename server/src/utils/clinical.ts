@@ -16,7 +16,21 @@ import type {
 import { toApiRole } from "./users";
 
 export type ApiGender = "child" | "child_female" | "child_male" | "female" | "male" | "other" | "unknown";
-export type ApiCaseStatus = "ai_completed" | "approved" | "finalized" | "pending" | "processing" | "rejected" | "reviewed" | "under_review" | "uploaded";
+export type ApiCaseStatus =
+  | "ai_completed"
+  | "approved"
+  | "archived"
+  | "awaiting_second_opinion"
+  | "escalated"
+  | "finalized"
+  | "new"
+  | "pending"
+  | "processing"
+  | "rejected"
+  | "reviewed"
+  | "signed"
+  | "under_review"
+  | "uploaded";
 export type ApiPriority = "low" | "medium" | "high" | "critical";
 export type ApiCaseSeverity = "abnormal" | "critical" | "normal";
 export type ApiSmokingStatus = "never" | "former" | "current" | "unknown";
@@ -44,11 +58,16 @@ const genderFromApi: Record<ApiGender, Gender> = {
 const statusToApi: Record<ECGCaseStatus, ApiCaseStatus> = {
   AI_COMPLETED: "ai_completed",
   APPROVED: "approved",
+  ARCHIVED: "archived",
+  AWAITING_SECOND_OPINION: "awaiting_second_opinion",
+  ESCALATED: "escalated",
   FINALIZED: "finalized",
+  NEW: "new",
   PENDING: "pending",
   PROCESSING: "processing",
   REJECTED: "rejected",
   REVIEWED: "reviewed",
+  SIGNED: "signed",
   UNDER_REVIEW: "under_review",
   UPLOADED: "uploaded",
 };
@@ -56,11 +75,16 @@ const statusToApi: Record<ECGCaseStatus, ApiCaseStatus> = {
 const statusFromApi: Record<ApiCaseStatus, ECGCaseStatus> = {
   ai_completed: "AI_COMPLETED",
   approved: "APPROVED",
+  archived: "ARCHIVED",
+  awaiting_second_opinion: "AWAITING_SECOND_OPINION",
+  escalated: "ESCALATED",
   finalized: "FINALIZED",
+  new: "NEW",
   pending: "PENDING",
   processing: "PROCESSING",
   rejected: "REJECTED",
   reviewed: "REVIEWED",
+  signed: "SIGNED",
   under_review: "UNDER_REVIEW",
   uploaded: "UPLOADED",
 };

@@ -2,23 +2,28 @@ import type { ECGCase, ECGCaseStatus } from "@prisma/client";
 import { AppError } from "../middleware/error";
 
 const allowedTransitions: Record<ECGCaseStatus, ECGCaseStatus[]> = {
+  NEW: ["PENDING", "UPLOADED"],
   PENDING: ["UPLOADED"],
   UPLOADED: ["PROCESSING"],
   PROCESSING: ["AI_COMPLETED"],
   AI_COMPLETED: ["UNDER_REVIEW"],
-  UNDER_REVIEW: ["APPROVED", "REJECTED"],
-  REVIEWED: [],
-  APPROVED: ["FINALIZED"],
+  UNDER_REVIEW: ["AWAITING_SECOND_OPINION", "ESCALATED", "REVIEWED", "APPROVED", "REJECTED"],
+  AWAITING_SECOND_OPINION: ["UNDER_REVIEW", "ESCALATED", "APPROVED", "REJECTED"],
+  ESCALATED: ["UNDER_REVIEW", "AWAITING_SECOND_OPINION", "APPROVED", "REJECTED"],
+  REVIEWED: ["APPROVED", "REJECTED", "FINALIZED"],
+  APPROVED: ["FINALIZED", "SIGNED"],
   REJECTED: ["FINALIZED"],
-  FINALIZED: [],
+  FINALIZED: ["SIGNED", "ARCHIVED"],
+  SIGNED: ["ARCHIVED"],
+  ARCHIVED: [],
 };
 
 export function isReadOnlyCaseStatus(status: ECGCaseStatus) {
-  return status === "FINALIZED";
+  return status === "FINALIZED" || status === "SIGNED" || status === "ARCHIVED";
 }
 
 export function isTerminalCaseStatus(status: ECGCaseStatus) {
-  return status === "FINALIZED";
+  return status === "FINALIZED" || status === "SIGNED" || status === "ARCHIVED";
 }
 
 export function canTransitionCaseStatus(from: ECGCaseStatus, to: ECGCaseStatus) {
@@ -54,10 +59,10 @@ export function statusTimestampPatch(status: ECGCaseStatus, actorId: string) {
     approvedAt: status === "APPROVED" ? new Date() : undefined,
     finalizedAt: status === "FINALIZED" ? new Date() : undefined,
     rejectedAt: status === "REJECTED" ? new Date() : undefined,
-    reviewedAt: ["UNDER_REVIEW", "REVIEWED", "APPROVED", "REJECTED", "FINALIZED"].includes(status)
+    reviewedAt: ["UNDER_REVIEW", "AWAITING_SECOND_OPINION", "ESCALATED", "REVIEWED", "APPROVED", "REJECTED", "FINALIZED", "SIGNED"].includes(status)
       ? new Date()
       : undefined,
-    reviewedById: ["UNDER_REVIEW", "REVIEWED", "APPROVED", "REJECTED", "FINALIZED"].includes(status)
+    reviewedById: ["UNDER_REVIEW", "AWAITING_SECOND_OPINION", "ESCALATED", "REVIEWED", "APPROVED", "REJECTED", "FINALIZED", "SIGNED"].includes(status)
       ? actorId
       : undefined,
   };

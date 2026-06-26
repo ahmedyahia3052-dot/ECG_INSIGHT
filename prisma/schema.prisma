@@ -208,15 +208,20 @@ enum PatientStatus {
 }
 
 enum ECGCaseStatus {
+  NEW
   PENDING
   UPLOADED
   PROCESSING
   AI_COMPLETED
   UNDER_REVIEW
+  AWAITING_SECOND_OPINION
+  ESCALATED
   REVIEWED
   APPROVED
   REJECTED
   FINALIZED
+  SIGNED
+  ARCHIVED
 }
 
 enum ECGCaseSeverity {
@@ -745,6 +750,55 @@ enum AuditAction {
   USAGE_RECORDED
   INVOICE_CREATED
   IMPERSONATION_STARTED
+  COLLABORATION_NOTE_CREATED
+  COLLABORATION_NOTE_UPDATED
+  COLLABORATION_MESSAGE_SENT
+  COLLABORATION_ASSIGNMENT_UPDATED
+  COLLABORATION_LOCK_ACQUIRED
+  COLLABORATION_LOCK_RELEASED
+  COLLABORATION_VERSION_RESTORED
+}
+
+enum CollaborationPresenceStatus {
+  ONLINE
+  IDLE
+  OFFLINE
+}
+
+enum CollaborationActivityType {
+  ECG_UPLOADED
+  AI_ANALYSIS_COMPLETED
+  REPORT_EDITED
+  REPORT_SIGNED
+  COMMENT_ADDED
+  CASE_REASSIGNED
+  STATUS_CHANGED
+  FINAL_APPROVAL
+  NOTE_ADDED
+  LOCK_ACQUIRED
+  LOCK_RELEASED
+  VERSION_RESTORED
+}
+
+enum CollaborationAssignmentType {
+  PRIMARY_REVIEW
+  REASSIGNMENT
+  ESCALATION
+  MULTI_REVIEW
+  SECOND_OPINION
+}
+
+enum CollaborationAssignmentStatus {
+  ACTIVE
+  COMPLETED
+  CANCELED
+  ESCALATED
+}
+
+enum CollaborationLockStatus {
+  ACTIVE
+  RELEASED
+  EXPIRED
 }
 
 model User {
@@ -849,6 +903,16 @@ model User {
   sentMessages                Message[]                 @relation("MessageSender")
   readReceipts                MessageReadReceipt[]
   collaborationAlerts         Alert[]
+  casePresences               CasePresence[]
+  authoredCaseNotes           CaseClinicalNote[]         @relation("CaseNoteAuthor")
+  editedCaseNotes             CaseClinicalNoteEdit[]     @relation("CaseNoteEditAuthor")
+  collaborationActivities     CaseActivity[]
+  authoredDiscussionMessages  CaseDiscussionMessage[]    @relation("CaseDiscussionAuthor")
+  discussionReadReceipts      CaseDiscussionReadReceipt[]
+  assignedCollaborations      CaseAssignment[]           @relation("CaseAssignmentAssignee")
+  assignedByCollaborations    CaseAssignment[]           @relation("CaseAssignmentAssignedBy")
+  caseLocks                   CaseLock[]
+  createdCaseVersions         CaseVersion[]
 
   @@index([role])
   @@index([isActive])
@@ -1539,6 +1603,13 @@ model ECGCase {
   tasks                 Task[]
   conversations         Conversation[]
   collaborationAlerts   Alert[]
+  collaborationPresences CasePresence[]
+  collaborationNotes    CaseClinicalNote[]
+  collaborationActivities CaseActivity[]
+  discussionThreads     CaseDiscussionThread[]
+  collaborationAssignments CaseAssignment[]
+  collaborationLocks    CaseLock[]
+  collaborationVersions CaseVersion[]
 
   @@index([patientId])
   @@index([uploadedById])
@@ -1550,6 +1621,193 @@ model ECGCase {
   @@index([caseNumber])
   @@index([uploadDate])
   @@index([acquisitionDate])
+}
+
+model CasePresence {
+  id             String                      @id @default(cuid())
+  caseId         String
+  userId         String
+  status         CollaborationPresenceStatus @default(ONLINE)
+  currentSection String?
+  lastActivityAt DateTime                    @default(now())
+  connectedAt    DateTime                    @default(now())
+  disconnectedAt DateTime?
+  metadata       Json?
+  case           ECGCase                     @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  user           User                        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([caseId, userId])
+  @@index([caseId])
+  @@index([userId])
+  @@index([status])
+  @@index([lastActivityAt])
+}
+
+model CaseClinicalNote {
+  id          String                 @id @default(cuid())
+  caseId      String
+  authorId    String
+  richText    String
+  plainText   String?
+  version     Int                    @default(1)
+  mentions    String[]               @default([])
+  metadata    Json?
+  createdAt   DateTime               @default(now())
+  updatedAt   DateTime               @updatedAt
+  case        ECGCase                @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  author      User                   @relation("CaseNoteAuthor", fields: [authorId], references: [id])
+  edits       CaseClinicalNoteEdit[]
+
+  @@index([caseId])
+  @@index([authorId])
+  @@index([createdAt])
+}
+
+model CaseClinicalNoteEdit {
+  id          String           @id @default(cuid())
+  noteId      String
+  editorId    String
+  previousRichText String
+  nextRichText     String
+  version     Int
+  reason      String?
+  createdAt   DateTime         @default(now())
+  note        CaseClinicalNote @relation(fields: [noteId], references: [id], onDelete: Cascade)
+  editor      User             @relation("CaseNoteEditAuthor", fields: [editorId], references: [id])
+
+  @@index([noteId])
+  @@index([editorId])
+  @@index([createdAt])
+}
+
+model CaseActivity {
+  id        String                    @id @default(cuid())
+  caseId    String
+  actorId   String?
+  type      CollaborationActivityType
+  title     String
+  message   String?
+  metadata  Json?
+  createdAt DateTime                  @default(now())
+  case      ECGCase                   @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  actor     User?                     @relation(fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([caseId])
+  @@index([actorId])
+  @@index([type])
+  @@index([createdAt])
+}
+
+model CaseDiscussionThread {
+  id        String                  @id @default(cuid())
+  caseId    String
+  title     String
+  resolved  Boolean                 @default(false)
+  createdAt DateTime                @default(now())
+  updatedAt DateTime                @updatedAt
+  case      ECGCase                 @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  messages  CaseDiscussionMessage[]
+
+  @@index([caseId])
+  @@index([resolved])
+  @@index([updatedAt])
+}
+
+model CaseDiscussionMessage {
+  id          String                      @id @default(cuid())
+  threadId    String
+  authorId    String
+  parentId    String?
+  body        String
+  mentions    String[]                    @default([])
+  attachments Json?
+  createdAt   DateTime                    @default(now())
+  updatedAt   DateTime                    @updatedAt
+  thread      CaseDiscussionThread        @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  author      User                        @relation("CaseDiscussionAuthor", fields: [authorId], references: [id])
+  parent      CaseDiscussionMessage?      @relation("CaseDiscussionReplies", fields: [parentId], references: [id], onDelete: SetNull)
+  replies     CaseDiscussionMessage[]     @relation("CaseDiscussionReplies")
+  readReceipts CaseDiscussionReadReceipt[]
+
+  @@index([threadId])
+  @@index([authorId])
+  @@index([parentId])
+  @@index([createdAt])
+}
+
+model CaseDiscussionReadReceipt {
+  id        String                @id @default(cuid())
+  messageId String
+  userId    String
+  readAt    DateTime              @default(now())
+  message   CaseDiscussionMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  user      User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([messageId, userId])
+  @@index([userId])
+  @@index([readAt])
+}
+
+model CaseAssignment {
+  id           String                        @id @default(cuid())
+  caseId       String
+  assignedToId String
+  assignedById String
+  type         CollaborationAssignmentType   @default(PRIMARY_REVIEW)
+  status       CollaborationAssignmentStatus @default(ACTIVE)
+  reason       String?
+  createdAt    DateTime                      @default(now())
+  completedAt  DateTime?
+  case         ECGCase                       @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  assignedTo   User                          @relation("CaseAssignmentAssignee", fields: [assignedToId], references: [id])
+  assignedBy   User                          @relation("CaseAssignmentAssignedBy", fields: [assignedById], references: [id])
+
+  @@index([caseId])
+  @@index([assignedToId])
+  @@index([assignedById])
+  @@index([type])
+  @@index([status])
+  @@index([createdAt])
+}
+
+model CaseLock {
+  id          String                  @id @default(cuid())
+  caseId      String
+  userId      String
+  resource    String
+  status      CollaborationLockStatus @default(ACTIVE)
+  version     Int                     @default(1)
+  expiresAt   DateTime
+  releasedAt  DateTime?
+  metadata    Json?
+  createdAt   DateTime                @default(now())
+  updatedAt   DateTime                @updatedAt
+  case        ECGCase                 @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  user        User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([caseId])
+  @@index([userId])
+  @@index([resource])
+  @@index([status])
+  @@index([expiresAt])
+}
+
+model CaseVersion {
+  id          String   @id @default(cuid())
+  caseId      String
+  createdById String
+  version     Int
+  snapshot    Json
+  reason      String?
+  restoredAt  DateTime?
+  createdAt   DateTime @default(now())
+  case        ECGCase  @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  createdBy   User     @relation(fields: [createdById], references: [id])
+
+  @@unique([caseId, version])
+  @@index([caseId])
+  @@index([createdById])
+  @@index([createdAt])
 }
 
 model ClinicalReport {

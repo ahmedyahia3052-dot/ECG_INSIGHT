@@ -11,6 +11,7 @@ import {
 } from "./clinical-intelligence/clinical-intelligence.routes";
 import { auditRouter } from "./audit/audit.routes";
 import { backupRouter } from "./backup/backup.routes";
+import { caseCollaborationRouter } from "./collaboration/case-collaboration.routes";
 import { alertsRouter, messagesRouter, syncRouter, tasksRouter, teamsRouter } from "./collaboration/collaboration.routes";
 import { complianceRouter } from "./compliance/compliance.routes";
 import { copilotRouter } from "./copilot/copilot.routes";
@@ -63,6 +64,7 @@ modulesRouter.use("/companies", companiesRouter);
 modulesRouter.use("/analytics", populationAnalyticsRouter);
 modulesRouter.use("/backup", backupRouter);
 modulesRouter.use("/cases", casesRouter);
+modulesRouter.use("/case-collaboration", caseCollaborationRouter);
 modulesRouter.use("/tasks", tasksRouter);
 modulesRouter.use("/messages", messagesRouter);
 modulesRouter.use("/teams", teamsRouter);

@@ -69,6 +69,7 @@ export interface ApiECGCase {
   aiDiagnosis?: string;
   aiStatus: string;
   aiModelVersion?: string;
+  assignedDoctorId?: string;
   caseId: string;
   caseNumber?: string;
   clinicalComments?: string;
@@ -102,7 +103,21 @@ export interface ApiECGCase {
   reviewedById?: string;
   rhythm?: string;
   severity?: "normal" | "abnormal" | "critical";
-  status: "ai_completed" | "approved" | "finalized" | "pending" | "processing" | "rejected" | "reviewed" | "under_review" | "uploaded";
+  status:
+    | "ai_completed"
+    | "approved"
+    | "archived"
+    | "awaiting_second_opinion"
+    | "escalated"
+    | "finalized"
+    | "new"
+    | "pending"
+    | "processing"
+    | "rejected"
+    | "reviewed"
+    | "signed"
+    | "under_review"
+    | "uploaded";
   uploadDate: string;
   uploadedById: string;
   uploadedByDoctorId?: string;

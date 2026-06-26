@@ -1,6 +1,21 @@
 import { z } from "zod";
 
-export const caseStatusSchema = z.enum(["uploaded", "processing", "ai_completed", "under_review", "approved", "rejected", "finalized"]);
+export const caseStatusSchema = z.enum([
+  "new",
+  "pending",
+  "uploaded",
+  "processing",
+  "ai_completed",
+  "under_review",
+  "awaiting_second_opinion",
+  "escalated",
+  "reviewed",
+  "approved",
+  "rejected",
+  "finalized",
+  "signed",
+  "archived",
+]);
 const caseCreateStatusSchema = z.preprocess((value) => value === "pending" ? "uploaded" : value, caseStatusSchema);
 export const caseSeveritySchema = z.enum(["normal", "abnormal", "critical"]);
 

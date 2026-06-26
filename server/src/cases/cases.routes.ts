@@ -3,6 +3,7 @@ import { Router } from "express";
 import { prisma } from "../config/prisma";
 import { requireAuth, requireRole } from "../middleware/auth";
 import { AppError } from "../middleware/error";
+import { emitRealtime } from "../realtime/realtime.service";
 import { validateBody } from "../middleware/validate";
 import {
   fromApiCaseStatus,
@@ -84,6 +85,31 @@ async function audit(input: {
       patient: input.patientId ? { connect: { id: input.patientId } } : undefined,
     },
   });
+}
+
+async function collaborationActivity(input: {
+  actorId: string;
+  caseId: string;
+  message?: string;
+  metadata?: Prisma.InputJsonValue;
+  title: string;
+  type: Prisma.CaseActivityCreateInput["type"];
+}) {
+  try {
+    const activity = await prisma.caseActivity.create({
+      data: {
+        actorId: input.actorId,
+        caseId: input.caseId,
+        message: input.message,
+        metadata: input.metadata,
+        title: input.title,
+        type: input.type,
+      },
+    });
+    emitRealtime("case.activity.created", activity, [`case:${input.caseId}`]);
+  } catch {
+    // Existing case workflows must keep running on test/staging databases before the Sprint 33 migration is applied.
+  }
 }
 
 casesRouter.get("/", async (req, res, next) => {
@@ -189,6 +215,12 @@ casesRouter.post("/", requireRole("DOCTOR"), validateBody(caseCreateSchema), asy
       caseId: ecgCase.id,
       message: `ECG case ${ecgCase.caseId} created.`,
       patientId: ecgCase.patientId,
+    });
+    await collaborationActivity({
+      actorId: req.auth!.id,
+      caseId: ecgCase.id,
+      title: "ECG uploaded",
+      type: "ECG_UPLOADED",
     });
 
     if (ecgCase.assignedDoctorId) {
@@ -308,6 +340,13 @@ casesRouter.post(
         message: `ECG case ${ecgCase.caseId} assigned.`,
         patientId: ecgCase.patientId,
       });
+      await collaborationActivity({
+        actorId: req.auth!.id,
+        caseId: ecgCase.id,
+        metadata: { assignedDoctorId: req.body.assignedDoctorId },
+        title: "Case reassigned",
+        type: "CASE_REASSIGNED",
+      });
       await createNotification({
         caseId: ecgCase.id,
         message: `You have been assigned ECG case ${ecgCase.caseId}.`,
@@ -348,6 +387,13 @@ casesRouter.post(
           metadata: { previousStatus: current.status, status: reviewed.status },
           patientId: reviewed.patientId,
         });
+        await collaborationActivity({
+          actorId: req.auth!.id,
+          caseId: reviewed.id,
+          metadata: { previousStatus: current.status, status: reviewed.status },
+          title: "Case status changed",
+          type: "STATUS_CHANGED",
+        });
         current = reviewed;
       }
       assertCaseStatusTransition(current.status, nextStatus);
@@ -365,6 +411,13 @@ casesRouter.post(
         caseId: ecgCase.id,
         message: `ECG case ${ecgCase.caseId} status changed to ${ecgCase.status}.`,
         patientId: ecgCase.patientId,
+      });
+      await collaborationActivity({
+        actorId: req.auth!.id,
+        caseId: ecgCase.id,
+        metadata: { status: ecgCase.status },
+        title: ecgCase.status === "APPROVED" ? "Final approval recorded" : "Case status changed",
+        type: ecgCase.status === "APPROVED" ? "FINAL_APPROVAL" : "STATUS_CHANGED",
       });
       if (ecgCase.status === "REVIEWED" || ecgCase.status === "FINALIZED") {
         await createNotification({
@@ -455,6 +508,13 @@ casesRouter.post("/:caseId/review", requireRole("DOCTOR"), validateBody(reviewCa
         type: "CLINICAL_NOTE_ADDED",
       },
     });
+    await collaborationActivity({
+      actorId: req.auth!.id,
+      caseId: ecgCase.id,
+      metadata: { diagnosis: ecgCase.doctorDiagnosis, severity: ecgCase.severity },
+      title: "Clinical note added",
+      type: "NOTE_ADDED",
+    });
     res.json({ case: serializeCase(ecgCase) });
   } catch (error) {
     next(error);
@@ -482,6 +542,13 @@ casesRouter.post("/:caseId/approve", requireRole("DOCTOR"), async (req, res, nex
       message: `ECG case ${ecgCase.caseNumber ?? ecgCase.caseId} approved.`,
       metadata: { status: ecgCase.status },
       patientId: ecgCase.patientId,
+    });
+    await collaborationActivity({
+      actorId: req.auth!.id,
+      caseId: ecgCase.id,
+      metadata: { status: ecgCase.status },
+      title: "Final approval recorded",
+      type: "FINAL_APPROVAL",
     });
     res.json({ case: serializeCase(ecgCase) });
   } catch (error) {

@@ -8,6 +8,7 @@ import {
 } from "../cases/state-machine";
 import { AppError } from "../middleware/error";
 import { ensureClinicalReportForCase } from "../modules/reports/reports.service";
+import { emitRealtime } from "../realtime/realtime.service";
 import { createNotification } from "../utils/notifications";
 import { isCriticalDiagnosis } from "./engine";
 import { generateExplainabilityArtifact } from "./explainability";
@@ -186,6 +187,25 @@ async function completeAnalysis(analysisId: string, actorId: string) {
         type: "AI_ANALYSIS_COMPLETED",
       },
     });
+    try {
+      const collaborationActivity = await prisma.caseActivity.create({
+        data: {
+          actorId,
+          caseId: queued.caseId,
+          metadata: {
+            analysisId: analysis.id,
+            confidenceScore: analysis.confidenceScore,
+            diagnosis: analysis.diagnosis,
+            severity: analysis.severity,
+          },
+          title: "AI analysis completed",
+          type: "AI_ANALYSIS_COMPLETED",
+        },
+      });
+      emitRealtime("case.activity.created", collaborationActivity, [`case:${queued.caseId}`]);
+    } catch {
+      // Keep legacy AI analysis tests and deployments working until the Sprint 33 migration is applied.
+    }
     await ensureClinicalReportForCase(queued.caseId, actorId);
 
     await createNotification({

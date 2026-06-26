@@ -28,6 +28,35 @@ export type NotificationCategory =
 export type NotificationChannel = "EMAIL" | "IN_APP" | "PUSH" | "SMS";
 export type NotificationFrequency = "DAILY_DIGEST" | "IMMEDIATE" | "MUTED" | "WEEKLY_DIGEST";
 
+export type CollaborationCaseStatus =
+  | "NEW"
+  | "PENDING"
+  | "UPLOADED"
+  | "PROCESSING"
+  | "AI_COMPLETED"
+  | "UNDER_REVIEW"
+  | "AWAITING_SECOND_OPINION"
+  | "ESCALATED"
+  | "REVIEWED"
+  | "APPROVED"
+  | "REJECTED"
+  | "FINALIZED"
+  | "SIGNED"
+  | "ARCHIVED";
+export type CollaborationAssignmentType = "ESCALATION" | "MULTI_REVIEW" | "PRIMARY_REVIEW" | "REASSIGNMENT" | "SECOND_OPINION";
+export type CollaborationPresenceStatus = "IDLE" | "OFFLINE" | "ONLINE";
+
+export interface CaseCollaborationState {
+  activities: unknown[];
+  assignments: unknown[];
+  case: { caseId: string; caseNumber?: string; id: string; patientId: string; status: CollaborationCaseStatus };
+  locks: unknown[];
+  notes: unknown[];
+  presence: unknown[];
+  threads: unknown[];
+  versions: unknown[];
+}
+
 export interface NotificationPreferenceRecord {
   category: NotificationCategory;
   emailEnabled: boolean;
@@ -145,6 +174,87 @@ export async function markAllNotificationsRead(accessToken: string) {
 
 export async function deleteNotification(accessToken: string, notificationId: string) {
   return apiRequest<void>(`/notifications/${notificationId}`, { accessToken, method: "DELETE" });
+}
+
+export async function getCaseCollaborationState(accessToken: string, caseId: string) {
+  return apiRequest<CaseCollaborationState>(`/case-collaboration/cases/${caseId}`, { accessToken });
+}
+
+export async function updateCasePresence(accessToken: string, caseId: string, input: { currentSection?: string; status?: CollaborationPresenceStatus }) {
+  return apiRequest<{ presence: unknown }>(`/case-collaboration/cases/${caseId}/presence`, {
+    accessToken,
+    body: JSON.stringify(input),
+    method: "POST",
+  });
+}
+
+export async function createCaseNote(accessToken: string, caseId: string, input: { plainText?: string; richText: string }) {
+  return apiRequest<{ note: unknown }>(`/case-collaboration/cases/${caseId}/notes`, {
+    accessToken,
+    body: JSON.stringify(input),
+    method: "POST",
+  });
+}
+
+export async function updateCaseNote(accessToken: string, caseId: string, noteId: string, input: { plainText?: string; reason?: string; richText: string }) {
+  return apiRequest<{ note: unknown }>(`/case-collaboration/cases/${caseId}/notes/${noteId}`, {
+    accessToken,
+    body: JSON.stringify(input),
+    method: "PATCH",
+  });
+}
+
+export async function sendCaseDiscussionMessage(accessToken: string, caseId: string, input: Record<string, unknown>) {
+  return apiRequest<{ message: unknown; thread: unknown }>(`/case-collaboration/cases/${caseId}/discussions`, {
+    accessToken,
+    body: JSON.stringify(input),
+    method: "POST",
+  });
+}
+
+export async function markCaseDiscussionRead(accessToken: string, caseId: string, threadId: string) {
+  return apiRequest<{ receipts: unknown[] }>(`/case-collaboration/cases/${caseId}/discussions/${threadId}/read`, {
+    accessToken,
+    method: "POST",
+  });
+}
+
+export async function createCaseAssignment(accessToken: string, caseId: string, input: { assignedToId: string; reason?: string; type?: CollaborationAssignmentType }) {
+  return apiRequest<{ assignment: unknown }>(`/case-collaboration/cases/${caseId}/assignments`, {
+    accessToken,
+    body: JSON.stringify(input),
+    method: "POST",
+  });
+}
+
+export async function updateCollaborationCaseStatus(accessToken: string, caseId: string, input: { reason?: string; status: CollaborationCaseStatus }) {
+  return apiRequest<{ case: unknown }>(`/case-collaboration/cases/${caseId}/status`, {
+    accessToken,
+    body: JSON.stringify(input),
+    method: "POST",
+  });
+}
+
+export async function acquireCaseLock(accessToken: string, caseId: string, input: { resource?: string; ttlSeconds?: number; version?: number }) {
+  return apiRequest<{ lock: unknown }>(`/case-collaboration/cases/${caseId}/locks`, {
+    accessToken,
+    body: JSON.stringify(input),
+    method: "POST",
+  });
+}
+
+export async function releaseCaseLock(accessToken: string, caseId: string, lockId: string) {
+  return apiRequest<{ lock: unknown }>(`/case-collaboration/cases/${caseId}/locks/${lockId}`, {
+    accessToken,
+    method: "DELETE",
+  });
+}
+
+export async function restoreCaseVersion(accessToken: string, caseId: string, versionId: string) {
+  return apiRequest<{ case: unknown; version: unknown }>(`/case-collaboration/cases/${caseId}/versions/${versionId}/restore`, {
+    accessToken,
+    method: "POST",
+  });
 }
 
 export async function listSyncState(accessToken: string) {
