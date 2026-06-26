@@ -6,7 +6,7 @@ import {
   useFonts,
 } from "@expo-google-fonts/inter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { Stack } from "expo-router";
+import { Stack, useSegments } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import React, { useEffect } from "react";
 import { StyleSheet, Text, View } from "react-native";
@@ -16,7 +16,7 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { MobileSyncStatus } from "@/components/mobile/MobileSyncStatus";
 import { LiveNotificationBell } from "@/components/notifications/LiveNotificationBell";
-import { AuthProvider } from "@/context/AuthContext";
+import { AuthProvider, useAuth } from "@/context/AuthContext";
 import { ApiError } from "@/services/api";
 
 SplashScreen.preventAutoHideAsync();
@@ -43,6 +43,26 @@ function RootLayoutNav() {
       <Stack.Screen name="verify-email" options={{ headerShown: false }} />
       <Stack.Screen name="(protected)" options={{ headerShown: false }} />
     </Stack>
+  );
+}
+
+function AuthenticatedChrome() {
+  const segments = useSegments();
+  const { isAuthenticated } = useAuth();
+  const routeRoot = segments[0];
+  const isAuthRoute =
+    routeRoot === "login" ||
+    routeRoot === "register" ||
+    routeRoot === "forgot-password" ||
+    routeRoot === "verify-email";
+
+  if (!isAuthenticated || isAuthRoute) return null;
+
+  return (
+    <>
+      <LiveNotificationBell />
+      <MobileSyncStatus />
+    </>
   );
 }
 
@@ -76,8 +96,7 @@ export default function RootLayout() {
           <GestureHandlerRootView style={{ flex: 1 }}>
             <AuthProvider>
               <RootLayoutNav />
-              <LiveNotificationBell />
-              <MobileSyncStatus />
+              <AuthenticatedChrome />
             </AuthProvider>
           </GestureHandlerRootView>
         </QueryClientProvider>

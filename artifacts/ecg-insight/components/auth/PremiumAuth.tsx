@@ -1,4 +1,5 @@
 import { Feather } from "@expo/vector-icons";
+import { BlurView } from "expo-blur";
 import { LinearGradient } from "expo-linear-gradient";
 import React, { useEffect, useRef } from "react";
 import {
@@ -13,7 +14,6 @@ import {
   Text,
   TextInput,
   TextInputProps,
-  useWindowDimensions,
   View,
   ViewStyle,
 } from "react-native";
@@ -42,13 +42,7 @@ export const accountTypes = [
   { description: "Medical education and supervised learning", icon: "book-open" as AuthIcon, label: "Student", role: "student" as const },
 ];
 
-const trustIndicators = ["99.99% Uptime", "HIPAA Secure", "SOC2 Ready", "MFA Protected", "AI Powered"];
 const complianceLinks = ["Privacy Policy", "Terms of Service", "HIPAA", "GDPR", "Cookie Policy", "Contact Support", "System Status"];
-const platformStats = [
-  { label: "ECG analyses", value: "2.4M+" },
-  { label: "Active physicians", value: "18K+" },
-  { label: "Enterprise organizations", value: "620+" },
-];
 
 function AnimatedMedicalBackground() {
   const pulse = useRef(new Animated.Value(0)).current;
@@ -80,7 +74,7 @@ function AnimatedMedicalBackground() {
   const translateY = drift.interpolate({ inputRange: [0, 1], outputRange: [22, -22] });
 
   return (
-    <View pointerEvents="none" style={StyleSheet.absoluteFill}>
+    <View pointerEvents="none" style={styles.backgroundLayer}>
       <LinearGradient colors={["#020617", "#06162A", "#0F172A"]} style={StyleSheet.absoluteFill} />
       <View style={styles.grid}>
         {Array.from({ length: 18 }).map((_, index) => (
@@ -144,56 +138,29 @@ export function PremiumAuthShell({
   subtitle: string;
   title: string;
 }) {
-  const { width } = useWindowDimensions();
-  const mobile = width < 640;
-  const tablet = width >= 640 && width < 1100;
-  const compact = width < 1100;
-  const cardWidth = mobile ? "100%" : tablet ? 560 : 620;
-  const heroTitleStyle = mobile ? styles.heroTitleMobile : tablet ? styles.heroTitleTablet : undefined;
-
   return (
     <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={styles.root}>
       <AnimatedMedicalBackground />
-      <ScrollView contentContainerStyle={[styles.scroll, compact && styles.scrollCompact, mobile && styles.scrollMobile]} keyboardShouldPersistTaps="handled">
-        <View style={[styles.hero, compact && styles.heroCompact]}>
-          <View style={styles.brandRow}>
+      <ScrollView
+        contentContainerStyle={styles.scroll}
+        keyboardShouldPersistTaps="handled"
+        showsHorizontalScrollIndicator={false}
+        showsVerticalScrollIndicator={false}
+        style={styles.contentLayer}
+      >
+        <View style={styles.authPanel}>
+          <View style={styles.shellBrand}>
             <View style={styles.logo}>
-              <Feather name="activity" size={25} color="#03131B" />
+              <Feather name="activity" size={22} color="#03131B" />
             </View>
-            <View>
-              <Text style={styles.brand}>ECG Insight</Text>
-              <Text style={styles.brandSub}>Enterprise Medical AI Platform</Text>
-            </View>
-          </View>
-          <View style={styles.heroCopy}>
+            <Text style={styles.brand}>ECG Insight</Text>
+            <Text style={styles.brandSub}>Enterprise Medical AI Platform</Text>
             {eyebrow ? <Text style={styles.eyebrow}>{eyebrow}</Text> : null}
-            <Text style={[styles.heroTitle, heroTitleStyle]}>{title}</Text>
+            <Text style={styles.heroTitle}>{title}</Text>
             <Text style={styles.heroSubtitle}>{subtitle}</Text>
           </View>
-          <View style={styles.trustGrid}>
-            {trustIndicators.map((indicator) => (
-              <View key={indicator} style={styles.trustPill}>
-                <Feather name="shield" size={13} color={authTheme.success} />
-                <Text style={styles.trustText}>{indicator}</Text>
-              </View>
-            ))}
-          </View>
-          {!compact ? (
-            <View style={styles.signalCard}>
-              <Text style={styles.signalTitle}>Clinical-grade access control</Text>
-              <Text style={styles.signalText}>MFA, session rotation, trusted device controls, immutable audit trails, and encrypted PHI workflows remain enforced by the existing backend.</Text>
-            </View>
-          ) : null}
-          <View style={styles.statsGrid}>
-            {platformStats.map((stat) => (
-              <View key={stat.label} style={styles.statWidget}>
-                <Text style={styles.statValue}>{stat.value}</Text>
-                <Text style={styles.statLabel}>{stat.label}</Text>
-              </View>
-            ))}
-          </View>
+          {children}
         </View>
-        <View style={[styles.authPanel, compact && styles.authPanelCompact, { maxWidth: cardWidth, width: cardWidth }]}>{children}</View>
         <View style={styles.complianceFooter}>
           {complianceLinks.map((item) => (
             <Pressable accessibilityRole="link" key={item} onPress={() => {}}>
@@ -207,7 +174,12 @@ export function PremiumAuthShell({
 }
 
 export function AuthCard({ children, style }: { children: React.ReactNode; style?: StyleProp<ViewStyle> }) {
-  return <View style={[styles.card, style]}>{children}</View>;
+  return (
+    <View style={[styles.card, style]}>
+      <BlurView intensity={22} tint="dark" style={StyleSheet.absoluteFill} />
+      <View style={styles.cardContent}>{children}</View>
+    </View>
+  );
 }
 
 export function AuthTextField({
@@ -350,12 +322,11 @@ export function AuthDivider({ label = "or continue with" }: { label?: string }) 
 export const premiumAuthTheme = authTheme;
 
 const styles = StyleSheet.create({
-  authPanel: { flexShrink: 0 },
-  authPanelCompact: { alignSelf: "center", minWidth: 0 },
+  authPanel: { alignItems: "center", maxWidth: 480, width: "100%", zIndex: 20 },
   background: { flex: 1 },
-  brand: { color: authTheme.text, fontSize: 22, fontWeight: "900", letterSpacing: -0.4 },
-  brandRow: { alignItems: "center", flexDirection: "row", gap: 14 },
-  brandSub: { color: authTheme.muted, fontSize: 10, fontWeight: "900", letterSpacing: 1.3, textTransform: "uppercase" },
+  backgroundLayer: { ...StyleSheet.absoluteFillObject, zIndex: 0 },
+  brand: { color: authTheme.text, fontSize: 24, fontWeight: "900", letterSpacing: -0.5, marginTop: 12, textAlign: "center" },
+  brandSub: { color: authTheme.muted, fontSize: 11, fontWeight: "900", letterSpacing: 1.3, marginTop: 4, textAlign: "center", textTransform: "uppercase" },
   button: { alignItems: "center", borderRadius: 16, borderWidth: 1, flexDirection: "row", gap: 9, justifyContent: "center", minHeight: 52, paddingHorizontal: 16 },
   buttonGhost: { backgroundColor: "transparent", borderColor: "transparent" },
   buttonOutline: { backgroundColor: "rgba(15,23,42,0.42)", borderColor: authTheme.border },
@@ -363,11 +334,13 @@ const styles = StyleSheet.create({
   buttonText: { fontSize: 14, fontWeight: "900" },
   buttonTextPrimary: { color: "#03131B" },
   buttonTextSecondary: { color: authTheme.text },
-  card: { backgroundColor: authTheme.card, borderColor: authTheme.border, borderRadius: 30, borderWidth: 1, gap: 18, minHeight: 760, padding: 26, shadowColor: "#000", shadowOpacity: 0.3, shadowRadius: 38 },
+  card: { backgroundColor: "rgba(8,18,35,0.68)", borderColor: "rgba(226,232,240,0.16)", borderRadius: 28, borderWidth: 1, maxWidth: 480, overflow: "hidden", shadowColor: "#000", shadowOpacity: 0.34, shadowRadius: 34, width: "100%" },
+  cardContent: { gap: 18, padding: 26, position: "relative", zIndex: 2 },
   checkbox: { alignItems: "center", borderColor: authTheme.border, borderRadius: 7, borderWidth: 1, height: 22, justifyContent: "center", width: 22 },
   checkboxChecked: { backgroundColor: authTheme.cyan, borderColor: authTheme.cyan },
-  complianceFooter: { flexDirection: "row", flexWrap: "wrap", gap: 14, justifyContent: "center", maxWidth: 980, width: "100%" },
+  complianceFooter: { flexDirection: "row", flexWrap: "wrap", gap: 12, justifyContent: "center", maxWidth: 480, paddingTop: 18, width: "100%", zIndex: 20 },
   complianceLink: { color: "rgba(226, 232, 240, 0.72)", fontSize: 12, fontWeight: "800" },
+  contentLayer: { flex: 1, position: "relative", zIndex: 20 },
   disabled: { opacity: 0.5 },
   divider: { alignItems: "center", flexDirection: "row", gap: 10 },
   dividerLine: { backgroundColor: authTheme.border, flex: 1, height: 1 },
@@ -383,14 +356,9 @@ const styles = StyleSheet.create({
   grid: { ...StyleSheet.absoluteFillObject, opacity: 0.78 },
   gridHorizontal: { backgroundColor: "rgba(34,211,238,0.055)", height: 1, left: 0, position: "absolute", right: 0 },
   gridVertical: { backgroundColor: "rgba(34,211,238,0.055)", bottom: 0, position: "absolute", top: 0, width: 1 },
-  hero: { flex: 1, flexShrink: 1, gap: 26, maxWidth: 690, minWidth: 0, paddingVertical: 22 },
-  heroCompact: { alignSelf: "center", maxWidth: 620, width: "100%" },
-  heroCopy: { gap: 12 },
-  heroSubtitle: { color: "rgba(203,213,225,0.88)", flexShrink: 1, fontSize: 17, lineHeight: 27, maxWidth: 620 },
-  heroTitle: { color: authTheme.text, flexShrink: 1, fontSize: 52, fontWeight: "900", letterSpacing: -2, lineHeight: 58, maxWidth: 680 },
-  heroTitleMobile: { fontSize: 34, letterSpacing: -1.1, lineHeight: 40 },
-  heroTitleTablet: { fontSize: 42, letterSpacing: -1.4, lineHeight: 48 },
-  logo: { alignItems: "center", backgroundColor: authTheme.cyan, borderRadius: 18, height: 52, justifyContent: "center", shadowColor: authTheme.cyan, shadowOpacity: 0.36, shadowRadius: 24, width: 52 },
+  heroSubtitle: { color: "rgba(203,213,225,0.84)", fontSize: 14, lineHeight: 21, marginTop: 8, textAlign: "center" },
+  heroTitle: { color: authTheme.text, fontSize: 24, fontWeight: "900", letterSpacing: -0.7, lineHeight: 30, marginTop: 10, textAlign: "center" },
+  logo: { alignItems: "center", backgroundColor: authTheme.cyan, borderRadius: 16, height: 48, justifyContent: "center", shadowColor: authTheme.cyan, shadowOpacity: 0.36, shadowRadius: 24, width: 48 },
   message: { fontSize: 13, fontWeight: "800", lineHeight: 19 },
   neuralLayer: { ...StyleSheet.absoluteFillObject, opacity: 0.36 },
   neuralLine: { backgroundColor: "rgba(34,211,238,0.16)", height: 1, position: "absolute", width: 120 },
@@ -399,20 +367,12 @@ const styles = StyleSheet.create({
   particles: { ...StyleSheet.absoluteFillObject },
   pressed: { transform: [{ scale: 0.985 }] },
   root: { backgroundColor: authTheme.background, flex: 1 },
-  scroll: { alignItems: "center", flexGrow: 1, flexDirection: "row", gap: 34, justifyContent: "center", padding: 32, width: "100%" },
-  scrollCompact: { flexDirection: "column", justifyContent: "flex-start", padding: 22, paddingTop: 34 },
-  scrollMobile: { padding: 16, paddingTop: 24 },
-  signalCard: { backgroundColor: "rgba(15,23,42,0.48)", borderColor: authTheme.border, borderRadius: 24, borderWidth: 1, gap: 8, maxWidth: 540, padding: 18 },
-  signalText: { color: authTheme.muted, fontSize: 13, fontWeight: "700", lineHeight: 21 },
-  signalTitle: { color: authTheme.text, fontSize: 16, fontWeight: "900" },
+  scroll: { alignItems: "center", flexGrow: 1, justifyContent: "center", minHeight: "100%", paddingHorizontal: 18, paddingVertical: 32, width: "100%" },
+  shellBrand: { alignItems: "center", paddingBottom: 20, width: "100%" },
   socialButton: { alignItems: "center", backgroundColor: "rgba(15,23,42,0.64)", borderColor: authTheme.border, borderRadius: 14, borderWidth: 1, flexDirection: "row", gap: 8, justifyContent: "center", minHeight: 44, paddingHorizontal: 10 },
   socialGrid: { flexDirection: "row", flexWrap: "wrap", gap: 9 },
   skeleton: { backgroundColor: "rgba(148,163,184,0.18)", borderRadius: 999, height: 14 },
   skeletonWrap: { gap: 10, paddingVertical: 4 },
-  statLabel: { color: authTheme.muted, fontSize: 11, fontWeight: "800", lineHeight: 15 },
-  statValue: { color: authTheme.text, fontSize: 20, fontWeight: "900" },
-  statsGrid: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
-  statWidget: { backgroundColor: "rgba(15,23,42,0.58)", borderColor: authTheme.border, borderRadius: 18, borderWidth: 1, flexGrow: 1, minWidth: 150, padding: 14 },
   toast: { alignItems: "flex-start", borderRadius: 16, borderWidth: 1, flexDirection: "row", gap: 10, padding: 12 },
   toastError: { backgroundColor: "rgba(251,113,133,0.12)", borderColor: "rgba(251,113,133,0.34)" },
   toastInfo: { backgroundColor: "rgba(34,211,238,0.10)", borderColor: "rgba(34,211,238,0.28)" },
@@ -421,7 +381,4 @@ const styles = StyleSheet.create({
   socialText: { color: authTheme.text, fontSize: 12, fontWeight: "900" },
   toggleRow: { alignItems: "center", flexDirection: "row", gap: 10 },
   toggleText: { color: authTheme.text, flex: 1, fontSize: 13, fontWeight: "800" },
-  trustGrid: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
-  trustPill: { alignItems: "center", backgroundColor: "rgba(15,23,42,0.58)", borderColor: authTheme.border, borderRadius: 999, borderWidth: 1, flexDirection: "row", gap: 7, paddingHorizontal: 12, paddingVertical: 8 },
-  trustText: { color: authTheme.text, fontSize: 12, fontWeight: "900" },
 });
