@@ -289,6 +289,7 @@ function ClassicTabLayout() {
       <Tabs.Screen name="backup-dashboard" options={{ href: null, title: "Backup Dashboard" }} />
       <Tabs.Screen name="financial-center" options={{ href: null, title: "Financial Center" }} />
       <Tabs.Screen name="production-readiness" options={{ href: null, title: "Production Readiness" }} />
+      <Tabs.Screen name="release-candidate" options={{ href: null, title: "Release Candidate" }} />
       <Tabs.Screen name="session-dashboard" options={{ href: null, title: "Session Dashboard" }} />
       <Tabs.Screen name="settings" options={{ href: null, title: "Settings" }} />
       <Tabs.Screen name="subscription" options={{ href: null, title: "Subscription" }} />

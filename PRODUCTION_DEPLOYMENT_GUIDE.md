@@ -61,6 +61,8 @@ curl -fsS http://localhost:3001/readiness
 curl -fsS http://localhost:3001/health
 curl -fsS http://localhost:8080
 PRODUCTION_BASE_URL=http://localhost:3001 npm run smoke:production
+npm run release:candidate
+RUN_LIVE_LOAD=true RELEASE_CANDIDATE_BASE_URL=http://localhost:3001 npm run release:load
 ```
 
 ## Security Configuration
@@ -94,3 +96,24 @@ Do not seed production repeatedly unless the seed is idempotent and approved.
 3. Restore database only if the migration introduced incompatible data changes and a rollback migration is unavailable.
 4. Run `/readiness` and `npm run smoke:production`.
 5. Record the incident and release SHA in the operations log.
+
+## Sprint 37 Release Candidate Gate
+
+Before promoting a build to production, run the final release gate:
+
+```bash
+npm run build
+npm run lint
+npm run test
+npm run release:candidate
+npm run release:load
+npx prisma migrate deploy
+```
+
+Then review `/api/release-candidate/dashboard` as an administrator. Launch requires:
+
+- Release readiness score of at least 85.
+- `GO` launch decision.
+- No unresolved critical defects.
+- Successful workflow validation for ECG reporting, occupational screening, collaboration, and subscription lifecycle.
+- Verified backups, disaster recovery, logging, monitoring, alerting, migrations, and rollback procedures.

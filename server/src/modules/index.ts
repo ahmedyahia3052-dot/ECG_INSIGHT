@@ -35,6 +35,7 @@ import {
   workRestrictionsRouter,
 } from "./occupational/occupational.routes";
 import { reportsRouter } from "./reports/reports.routes";
+import { releaseCandidateRouter } from "./release-candidate/release-candidate.routes";
 import { searchRouter } from "./search/search.routes";
 import { securityRouter } from "./security/security.routes";
 import { subscriptionsRouter } from "../subscriptions/subscriptions.routes";
@@ -93,6 +94,7 @@ modulesRouter.use("/preferences", preferencesRouter);
 modulesRouter.use("/pacs", pacsRouter);
 modulesRouter.use("/fhir", fhirRouter);
 modulesRouter.use("/reports", reportsRouter);
+modulesRouter.use("/release-candidate", releaseCandidateRouter);
 modulesRouter.use("/risk", riskRouter);
 modulesRouter.use("/search", searchRouter);
 modulesRouter.use("/security", securityRouter);
