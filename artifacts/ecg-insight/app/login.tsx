@@ -10,14 +10,17 @@ import {
   AuthDivider,
   AuthMessage,
   AuthPrimaryButton,
+  AuthSkeleton,
   AuthTextField,
   AuthToggle,
+  AuthToast,
   premiumAuthTheme,
   PremiumAuthShell,
   SocialAuthGrid,
 } from "@/components/auth/PremiumAuth";
 import { useAuth } from "@/context/AuthContext";
 import { checkBackendHealth } from "@/services/api";
+import { checkEmailAvailability, createSocialAuthIntent, type SocialProvider } from "@/services/authProviders";
 
 const loginSchema = z.object({
   email: z.string().email("Enter a valid email address."),
@@ -41,7 +44,26 @@ const registerSchema = z.object({
 
 type ConnectionState = "checking" | "offline" | "online";
 type AuthMode = "login" | "register";
-type RegisterRole = "corporate_client" | "doctor" | "student" | "user";
+type EmailAvailability = "available" | "checking" | "taken" | "unknown";
+
+function passwordScore(passwordValue: string) {
+  const checks = [
+    passwordValue.length >= 12,
+    /[A-Z]/.test(passwordValue),
+    /[a-z]/.test(passwordValue),
+    /\d/.test(passwordValue),
+    /[^A-Za-z0-9]/.test(passwordValue),
+  ];
+  return checks.filter(Boolean).length;
+}
+
+function passwordStrengthLabel(score: number) {
+  if (score >= 5) return "Excellent";
+  if (score >= 4) return "Strong";
+  if (score >= 3) return "Moderate";
+  if (score >= 1) return "Weak";
+  return "Required";
+}
 
 export default function LoginScreen() {
   const router = useRouter();
@@ -56,7 +78,7 @@ export default function LoginScreen() {
   const params = useLocalSearchParams<{ mode?: string }>();
   const [mode, setMode] = useState<AuthMode>("login");
   const [wizardStep, setWizardStep] = useState(1);
-  const [selectedRole, setSelectedRole] = useState<RegisterRole>("doctor");
+  const [selectedAccountLabel, setSelectedAccountLabel] = useState("Doctor");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [remember, setRemember] = useState(true);
@@ -70,16 +92,24 @@ export default function LoginScreen() {
   const [registerPhone, setRegisterPhone] = useState("");
   const [registerPassword, setRegisterPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [capsLockOn, setCapsLockOn] = useState(false);
   const [organizationName, setOrganizationName] = useState("");
   const [country, setCountry] = useState("");
   const [specialty, setSpecialty] = useState("");
+  const [department, setDepartment] = useState("");
+  const [medicalLicense, setMedicalLicense] = useState("");
+  const [occupationalProgram, setOccupationalProgram] = useState("");
+  const [facilityType, setFacilityType] = useState("");
   const [userCount, setUserCount] = useState("");
+  const [emailAvailability, setEmailAvailability] = useState<EmailAvailability>("unknown");
   const [error, setError] = useState("");
   const [info, setInfo] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [connection, setConnection] = useState<ConnectionState>("checking");
   const [connectionMessage, setConnectionMessage] = useState("Checking authentication service...");
-  const selectedAccount = useMemo(() => accountTypes.find((item) => item.role === selectedRole) ?? accountTypes[0], [selectedRole]);
+  const selectedAccount = useMemo(() => accountTypes.find((item) => item.label === selectedAccountLabel) ?? accountTypes[0], [selectedAccountLabel]);
 
   const checkConnection = useCallback(async () => {
     setConnection("checking");
@@ -100,6 +130,21 @@ export default function LoginScreen() {
   useEffect(() => {
     if (params.mode === "register") setMode("register");
   }, [params.mode]);
+
+  useEffect(() => {
+    const emailValue = registerEmail.trim().toLowerCase();
+    if (!emailValue || !z.string().email().safeParse(emailValue).success) {
+      setEmailAvailability("unknown");
+      return;
+    }
+    setEmailAvailability("checking");
+    const timeout = setTimeout(() => {
+      void checkEmailAvailability(emailValue)
+        .then((result) => setEmailAvailability(result.available ? "available" : "taken"))
+        .catch(() => setEmailAvailability("unknown"));
+    }, 350);
+    return () => clearTimeout(timeout);
+  }, [registerEmail]);
 
   const submit = async () => {
     setError("");
@@ -165,15 +210,19 @@ export default function LoginScreen() {
       setError(parsed.error.issues[0]?.message ?? "Registration details are incomplete.");
       return;
     }
+    if (emailAvailability === "taken") {
+      setError("An account already exists for this email address.");
+      return;
+    }
     setSubmitting(true);
     const result = await register(
       parsed.data.fullName,
       parsed.data.email,
       parsed.data.password,
-      selectedRole,
+      selectedAccount.role,
       parsed.data.phone,
       parsed.data.organizationName,
-      parsed.data.specialty,
+      [parsed.data.specialty, department, medicalLicense, occupationalProgram, facilityType].filter(Boolean).join(" | "),
     );
     setSubmitting(false);
     if (!result.success) {
@@ -183,23 +232,35 @@ export default function LoginScreen() {
     router.replace("/dashboard" as never);
   };
 
-  const handleSocialProvider = async (provider: "APPLE" | "FACEBOOK" | "GOOGLE" | "LINKEDIN" | "MICROSOFT") => {
+  const handleSocialProvider = async (provider: SocialProvider) => {
     setError("");
     setInfo("");
-    if (provider === "FACEBOOK" || provider === "LINKEDIN") {
-      setInfo(`${provider === "FACEBOOK" ? "Facebook" : "LinkedIn"} enterprise SSO hook is ready for provider credentials.`);
+    const intent = createSocialAuthIntent(provider);
+    if (intent.status === "enterprise_sso_ready") {
+      setInfo(`${intent.label} enterprise SSO is routed through the provider intent service and awaits tenant credentials.`);
       return;
     }
-    setInfo(`${provider} OAuth connector is wired to the existing backend /auth/oauth/login contract.`);
+    setInfo(`${intent.label} OAuth is backend-ready. Native/web provider credentials will be exchanged through /auth/oauth/login.`);
   };
+
+  const strength = passwordScore(registerPassword);
+  const strengthLabel = passwordStrengthLabel(strength);
+  const canContinueStep2 =
+    fullName.trim().length >= 2 &&
+    z.string().email().safeParse(registerEmail).success &&
+    registerPhone.trim().length >= 8 &&
+    strength >= 4 &&
+    registerPassword === confirmPassword &&
+    emailAvailability !== "taken";
 
   return (
     <PremiumAuthShell
       eyebrow="Secure enterprise access"
-      subtitle="A premium clinical command entry point for hospitals, clinics, occupational medicine, and medical AI teams."
-      title="World-class ECG intelligence starts with secure access."
+      subtitle="AI-powered occupational and clinical cardiology platform for physicians, hospitals, clinics, and enterprises."
+      title="Enterprise ECG Intelligence Platform"
     >
       <AuthCard>
+        {connection === "checking" ? <AuthSkeleton /> : null}
         <View style={styles.modeSwitch}>
           <Pressable accessibilityRole="tab" accessibilityState={{ selected: mode === "login" }} onPress={() => setMode("login")} style={[styles.modeButton, mode === "login" && styles.modeButtonActive]}>
             <Text style={[styles.modeText, mode === "login" && styles.modeTextActive]}>Sign In</Text>
@@ -212,6 +273,11 @@ export default function LoginScreen() {
         <View style={styles.connection}>
           <View style={[styles.statusDot, connection === "online" ? styles.statusOnline : connection === "checking" ? styles.statusChecking : styles.statusOffline]} />
           <Text style={styles.connectionText}>{connectionMessage}</Text>
+          {connection === "offline" ? (
+            <Pressable accessibilityRole="button" onPress={() => void checkConnection()}>
+              <Text style={styles.retryLink}>Retry</Text>
+            </Pressable>
+          ) : null}
         </View>
 
         {mode === "login" ? (
@@ -232,7 +298,19 @@ export default function LoginScreen() {
             ) : (
               <>
                 <AuthTextField autoCapitalize="none" icon="mail" keyboardType="email-address" label="Email address" onChangeText={setEmail} placeholder="doctor@hospital.com" value={email} />
-                <AuthTextField icon="lock" label="Password" onChangeText={setPassword} placeholder="Enter your password" secureTextEntry value={password} />
+                <AuthTextField
+                  icon="lock"
+                  label="Password"
+                  onChangeText={setPassword}
+                  placeholder="Enter your password"
+                  right={(
+                    <Pressable accessibilityRole="button" onPress={() => setShowPassword((value) => !value)}>
+                      <Feather name={showPassword ? "eye-off" : "eye"} size={16} color={premiumAuthTheme.muted} />
+                    </Pressable>
+                  )}
+                  secureTextEntry={!showPassword}
+                  value={password}
+                />
                 <View style={styles.optionGrid}>
                   <AuthToggle checked={remember} label="Remember me" onPress={() => setRemember((value) => !value)} />
                   <AuthToggle checked={trustDevice} label="Trust this device" onPress={() => setTrustDevice((value) => !value)} />
@@ -247,6 +325,10 @@ export default function LoginScreen() {
             )}
             <AuthDivider />
             <SocialAuthGrid onProvider={handleSocialProvider} />
+            <View style={styles.securityGrid}>
+              <Text style={styles.securityItem}>MFA enrollment after login</Text>
+              <Text style={styles.securityItem}>Recovery codes supported</Text>
+            </View>
           </>
         ) : (
           <>
@@ -264,7 +346,7 @@ export default function LoginScreen() {
             {wizardStep === 1 ? (
               <View style={styles.accountGrid}>
                 {accountTypes.map((type) => (
-                  <Pressable key={type.label} onPress={() => setSelectedRole(type.role)} style={[styles.accountType, selectedAccount.label === type.label && styles.accountTypeActive]}>
+                  <Pressable key={type.label} onPress={() => setSelectedAccountLabel(type.label)} style={[styles.accountType, selectedAccount.label === type.label && styles.accountTypeActive]}>
                     <Feather name={type.icon} size={18} color={selectedAccount.label === type.label ? premiumAuthTheme.cyan : premiumAuthTheme.muted} />
                     <View style={styles.accountTextWrap}>
                       <Text style={styles.accountTitle}>{type.label}</Text>
@@ -278,9 +360,47 @@ export default function LoginScreen() {
               <>
                 <AuthTextField icon="user" label="Full name" onChangeText={setFullName} placeholder="Dr. Sarah Morgan" value={fullName} />
                 <AuthTextField autoCapitalize="none" icon="mail" keyboardType="email-address" label="Email" onChangeText={setRegisterEmail} placeholder="doctor@hospital.com" value={registerEmail} />
+                {emailAvailability === "checking" ? <AuthMessage message="Checking email availability..." /> : null}
+                {emailAvailability === "available" ? <AuthMessage message="Email is available." tone="success" /> : null}
+                {emailAvailability === "taken" ? <AuthMessage message="This email is already registered." tone="error" /> : null}
                 <AuthTextField icon="smartphone" keyboardType="phone-pad" label="Mobile phone" onChangeText={setRegisterPhone} placeholder="+1 555 0100" value={registerPhone} />
-                <AuthTextField icon="lock" label="Password" onChangeText={setRegisterPassword} placeholder="12+ characters with symbol" secureTextEntry value={registerPassword} />
-                <AuthTextField icon="shield" label="Confirm password" onChangeText={setConfirmPassword} placeholder="Confirm password" secureTextEntry value={confirmPassword} />
+                <AuthTextField
+                  icon="lock"
+                  label="Password"
+                  onChangeText={(value) => {
+                    setRegisterPassword(value);
+                    setCapsLockOn(/[A-Z]{2,}/.test(value.slice(-3)) && !/[a-z]/.test(value.slice(-3)));
+                  }}
+                  placeholder="12+ characters with symbol"
+                  right={(
+                    <Pressable accessibilityRole="button" onPress={() => setShowPassword((value) => !value)}>
+                      <Feather name={showPassword ? "eye-off" : "eye"} size={16} color={premiumAuthTheme.muted} />
+                    </Pressable>
+                  )}
+                  secureTextEntry={!showPassword}
+                  value={registerPassword}
+                />
+                <View style={styles.strengthWrap}>
+                  <View style={styles.strengthTrack}>
+                    <View style={[styles.strengthFill, { width: `${strength * 20}%` }]} />
+                  </View>
+                  <Text style={styles.strengthText}>Password strength: {strengthLabel}</Text>
+                </View>
+                {capsLockOn ? <AuthMessage message="Caps lock appears to be on." /> : null}
+                <AuthTextField
+                  icon="shield"
+                  label="Confirm password"
+                  onChangeText={setConfirmPassword}
+                  placeholder="Confirm password"
+                  right={(
+                    <Pressable accessibilityRole="button" onPress={() => setShowConfirmPassword((value) => !value)}>
+                      <Feather name={showConfirmPassword ? "eye-off" : "eye"} size={16} color={premiumAuthTheme.muted} />
+                    </Pressable>
+                  )}
+                  secureTextEntry={!showConfirmPassword}
+                  value={confirmPassword}
+                />
+                {confirmPassword && registerPassword !== confirmPassword ? <AuthMessage message="Passwords do not match." tone="error" /> : null}
               </>
             ) : null}
             {wizardStep === 3 ? (
@@ -288,13 +408,23 @@ export default function LoginScreen() {
                 <AuthTextField icon="briefcase" label="Organization name" onChangeText={setOrganizationName} placeholder="NorthStar Heart Institute" value={organizationName} />
                 <AuthTextField icon="globe" label="Country" onChangeText={setCountry} placeholder="United States" value={country} />
                 <AuthTextField icon="activity" label="Specialty" onChangeText={setSpecialty} placeholder="Cardiology / Occupational Medicine" value={specialty} />
+                <AuthTextField icon="layers" label="Department" onChangeText={setDepartment} placeholder="Cardiology, HSE, or Occupational Health" value={department} />
+                {selectedAccount.label === "Doctor" ? (
+                  <AuthTextField icon="award" label="Medical license" onChangeText={setMedicalLicense} placeholder="License / registration number" value={medicalLicense} />
+                ) : null}
+                {selectedAccount.label === "Company" ? (
+                  <AuthTextField icon="hard-drive" label="Occupational medicine program" onChangeText={setOccupationalProgram} placeholder="Pre-employment, periodic, return-to-work" value={occupationalProgram} />
+                ) : null}
+                {selectedAccount.label === "Hospital" ? (
+                  <AuthTextField icon="home" label="Facility information" onChangeText={setFacilityType} placeholder="Tertiary hospital, clinic network, or cardiac center" value={facilityType} />
+                ) : null}
                 <AuthTextField icon="users" keyboardType="number-pad" label="User count" onChangeText={setUserCount} placeholder="25" value={userCount} />
               </>
             ) : null}
             <View style={styles.wizardActions}>
               <AuthPrimaryButton disabled={wizardStep === 1} label="Back" onPress={() => setWizardStep((step) => Math.max(1, step - 1))} variant="outline" />
               {wizardStep < 3 ? (
-                <AuthPrimaryButton icon="arrow-right" label="Continue" onPress={() => setWizardStep((step) => Math.min(3, step + 1))} />
+                <AuthPrimaryButton disabled={wizardStep === 2 && !canContinueStep2} icon="arrow-right" label="Continue" onPress={() => setWizardStep((step) => Math.min(3, step + 1))} />
               ) : (
                 <AuthPrimaryButton disabled={submitting} icon="user-plus" label={submitting ? "Creating account..." : "Create Secure Account"} onPress={submitRegister} />
               )}
@@ -302,8 +432,8 @@ export default function LoginScreen() {
           </>
         )}
 
-        {error ? <AuthMessage message={error} tone="error" /> : null}
-        {info ? <AuthMessage message={info} tone="info" /> : null}
+        {error ? <AuthToast message={error} tone="error" /> : null}
+        {info ? <AuthToast message={info} tone="info" /> : null}
         <View style={styles.sessionCard}>
           <Feather name="monitor" size={16} color={premiumAuthTheme.cyan} />
           <Text style={styles.sessionText}>Session management includes active sessions, trusted devices, MFA settings, and force logout controls after sign-in.</Text>
@@ -331,6 +461,9 @@ const styles = StyleSheet.create({
   modeText: { color: premiumAuthTheme.muted, fontSize: 13, fontWeight: "900" },
   modeTextActive: { color: premiumAuthTheme.text },
   optionGrid: { gap: 11 },
+  retryLink: { color: premiumAuthTheme.cyan, fontSize: 12, fontWeight: "900" },
+  securityGrid: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+  securityItem: { backgroundColor: "rgba(15,23,42,0.56)", borderColor: premiumAuthTheme.border, borderRadius: 999, borderWidth: 1, color: premiumAuthTheme.muted, fontSize: 11, fontWeight: "900", overflow: "hidden", paddingHorizontal: 10, paddingVertical: 7 },
   sessionCard: { alignItems: "flex-start", backgroundColor: "rgba(34,211,238,0.08)", borderColor: "rgba(34,211,238,0.22)", borderRadius: 16, borderWidth: 1, flexDirection: "row", gap: 10, padding: 12 },
   sessionText: { color: premiumAuthTheme.muted, flex: 1, fontSize: 12, fontWeight: "700", lineHeight: 18 },
   statusChecking: { backgroundColor: premiumAuthTheme.warning },
@@ -342,6 +475,10 @@ const styles = StyleSheet.create({
   stepText: { color: premiumAuthTheme.muted, fontSize: 13, fontWeight: "900" },
   stepTextActive: { color: "#03131B" },
   steps: { flexDirection: "row", gap: 10 },
+  strengthFill: { backgroundColor: premiumAuthTheme.cyan, borderRadius: 999, height: "100%" },
+  strengthText: { color: premiumAuthTheme.muted, fontSize: 11, fontWeight: "900" },
+  strengthTrack: { backgroundColor: "rgba(148,163,184,0.18)", borderRadius: 999, height: 8, overflow: "hidden" },
+  strengthWrap: { gap: 7 },
   subtitle: { color: premiumAuthTheme.muted, fontSize: 14, fontWeight: "700", lineHeight: 21 },
   title: { color: premiumAuthTheme.text, fontSize: 28, fontWeight: "900", letterSpacing: -0.8 },
   wizardActions: { flexDirection: "row", gap: 10 },

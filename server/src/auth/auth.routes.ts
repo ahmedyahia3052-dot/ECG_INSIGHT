@@ -36,6 +36,20 @@ import {
 
 export const authRouter = Router();
 
+authRouter.get("/email-availability", async (req, res, next) => {
+  try {
+    const email = typeof req.query.email === "string" ? req.query.email.trim().toLowerCase() : "";
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      res.status(400).json({ available: false, message: "Valid email is required." });
+      return;
+    }
+    const existing = await prisma.user.findUnique({ select: { id: true }, where: { email } });
+    res.json({ available: !existing });
+  } catch (error) {
+    next(error);
+  }
+});
+
 authRouter.post("/register", validateBody(registerSchema), async (req, res, next) => {
   try {
     const payload = await registerUser(req.body, req, res);

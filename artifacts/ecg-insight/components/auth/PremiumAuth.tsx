@@ -42,8 +42,13 @@ export const accountTypes = [
   { description: "Medical education and supervised learning", icon: "book-open" as AuthIcon, label: "Student", role: "student" as const },
 ];
 
-const trustIndicators = ["256-bit Encryption", "HIPAA Secure", "SOC2 Ready", "99.9% Uptime"];
-const complianceLinks = ["Privacy Policy", "Terms of Service", "HIPAA", "GDPR", "Cookie Policy"];
+const trustIndicators = ["99.99% Uptime", "HIPAA Secure", "SOC2 Ready", "MFA Protected", "AI Powered"];
+const complianceLinks = ["Privacy Policy", "Terms of Service", "HIPAA", "GDPR", "Cookie Policy", "Contact Support", "System Status"];
+const platformStats = [
+  { label: "ECG analyses", value: "2.4M+" },
+  { label: "Active physicians", value: "18K+" },
+  { label: "Enterprise organizations", value: "620+" },
+];
 
 function AnimatedMedicalBackground() {
   const pulse = useRef(new Animated.Value(0)).current;
@@ -114,6 +119,14 @@ function AnimatedMedicalBackground() {
           />
         ))}
       </Animated.View>
+      <View style={styles.neuralLayer}>
+        {Array.from({ length: 9 }).map((_, index) => (
+          <View key={`n-${index}`} style={[styles.neuralNode, { left: `${8 + ((index * 13) % 82)}%`, top: `${12 + ((index * 19) % 72)}%` }]} />
+        ))}
+        {Array.from({ length: 6 }).map((_, index) => (
+          <View key={`nl-${index}`} style={[styles.neuralLine, { left: `${10 + index * 13}%`, top: `${22 + (index % 3) * 18}%`, transform: [{ rotate: `${index % 2 ? "-" : ""}18deg` }] }]} />
+        ))}
+      </View>
       <View style={styles.glowOne} />
       <View style={styles.glowTwo} />
     </View>
@@ -132,12 +145,16 @@ export function PremiumAuthShell({
   title: string;
 }) {
   const { width } = useWindowDimensions();
-  const compact = width < 900;
+  const mobile = width < 640;
+  const tablet = width >= 640 && width < 1100;
+  const compact = width < 1100;
+  const cardWidth = mobile ? "100%" : tablet ? 560 : 620;
+  const heroTitleStyle = mobile ? styles.heroTitleMobile : tablet ? styles.heroTitleTablet : undefined;
 
   return (
     <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={styles.root}>
       <AnimatedMedicalBackground />
-      <ScrollView contentContainerStyle={[styles.scroll, compact && styles.scrollCompact]} keyboardShouldPersistTaps="handled">
+      <ScrollView contentContainerStyle={[styles.scroll, compact && styles.scrollCompact, mobile && styles.scrollMobile]} keyboardShouldPersistTaps="handled">
         <View style={[styles.hero, compact && styles.heroCompact]}>
           <View style={styles.brandRow}>
             <View style={styles.logo}>
@@ -150,7 +167,7 @@ export function PremiumAuthShell({
           </View>
           <View style={styles.heroCopy}>
             {eyebrow ? <Text style={styles.eyebrow}>{eyebrow}</Text> : null}
-            <Text style={styles.heroTitle}>{title}</Text>
+            <Text style={[styles.heroTitle, heroTitleStyle]}>{title}</Text>
             <Text style={styles.heroSubtitle}>{subtitle}</Text>
           </View>
           <View style={styles.trustGrid}>
@@ -167,8 +184,16 @@ export function PremiumAuthShell({
               <Text style={styles.signalText}>MFA, session rotation, trusted device controls, immutable audit trails, and encrypted PHI workflows remain enforced by the existing backend.</Text>
             </View>
           ) : null}
+          <View style={styles.statsGrid}>
+            {platformStats.map((stat) => (
+              <View key={stat.label} style={styles.statWidget}>
+                <Text style={styles.statValue}>{stat.value}</Text>
+                <Text style={styles.statLabel}>{stat.label}</Text>
+              </View>
+            ))}
+          </View>
         </View>
-        <View style={[styles.authPanel, compact && styles.authPanelCompact]}>{children}</View>
+        <View style={[styles.authPanel, compact && styles.authPanelCompact, { maxWidth: cardWidth, width: cardWidth }]}>{children}</View>
         <View style={styles.complianceFooter}>
           {complianceLinks.map((item) => (
             <Pressable accessibilityRole="link" key={item} onPress={() => {}}>
@@ -188,10 +213,12 @@ export function AuthCard({ children, style }: { children: React.ReactNode; style
 export function AuthTextField({
   icon,
   label,
+  right,
   ...props
 }: TextInputProps & {
   icon: AuthIcon;
   label: string;
+  right?: React.ReactNode;
 }) {
   return (
     <View style={styles.fieldWrap}>
@@ -204,6 +231,7 @@ export function AuthTextField({
           style={styles.fieldInput}
           {...props}
         />
+        {right}
       </View>
     </View>
   );
@@ -265,6 +293,26 @@ export function AuthMessage({ message, tone = "info" }: { message: string; tone?
   return <Text style={[styles.message, { color }]}>{message}</Text>;
 }
 
+export function AuthToast({ message, tone = "info" }: { message: string; tone?: "error" | "info" | "success" }) {
+  const icon = tone === "error" ? "alert-triangle" : tone === "success" ? "check-circle" : "info";
+  return (
+    <View style={[styles.toast, tone === "error" ? styles.toastError : tone === "success" ? styles.toastSuccess : styles.toastInfo]}>
+      <Feather name={icon} size={16} color={authTheme.text} />
+      <Text style={styles.toastText}>{message}</Text>
+    </View>
+  );
+}
+
+export function AuthSkeleton() {
+  return (
+    <View style={styles.skeletonWrap}>
+      <View style={[styles.skeleton, { width: "72%" }]} />
+      <View style={[styles.skeleton, { width: "100%" }]} />
+      <View style={[styles.skeleton, { width: "86%" }]} />
+    </View>
+  );
+}
+
 export function SocialAuthGrid({
   onProvider,
 }: {
@@ -302,8 +350,8 @@ export function AuthDivider({ label = "or continue with" }: { label?: string }) 
 export const premiumAuthTheme = authTheme;
 
 const styles = StyleSheet.create({
-  authPanel: { flex: 1, maxWidth: 560, minWidth: 420 },
-  authPanelCompact: { minWidth: 0, width: "100%" },
+  authPanel: { flexShrink: 0 },
+  authPanelCompact: { alignSelf: "center", minWidth: 0 },
   background: { flex: 1 },
   brand: { color: authTheme.text, fontSize: 22, fontWeight: "900", letterSpacing: -0.4 },
   brandRow: { alignItems: "center", flexDirection: "row", gap: 14 },
@@ -315,7 +363,7 @@ const styles = StyleSheet.create({
   buttonText: { fontSize: 14, fontWeight: "900" },
   buttonTextPrimary: { color: "#03131B" },
   buttonTextSecondary: { color: authTheme.text },
-  card: { backgroundColor: authTheme.card, borderColor: authTheme.border, borderRadius: 30, borderWidth: 1, gap: 18, padding: 22, shadowColor: "#000", shadowOpacity: 0.26, shadowRadius: 34 },
+  card: { backgroundColor: authTheme.card, borderColor: authTheme.border, borderRadius: 30, borderWidth: 1, gap: 18, minHeight: 760, padding: 26, shadowColor: "#000", shadowOpacity: 0.3, shadowRadius: 38 },
   checkbox: { alignItems: "center", borderColor: authTheme.border, borderRadius: 7, borderWidth: 1, height: 22, justifyContent: "center", width: 22 },
   checkboxChecked: { backgroundColor: authTheme.cyan, borderColor: authTheme.cyan },
   complianceFooter: { flexDirection: "row", flexWrap: "wrap", gap: 14, justifyContent: "center", maxWidth: 980, width: "100%" },
@@ -335,24 +383,41 @@ const styles = StyleSheet.create({
   grid: { ...StyleSheet.absoluteFillObject, opacity: 0.78 },
   gridHorizontal: { backgroundColor: "rgba(34,211,238,0.055)", height: 1, left: 0, position: "absolute", right: 0 },
   gridVertical: { backgroundColor: "rgba(34,211,238,0.055)", bottom: 0, position: "absolute", top: 0, width: 1 },
-  hero: { flex: 1, gap: 28, maxWidth: 660, minWidth: 360, paddingVertical: 22 },
-  heroCompact: { minWidth: 0, width: "100%" },
+  hero: { flex: 1, flexShrink: 1, gap: 26, maxWidth: 690, minWidth: 0, paddingVertical: 22 },
+  heroCompact: { alignSelf: "center", maxWidth: 620, width: "100%" },
   heroCopy: { gap: 12 },
-  heroSubtitle: { color: "rgba(203,213,225,0.86)", fontSize: 17, lineHeight: 27, maxWidth: 620 },
-  heroTitle: { color: authTheme.text, fontSize: 54, fontWeight: "900", letterSpacing: -2.2, lineHeight: 58, maxWidth: 680 },
+  heroSubtitle: { color: "rgba(203,213,225,0.88)", flexShrink: 1, fontSize: 17, lineHeight: 27, maxWidth: 620 },
+  heroTitle: { color: authTheme.text, flexShrink: 1, fontSize: 52, fontWeight: "900", letterSpacing: -2, lineHeight: 58, maxWidth: 680 },
+  heroTitleMobile: { fontSize: 34, letterSpacing: -1.1, lineHeight: 40 },
+  heroTitleTablet: { fontSize: 42, letterSpacing: -1.4, lineHeight: 48 },
   logo: { alignItems: "center", backgroundColor: authTheme.cyan, borderRadius: 18, height: 52, justifyContent: "center", shadowColor: authTheme.cyan, shadowOpacity: 0.36, shadowRadius: 24, width: 52 },
   message: { fontSize: 13, fontWeight: "800", lineHeight: 19 },
+  neuralLayer: { ...StyleSheet.absoluteFillObject, opacity: 0.36 },
+  neuralLine: { backgroundColor: "rgba(34,211,238,0.16)", height: 1, position: "absolute", width: 120 },
+  neuralNode: { backgroundColor: "rgba(34,211,238,0.42)", borderColor: "rgba(255,255,255,0.16)", borderRadius: 999, borderWidth: 1, height: 9, position: "absolute", width: 9 },
   particle: { backgroundColor: authTheme.cyan, borderRadius: 999, position: "absolute" },
   particles: { ...StyleSheet.absoluteFillObject },
   pressed: { transform: [{ scale: 0.985 }] },
   root: { backgroundColor: authTheme.background, flex: 1 },
-  scroll: { alignItems: "center", flexGrow: 1, flexDirection: "row", gap: 36, justifyContent: "center", padding: 28 },
-  scrollCompact: { flexDirection: "column", justifyContent: "flex-start", padding: 18, paddingTop: 34 },
+  scroll: { alignItems: "center", flexGrow: 1, flexDirection: "row", gap: 34, justifyContent: "center", padding: 32, width: "100%" },
+  scrollCompact: { flexDirection: "column", justifyContent: "flex-start", padding: 22, paddingTop: 34 },
+  scrollMobile: { padding: 16, paddingTop: 24 },
   signalCard: { backgroundColor: "rgba(15,23,42,0.48)", borderColor: authTheme.border, borderRadius: 24, borderWidth: 1, gap: 8, maxWidth: 540, padding: 18 },
   signalText: { color: authTheme.muted, fontSize: 13, fontWeight: "700", lineHeight: 21 },
   signalTitle: { color: authTheme.text, fontSize: 16, fontWeight: "900" },
   socialButton: { alignItems: "center", backgroundColor: "rgba(15,23,42,0.64)", borderColor: authTheme.border, borderRadius: 14, borderWidth: 1, flexDirection: "row", gap: 8, justifyContent: "center", minHeight: 44, paddingHorizontal: 10 },
   socialGrid: { flexDirection: "row", flexWrap: "wrap", gap: 9 },
+  skeleton: { backgroundColor: "rgba(148,163,184,0.18)", borderRadius: 999, height: 14 },
+  skeletonWrap: { gap: 10, paddingVertical: 4 },
+  statLabel: { color: authTheme.muted, fontSize: 11, fontWeight: "800", lineHeight: 15 },
+  statValue: { color: authTheme.text, fontSize: 20, fontWeight: "900" },
+  statsGrid: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
+  statWidget: { backgroundColor: "rgba(15,23,42,0.58)", borderColor: authTheme.border, borderRadius: 18, borderWidth: 1, flexGrow: 1, minWidth: 150, padding: 14 },
+  toast: { alignItems: "flex-start", borderRadius: 16, borderWidth: 1, flexDirection: "row", gap: 10, padding: 12 },
+  toastError: { backgroundColor: "rgba(251,113,133,0.12)", borderColor: "rgba(251,113,133,0.34)" },
+  toastInfo: { backgroundColor: "rgba(34,211,238,0.10)", borderColor: "rgba(34,211,238,0.28)" },
+  toastSuccess: { backgroundColor: "rgba(52,211,153,0.12)", borderColor: "rgba(52,211,153,0.32)" },
+  toastText: { color: authTheme.text, flex: 1, fontSize: 12, fontWeight: "800", lineHeight: 18 },
   socialText: { color: authTheme.text, fontSize: 12, fontWeight: "900" },
   toggleRow: { alignItems: "center", flexDirection: "row", gap: 10 },
   toggleText: { color: authTheme.text, flex: 1, fontSize: 13, fontWeight: "800" },
