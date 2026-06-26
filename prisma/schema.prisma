@@ -542,6 +542,11 @@ enum SecurityEventType {
   BRUTE_FORCE_ATTEMPT
   UNUSUAL_IP_ACCESS
   DEVICE_REVOKED
+  REQUEST_SIGNATURE_FAILED
+  CSRF_VALIDATION_FAILED
+  PASSWORD_POLICY_VIOLATION
+  PHI_ACCESS_ANOMALY
+  KEY_ROTATION_COMPLETED
 }
 
 enum SecurityEventSeverity {
@@ -786,9 +791,14 @@ enum AuditAction {
   CLINICAL_DECISION_ALERT_CREATED
   LOGIN
   LOGOUT
+  FAILED_LOGIN
   PATIENT_VIEWED
   DOCUMENT_DELETED
   REPORT_DOWNLOADED
+  REPORT_VIEWED
+  REPORT_EDITED
+  DATA_EXPORTED
+  DATA_DELETED
   SECURITY_EVENT_CREATED
   COMPLIANCE_REQUEST_CREATED
   BACKUP_JOB_CREATED
@@ -846,6 +856,26 @@ enum AuditAction {
   COLLABORATION_VERSION_RESTORED
   CDSS_DECISION_GENERATED
   LONGITUDINAL_ECG_COMPARISON_COMPLETED
+  MFA_RECOVERY_CODE_USED
+  TRUSTED_DEVICE_REVOKED
+  SESSION_REVOKED
+  SECURITY_POLICY_UPDATED
+  PHI_FIELD_ENCRYPTED
+  KEY_ROTATED
+}
+
+enum SecurityPolicyType {
+  PASSWORD
+  SESSION
+  RATE_LIMIT
+  DATA_RETENTION
+  DEVICE_TRUST
+}
+
+enum EncryptionKeyStatus {
+  ACTIVE
+  ROTATING
+  RETIRED
 }
 
 enum CollaborationPresenceStatus {
@@ -974,8 +1004,11 @@ model User {
   acknowledgedClinicalAlerts  ClinicalAlert[]           @relation("ClinicalAlertAcknowledgedBy")
   enterpriseSessions          UserSession[]
   mfaMethods                  UserMFA[]
+  mfaRecoveryCodes            MFARecoveryCode[]
   passwordHistory             PasswordHistory[]
   trustedDevices              TrustedDevice[]
+  authoredSecurityPolicies    SecurityPolicy[]
+  keyRotationEvents           KeyRotationEvent[]
   rolePermissions             RolePermission[]
   securityEvents              SecurityEvent[]
   patientConsents             PatientConsent[]
@@ -1170,8 +1203,11 @@ model Organization {
   clinicalAlerts         ECGClinicalAlert[]
   clinicalDecisionAlerts ClinicalAlert[]
   securityEvents         SecurityEvent[]
+  securityPolicies       SecurityPolicy[]
   patientConsents        PatientConsent[]
   dataRequests           DataRequest[]
+  phiEncryptionRecords   PHIEncryptionRecord[]
+  keyRotationEvents      KeyRotationEvent[]
   backupJobs             BackupJob[]
   teams                  Team[]
   tasks                  Task[]
@@ -2769,10 +2805,27 @@ model UserMFA {
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
   user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  recoveryCodes MFARecoveryCode[]
 
   @@index([userId])
   @@index([type])
   @@index([enabled])
+}
+
+model MFARecoveryCode {
+  id          String    @id @default(cuid())
+  userId      String
+  mfaMethodId String?
+  codeHash    String
+  usedAt      DateTime?
+  createdAt   DateTime  @default(now())
+  expiresAt   DateTime?
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  mfaMethod   UserMFA?  @relation(fields: [mfaMethodId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([mfaMethodId])
+  @@index([usedAt])
 }
 
 model PasswordHistory {
@@ -2795,6 +2848,8 @@ model TrustedDevice {
   ipAddress         String?
   lastSeenAt        DateTime @default(now())
   trusted           Boolean  @default(false)
+  revokedAt         DateTime?
+  revokedById       String?
   createdAt         DateTime @default(now())
   user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -2802,6 +2857,25 @@ model TrustedDevice {
   @@index([userId])
   @@index([trusted])
   @@index([lastSeenAt])
+}
+
+model SecurityPolicy {
+  id            String             @id @default(cuid())
+  policyType    SecurityPolicyType
+  name          String
+  enabled       Boolean            @default(true)
+  config        Json
+  version       Int                @default(1)
+  organizationId String?
+  updatedById   String
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
+  updatedBy     User               @relation(fields: [updatedById], references: [id])
+  organization  Organization?      @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+
+  @@index([policyType])
+  @@index([enabled])
+  @@index([organizationId])
 }
 
 model Permission {
@@ -2894,6 +2968,42 @@ model SecurityEvent {
   @@index([severity])
   @@index([status])
   @@index([createdAt])
+}
+
+model PHIEncryptionRecord {
+  id             String        @id @default(cuid())
+  organizationId String?
+  entityType     String
+  entityId       String
+  fieldName      String
+  keyVersion     Int
+  encryptedAt    DateTime      @default(now())
+  rotatedAt      DateTime?
+  metadata       Json?
+  organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+
+  @@unique([entityType, entityId, fieldName])
+  @@index([organizationId])
+  @@index([entityType])
+  @@index([keyVersion])
+}
+
+model KeyRotationEvent {
+  id             String              @id @default(cuid())
+  organizationId String?
+  keyVersion     Int
+  status         EncryptionKeyStatus @default(ACTIVE)
+  rotatedById    String
+  rotatedAt      DateTime            @default(now())
+  previousVersion Int?
+  metadata       Json?
+  organization   Organization?       @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+  rotatedBy      User                @relation(fields: [rotatedById], references: [id])
+
+  @@index([organizationId])
+  @@index([keyVersion])
+  @@index([status])
+  @@index([rotatedAt])
 }
 
 model BackupJob {

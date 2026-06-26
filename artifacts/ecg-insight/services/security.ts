@@ -1,7 +1,7 @@
 import { API_ROOT_URL, apiRequest } from "./api";
 
 export async function listSecurityEvents(accessToken: string) {
-  return apiRequest<{ events: unknown[] }>("/security/events", { accessToken });
+  return apiRequest<{ events: SecurityEvent[] }>("/security/events", { accessToken });
 }
 
 export async function listSecuritySessions(accessToken: string) {
@@ -19,6 +19,35 @@ export interface SecuritySession {
   userAgent?: string | null;
 }
 
+export interface SecurityEvent {
+  createdAt: string;
+  eventType: string;
+  id: string;
+  ipAddress?: string | null;
+  message: string;
+  severity: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
+  status: "OPEN" | "INVESTIGATING" | "RESOLVED";
+}
+
+export interface TrustedDevice {
+  createdAt: string;
+  deviceFingerprint: string;
+  deviceName: string;
+  id: string;
+  ipAddress?: string | null;
+  lastSeenAt: string;
+  revokedAt?: string | null;
+  trusted: boolean;
+}
+
+export interface MfaMethod {
+  enabled: boolean;
+  id: string;
+  lastUsedAt?: string | null;
+  type: "EMAIL_OTP" | "TOTP";
+  verifiedAt?: string | null;
+}
+
 export async function revokeSecuritySession(accessToken: string, sessionId: string) {
   return apiRequest<{ session: SecuritySession }>(`/security/sessions/${sessionId}/revoke`, {
     accessToken,
@@ -34,7 +63,59 @@ export async function revokeAllSecuritySessions(accessToken: string) {
 }
 
 export async function listMfaMethods(accessToken: string) {
-  return apiRequest<{ methods: unknown[] }>("/security/mfa", { accessToken });
+  return apiRequest<{ methods: MfaMethod[] }>("/security/mfa", { accessToken });
+}
+
+export async function createMfaMethod(accessToken: string, type: "EMAIL_OTP" | "TOTP") {
+  return apiRequest<{ method: MfaMethod; otp?: string; recoveryCodes: string[]; secret?: string }>("/security/mfa", {
+    accessToken,
+    body: JSON.stringify({ type }),
+    method: "POST",
+  });
+}
+
+export async function verifyMfaMethod(accessToken: string, methodId: string, code: string) {
+  return apiRequest<{ method: MfaMethod; valid: boolean }>(`/security/mfa/${methodId}/verify`, {
+    accessToken,
+    body: JSON.stringify({ code }),
+    method: "POST",
+  });
+}
+
+export async function regenerateRecoveryCodes(accessToken: string) {
+  return apiRequest<{ recoveryCodes: string[] }>("/security/mfa/recovery/regenerate", {
+    accessToken,
+    method: "POST",
+  });
+}
+
+export async function listTrustedDevices(accessToken: string) {
+  return apiRequest<{ devices: TrustedDevice[] }>("/security/devices", { accessToken });
+}
+
+export async function revokeTrustedDevice(accessToken: string, deviceId: string) {
+  return apiRequest<{ device: TrustedDevice }>(`/security/devices/${deviceId}/revoke`, {
+    accessToken,
+    method: "POST",
+  });
+}
+
+export interface SecurityMonitoringSummary {
+  activeSessions: number;
+  failedLogins24h: number;
+  openCritical: number;
+  riskScore: number;
+  siemReady: boolean;
+  suspiciousEvents24h: number;
+  trustedDevices: number;
+}
+
+export async function getSecurityMonitoringSummary(accessToken: string) {
+  return apiRequest<{ summary: SecurityMonitoringSummary }>("/security/monitoring/summary", { accessToken });
+}
+
+export async function listSecurityPolicies(accessToken: string) {
+  return apiRequest<{ policies: unknown[] }>("/security/policies", { accessToken });
 }
 
 export async function listAuditLogs(accessToken: string) {
@@ -47,6 +128,10 @@ export async function listConsents(accessToken: string) {
 
 export async function listDataRequests(accessToken: string) {
   return apiRequest<{ requests: unknown[] }>("/compliance/requests", { accessToken });
+}
+
+export async function listRetentionPolicies(accessToken: string) {
+  return apiRequest<{ policies: unknown[] }>("/compliance/retention-policies", { accessToken });
 }
 
 export async function listBackupJobs(accessToken: string) {

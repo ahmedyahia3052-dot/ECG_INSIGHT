@@ -6,6 +6,7 @@ import helmet from "helmet";
 import { env } from "./config/env";
 import { prisma } from "./config/prisma";
 import { errorHandler, notFoundHandler } from "./middleware/error";
+import { apiSecurityMiddleware } from "./middleware/api-security";
 import { inputSanitizer } from "./middleware/input-sanitizer";
 import { metricsSnapshot, requestMetrics } from "./middleware/observability";
 import { requestContext } from "./middleware/request-context";
@@ -76,6 +77,7 @@ export function createApp() {
   app.use(express.json({ limit: "1mb" }));
   app.use(express.urlencoded({ extended: true }));
   app.use(inputSanitizer);
+  app.use(apiSecurityMiddleware);
   app.use(requestMetrics);
 
   app.get("/health", (req, res) => {

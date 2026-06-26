@@ -37,6 +37,19 @@ function assertPasswordPolicy(password: string) {
   }
 }
 
+async function assertPasswordNotReused(userId: string, password: string) {
+  const recentPasswords = await prisma.passwordHistory.findMany({
+    orderBy: { createdAt: "desc" },
+    take: 5,
+    where: { userId },
+  });
+  for (const historicalPassword of recentPasswords) {
+    if (await verifyPassword(password, historicalPassword.passwordHash)) {
+      throw new AppError(400, "Password was used recently. Choose a different password.", "PASSWORD_REUSED");
+    }
+  }
+}
+
 export async function setupOwnerPassword(body: { email: string; newPassword: string; username: string }) {
   assertPasswordPolicy(body.newPassword);
   const owner = await prisma.user.findFirst({
@@ -286,6 +299,16 @@ export async function loginUser(
           },
         });
       }
+      await prisma.auditLog.create({
+        data: {
+          action: "FAILED_LOGIN",
+          actorId: user.id,
+          ipAddress: req.ip,
+          message: "Failed login attempt.",
+          metadata: { failedLoginAttempts, locked: Boolean(lockedUntil) },
+          userAgent: req.get("user-agent"),
+        },
+      });
     }
     const error = new AppError(401, "Invalid email or password.", "INVALID_CREDENTIALS");
     if (user && user.failedLoginAttempts + 1 >= CAPTCHA_FAILED_ATTEMPTS) {
@@ -554,6 +577,7 @@ export async function resetPassword(body: {
   ) {
     throw new AppError(400, "Password reset token is invalid or expired.", "RESET_INVALID");
   }
+  await assertPasswordNotReused(user.id, body.newPassword);
 
   await prisma.user.update({
     data: {
@@ -616,6 +640,7 @@ export async function changeOwnPassword(userId: string, body: { currentPassword:
   if (!user || !(await verifyPassword(body.currentPassword, user.passwordHash))) {
     throw new AppError(400, "Current password is incorrect.", "CURRENT_PASSWORD_INVALID");
   }
+  await assertPasswordNotReused(userId, body.newPassword);
   await prisma.user.update({
     data: {
       forcePasswordReset: false,

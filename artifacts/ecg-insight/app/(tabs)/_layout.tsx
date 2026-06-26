@@ -278,6 +278,12 @@ function ClassicTabLayout() {
       <Tabs.Screen name="population-analytics" options={{ href: null, title: "Population Analytics" }} />
       <Tabs.Screen name="clinical-alerts" options={{ href: null, title: "Clinical Alerts" }} />
       <Tabs.Screen name="security-dashboard" options={{ href: null, title: "Security Dashboard" }} />
+      <Tabs.Screen name="active-sessions" options={{ href: null, title: "Active Sessions" }} />
+      <Tabs.Screen name="trusted-devices" options={{ href: null, title: "Trusted Devices" }} />
+      <Tabs.Screen name="mfa-settings" options={{ href: null, title: "MFA Settings" }} />
+      <Tabs.Screen name="consent-management" options={{ href: null, title: "Consent Management" }} />
+      <Tabs.Screen name="audit-explorer" options={{ href: null, title: "Audit Explorer" }} />
+      <Tabs.Screen name="security-alerts" options={{ href: null, title: "Security Alerts" }} />
       <Tabs.Screen name="audit-dashboard" options={{ href: null, title: "Audit Dashboard" }} />
       <Tabs.Screen name="compliance-dashboard" options={{ href: null, title: "Compliance Dashboard" }} />
       <Tabs.Screen name="backup-dashboard" options={{ href: null, title: "Backup Dashboard" }} />
