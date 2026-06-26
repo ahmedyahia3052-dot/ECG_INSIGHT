@@ -5,6 +5,7 @@ import { prisma } from "../../config/prisma";
 import { assertCaseCanAcceptAnalysis } from "../../cases/state-machine";
 import { AppError } from "../../middleware/error";
 import { ECGMeasurementEngine, ECGParsingService } from "../ecg-files/ecg-clinical.service";
+import { ensureClinicalReportForCase } from "../reports/reports.service";
 import { detectGridCalibration, latestFileForCase, reconstructCaseEcg } from "./ecg-digitization.service";
 
 const STANDARD_LEADS = ["I", "II", "III", "aVR", "aVL", "aVF", "V1", "V2", "V3", "V4", "V5", "V6"] as const;
@@ -403,6 +404,7 @@ export async function analyzeEcgImage(input: { actorId: string; caseId?: string;
       type: "AI_ANALYSIS_COMPLETED",
     },
   });
+  await ensureClinicalReportForCase(caseId, input.actorId);
   return serializeAnalysis(result);
 }
 

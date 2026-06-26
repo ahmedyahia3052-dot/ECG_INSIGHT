@@ -4,7 +4,7 @@ import { prisma } from "../../config/prisma";
 import { runAnalysisNow, serializeAnalysis } from "../../ai/ai.service";
 import { requireAuth, requireRole } from "../../middleware/auth";
 import { AppError } from "../../middleware/error";
-import { generateClinicalReport, serializeReport } from "../reports/reports.service";
+import { ensureClinicalReportForCase, serializeReport } from "../reports/reports.service";
 import { assertCanRunAnalysis, recordAnalysisUsage } from "../../subscriptions/monetization.service";
 import { assertResourceAccess, canAccessCase, canAccessPatient } from "../../utils/resource-access";
 import { exportDigitalEcg, getDigitalEcg, reconstructCaseEcg } from "./ecg-digitization.service";
@@ -90,7 +90,7 @@ ecgProcessingRouter.post("/analyze-real-ai", requireRole("DOCTOR"), async (req, 
     const analysis = await runAnalysisNow(body.caseId, req.auth!.id);
     if (!analysis || analysis.status === "FAILED") throw new AppError(500, "Real AI ECG analysis failed.", "REAL_AI_ANALYSIS_FAILED");
     await recordAnalysisUsage(req.auth!.id, { analysisId: analysis.id, caseId: body.caseId });
-    const report = await generateClinicalReport(body.caseId, req.auth!.id);
+    const report = await ensureClinicalReportForCase(body.caseId, req.auth!.id);
     res.status(201).json({
       analysis: serializeAnalysis(analysis),
       report: serializeReport(report),

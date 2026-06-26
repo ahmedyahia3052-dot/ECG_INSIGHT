@@ -7,6 +7,7 @@ import {
   isReadOnlyCaseStatus,
 } from "../cases/state-machine";
 import { AppError } from "../middleware/error";
+import { ensureClinicalReportForCase } from "../modules/reports/reports.service";
 import { createNotification } from "../utils/notifications";
 import { isCriticalDiagnosis } from "./engine";
 import { generateExplainabilityArtifact } from "./explainability";
@@ -185,6 +186,7 @@ async function completeAnalysis(analysisId: string, actorId: string) {
         type: "AI_ANALYSIS_COMPLETED",
       },
     });
+    await ensureClinicalReportForCase(queued.caseId, actorId);
 
     await createNotification({
       caseId: queued.caseId,

@@ -1426,6 +1426,11 @@ model ClinicalReport {
   physicianSpecialty        String?
   physicianLicenseNumber    String?
   electronicSignaturePath   String?
+  pdfStoragePath            String?
+  htmlStoragePath           String?
+  verificationToken         String          @unique @default(cuid())
+  verificationUrl           String?
+  qrCodeData                String?
   generatedAt               DateTime        @default(now())
   finalizedAt               DateTime?
   signedAt                  DateTime?
@@ -1448,6 +1453,7 @@ model ClinicalReport {
   @@index([status])
   @@index([authorId])
   @@index([createdAt])
+  @@index([verificationToken])
 }
 
 model ReportVersion {

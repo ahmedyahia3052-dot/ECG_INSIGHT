@@ -25,6 +25,10 @@ export interface ClinicalReport {
   physicianLicenseNumber?: string;
   physicianName: string;
   physicianSpecialty?: string;
+  pdfStoragePath?: string;
+  htmlStoragePath?: string;
+  verificationUrl?: string;
+  qrCodeData?: string;
   recommendations: string[];
   referringPhysician?: string;
   reportNumber: string;
@@ -66,6 +70,20 @@ export interface ReportSignature {
 export function reportPdfUrl(reportId: string, watermark?: string) {
   const query = watermark ? `?watermark=${encodeURIComponent(watermark)}` : "";
   return `${API_URL}/reports/${reportId}/pdf${query}`;
+}
+
+export function reportHtmlUrl(reportId: string) {
+  return `${API_URL}/reports/${reportId}/html`;
+}
+
+export function reportPrintUrl(reportId: string) {
+  return `${API_URL}/reports/${reportId}/print`;
+}
+
+export async function verifyReportByQr(reportNumber: string, token: string) {
+  return apiRequest<{ verification: { generatedAt?: string; patientCode?: string; physicianName?: string; reportId?: string; reportNumber?: string; reportingDate?: string; status?: string; verified: boolean } }>(
+    `/reports/verify/${encodeURIComponent(reportNumber)}?token=${encodeURIComponent(token)}`,
+  );
 }
 
 export async function downloadReportPdf(accessToken: string, reportId: string, watermark?: string) {

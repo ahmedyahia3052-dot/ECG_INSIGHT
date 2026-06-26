@@ -14,12 +14,16 @@ import { assertResourceAccess, canAccessCase, canAccessOwnedResource, canAccessP
 import {
   assertCanEditReport,
   assertCanFinalize,
+  buildReportHtml,
   buildReportPdf,
   canManageReport,
   createReportVersion,
   generateClinicalReport,
+  ensureClinicalReportForCase,
+  persistReportArtifacts,
   serializeReport,
   statusFromApi,
+  verifyReport,
 } from "./reports.service";
 import {
   drawnSignatureSchema,
@@ -71,7 +75,20 @@ const uploadSignature = multer({
 
 export const reportsRouter = Router();
 
+reportsRouter.get("/verify/:reportNumber", async (req, res, next) => {
+  try {
+    res.json({ verification: await verifyReport(String(req.params.reportNumber), typeof req.query.token === "string" ? req.query.token : undefined) });
+  } catch (error) {
+    next(error);
+  }
+});
+
 reportsRouter.use(requireAuth);
+
+function requestBaseUrl(req: { get(header: string): string | undefined; protocol: string }) {
+  const host = req.get("host");
+  return host ? `${req.protocol}://${host}` : "";
+}
 
 function reportInclude() {
   return {
@@ -215,7 +232,7 @@ reportsRouter.post("/", requireRole("DOCTOR"), async (req, res, next) => {
     }
 
     assertResourceAccess(await canAccessCase(caseId, req.auth!));
-    const report = await generateClinicalReport(caseId, req.auth!.id);
+    const report = await ensureClinicalReportForCase(caseId, req.auth!.id);
     const updated = await prisma.clinicalReport.update({
       data: {
         aiFindings: body.aiFindings ?? report.aiFindings,
@@ -225,7 +242,8 @@ reportsRouter.post("/", requireRole("DOCTOR"), async (req, res, next) => {
       include: reportInclude(),
       where: { id: report.id },
     });
-    res.status(201).json({ report: serializeReport(updated) });
+    const persisted = await persistReportArtifacts(updated.id, requestBaseUrl(req));
+    res.status(201).json({ report: serializeReport(persisted) });
   } catch (error) {
     next(error);
   }
@@ -259,8 +277,9 @@ reportsRouter.delete("/:reportId", requireRole("DOCTOR"), async (req, res, next)
 reportsRouter.post("/cases/:caseId/generate", requireRole("DOCTOR"), async (req, res, next) => {
   try {
     assertResourceAccess(await canAccessCase(String(req.params.caseId), req.auth!));
-    const report = await generateClinicalReport(String(req.params.caseId), req.auth!.id);
-    res.status(201).json({ report: serializeReport(report) });
+    const report = await ensureClinicalReportForCase(String(req.params.caseId), req.auth!.id);
+    const persisted = await persistReportArtifacts(report.id, requestBaseUrl(req));
+    res.status(201).json({ report: serializeReport(persisted) });
   } catch (error) {
     next(error);
   }
@@ -522,10 +541,38 @@ reportsRouter.get("/:reportId/versions", async (req, res, next) => {
 reportsRouter.get("/:reportId/pdf", async (req, res, next) => {
   try {
     const report = await reportForAccess(String(req.params.reportId), req.auth!);
-    const pdf = buildReportPdf(report, typeof req.query.watermark === "string" ? req.query.watermark : undefined);
+    const pdf = report.pdfStoragePath && fs.existsSync(report.pdfStoragePath)
+      ? fs.readFileSync(report.pdfStoragePath)
+      : await buildReportPdf(report, typeof req.query.watermark === "string" ? req.query.watermark : undefined, requestBaseUrl(req));
     res.setHeader("content-type", "application/pdf");
     res.setHeader("content-disposition", `attachment; filename="${report.reportNumber}.pdf"`);
     res.send(pdf);
+  } catch (error) {
+    next(error);
+  }
+});
+
+reportsRouter.get("/:reportId/html", async (req, res, next) => {
+  try {
+    const report = await reportForAccess(String(req.params.reportId), req.auth!);
+    const html = report.htmlStoragePath && fs.existsSync(report.htmlStoragePath)
+      ? fs.readFileSync(report.htmlStoragePath, "utf8")
+      : await buildReportHtml(report, requestBaseUrl(req));
+    res.setHeader("content-type", "text/html; charset=utf-8");
+    res.send(html);
+  } catch (error) {
+    next(error);
+  }
+});
+
+reportsRouter.get("/:reportId/print", async (req, res, next) => {
+  try {
+    const report = await reportForAccess(String(req.params.reportId), req.auth!);
+    const html = report.htmlStoragePath && fs.existsSync(report.htmlStoragePath)
+      ? fs.readFileSync(report.htmlStoragePath, "utf8")
+      : await buildReportHtml(report, requestBaseUrl(req));
+    res.setHeader("content-type", "text/html; charset=utf-8");
+    res.send(html.replace("</body>", "<script>window.addEventListener('load',()=>window.print());</script></body>"));
   } catch (error) {
     next(error);
   }
@@ -535,7 +582,8 @@ reportsRouter.post("/:reportId/save-to-record", requireRole("DOCTOR"), async (re
   try {
     const report = await reportForAccess(String(req.params.reportId), req.auth!);
     if (!canManageReport(req.auth!, report)) throw new AppError(403, "You can only save your own reports.", "FORBIDDEN");
-    const pdf = buildReportPdf(report);
+    const pdf = await buildReportPdf(report, "ECG Insight", requestBaseUrl(req));
+    const persisted = await persistReportArtifacts(report.id, requestBaseUrl(req));
     const storedName = `${report.reportNumber}-${randomUUID()}.pdf`;
     const storagePath = path.join(reportRoot, storedName);
     fs.writeFileSync(storagePath, pdf);
@@ -553,7 +601,7 @@ reportsRouter.post("/:reportId/save-to-record", requireRole("DOCTOR"), async (re
         uploadedById: req.auth!.id,
       },
     });
-    res.status(201).json({ documentId: document.id });
+    res.status(201).json({ documentId: document.id, report: serializeReport(persisted) });
   } catch (error) {
     next(error);
   }
@@ -567,7 +615,13 @@ reportsRouter.post("/:reportId/email", validateBody(emailReportSchema), async (r
     }
     const emailLog = await prisma.emailLog.create({
       data: {
-        metadata: { message: req.body.message ?? "", reportNumber: report.reportNumber },
+        metadata: {
+          htmlStoragePath: report.htmlStoragePath,
+          message: req.body.message ?? "",
+          pdfStoragePath: report.pdfStoragePath,
+          reportNumber: report.reportNumber,
+          verificationUrl: report.verificationUrl,
+        },
         recipient: req.body.recipient,
         reportId: report.id,
         senderId: req.auth!.id,
