@@ -1,6 +1,7 @@
 import { apiRequest } from "./api";
 
 export type SubscriptionPlanCode = "basic" | "clinic" | "enterprise" | "free" | "hospital" | "lifetime" | "professional";
+export type PaymentGateway = "BANK_TRANSFER" | "CARD" | "INSTAPAY" | "PAYMOB" | "STRIPE" | "WALLET";
 
 export interface SubscriptionPlan {
   active: boolean;
@@ -31,6 +32,15 @@ export interface SubscriptionAnalytics {
   paymentStatusSummary: Array<{ count: number; status: string }>;
   subscriptionDistribution: Array<{ count: number; plan: string }>;
   totalUsers: number;
+}
+
+export interface FinancialDashboard {
+  activeSubscriptions: number;
+  churnRate: number;
+  conversionRate: number;
+  monthlyRecurringRevenueCents: number;
+  paymentStatusSummary: Array<{ count: number; status: string }>;
+  revenueCents: number;
 }
 
 export interface LicenseRecord {
@@ -68,6 +78,47 @@ export interface PaymentRecord {
   status: string;
 }
 
+export interface PaymentTransactionRecord {
+  amount: number;
+  createdAt: string;
+  currency: string;
+  id: string;
+  paymentMethod: string;
+  provider: PaymentGateway;
+  referenceNumber?: string | null;
+  status: string;
+}
+
+export interface PaymentMethodRecord {
+  id: string;
+  isDefault: boolean;
+  label: string;
+  last4?: string | null;
+  provider: PaymentGateway;
+  status: string;
+  type: string;
+}
+
+export interface RefundRecord {
+  amountCents: number;
+  createdAt: string;
+  currency: string;
+  id: string;
+  paymentId: string;
+  reason?: string | null;
+  status: string;
+}
+
+export interface FinancialAuditRecord {
+  action: string;
+  amountCents?: number | null;
+  createdAt: string;
+  currency?: string | null;
+  entityId?: string | null;
+  entityType: string;
+  id: string;
+}
+
 export interface UsageTrackingRecord {
   exceeded: boolean;
   id: string;
@@ -91,6 +142,20 @@ export async function listSubscriptionPlans(accessToken: string) {
 
 export async function getSubscriptionAnalytics(accessToken: string) {
   return apiRequest<{ analytics: SubscriptionAnalytics }>("/subscriptions/analytics", { accessToken });
+}
+
+export async function getFinancialDashboard(accessToken: string) {
+  return apiRequest<{ dashboard: FinancialDashboard }>("/subscriptions/financial/dashboard", { accessToken });
+}
+
+export async function getFinancialAdminCenter(accessToken: string) {
+  return apiRequest<{
+    auditLogs: FinancialAuditRecord[];
+    invoices: InvoiceRecord[];
+    manualPayments: PaymentRecord[];
+    refunds: RefundRecord[];
+    transactions: PaymentTransactionRecord[];
+  }>("/subscriptions/financial/admin-center", { accessToken });
 }
 
 export async function listLicenses(accessToken: string) {
@@ -172,6 +237,89 @@ export async function getBillingHistory(accessToken: string) {
 
 export async function getUsageDashboard(accessToken: string) {
   return apiRequest<{ quota: MySubscription["quota"]; usageTracking: UsageTrackingRecord[] }>("/subscriptions/usage", { accessToken });
+}
+
+export async function createCheckoutSession(accessToken: string, input: {
+  idempotencyKey?: string;
+  plan: SubscriptionPlanCode;
+  provider: PaymentGateway;
+}) {
+  return apiRequest<{ checkout: { redirectUrl?: string; providerPayload: Record<string, unknown>; transactionId?: string }; invoice: InvoiceRecord; payment: PaymentRecord; transaction: PaymentTransactionRecord }>("/subscriptions/checkout", {
+    accessToken,
+    body: JSON.stringify(input),
+    headers: input.idempotencyKey ? { "idempotency-key": input.idempotencyKey } : undefined,
+    method: "POST",
+  });
+}
+
+export async function retryPayment(accessToken: string, paymentId: string) {
+  return apiRequest<unknown>("/subscriptions/payments/retry", {
+    accessToken,
+    body: JSON.stringify({ paymentId }),
+    method: "POST",
+  });
+}
+
+export async function listPaymentMethods(accessToken: string) {
+  return apiRequest<{ methods: PaymentMethodRecord[] }>("/subscriptions/payment-methods", { accessToken });
+}
+
+export async function addPaymentMethod(accessToken: string, input: {
+  expMonth?: number;
+  expYear?: number;
+  fingerprint?: string;
+  isDefault?: boolean;
+  label: string;
+  last4?: string;
+  provider: PaymentGateway;
+  providerToken?: string;
+  type: string;
+}) {
+  return apiRequest<{ method: PaymentMethodRecord }>("/subscriptions/payment-methods", {
+    accessToken,
+    body: JSON.stringify(input),
+    method: "POST",
+  });
+}
+
+export async function changePlan(accessToken: string, plan: SubscriptionPlanCode, direction: "downgrade" | "upgrade") {
+  return apiRequest<{ subscription: unknown }>(`/subscriptions/subscription/${direction}`, {
+    accessToken,
+    body: JSON.stringify({ plan }),
+    method: "POST",
+  });
+}
+
+export async function convertTrial(accessToken: string, plan: SubscriptionPlanCode) {
+  return apiRequest<{ subscription: unknown }>("/subscriptions/subscription/convert-trial", {
+    accessToken,
+    body: JSON.stringify({ plan }),
+    method: "POST",
+  });
+}
+
+export async function cancelMySubscription(accessToken: string, immediately = false) {
+  return apiRequest<{ subscription: unknown }>("/subscriptions/subscription/cancel", {
+    accessToken,
+    body: JSON.stringify({ immediately }),
+    method: "POST",
+  });
+}
+
+export async function requestRefund(accessToken: string, input: { amountCents?: number; paymentId: string; reason?: string }) {
+  return apiRequest<{ refund: RefundRecord }>("/subscriptions/refunds", {
+    accessToken,
+    body: JSON.stringify(input),
+    method: "POST",
+  });
+}
+
+export async function reviewRefund(accessToken: string, refundId: string, input: { decision: "approve" | "reject"; reason?: string }) {
+  return apiRequest<{ refund: RefundRecord }>(`/subscriptions/refunds/${refundId}/review`, {
+    accessToken,
+    body: JSON.stringify(input),
+    method: "POST",
+  });
 }
 
 export async function activateSubscription(accessToken: string, userId: string, plan: SubscriptionPlanCode) {

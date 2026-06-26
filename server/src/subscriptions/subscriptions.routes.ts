@@ -9,12 +9,19 @@ import { validateBody } from "../middleware/validate";
 import { fromApiTier, serializeUser, toApiTier } from "../utils/users";
 import {
   activateSubscriptionSchema,
+  cancelSubscriptionSchema,
+  checkoutSessionSchema,
   createPlanSchema,
+  paymentMethodSchema,
+  refundRequestSchema,
+  refundReviewSchema,
   grantLicenseSchema,
   initiatePaymentSchema,
   planSchema,
   receiptSchema,
+  retryPaymentSchema,
   reviewPaymentSchema,
+  subscriptionPlanChangeSchema,
   updateSubscriptionSchema,
   verifyPaymentSchema,
 } from "./schemas";
@@ -30,6 +37,19 @@ import {
   revokeLifetimeLicense,
   subscriptionSummary,
 } from "./monetization.service";
+import {
+  cancelSubscription,
+  changeSubscriptionPlan,
+  completePayment,
+  createCheckoutSession,
+  financialAudit,
+  financialDashboard,
+  renewDueSubscriptions,
+  requestRefund,
+  reviewRefund,
+  retryPayment,
+  verifyWebhookSignature,
+} from "./financial.service";
 import { signAccessToken } from "../utils/jwt";
 
 export const subscriptionsRouter = Router();
@@ -316,6 +336,178 @@ subscriptionsRouter.get("/usage", async (req, res, next) => {
 subscriptionsRouter.get("/analytics", ownerRole, async (_req, res, next) => {
   try {
     res.json({ analytics: await ownerAnalytics() });
+  } catch (error) {
+    next(error);
+  }
+});
+
+subscriptionsRouter.post("/checkout", validateBody(checkoutSessionSchema), async (req, res, next) => {
+  try {
+    rejectPrivateLifetime(req.body.plan, req.auth?.role);
+    const result = await createCheckoutSession({
+      idempotencyKey: req.body.idempotencyKey ?? req.get("idempotency-key") ?? undefined,
+      ipAddress: req.ip,
+      planCode: fromApiTier(req.body.plan),
+      provider: req.body.provider,
+      userAgent: req.get("user-agent"),
+      userId: req.auth!.id,
+    });
+    res.status(201).json(result);
+  } catch (error) {
+    next(error);
+  }
+});
+
+subscriptionsRouter.post("/payments/retry", validateBody(retryPaymentSchema), async (req, res, next) => {
+  try {
+    res.status(201).json(await retryPayment(req.body.paymentId, req.auth!.id));
+  } catch (error) {
+    next(error);
+  }
+});
+
+subscriptionsRouter.post("/payments/webhooks/:provider", validateBody(verifyPaymentSchema), async (req, res, next) => {
+  try {
+    const provider = z.enum(["PAYMOB", "INSTAPAY", "BANK_TRANSFER", "WALLET", "CARD", "STRIPE"]).parse(String(req.params.provider).toUpperCase());
+    const signature = req.get("x-payment-signature");
+    if (!verifyWebhookSignature(req.body, signature)) {
+      throw new AppError(401, "Invalid payment webhook signature.", "INVALID_WEBHOOK_SIGNATURE");
+    }
+    const paymentId = typeof req.body["paymentId"] === "string" ? req.body["paymentId"] : undefined;
+    const transactionId = typeof req.body["transactionId"] === "string" ? req.body["transactionId"] : undefined;
+    const payment = paymentId
+      ? await prisma.payment.findUnique({ where: { id: paymentId } })
+      : transactionId
+        ? await prisma.payment.findFirst({ where: { transactionId } })
+        : null;
+    if (!payment) throw new AppError(404, "Payment not found.", "PAYMENT_NOT_FOUND");
+    if (payment.provider !== provider) throw new AppError(400, "Webhook provider does not match payment provider.", "WEBHOOK_PROVIDER_MISMATCH");
+    const status = req.body["success"] === true || req.body["status"] === "PAID" || req.body["status"] === "SUCCESS" ? "PAID" : "FAILED";
+    const updated = await completePayment({
+      failureReason: status === "FAILED" ? String(req.body["failureReason"] ?? "Gateway reported payment failure.") : undefined,
+      paymentId: payment.id,
+      providerPayload: req.body as Prisma.InputJsonObject,
+      status,
+    });
+    await financialAudit({ action: "WEBHOOK_RECEIVED", amountCents: payment.amountCents, currency: payment.currency, entityId: payment.id, entityType: "Payment", metadata: { provider, status } as Prisma.InputJsonObject, userId: payment.userId });
+    res.json({ payment: updated });
+  } catch (error) {
+    next(error);
+  }
+});
+
+subscriptionsRouter.get("/payment-methods", async (req, res, next) => {
+  try {
+    const methods = await prisma.paymentMethod.findMany({ orderBy: [{ isDefault: "desc" }, { createdAt: "desc" }], where: { userId: req.auth!.id } });
+    res.json({ methods });
+  } catch (error) {
+    next(error);
+  }
+});
+
+subscriptionsRouter.post("/payment-methods", validateBody(paymentMethodSchema), async (req, res, next) => {
+  try {
+    if (req.body.isDefault) {
+      await prisma.paymentMethod.updateMany({ data: { isDefault: false }, where: { userId: req.auth!.id } });
+    }
+    const method = await prisma.paymentMethod.create({
+      data: {
+        expMonth: req.body.expMonth,
+        expYear: req.body.expYear,
+        fingerprint: req.body.fingerprint,
+        isDefault: req.body.isDefault,
+        label: req.body.label,
+        last4: req.body.last4,
+        metadata: req.body.metadata as Prisma.InputJsonObject | undefined,
+        provider: req.body.provider,
+        providerToken: req.body.providerToken,
+        type: req.body.type,
+        userId: req.auth!.id,
+      },
+    });
+    await financialAudit({ action: "CHECKOUT_CREATED", actorId: req.auth!.id, entityId: method.id, entityType: "PaymentMethod", metadata: { provider: method.provider, type: method.type } as Prisma.InputJsonObject, userId: req.auth!.id });
+    res.status(201).json({ method });
+  } catch (error) {
+    next(error);
+  }
+});
+
+subscriptionsRouter.post("/subscription/upgrade", validateBody(subscriptionPlanChangeSchema), async (req, res, next) => {
+  try {
+    res.json({ subscription: await changeSubscriptionPlan(req.auth!.id, fromApiTier(req.body.plan)) });
+  } catch (error) {
+    next(error);
+  }
+});
+
+subscriptionsRouter.post("/subscription/downgrade", validateBody(subscriptionPlanChangeSchema), async (req, res, next) => {
+  try {
+    res.json({ subscription: await changeSubscriptionPlan(req.auth!.id, fromApiTier(req.body.plan)) });
+  } catch (error) {
+    next(error);
+  }
+});
+
+subscriptionsRouter.post("/subscription/cancel", validateBody(cancelSubscriptionSchema), async (req, res, next) => {
+  try {
+    res.json({ subscription: await cancelSubscription(req.auth!.id, req.body.immediately) });
+  } catch (error) {
+    next(error);
+  }
+});
+
+subscriptionsRouter.post("/subscription/convert-trial", validateBody(subscriptionPlanChangeSchema), async (req, res, next) => {
+  try {
+    res.json({ subscription: await changeSubscriptionPlan(req.auth!.id, fromApiTier(req.body.plan)) });
+  } catch (error) {
+    next(error);
+  }
+});
+
+subscriptionsRouter.get("/financial/dashboard", ownerRole, async (_req, res, next) => {
+  try {
+    res.json({ dashboard: await financialDashboard() });
+  } catch (error) {
+    next(error);
+  }
+});
+
+subscriptionsRouter.get("/financial/admin-center", ownerRole, async (_req, res, next) => {
+  try {
+    const [transactions, refunds, invoices, manualPayments, auditLogs] = await Promise.all([
+      prisma.paymentTransaction.findMany({ orderBy: { createdAt: "desc" }, take: 100 }),
+      prisma.refund.findMany({ include: { payment: true }, orderBy: { createdAt: "desc" }, take: 100 }),
+      prisma.invoice.findMany({ orderBy: { issuedAt: "desc" }, take: 100 }),
+      prisma.payment.findMany({ orderBy: { createdAt: "desc" }, take: 100, where: { provider: { in: ["BANK_TRANSFER", "INSTAPAY", "WALLET"] }, status: "PENDING" } }),
+      prisma.financialAuditLog.findMany({ orderBy: { createdAt: "desc" }, take: 100 }),
+    ]);
+    res.json({ auditLogs, invoices, manualPayments, refunds, transactions });
+  } catch (error) {
+    next(error);
+  }
+});
+
+subscriptionsRouter.post("/financial/renew-due", ownerRole, async (_req, res, next) => {
+  try {
+    res.json({ renewed: await renewDueSubscriptions() });
+  } catch (error) {
+    next(error);
+  }
+});
+
+subscriptionsRouter.post("/refunds", validateBody(refundRequestSchema), async (req, res, next) => {
+  try {
+    const payment = await prisma.payment.findFirst({ where: { id: req.body.paymentId, userId: req.auth!.id } });
+    if (!payment && req.auth?.role !== "SUPER_ADMIN") throw new AppError(404, "Payment not found.", "PAYMENT_NOT_FOUND");
+    res.status(201).json({ refund: await requestRefund({ actorId: req.auth!.id, amountCents: req.body.amountCents, paymentId: req.body.paymentId, reason: req.body.reason }) });
+  } catch (error) {
+    next(error);
+  }
+});
+
+subscriptionsRouter.post("/refunds/:refundId/review", ownerRole, validateBody(refundReviewSchema), async (req, res, next) => {
+  try {
+    res.json({ refund: await reviewRefund({ actorId: req.auth!.id, decision: req.body.decision, refundId: String(req.params.refundId), reason: req.body.reason }) });
   } catch (error) {
     next(error);
   }
@@ -631,7 +823,10 @@ subscriptionsRouter.post("/payments/:paymentId/review", ownerRole, validateBody(
     });
     if (approved && req.body.plan) {
       rejectPrivateLifetime(req.body.plan, req.auth?.role);
-      await activateUserPlan(payment.userId, fromApiTier(req.body.plan));
+      await completePayment({ actorId: req.auth!.id, paymentId: payment.id, providerPayload: { decision: req.body.decision, reason: req.body.reason } as Prisma.InputJsonObject, status: "APPROVED" });
+      if (!payment.subscriptionId) {
+        await activateUserPlan(payment.userId, fromApiTier(req.body.plan));
+      }
       await prisma.notification.create({
         data: { message: "Your payment was approved and subscription is active.", title: "Payment approved", type: "SUCCESS", userId: payment.userId },
       });
@@ -640,6 +835,16 @@ subscriptionsRouter.post("/payments/:paymentId/review", ownerRole, validateBody(
         data: { message: req.body.reason ?? "Your payment receipt was rejected.", title: "Payment rejected", type: "WARNING", userId: payment.userId },
       });
     }
+    await financialAudit({
+      action: approved ? "MANUAL_PAYMENT_APPROVED" : "PAYMENT_FAILED",
+      actorId: req.auth!.id,
+      amountCents: payment.amountCents,
+      currency: payment.currency,
+      entityId: payment.id,
+      entityType: "Payment",
+      metadata: { decision: req.body.decision, reason: req.body.reason } as Prisma.InputJsonObject,
+      userId: payment.userId,
+    });
     res.json({ payment: updated });
   } catch (error) {
     next(error);

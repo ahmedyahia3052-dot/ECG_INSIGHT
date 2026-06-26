@@ -2,7 +2,7 @@ import type { PaymentProvider } from "@prisma/client";
 import type { PaymentInitiationInput, PaymentInitiationResult, PaymentProviderAdapter, PaymentVerificationResult } from "./types";
 
 export class ManualPaymentProvider implements PaymentProviderAdapter {
-  constructor(private readonly provider: Extract<PaymentProvider, "CARD" | "INSTAPAY" | "STRIPE" | "WALLET">) {}
+  constructor(private readonly provider: Extract<PaymentProvider, "BANK_TRANSFER" | "CARD" | "INSTAPAY" | "STRIPE" | "WALLET">) {}
 
   async initiate(input: PaymentInitiationInput): Promise<PaymentInitiationResult> {
     const transactionId = `${this.provider.toLowerCase()}_${input.paymentId}`;
@@ -13,7 +13,9 @@ export class ManualPaymentProvider implements PaymentProviderAdapter {
         amountCents: input.amountCents,
         currency: input.currency,
         instructions:
-          this.provider === "INSTAPAY" || this.provider === "WALLET"
+          this.provider === "BANK_TRANSFER"
+            ? "Transfer to the configured ECG Insight bank account and upload proof for finance approval."
+            : this.provider === "INSTAPAY" || this.provider === "WALLET"
             ? "Upload a payment receipt for Owner review."
             : "Provider checkout is prepared for future activation.",
         planCode: input.planCode,
