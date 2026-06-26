@@ -40,6 +40,8 @@ function validateOriginList(value: string) {
     });
 }
 
+const optionalUrl = z.preprocess((value) => (value === "" ? undefined : value), z.string().url().optional());
+
 const envSchema = z
   .object({
     CLIENT_ORIGIN: z
@@ -49,10 +51,13 @@ const envSchema = z
         message: "CLIENT_ORIGIN must be one or more comma-separated frontend origins.",
       }),
     AI_MODEL_API_KEY: z.string().optional(),
-    AI_MODEL_ENDPOINT: z.string().url().optional(),
+    AI_MODEL_ENDPOINT: optionalUrl,
+    AI_ENGINE_URL: optionalUrl,
     AI_PROVIDER: z.enum(["deep_learning", "mock", "rule_based"]).default("rule_based"),
+    BACKUP_DIR: z.string().default("backups"),
+    BACKUP_RETENTION_DAYS: z.coerce.number().int().positive().default(30),
     COOKIE_DOMAIN: z.string().optional(),
-    EXCEPTION_MONITORING_DSN: z.string().url().optional(),
+    EXCEPTION_MONITORING_DSN: optionalUrl,
     DATABASE_URL: z.string().url({
       message: "DATABASE_URL must be a valid PostgreSQL connection URL.",
     }),
@@ -72,6 +77,7 @@ const envSchema = z
     }),
     RATE_LIMIT_MAX: z.coerce.number().int().positive().default(600),
     RATE_LIMIT_WINDOW_MS: z.coerce.number().int().positive().default(15 * 60 * 1000),
+    STORAGE_PATH: z.string().default("uploads"),
     TRUST_PROXY: z
       .enum(["true", "false"])
       .default("false")
@@ -103,6 +109,14 @@ const envSchema = z
         code: "custom",
         message: "EXPO_PUBLIC_API_URL must use HTTPS in production.",
         path: ["EXPO_PUBLIC_API_URL"],
+      });
+    }
+
+    if (value.AI_ENGINE_URL && !value.AI_ENGINE_URL.startsWith("https://")) {
+      ctx.addIssue({
+        code: "custom",
+        message: "AI_ENGINE_URL must use HTTPS in production.",
+        path: ["AI_ENGINE_URL"],
       });
     }
 

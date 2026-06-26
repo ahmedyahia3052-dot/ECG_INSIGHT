@@ -17,7 +17,7 @@ services:
   api:
     build:
       context: .
-      dockerfile: Dockerfile.production
+      dockerfile: Dockerfile.backend.production
     depends_on:
       db:
         condition: service_healthy
@@ -27,6 +27,7 @@ services:
       CLIENT_ORIGIN: ${CLIENT_ORIGIN:?CLIENT_ORIGIN is required}
       COOKIE_DOMAIN: ${COOKIE_DOMAIN:-}
       DATABASE_URL: postgresql://${POSTGRES_USER:-ecg_insight}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-ecg_insight}
+      AI_ENGINE_URL: http://ai-engine:8000
       EXPO_PUBLIC_API_URL: ${EXPO_PUBLIC_API_URL:?EXPO_PUBLIC_API_URL is required}
       JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:?JWT_REFRESH_SECRET is required}
       JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
@@ -34,6 +35,9 @@ services:
       NODE_ENV: production
       RATE_LIMIT_MAX: ${RATE_LIMIT_MAX:-600}
       RATE_LIMIT_WINDOW_MS: ${RATE_LIMIT_WINDOW_MS:-900000}
+      STORAGE_PATH: /app/uploads
+      BACKUP_DIR: /app/backups
+      BACKUP_RETENTION_DAYS: ${BACKUP_RETENTION_DAYS:-30}
       TRUST_PROXY: "true"
     healthcheck:
       test: ["CMD-SHELL", "node -e \"fetch('http://127.0.0.1:3001/readiness').then((r)=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\""]
@@ -46,6 +50,43 @@ services:
     restart: unless-stopped
     volumes:
       - api-uploads:/app/uploads
+      - production-backups:/app/backups
+
+  ai-engine:
+    build:
+      context: .
+      dockerfile: ai-engine/Dockerfile.production
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=4)\""]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 45s
+    restart: unless-stopped
+
+  backup:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend.production
+    command: ["npx", "tsx", "scripts/backup-service.ts"]
+    depends_on:
+      db:
+        condition: service_healthy
+    env_file:
+      - .env.production
+    environment:
+      BACKUP_DIR: /app/backups
+      BACKUP_RETENTION_DAYS: ${BACKUP_RETENTION_DAYS:-30}
+      DATABASE_URL: postgresql://${POSTGRES_USER:-ecg_insight}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-ecg_insight}
+      NODE_ENV: production
+      POSTGRES_DB: ${POSTGRES_DB:-ecg_insight}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+      POSTGRES_USER: ${POSTGRES_USER:-ecg_insight}
+      STORAGE_PATH: /app/uploads
+    restart: unless-stopped
+    volumes:
+      - api-uploads:/app/uploads:ro
+      - production-backups:/app/backups
 
   frontend:
     build:
@@ -66,6 +107,8 @@ services:
     depends_on:
       api:
         condition: service_healthy
+      frontend:
+        condition: service_healthy
     ports:
       - "80:80"
     restart: unless-stopped
@@ -75,3 +118,4 @@ services:
 volumes:
   api-uploads:
   postgres-production-data:
+  production-backups:

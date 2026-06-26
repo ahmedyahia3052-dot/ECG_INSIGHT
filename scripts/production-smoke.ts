@@ -4,6 +4,10 @@ const checks = [
   { path: "/health", requiredKeys: ["ok", "service"] },
   { path: "/liveness", requiredKeys: ["ok", "uptimeSeconds"] },
   { path: "/readiness", requiredKeys: ["ok", "checks"] },
+  { path: "/api/health", requiredKeys: ["ok", "components"] },
+  { path: "/api/health/db", requiredKeys: ["ok", "component"] },
+  { path: "/api/health/ai", requiredKeys: ["ok", "component"] },
+  { path: "/api/health/storage", requiredKeys: ["ok", "component"] },
 ] as const;
 
 function assert(condition: unknown, message: string) {

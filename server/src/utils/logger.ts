@@ -1,17 +1,14 @@
+import pino from "pino";
+
 type LogLevel = "debug" | "info" | "warn" | "error";
 
-const severity: Record<LogLevel, number> = {
-  debug: 10,
-  info: 20,
-  warn: 30,
-  error: 40,
-};
-
 const configuredLevel = (process.env["LOG_LEVEL"] as LogLevel | undefined) ?? "info";
-
-function shouldLog(level: LogLevel) {
-  return severity[level] >= severity[configuredLevel];
-}
+const logger = pino({
+  base: { service: "ecg-insight-api" },
+  level: configuredLevel,
+  messageKey: "message",
+  timestamp: pino.stdTimeFunctions.isoTime,
+});
 
 function normalizeMetadata(metadata?: Record<string, unknown>) {
   if (!metadata) return undefined;
@@ -21,24 +18,7 @@ function normalizeMetadata(metadata?: Record<string, unknown>) {
 }
 
 export function log(level: LogLevel, message: string, metadata?: Record<string, unknown>) {
-  if (!shouldLog(level)) return;
-  const payload = {
-    level,
-    message,
-    service: "ecg-insight-api",
-    timestamp: new Date().toISOString(),
-    ...normalizeMetadata(metadata),
-  };
-  const line = JSON.stringify(payload);
-  if (level === "error") {
-    console.error(line);
-    return;
-  }
-  if (level === "warn") {
-    console.warn(line);
-    return;
-  }
-  console.log(line);
+  logger[level](normalizeMetadata(metadata) ?? {}, message);
 }
 
 export function logError(message: string, error: unknown, metadata?: Record<string, unknown>) {

@@ -53,6 +53,26 @@ export async function listBackupJobs(accessToken: string) {
   return apiRequest<{ jobs: unknown[] }>("/backup", { accessToken });
 }
 
+export interface ProductionReadiness {
+  activeUsers: number;
+  components: Record<string, {
+    details?: unknown;
+    durationMs: number;
+    ok: boolean;
+    status: "degraded" | "down" | "healthy";
+  }>;
+  environment: string;
+  metrics: Record<string, unknown>;
+  ok: boolean;
+  service: string;
+  status: "degraded" | "down" | "healthy";
+  timestamp: string;
+}
+
+export async function getProductionReadiness(accessToken: string) {
+  return apiRequest<{ readiness: ProductionReadiness }>("/health/readiness-dashboard", { accessToken });
+}
+
 export async function getMetrics(accessToken: string) {
   const response = await fetch(`${API_ROOT_URL}/metrics`, {
     credentials: "include",

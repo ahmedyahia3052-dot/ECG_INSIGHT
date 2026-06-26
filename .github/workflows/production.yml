@@ -1,10 +1,11 @@
-name: Production Validation
+name: Production Infrastructure CI/CD
 
 on:
   pull_request:
   push:
     branches:
       - main
+      - backup-before-restore
 
 jobs:
   validate:
@@ -25,6 +26,8 @@ jobs:
           - 5432:5432
 
     env:
+      BACKUP_DIR: backups
+      BACKUP_RETENTION_DAYS: 30
       CLIENT_ORIGIN: https://app.example.com
       DATABASE_URL: postgresql://postgres:postgres@localhost:5432/ecg_insight_ci
       EXPO_PUBLIC_API_URL: https://api.example.com/api
@@ -34,6 +37,7 @@ jobs:
       PORT: 3001
       RATE_LIMIT_MAX: 600
       RATE_LIMIT_WINDOW_MS: 900000
+      STORAGE_PATH: uploads
       TRUST_PROXY: "true"
 
     steps:
@@ -72,11 +76,22 @@ jobs:
       - name: Production validation
         run: npm run validate:production
 
-      - name: Build production Docker image
-        run: docker build -f Dockerfile.production -t ecg-insight-api:ci .
+      - name: Secret placeholder check
+        run: |
+          test ! -f .env || (echo ".env must not be committed" && exit 1)
+          grep -R "replace-with" .env.production .env.staging .env.production.example >/dev/null
+
+      - name: Build production backend image
+        run: docker build -f Dockerfile.backend.production -t ecg-insight-api:ci .
 
       - name: Build production frontend image
         run: docker build -f Dockerfile.frontend.production -t ecg-insight-frontend:ci .
+
+      - name: Build AI engine image
+        run: docker build -f ai-engine/Dockerfile.production -t ecg-insight-ai-engine:ci .
+
+      - name: Validate production compose config
+        run: docker compose -f docker-compose.production.yml config
 
       - name: Start API for smoke tests
         run: |
@@ -94,3 +109,12 @@ jobs:
         if: always()
         run: |
           if [ -f api.pid ]; then kill "$(cat api.pid)" || true; fi
+
+  deploy:
+    needs: validate
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Deployment gate
+        run: echo "Production deployment is ready. Configure registry/server secrets to execute rollout."

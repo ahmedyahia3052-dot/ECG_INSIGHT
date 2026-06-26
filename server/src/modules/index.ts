@@ -20,6 +20,7 @@ import { ecgProcessingRouter } from "./ecg-processing/ecg-processing.routes";
 import { emrRouter } from "./emr/emr.routes";
 import { enterpriseRouter } from "./enterprise/enterprise.routes";
 import { fhirRouter, pacsRouter, telecardiologyRouter } from "./hospital-integration/hospital-integration.routes";
+import { healthRouter } from "./health/health.routes";
 import { knowledgeRouter } from "./knowledge/knowledge.routes";
 import { notificationsRouter } from "../notifications/notifications.routes";
 import { ocrRouter } from "./ocr/ocr.routes";
@@ -51,10 +52,7 @@ modulesRouter.get("/healthz", (_req, res) => {
   res.json({ ok: true, service: "ecg-insight-api" });
 });
 
-modulesRouter.get("/health", (_req, res) => {
-  res.json({ ok: true, service: "ecg-insight-api" });
-});
-
+modulesRouter.use("/health", healthRouter);
 modulesRouter.use("/auth", authRouter);
 modulesRouter.use("/audit", auditRouter);
 modulesRouter.use("/assistant", assistantRouter);

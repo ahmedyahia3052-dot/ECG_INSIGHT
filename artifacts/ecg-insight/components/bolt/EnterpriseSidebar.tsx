@@ -28,6 +28,7 @@ const NAV_ITEMS: NavItem[] = [
   { icon: "credit-card", label: "Billing & Subscription", route: "/(tabs)/subscription", section: "Workspace" },
   { icon: "briefcase", label: "Team Management", route: "/(tabs)/workforce-dashboard", section: "Workspace" },
   { icon: "shield", label: "Admin Dashboard", route: "/admin/", adminOnly: true, section: "Administration" },
+  { icon: "server", label: "Production Readiness", route: "/(tabs)/production-readiness", adminOnly: true, section: "Administration" },
   { icon: "award", label: "License Management", route: "/admin/licenses", adminOnly: true, section: "Administration" },
   { icon: "settings", label: "Profile & Settings", route: "/(tabs)/profile", section: "Workspace" },
 ];
