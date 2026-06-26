@@ -52,7 +52,16 @@ export interface DigitalEcg {
   durationSeconds: number;
   ecgFileId?: string;
   enhancedImageUrl?: string;
+  extractionTimestamp?: string;
   fallbackReason?: string;
+  leadSegments: Array<{
+    confidence: number;
+    heightPercent: number;
+    lead: string;
+    widthPercent: number;
+    xPercent: number;
+    yPercent: number;
+  }>;
   leads: DigitalEcgLead[];
   measurements: {
     prIntervalMs: number;
@@ -61,6 +70,21 @@ export interface DigitalEcg {
     rrIntervalMs: number;
   };
   originalImageUrl?: string;
+  preprocessing?: {
+    autoRotationDegrees: number;
+    borderDetected: boolean;
+    contrastEnhanced: boolean;
+    croppingOptimization: { heightPercent: number; widthPercent: number; xPercent: number; yPercent: number };
+    deskewDegrees: number;
+    gridEnhanced: boolean;
+    noiseReduced: boolean;
+    perspectiveCorrected: boolean;
+    shadowRemoved: boolean;
+  };
+  quality: {
+    score: number;
+    warnings: string[];
+  };
   status: "available" | "fallback";
 }
 
@@ -85,6 +109,28 @@ export async function getECGWaveform(accessToken: string, caseId: string) {
 
 export async function getDigitalECG(accessToken: string, caseId: string) {
   return apiRequest<{ digitalEcg: DigitalEcg }>(`/ecg/digital/${caseId}`, { accessToken });
+}
+
+export async function digitizeECG(
+  accessToken: string,
+  input: { caseId?: string; ecgFileId?: string; gainMmPerMv?: 5 | 10 | 20; paperSpeedMmPerSec?: 25 | 50 },
+) {
+  return apiRequest<{ clinicalDisclaimer: string; digitalEcg: DigitalEcg }>("/ecg/digitize", {
+    accessToken,
+    body: JSON.stringify(input),
+    method: "POST",
+  });
+}
+
+export async function getDigitizedECG(accessToken: string, caseId: string) {
+  return apiRequest<{ clinicalDisclaimer: string; digitalEcg: DigitalEcg }>(`/ecg/${caseId}/digitized`, { accessToken });
+}
+
+export async function getDigitizationQuality(accessToken: string, caseId: string) {
+  return apiRequest<{
+    clinicalDisclaimer: string;
+    digitizationQuality: Pick<DigitalEcg, "calibration" | "ecgFileId" | "extractionTimestamp" | "leadSegments" | "preprocessing" | "quality" | "status">;
+  }>(`/ecg/${caseId}/digitization-quality`, { accessToken });
 }
 
 export async function reconstructDigitalECG(

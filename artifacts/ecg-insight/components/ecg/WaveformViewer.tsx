@@ -22,7 +22,9 @@ function waveformToDigital(waveform: ProcessedWaveform): DigitalEcg {
         samplingRate: waveform.sampleRate,
       },
     ],
+    leadSegments: [],
     measurements: { prIntervalMs: 0, qrsDurationMs: 0, qtIntervalMs: 0, rrIntervalMs: 0 },
+    quality: { score: 70, warnings: [] },
     status: "available",
   };
 }

@@ -136,6 +136,7 @@ export function EcgProViewer({
       {mode === "digitized" ? (
         <View style={styles.viewerPanel}>
           <SectionHeader title="Digitized 12-Lead ECG" subtitle="Smooth waveform rendering with lead labels, time axis, voltage axis, lead focus, calipers, and AI overlays." />
+          <DigitizationQualityPanel digitalEcg={digitalEcg} />
           <WaveformGrid annotations={visibleAnnotations} leadData={leadData} focusedLead={focusedLead} onFocusLead={(lead) => {
             setFocusedLead(lead);
             setSelectedLead(lead);
@@ -302,6 +303,33 @@ function MeasurementPanel({ analysis, ecgCase }: { analysis?: AIAnalysisResult |
           <Text style={styles.measurementValue}>{value}</Text>
         </View>
       ))}
+    </View>
+  );
+}
+
+function DigitizationQualityPanel({ digitalEcg }: { digitalEcg?: DigitalEcg | null }) {
+  if (!digitalEcg) return <EmptyState title="Digitization pending" message="Run ECG digitization to view signal quality, calibration, lead extraction, and warnings." />;
+  const warnings = digitalEcg.quality.warnings.length ? digitalEcg.quality.warnings : ["No digitization warnings detected."];
+  return (
+    <View style={styles.qualityPanel}>
+      <View style={styles.qualityHeader}>
+        <Badge label={`Quality ${digitalEcg.quality.score}/100`} tone={digitalEcg.quality.score >= 80 ? "success" : digitalEcg.quality.score >= 55 ? "warning" : "critical"} />
+        <Badge label={`${digitalEcg.leadSegments.length || digitalEcg.leads.length}/12 leads`} tone={(digitalEcg.leadSegments.length || digitalEcg.leads.length) === 12 ? "success" : "warning"} />
+        <Badge label={`${digitalEcg.calibration.paperSpeedMmPerSec} mm/s`} tone="primary" />
+        <Badge label={`${digitalEcg.calibration.gainMmPerMv} mm/mV`} tone="primary" />
+      </View>
+      <Text style={styles.qualityText}>
+        Extraction {digitalEcg.extractionTimestamp ? new Date(digitalEcg.extractionTimestamp).toLocaleString() : "pending"} • Grid {digitalEcg.calibration.gridDetected ? "detected" : "not detected"} • Confidence {Math.round(digitalEcg.calibration.confidence * 100)}%
+      </Text>
+      {digitalEcg.preprocessing ? (
+        <Text style={styles.qualityText}>
+          Preprocessing: border {digitalEcg.preprocessing.borderDetected ? "detected" : "uncertain"}, deskew {digitalEcg.preprocessing.deskewDegrees}°, rotation {digitalEcg.preprocessing.autoRotationDegrees}°, contrast {digitalEcg.preprocessing.contrastEnhanced ? "enhanced" : "stable"}, noise {digitalEcg.preprocessing.noiseReduced ? "reduced" : "acceptable"}.
+        </Text>
+      ) : null}
+      <Text style={styles.disclaimerText}>Clinical disclaimer: digitized ECG signals must be reviewed against the original ECG image before diagnosis, treatment, emergency activation, or occupational fitness decisions.</Text>
+      <View style={styles.warningList}>
+        {warnings.map((warning) => <Text key={warning} style={styles.warningText}>• {warning}</Text>)}
+      </View>
     </View>
   );
 }
@@ -585,6 +613,7 @@ const styles = StyleSheet.create({
   confidenceText: { fontSize: 11, fontWeight: "900" },
   criticalBanner: { alignItems: "center", backgroundColor: medicalTheme.critical, borderRadius: 14, flexDirection: "row", gap: 10, padding: 12 },
   criticalText: { color: "#fff", flex: 1, fontSize: 13, fontWeight: "900" },
+  disclaimerText: { color: "#FBBF24", fontSize: 12, fontWeight: "800", lineHeight: 18 },
   evidenceLine: { color: medicalTheme.text, fontSize: 12, fontWeight: "800", lineHeight: 18 },
   explainabilityLayout: { alignItems: "stretch", flexDirection: "row", flexWrap: "wrap", gap: 14 },
   explainabilityPanel: { backgroundColor: medicalTheme.surface, borderColor: medicalTheme.border, borderRadius: 16, borderWidth: 1, flex: 1, gap: 12, minWidth: 300, padding: 14 },
@@ -610,10 +639,15 @@ const styles = StyleSheet.create({
   originalImage: { height: 500, width: "100%" },
   panelDiagnosis: { color: medicalTheme.text, fontSize: 20, fontWeight: "900" },
   panelSubheading: { color: medicalTheme.primary, fontSize: 12, fontWeight: "900", letterSpacing: 0.5, textTransform: "uppercase" },
+  qualityHeader: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+  qualityPanel: { backgroundColor: "#071D2D", borderColor: medicalTheme.border, borderRadius: 16, borderWidth: 1, gap: 8, padding: 12 },
+  qualityText: { color: medicalTheme.text, fontSize: 12, fontWeight: "800", lineHeight: 18 },
   subtitle: { color: medicalTheme.muted, fontSize: 13, lineHeight: 19 },
   title: { color: medicalTheme.text, fontSize: 22, fontWeight: "900" },
   toolbar: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   viewerPanel: { gap: 12 },
   waveScroll: { borderRadius: 16, maxHeight: 720 },
+  warningList: { gap: 4 },
+  warningText: { color: medicalTheme.muted, fontSize: 12, fontWeight: "800", lineHeight: 18 },
   workstation: { backgroundColor: medicalTheme.card, borderColor: medicalTheme.border, borderRadius: 22, borderWidth: 1, gap: 14, padding: 16 },
 });

@@ -7,7 +7,7 @@ import { AppError } from "../../middleware/error";
 import { ensureClinicalReportForCase, serializeReport } from "../reports/reports.service";
 import { assertCanRunAnalysis, recordAnalysisUsage } from "../../subscriptions/monetization.service";
 import { assertResourceAccess, canAccessCase, canAccessPatient } from "../../utils/resource-access";
-import { exportDigitalEcg, getDigitalEcg, reconstructCaseEcg } from "./ecg-digitization.service";
+import { exportDigitalEcg, getDigitalEcg, getDigitizationQuality, reconstructCaseEcg } from "./ecg-digitization.service";
 import { analyzeEcgImage, getEcgImageAnalysisResults } from "./ecg-image-analysis.service";
 import {
   getProcessedWaveform,
@@ -55,6 +55,15 @@ const calibrationOverrideSchema = z.object({
   paperSpeedMmPerSec: z.union([z.literal(25), z.literal(50)]).optional(),
 });
 
+const digitizeSchema = z.object({
+  caseId: z.string().trim().optional(),
+  ecgFileId: z.string().trim().optional(),
+  gainMmPerMv: z.union([z.literal(5), z.literal(10), z.literal(20)]).optional(),
+  paperSpeedMmPerSec: z.union([z.literal(25), z.literal(50)]).optional(),
+}).refine((body) => body.caseId || body.ecgFileId, {
+  message: "caseId or ecgFileId is required.",
+});
+
 const imageAnalysisSchema = z.object({
   caseId: z.string().trim().optional(),
   ecgFileId: z.string().trim().optional(),
@@ -65,6 +74,14 @@ const imageAnalysisSchema = z.object({
 const realAiAnalysisSchema = z.object({
   caseId: z.string().trim().min(1),
 });
+
+async function resolveCaseId(id: string) {
+  const ecgCase = await prisma.eCGCase.findFirst({
+    where: { OR: [{ id }, { caseId: id }, { caseNumber: id }] },
+  });
+  if (!ecgCase) throw new AppError(404, "ECG case not found.", "CASE_NOT_FOUND");
+  return ecgCase.id;
+}
 
 ecgProcessingRouter.post("/analyze", requireRole("DOCTOR"), async (req, res, next) => {
   try {
@@ -100,6 +117,30 @@ ecgProcessingRouter.post("/analyze-real-ai", requireRole("DOCTOR"), async (req, 
   }
 });
 
+ecgProcessingRouter.post("/digitize", requireRole("DOCTOR"), async (req, res, next) => {
+  try {
+    const body = digitizeSchema.parse(req.body);
+    let caseId = body.caseId ? await resolveCaseId(body.caseId) : undefined;
+    if (!caseId && body.ecgFileId) {
+      const file = await prisma.eCGFile.findUnique({ where: { id: body.ecgFileId } });
+      if (!file?.caseId) throw new AppError(404, "ECG case file not found.", "ECG_FILE_NOT_FOUND");
+      caseId = file.caseId;
+    }
+    if (!caseId) throw new AppError(400, "ECG case is required for digitization.", "CASE_REQUIRED");
+    assertResourceAccess(await canAccessCase(caseId, req.auth!));
+    const digitalEcg = await reconstructCaseEcg(caseId, req.auth!.id, {
+      gainMmPerMv: body.gainMmPerMv,
+      paperSpeedMmPerSec: body.paperSpeedMmPerSec,
+    });
+    res.status(202).json({
+      clinicalDisclaimer: "Digitized ECG signals are reconstructed from uploaded ECG media and require physician review against the original ECG image before clinical decisions.",
+      digitalEcg,
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
 ecgProcessingRouter.post("/digital/:caseId/reconstruct", requireRole("DOCTOR"), async (req, res, next) => {
   try {
     const caseId = String(req.params.caseId);
@@ -124,13 +165,41 @@ ecgProcessingRouter.get("/digital/:caseId", async (req, res, next) => {
           calibration: { confidence: 0, gainMmPerMv: 10, gridDetected: false, paperSpeedMmPerSec: 25 },
           durationSeconds: 0,
           fallbackReason: "Digital waveform reconstruction unavailable.",
+          leadSegments: [],
           leads: [],
           measurements: { prIntervalMs: 0, qrsDurationMs: 0, qtIntervalMs: 0, rrIntervalMs: 0 },
+          quality: { score: 0, warnings: ["Digital waveform reconstruction unavailable."] },
           status: "fallback",
         },
       });
       return;
     }
+    next(error);
+  }
+});
+
+ecgProcessingRouter.get("/:id/digitized", async (req, res, next) => {
+  try {
+    const caseId = await resolveCaseId(String(req.params.id));
+    assertResourceAccess(await canAccessCase(caseId, req.auth!));
+    res.json({
+      clinicalDisclaimer: "Digitized ECG signals are reconstructed from uploaded ECG media and require physician review against the original ECG image before clinical decisions.",
+      digitalEcg: await getDigitalEcg(caseId),
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+ecgProcessingRouter.get("/:id/digitization-quality", async (req, res, next) => {
+  try {
+    const caseId = await resolveCaseId(String(req.params.id));
+    assertResourceAccess(await canAccessCase(caseId, req.auth!));
+    res.json({
+      clinicalDisclaimer: "Digitization quality scores support technical review only and do not validate diagnostic accuracy.",
+      digitizationQuality: await getDigitizationQuality(caseId),
+    });
+  } catch (error) {
     next(error);
   }
 });
