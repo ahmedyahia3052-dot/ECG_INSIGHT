@@ -21,6 +21,21 @@ const PASSWORD_MAX_AGE_DAYS = 90;
 const MAX_CONCURRENT_SESSIONS = 5;
 const CAPTCHA_FAILED_ATTEMPTS = 3;
 
+function organizationTypeForRegistration(type?: string) {
+  switch (type) {
+    case "Hospital":
+      return "HOSPITAL" as const;
+    case "Clinic":
+      return "CLINIC" as const;
+    case "Company":
+      return "COMPANY" as const;
+    case "Government Institution":
+      return "GOVERNMENT" as const;
+    default:
+      return "OTHER" as const;
+  }
+}
+
 function assertPasswordPolicy(password: string) {
   const strongEnough =
     password.length >= 12 &&
@@ -206,11 +221,17 @@ export async function issueAuthResponse(input: {
 export async function registerUser(
   body: {
     email?: string;
+    accountType?: "INDIVIDUAL" | "ORGANIZATION";
     institution?: string;
     name: string;
+    organizationCity?: string;
+    organizationCountry?: string;
+    organizationName?: string;
+    organizationType?: string;
     password?: string;
     phoneNumber?: string;
     role: "admin" | "corporate_client" | "doctor" | "student" | "user";
+    registrationRole?: string;
     specialization?: string;
   },
   req: Request,
@@ -225,33 +246,55 @@ export async function registerUser(
   }
 
   const emailToken = createOpaqueToken(32);
-  const user = await prisma.user.create({
-    data: {
-      avatarInitials: initialsForName(body.name),
-      email,
-      emailVerificationExpiresAt: new Date(Date.now() + 1000 * 60 * 60 * 24),
-      emailVerificationTokenHash: hashToken(emailToken),
-      institution: body.institution,
-      name: body.name,
-      passwordHash: await hashPassword(body.password ?? createOpaqueToken(48)),
-      phoneNumber,
-      role: fromApiRole(body.role),
-      specialization: body.specialization,
-      subscription: {
-        create: {
-          tier: "FREE",
-          status: "ACTIVE",
+  const passwordHash = await hashPassword(body.password ?? createOpaqueToken(48));
+  const user = await prisma.$transaction(async (tx) => {
+    const organization =
+      body.accountType === "ORGANIZATION"
+        ? await tx.organization.create({
+            data: {
+              city: body.organizationCity,
+              country: body.organizationCountry,
+              email,
+              name: body.organizationName ?? body.institution ?? `${body.name} Organization`,
+              type: organizationTypeForRegistration(body.organizationType),
+            },
+          })
+        : null;
+
+    const createdUser = await tx.user.create({
+      data: {
+        accountType: body.accountType ?? "INDIVIDUAL",
+        avatarInitials: initialsForName(body.name),
+        email,
+        emailVerificationExpiresAt: new Date(Date.now() + 1000 * 60 * 60 * 24),
+        emailVerificationTokenHash: hashToken(emailToken),
+        institution: body.institution ?? body.organizationName,
+        name: body.name,
+        organizationId: organization?.id,
+        passwordHash,
+        phoneNumber,
+        registrationRole: body.registrationRole,
+        role: fromApiRole(body.role),
+        specialization: body.specialization ?? body.registrationRole,
+        subscription: {
+          create: {
+            tier: "FREE",
+            status: "ACTIVE",
+          },
         },
       },
-    },
-    include: { subscription: true },
-  });
-  await prisma.passwordHistory.create({
-    data: {
-      expiresAt: new Date(Date.now() + PASSWORD_MAX_AGE_DAYS * 24 * 60 * 60 * 1000),
-      passwordHash: user.passwordHash,
-      userId: user.id,
-    },
+      include: { subscription: true },
+    });
+
+    await tx.passwordHistory.create({
+      data: {
+        expiresAt: new Date(Date.now() + PASSWORD_MAX_AGE_DAYS * 24 * 60 * 60 * 1000),
+        passwordHash: createdUser.passwordHash,
+        userId: createdUser.id,
+      },
+    });
+
+    return createdUser;
   });
 
   const session = await createSession(user.id, true, req, res);

@@ -1,6 +1,6 @@
-import { apiRequest, checkBackendHealth } from "./api";
+import { apiRequest } from "./api";
 
-export type ServiceStatus = "offline" | "operational";
+export type ServiceStatus = "degraded" | "offline" | "operational";
 
 export interface StatusCheck {
   details?: string;
@@ -10,24 +10,22 @@ export interface StatusCheck {
 
 async function probe(name: string, request: () => Promise<unknown>): Promise<StatusCheck> {
   try {
-    await request();
-    return { name, status: "operational" };
+    const response = await request();
+    const status = response && typeof response === "object" && "status" in response ? String((response as { status?: string }).status) : "ok";
+    return { name, status: status === "degraded" ? "degraded" : status === "offline" || status === "down" ? "offline" : "operational" };
   } catch (error) {
     return { details: error instanceof Error ? error.message : "Service unavailable.", name, status: "offline" };
   }
 }
 
 export async function getSystemStatus(): Promise<StatusCheck[]> {
-  const backend = await checkBackendHealth();
   const checks = await Promise.all([
-    probe("Authentication Service", () => apiRequest("/auth/email-availability?email=status%40ecginsight.health")),
-    probe("Database", () => apiRequest("/health/db")),
+    probe("Frontend", () => apiRequest("/health/frontend")),
+    probe("API Gateway", () => apiRequest("/health")),
+    probe("Authentication Service", () => apiRequest("/health/auth")),
+    probe("Database", () => apiRequest("/health/database")),
     probe("AI Engine", () => apiRequest("/health/ai")),
   ]);
 
-  return [
-    { name: "Frontend", status: "operational" },
-    { details: backend.message, name: "API", status: backend.ok ? "operational" : "offline" },
-    ...checks,
-  ];
+  return checks;
 }

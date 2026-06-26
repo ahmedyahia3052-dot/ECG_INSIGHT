@@ -6,6 +6,7 @@ import { z } from "zod";
 
 import { AuthCard, AuthMessage, AuthPrimaryButton, AuthTextField, AuthToggle, premiumAuthTheme, PremiumAuthShell } from "@/components/auth/PremiumAuth";
 import { useAuth } from "@/context/AuthContext";
+import { assertOAuthProviderReady, type OAuthProvider } from "@/services/oauth";
 
 const loginSchema = z.object({
   email: z.string().trim().min(1, "Email is required.").email("Enter a valid email address."),
@@ -21,6 +22,7 @@ export default function LoginScreen() {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [oauthLoading, setOauthLoading] = useState<OAuthProvider | null>(null);
 
   useEffect(() => {
     if (!isLoading && isAuthenticated) router.replace("/dashboard" as never);
@@ -44,6 +46,19 @@ export default function LoginScreen() {
     }
 
     router.replace("/dashboard" as never);
+  };
+
+  const startOAuth = async (provider: OAuthProvider) => {
+    setError("");
+    setOauthLoading(provider);
+    try {
+      await assertOAuthProviderReady(provider);
+      setError(`${provider} OAuth is configured. Complete native provider credential exchange before calling /auth/oauth/login.`);
+    } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : `${provider} sign-in is unavailable.`);
+    } finally {
+      setOauthLoading(null);
+    }
   };
 
   return (
@@ -94,6 +109,18 @@ export default function LoginScreen() {
 
         <AuthPrimaryButton disabled={submitting} icon="log-in" label={submitting ? "Signing in..." : "Sign In"} onPress={submit} />
 
+        <View style={styles.oauthGrid}>
+          {(["GOOGLE", "APPLE", "MICROSOFT"] as OAuthProvider[]).map((provider) => (
+            <AuthPrimaryButton
+              disabled={oauthLoading !== null}
+              key={provider}
+              label={oauthLoading === provider ? "Checking..." : provider === "GOOGLE" ? "Google" : provider === "APPLE" ? "Apple" : "Microsoft"}
+              onPress={() => void startOAuth(provider)}
+              variant="outline"
+            />
+          ))}
+        </View>
+
         <Text style={styles.createText}>
           New to ECG Insight? <Link href="/register" style={styles.link}>Create Account</Link>
         </Text>
@@ -106,6 +133,7 @@ const styles = StyleSheet.create({
   createText: { color: premiumAuthTheme.muted, fontSize: 13, fontWeight: "700", textAlign: "center" },
   header: { gap: 6 },
   link: { color: premiumAuthTheme.cyan, fontSize: 13, fontWeight: "900" },
+  oauthGrid: { flexDirection: "row", gap: 8 },
   options: { alignItems: "center", flexDirection: "row", justifyContent: "space-between" },
   subtitle: { color: premiumAuthTheme.muted, fontSize: 14, fontWeight: "700", lineHeight: 20 },
   title: { color: premiumAuthTheme.text, fontSize: 28, fontWeight: "900", letterSpacing: -0.7 },

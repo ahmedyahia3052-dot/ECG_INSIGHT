@@ -13,7 +13,26 @@ export const healthRouter = Router();
 
 healthRouter.get("/", async (_req, res, next) => {
   try {
-    res.json(await productionReadinessSnapshot());
+    const result = await productionReadinessSnapshot();
+    res.json({ ...result, status: result.ok ? "ok" : result.status, service: "api-gateway" });
+  } catch (error) {
+    next(error);
+  }
+});
+
+healthRouter.get("/frontend", async (_req, res) => {
+  res.json({ service: "frontend", status: "ok", timestamp: new Date().toISOString() });
+});
+
+healthRouter.get("/auth", async (_req, res, next) => {
+  try {
+    const result = await databaseHealth();
+    res.status(result.ok ? 200 : 503).json({
+      details: result.details,
+      durationMs: result.durationMs,
+      service: "authentication",
+      status: result.ok ? "ok" : "offline",
+    });
   } catch (error) {
     next(error);
   }
@@ -22,7 +41,16 @@ healthRouter.get("/", async (_req, res, next) => {
 healthRouter.get("/db", async (_req, res, next) => {
   try {
     const result = await databaseHealth();
-    res.status(result.ok ? 200 : 503).json({ component: "database", ...result });
+    res.status(result.ok ? 200 : 503).json({ component: "database", service: "database", status: result.ok ? "ok" : "offline", ...result });
+  } catch (error) {
+    next(error);
+  }
+});
+
+healthRouter.get("/database", async (_req, res, next) => {
+  try {
+    const result = await databaseHealth();
+    res.status(result.ok ? 200 : 503).json({ component: "database", service: "database", status: result.ok ? "ok" : "offline", ...result });
   } catch (error) {
     next(error);
   }
@@ -31,7 +59,8 @@ healthRouter.get("/db", async (_req, res, next) => {
 healthRouter.get("/ai", async (_req, res, next) => {
   try {
     const result = await aiHealth();
-    res.status(result.ok ? 200 : 503).json({ component: "ai", ...result });
+    const degraded = result.ok && result.details && typeof result.details === "object" && "engineUrlConfigured" in result.details && result.details.engineUrlConfigured === false;
+    res.status(result.ok ? 200 : 503).json({ component: "ai", service: "ai", status: result.ok ? (degraded ? "degraded" : "ok") : "offline", ...result });
   } catch (error) {
     next(error);
   }

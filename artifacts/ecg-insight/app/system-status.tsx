@@ -38,10 +38,10 @@ export default function SystemStatusScreen() {
         <View style={styles.list}>
           {checks.map((check) => (
             <View key={check.name} style={styles.statusRow}>
-              <View style={[styles.dot, check.status === "operational" ? styles.green : styles.red]} />
+              <View style={[styles.dot, check.status === "operational" ? styles.green : check.status === "degraded" ? styles.yellow : styles.red]} />
               <View style={styles.statusTextWrap}>
                 <Text style={styles.statusName}>{check.name}</Text>
-                <Text style={styles.statusMeta}>{check.status === "operational" ? "Operational" : check.details ?? "Offline"}</Text>
+                <Text style={styles.statusMeta}>{check.status === "operational" ? "Operational" : check.status === "degraded" ? "Degraded" : check.details ?? "Offline"}</Text>
               </View>
             </View>
           ))}
@@ -66,4 +66,5 @@ const styles = StyleSheet.create({
   statusTextWrap: { flex: 1 },
   subtitle: { color: premiumAuthTheme.muted, fontSize: 14, fontWeight: "700", lineHeight: 20 },
   title: { color: premiumAuthTheme.text, fontSize: 28, fontWeight: "900", letterSpacing: -0.7 },
+  yellow: { backgroundColor: premiumAuthTheme.warning },
 });

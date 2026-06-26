@@ -1,14 +1,47 @@
 import { z } from "zod";
 
+export const registrationRoles = [
+  "Doctor",
+  "Cardiologist",
+  "Resident Physician",
+  "Medical Student",
+  "Nurse",
+  "Technician",
+  "Occupational Health Physician",
+  "Administrator",
+] as const;
+
+export const accountTypes = ["INDIVIDUAL", "ORGANIZATION"] as const;
+
+export const organizationTypes = [
+  "Hospital",
+  "Clinic",
+  "Company",
+  "Occupational Health Center",
+  "University",
+  "Medical School",
+  "Healthcare Network",
+  "Government Institution",
+] as const;
+
 export const registerSchema = z.object({
+  accountType: z.enum(accountTypes).default("INDIVIDUAL"),
   email: z.string().email().optional(),
   institution: z.string().trim().max(120).optional(),
   name: z.string().trim().min(2).max(120),
+  organizationCity: z.string().trim().max(120).optional(),
+  organizationCountry: z.string().trim().max(120).optional(),
+  organizationName: z.string().trim().max(160).optional(),
+  organizationType: z.enum(organizationTypes).optional(),
   password: z.string().min(8).max(128).optional(),
   phoneNumber: z.string().trim().min(8).max(24).optional(),
   role: z.enum(["admin", "corporate_client", "doctor", "student", "user"]).default("user"),
+  registrationRole: z.enum(registrationRoles),
   specialization: z.string().trim().max(120).optional(),
-}).refine((body) => Boolean(body.email || body.phoneNumber), { message: "Email or phone number is required." });
+}).refine((body) => Boolean(body.email || body.phoneNumber), { message: "Email or phone number is required." })
+  .refine((body) => body.accountType === "INDIVIDUAL" || Boolean(body.organizationName && body.organizationType && body.organizationCountry && body.organizationCity), {
+    message: "Organization name, type, country, and city are required for organization accounts.",
+  });
 
 export const loginSchema = z.object({
   email: z.string().email(),

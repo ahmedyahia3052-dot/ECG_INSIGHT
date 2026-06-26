@@ -83,6 +83,24 @@ authRouter.post("/phone/verify", validateBody(verifyPhoneOtpSchema), async (req,
   }
 });
 
+authRouter.get("/oauth/providers", (_req, res) => {
+  const providers = [
+    {
+      configured: Boolean(process.env.GOOGLE_OAUTH_CLIENT_ID),
+      provider: "GOOGLE",
+    },
+    {
+      configured: Boolean(process.env.APPLE_OAUTH_CLIENT_ID),
+      provider: "APPLE",
+    },
+    {
+      configured: Boolean(process.env.MICROSOFT_OAUTH_CLIENT_ID),
+      provider: "MICROSOFT",
+    },
+  ];
+  res.json({ providers });
+});
+
 authRouter.post("/oauth/login", validateBody(oauthLoginSchema), async (req, res, next) => {
   try {
     res.json(await oauthLogin(req.body, req, res));

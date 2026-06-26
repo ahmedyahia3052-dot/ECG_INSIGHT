@@ -136,11 +136,13 @@ function AnimatedMedicalBackground() {
 export function PremiumAuthShell({
   children,
   eyebrow,
+  maxContentWidth = 480,
   subtitle,
   title,
 }: {
   children: React.ReactNode;
   eyebrow?: string;
+  maxContentWidth?: number;
   subtitle: string;
   title: string;
 }) {
@@ -156,7 +158,7 @@ export function PremiumAuthShell({
         showsVerticalScrollIndicator={false}
         style={styles.contentLayer}
       >
-        <View style={styles.authPanel}>
+        <View style={[styles.authPanel, { maxWidth: maxContentWidth }]}>
           <View style={styles.shellBrand}>
             <View style={styles.logo}>
               <Feather name="activity" size={22} color="#03131B" />
@@ -342,7 +344,7 @@ const styles = StyleSheet.create({
   buttonText: { fontSize: 14, fontWeight: "900" },
   buttonTextPrimary: { color: "#03131B" },
   buttonTextSecondary: { color: authTheme.text },
-  card: { backgroundColor: "rgba(8,18,35,0.68)", borderColor: "rgba(226,232,240,0.16)", borderRadius: 28, borderWidth: 1, maxWidth: 480, overflow: "hidden", shadowColor: "#000", shadowOpacity: 0.34, shadowRadius: 34, width: "100%" },
+  card: { backgroundColor: "rgba(8,18,35,0.68)", borderColor: "rgba(226,232,240,0.16)", borderRadius: 28, borderWidth: 1, maxWidth: 480, overflow: "visible", shadowColor: "#000", shadowOpacity: 0.34, shadowRadius: 34, width: "100%" },
   cardContent: { gap: 18, padding: 26, position: "relative", zIndex: 2 },
   checkbox: { alignItems: "center", borderColor: authTheme.border, borderRadius: 7, borderWidth: 1, height: 22, justifyContent: "center", width: 22 },
   checkboxChecked: { backgroundColor: authTheme.cyan, borderColor: authTheme.cyan },

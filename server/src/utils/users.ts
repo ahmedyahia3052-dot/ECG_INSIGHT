@@ -69,6 +69,7 @@ export function serializeUser(
   user: Pick<
     User,
     | "avatarInitials"
+    | "accountType"
     | "email"
     | "emailVerified"
     | "id"
@@ -79,12 +80,14 @@ export function serializeUser(
     | "lifetimeGrantedBy"
     | "licenseNumber"
     | "name"
+    | "organizationId"
     | "ownerPasswordSetupRequired"
     | "ownerTwoFactorRequired"
     | "protectedOwner"
     | "role"
     | "phoneNumber"
     | "phoneVerified"
+    | "registrationRole"
     | "specialization"
     | "username"
     | "createdAt"
@@ -95,6 +98,7 @@ export function serializeUser(
 ) {
   return {
     avatarInitials: user.avatarInitials,
+    accountType: user.accountType,
     caseCount: 0,
     email: user.email,
     emailVerified: user.emailVerified,
@@ -109,12 +113,14 @@ export function serializeUser(
     lifetimeGrantedBy: user.lifetimeGrantedBy ?? undefined,
     licenseNumber: user.licenseNumber ?? undefined,
     name: user.name,
+    organizationId: user.organizationId ?? undefined,
     ownerPasswordSetupRequired: user.ownerPasswordSetupRequired,
     ownerTwoFactorRequired: user.ownerTwoFactorRequired,
     protectedOwner: user.protectedOwner,
     phoneNumber: user.phoneNumber ?? undefined,
     phoneVerified: user.phoneVerified,
     role: toApiRole(user.role),
+    registrationRole: user.registrationRole ?? undefined,
     specialization: user.specialization ?? undefined,
     subscriptionTier: user.subscription ? publicUserTier(user.subscription.tier) : "free",
     username: user.username ?? undefined,

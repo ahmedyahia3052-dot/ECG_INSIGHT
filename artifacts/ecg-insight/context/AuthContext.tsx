@@ -9,11 +9,14 @@ export interface User {
   id: string;
   name: string;
   email: string;
+  accountType?: "INDIVIDUAL" | "ORGANIZATION";
   phoneNumber?: string;
   phoneVerified?: boolean;
   role: UserRole;
   specialization?: string;
   institution?: string;
+  organizationId?: string;
+  registrationRole?: string;
   avatarInitials: string;
   emailVerified?: boolean;
   isActive?: boolean;
@@ -54,7 +57,15 @@ interface AuthContextType {
     role: "admin" | "corporate_client" | "doctor" | "student" | "user",
     phoneNumber?: string,
     institution?: string,
-    specialization?: string
+    specialization?: string,
+    registration?: {
+      accountType?: "INDIVIDUAL" | "ORGANIZATION";
+      organizationCity?: string;
+      organizationCountry?: string;
+      organizationName?: string;
+      organizationType?: string;
+      registrationRole?: string;
+    }
   ) => Promise<{ success: boolean; error?: string }>;
   requestPhoneOtp: (phoneNumber: string, purpose?: "LOGIN" | "REGISTER", name?: string) => Promise<{ success: boolean; otp?: string; error?: string }>;
   verifyPhoneOtp: (phoneNumber: string, otp: string, rememberMe?: boolean) => Promise<{ success: boolean; error?: string }>;
@@ -265,11 +276,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       role: "admin" | "corporate_client" | "doctor" | "student" | "user",
       phoneNumber?: string,
       institution?: string,
-      specialization?: string
+      specialization?: string,
+      registration?: {
+        accountType?: "INDIVIDUAL" | "ORGANIZATION";
+        organizationCity?: string;
+        organizationCountry?: string;
+        organizationName?: string;
+        organizationType?: string;
+        registrationRole?: string;
+      }
     ) => {
       try {
         const payload = await apiRequest<AuthPayload>("/auth/register", {
-          body: JSON.stringify({ email: email || undefined, institution, name, password: password || undefined, phoneNumber, role, specialization }),
+          body: JSON.stringify({ email: email || undefined, institution, name, password: password || undefined, phoneNumber, role, specialization, ...registration }),
           method: "POST",
         });
         setState({
