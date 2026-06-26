@@ -40,6 +40,13 @@ node_modules
 /playwright-report
 /test-results
 /uploads
+/ai-engine/data
+/ai-engine/runs
+/ai-engine/artifacts
+/ai-engine/.venv
+/ai-engine/**/*.pt
+/ai-engine/**/*.pth
+/ai-engine/**/*.onnx
 /libpeerconnection.log
 npm-debug.log
 yarn-error.log
