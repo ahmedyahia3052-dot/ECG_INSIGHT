@@ -34,10 +34,10 @@ class TorchECGDataset(Dataset[tuple[torch.Tensor, torch.Tensor]]):
         return np.pad(signal, ((0, 0), (0, pad_width)), mode="constant").astype(np.float32)
 
 
-def load_dataset(name: str, root: str | Path, manifest: str | None = None):
+def load_dataset(name: str, root: str | Path, manifest: str | None = None, split: str | None = None):
     normalized = name.lower()
     if normalized == "ptb-xl":
-        return PTBXLDataset(root, manifest or "ptbxl_manifest.csv")
+        return PTBXLDataset(root, manifest or "ptbxl_manifest.csv", split=split)
     if normalized == "mit-bih":
         return MITBIHArrhythmiaDataset(root, manifest or "mitbih_manifest.csv")
     if normalized == "physionet":

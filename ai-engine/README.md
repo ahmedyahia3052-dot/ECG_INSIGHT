@@ -37,6 +37,14 @@ Example smoke benchmark once a local manifest exists:
 python -m training.benchmark --dataset ptb-xl --data-root data/ptb-xl-sample --model cnn --epochs 1
 ```
 
+First real PTB-XL small-subset model workflow:
+
+```bash
+python -m training.train_first_ptbxl_model --prepare --max-records 40 --epochs 4 --batch-size 4
+```
+
+This downloads a tiny PTB-XL subset, writes a 70/15/15 manifest, trains the baseline CNN, evaluates test metrics, exports `model.onnx`, and saves `sample_predictions.json`.
+
 ## Current Status
 
 Scaffold only. Models, training weights, dataset manifests, and production integration are intentionally absent until clinical validation assets are available.

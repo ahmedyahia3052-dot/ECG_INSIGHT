@@ -8,29 +8,28 @@ class PTBXLDataset:
     """PTB-XL manifest loader.
 
     Expected manifest columns:
-    record_id,signal_path,labels,sampling_rate_hz
+    record_id,signal_path,labels,sampling_rate_hz,split
 
     Labels are pipe-separated and mapped to the configured label list.
     """
 
     label_names = [
-        "normal_sinus_rhythm",
+        "normal_ecg",
         "atrial_fibrillation",
-        "atrial_flutter",
-        "pvc",
-        "pac",
-        "rbbb",
-        "lbbb",
-        "lvh",
-        "rvh",
-        "stemi",
-        "nstemi_pattern",
-        "qt_prolongation",
+        "left_bundle_branch_block",
+        "right_bundle_branch_block",
+        "myocardial_infarction",
     ]
 
-    def __init__(self, root: str | Path, manifest: str | Path = "ptbxl_manifest.csv") -> None:
+    def __init__(
+        self,
+        root: str | Path,
+        manifest: str | Path = "ptbxl_manifest.csv",
+        split: str | None = None,
+    ) -> None:
         self.root = Path(root)
-        self.rows = list(csv.DictReader((self.root / manifest).open(newline="", encoding="utf-8")))
+        rows = list(csv.DictReader((self.root / manifest).open(newline="", encoding="utf-8")))
+        self.rows = [row for row in rows if split is None or row.get("split") == split]
 
     def __len__(self) -> int:
         return len(self.rows)

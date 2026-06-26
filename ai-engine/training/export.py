@@ -19,19 +19,19 @@ def export(args: argparse.Namespace) -> None:
     output_dir.mkdir(parents=True, exist_ok=True)
 
     traced = torch.jit.trace(model, example)
-    traced.save(str(output_dir / "ecg_model.torchscript.pt"))
+    traced.save(str(output_dir / "model.torchscript.pt"))
 
     torch.onnx.export(
         model,
         example,
-        output_dir / "ecg_model.onnx",
+        output_dir / "model.onnx",
         input_names=["ecg"],
         output_names=["logits"],
         dynamic_axes={"ecg": {0: "batch"}, "logits": {0: "batch"}},
         opset_version=17,
     )
 
-    print({"onnx": str(output_dir / "ecg_model.onnx"), "torchscript": str(output_dir / "ecg_model.torchscript.pt")})
+    print({"onnx": str(output_dir / "model.onnx"), "torchscript": str(output_dir / "model.torchscript.pt")})
 
 
 def parse_args() -> argparse.Namespace:

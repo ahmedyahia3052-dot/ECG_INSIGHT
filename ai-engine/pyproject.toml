@@ -2,7 +2,7 @@
 name = "ecg-insight-ai-engine"
 version = "0.1.0"
 description = "Standalone ECG Insight AI Engine scaffold for future validated ECG inference."
-requires-python = ">=3.11"
+requires-python = ">=3.11,<3.13"
 dependencies = [
   "fastapi>=0.115.0",
   "numpy>=2.0.0",
@@ -10,6 +10,7 @@ dependencies = [
   "pydantic>=2.8.0",
   "pydantic-settings>=2.4.0",
   "python-multipart>=0.0.9",
+  "tensorboard>=2.18.0",
   "torch>=2.4.0",
   "uvicorn[standard]>=0.30.0",
 ]

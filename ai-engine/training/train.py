@@ -4,6 +4,10 @@ from pathlib import Path
 import torch
 from torch import nn
 from torch.utils.data import DataLoader, random_split
+try:
+    from torch.utils.tensorboard import SummaryWriter
+except ImportError:  # pragma: no cover - tensorboard is optional until dependencies are installed
+    SummaryWriter = None
 
 from models.cnn import BaselineECGCNN
 from models.hybrid_cnn_transformer import HybridCNNTransformer
@@ -19,11 +23,18 @@ def build_model(name: str, num_classes: int) -> nn.Module:
 
 
 def train(args: argparse.Namespace) -> None:
-    source_dataset = load_dataset(args.dataset, args.data_root, args.manifest)
-    dataset = TorchECGDataset(source_dataset, max_samples=args.max_samples)
-    validation_size = max(1, int(len(dataset) * args.validation_fraction))
-    train_size = len(dataset) - validation_size
-    train_dataset, validation_dataset = random_split(dataset, [train_size, validation_size])
+    train_source = load_dataset(args.dataset, args.data_root, args.manifest, split="train")
+    validation_source = load_dataset(args.dataset, args.data_root, args.manifest, split="validation")
+    if len(train_source) and len(validation_source):
+        source_dataset = train_source
+        train_dataset = TorchECGDataset(train_source, max_samples=args.max_samples)
+        validation_dataset = TorchECGDataset(validation_source, max_samples=args.max_samples)
+    else:
+        source_dataset = load_dataset(args.dataset, args.data_root, args.manifest)
+        dataset = TorchECGDataset(source_dataset, max_samples=args.max_samples)
+        validation_size = max(1, int(len(dataset) * args.validation_fraction))
+        train_size = len(dataset) - validation_size
+        train_dataset, validation_dataset = random_split(dataset, [train_size, validation_size])
 
     train_loader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True)
     validation_loader = DataLoader(validation_dataset, batch_size=args.batch_size)
@@ -31,6 +42,11 @@ def train(args: argparse.Namespace) -> None:
     model = build_model(args.model, num_classes=len(source_dataset.label_names))
     optimizer = torch.optim.AdamW(model.parameters(), lr=args.learning_rate)
     criterion = nn.BCEWithLogitsLoss()
+    output_dir = Path(args.output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+    writer = SummaryWriter(log_dir=str(output_dir / "tensorboard")) if SummaryWriter else None
+    best_validation_loss = float("inf")
+    epochs_without_improvement = 0
 
     for epoch in range(args.epochs):
         model.train()
@@ -48,27 +64,42 @@ def train(args: argparse.Namespace) -> None:
         with torch.no_grad():
             for signals, labels in validation_loader:
                 validation_loss += float(criterion(model(signals), labels).item())
+        train_loss = running_loss / max(len(train_loader), 1)
+        validation_loss = validation_loss / max(len(validation_loader), 1)
+        if writer:
+            writer.add_scalar("loss/train", train_loss, epoch + 1)
+            writer.add_scalar("loss/validation", validation_loss, epoch + 1)
 
         print(
             {
                 "epoch": epoch + 1,
-                "train_loss": running_loss / max(len(train_loader), 1),
-                "validation_loss": validation_loss / max(len(validation_loader), 1),
+                "train_loss": train_loss,
+                "validation_loss": validation_loss,
             },
         )
 
-    output_dir = Path(args.output_dir)
-    output_dir.mkdir(parents=True, exist_ok=True)
-    torch.save(
-        {
+        checkpoint = {
             "model_state_dict": model.state_dict(),
             "model": args.model,
             "dataset": args.dataset,
             "label_names": source_dataset.label_names,
             "max_samples": args.max_samples,
-        },
-        output_dir / "checkpoint.pt",
-    )
+            "epoch": epoch + 1,
+            "validation_loss": validation_loss,
+        }
+        torch.save(checkpoint, output_dir / "checkpoint.pt")
+        if validation_loss < best_validation_loss - args.min_delta:
+            best_validation_loss = validation_loss
+            epochs_without_improvement = 0
+            torch.save(checkpoint, output_dir / "best_checkpoint.pt")
+        else:
+            epochs_without_improvement += 1
+            if epochs_without_improvement >= args.patience:
+                print({"early_stopping": True, "epoch": epoch + 1})
+                break
+    if writer:
+        writer.flush()
+        writer.close()
 
 
 def parse_args() -> argparse.Namespace:
@@ -82,6 +113,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--learning-rate", type=float, default=1e-3)
     parser.add_argument("--validation-fraction", type=float, default=0.2)
     parser.add_argument("--max-samples", type=int, default=5000)
+    parser.add_argument("--patience", type=int, default=3)
+    parser.add_argument("--min-delta", type=float, default=0.0)
     parser.add_argument("--output-dir", default="runs/ecg-baseline")
     return parser.parse_args()
 

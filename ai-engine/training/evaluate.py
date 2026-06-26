@@ -13,7 +13,9 @@ from training.train import build_model
 
 def evaluate(args: argparse.Namespace) -> None:
     checkpoint = torch.load(args.checkpoint, map_location="cpu")
-    source_dataset = load_dataset(args.dataset, args.data_root, args.manifest)
+    source_dataset = load_dataset(args.dataset, args.data_root, args.manifest, split=args.split)
+    if not len(source_dataset):
+        source_dataset = load_dataset(args.dataset, args.data_root, args.manifest)
     dataset = TorchECGDataset(source_dataset, max_samples=int(checkpoint.get("max_samples", 5000)))
     loader = DataLoader(dataset, batch_size=args.batch_size)
 
@@ -46,6 +48,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--dataset", choices=["ptb-xl", "mit-bih", "physionet"], required=True)
     parser.add_argument("--data-root", required=True)
     parser.add_argument("--manifest")
+    parser.add_argument("--split", default="test")
     parser.add_argument("--model", choices=["cnn", "hybrid"], default="cnn")
     parser.add_argument("--batch-size", type=int, default=8)
     parser.add_argument("--threshold", type=float, default=0.5)
