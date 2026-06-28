@@ -36,6 +36,14 @@ function organizationTypeForRegistration(type?: string) {
   }
 }
 
+function registrationRoleFor(role: string, explicitRole?: string) {
+  if (explicitRole) return explicitRole;
+  if (role === "doctor") return "Doctor";
+  if (role === "student") return "Medical Student";
+  if (role === "admin") return "Administrator";
+  return "Doctor";
+}
+
 function assertPasswordPolicy(password: string) {
   const strongEnough =
     password.length >= 12 &&
@@ -273,9 +281,9 @@ export async function registerUser(
         organizationId: organization?.id,
         passwordHash,
         phoneNumber,
-        registrationRole: body.registrationRole,
+        registrationRole: registrationRoleFor(body.role, body.registrationRole),
         role: fromApiRole(body.role),
-        specialization: body.specialization ?? body.registrationRole,
+        specialization: body.specialization ?? registrationRoleFor(body.role, body.registrationRole),
         subscription: {
           create: {
             tier: "FREE",

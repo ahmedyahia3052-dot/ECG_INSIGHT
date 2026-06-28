@@ -36,7 +36,7 @@ export const registerSchema = z.object({
   password: z.string().min(8).max(128).optional(),
   phoneNumber: z.string().trim().min(8).max(24).optional(),
   role: z.enum(["admin", "corporate_client", "doctor", "student", "user"]).default("user"),
-  registrationRole: z.enum(registrationRoles),
+  registrationRole: z.enum(registrationRoles).optional(),
   specialization: z.string().trim().max(120).optional(),
 }).refine((body) => Boolean(body.email || body.phoneNumber), { message: "Email or phone number is required." })
   .refine((body) => body.accountType === "INDIVIDUAL" || Boolean(body.organizationName && body.organizationType && body.organizationCountry && body.organizationCity), {
