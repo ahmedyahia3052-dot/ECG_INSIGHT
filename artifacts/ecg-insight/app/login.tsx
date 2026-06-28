@@ -1,12 +1,12 @@
 import { Feather } from "@expo/vector-icons";
 import { Link, useRouter } from "expo-router";
 import React, { useEffect, useState } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Linking, Pressable, StyleSheet, Text, View } from "react-native";
 import { z } from "zod";
 
 import { AuthCard, AuthMessage, AuthPrimaryButton, AuthTextField, AuthToggle, premiumAuthTheme, PremiumAuthShell } from "@/components/auth/PremiumAuth";
 import { useAuth } from "@/context/AuthContext";
-import { assertOAuthProviderReady, type OAuthProvider } from "@/services/oauth";
+import { assertOAuthProviderReady, oauthStartUrl, type OAuthProvider } from "@/services/oauth";
 
 const loginSchema = z.object({
   email: z.string().trim().min(1, "Email is required.").email("Enter a valid email address."),
@@ -53,7 +53,7 @@ export default function LoginScreen() {
     setOauthLoading(provider);
     try {
       await assertOAuthProviderReady(provider);
-      setError(`${provider} OAuth is configured. Complete native provider credential exchange before calling /auth/oauth/login.`);
+      await Linking.openURL(oauthStartUrl(provider));
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : `${provider} sign-in is unavailable.`);
     } finally {

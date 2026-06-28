@@ -3,6 +3,7 @@ import { prisma } from "../config/prisma";
 import { requireAuth } from "../middleware/auth";
 import { validateBody } from "../middleware/validate";
 import { serializeUser } from "../utils/users";
+import { completeOAuth, oauthProviderStatuses, startOAuth } from "./oauth-passport";
 import {
   changePasswordSchema,
   forgotPasswordSchema,
@@ -84,22 +85,15 @@ authRouter.post("/phone/verify", validateBody(verifyPhoneOtpSchema), async (req,
 });
 
 authRouter.get("/oauth/providers", (_req, res) => {
-  const providers = [
-    {
-      configured: Boolean(process.env.GOOGLE_OAUTH_CLIENT_ID),
-      provider: "GOOGLE",
-    },
-    {
-      configured: Boolean(process.env.APPLE_OAUTH_CLIENT_ID),
-      provider: "APPLE",
-    },
-    {
-      configured: Boolean(process.env.MICROSOFT_OAUTH_CLIENT_ID),
-      provider: "MICROSOFT",
-    },
-  ];
-  res.json({ providers });
+  res.json({ providers: oauthProviderStatuses() });
 });
+
+authRouter.get("/google", startOAuth("GOOGLE"));
+authRouter.get("/google/callback", ...completeOAuth("GOOGLE"));
+authRouter.get("/apple", startOAuth("APPLE"));
+authRouter.get("/apple/callback", ...completeOAuth("APPLE"));
+authRouter.get("/microsoft", startOAuth("MICROSOFT"));
+authRouter.get("/microsoft/callback", ...completeOAuth("MICROSOFT"));
 
 authRouter.post("/oauth/login", validateBody(oauthLoginSchema), async (req, res, next) => {
   try {

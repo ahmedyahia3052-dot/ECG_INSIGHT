@@ -46,7 +46,7 @@ const registerSchema = z.object({
   organizationName: z.string().trim().optional(),
   organizationType: z.enum(organizationTypes).optional(),
   password: z.string().min(12, "Password must be at least 12 characters.").regex(/[A-Z]/, "Password must include an uppercase letter.").regex(/[a-z]/, "Password must include a lowercase letter.").regex(/\d/, "Password must include a number.").regex(/[^A-Za-z0-9]/, "Password must include a symbol."),
-  role: z.string().min(1, "Role is required."),
+  role: z.string().min(1, "Role is required.").refine((value) => roleOptions.some((item) => item.label === value), "Select a supported role."),
 }).refine((value) => value.password === value.confirmPassword, {
   message: "Passwords do not match.",
   path: ["confirmPassword"],
@@ -74,11 +74,14 @@ function SelectField({
   }, [value]);
 
   return (
-    <View style={styles.selectWrap}>
+    <View style={[styles.selectWrap, open && styles.selectWrapOpen]}>
       <AuthTextField
         icon="search"
         label={label}
-        onBlur={() => setTimeout(() => setOpen(false), 120)}
+        onBlur={() => setTimeout(() => {
+          setOpen(false);
+          setQuery(value);
+        }, 120)}
         onChangeText={(text) => {
           setQuery(text);
           setOpen(true);
@@ -276,6 +279,7 @@ const styles = StyleSheet.create({
   menuItem: { paddingHorizontal: 12, paddingVertical: 9 },
   menuText: { color: premiumAuthTheme.text, fontSize: 13, fontWeight: "800" },
   selectWrap: { position: "relative", zIndex: 10 },
+  selectWrapOpen: { zIndex: 100 },
   subtitle: { color: premiumAuthTheme.muted, fontSize: 13, fontWeight: "700", lineHeight: 18 },
   title: { color: premiumAuthTheme.text, fontSize: 26, fontWeight: "900", letterSpacing: -0.7 },
 });

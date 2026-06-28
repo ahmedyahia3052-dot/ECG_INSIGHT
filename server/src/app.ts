@@ -3,14 +3,17 @@ import cors from "cors";
 import express from "express";
 import rateLimit from "express-rate-limit";
 import helmet from "helmet";
+import passport from "passport";
 import { env } from "./config/env";
 import { prisma } from "./config/prisma";
+import { configureOAuthPassport } from "./auth/oauth-passport";
 import { errorHandler, notFoundHandler } from "./middleware/error";
 import { apiSecurityMiddleware } from "./middleware/api-security";
 import { inputSanitizer } from "./middleware/input-sanitizer";
 import { metricsSnapshot, requestMetrics } from "./middleware/observability";
 import { requestContext } from "./middleware/request-context";
 import { modulesRouter } from "./modules";
+import { productionReadinessSnapshot } from "./modules/health/health.service";
 import { log } from "./utils/logger";
 
 const developmentOrigins = ["http://localhost:8082", "http://localhost:8081", "http://localhost:5173", "http://localhost:3000"];
@@ -38,6 +41,7 @@ function allowedOrigins() {
 export function createApp() {
   const app = express();
   const corsOrigins = allowedOrigins();
+  configureOAuthPassport();
 
   app.disable("x-powered-by");
   if (env.TRUST_PROXY) app.set("trust proxy", 1);
@@ -76,19 +80,24 @@ export function createApp() {
   app.use(cookieParser());
   app.use(express.json({ limit: "1mb" }));
   app.use(express.urlencoded({ extended: true }));
+  app.use(passport.initialize());
   app.use(inputSanitizer);
   app.use(apiSecurityMiddleware);
   app.use(requestMetrics);
 
-  app.get("/health", (req, res) => {
-    res.json({
-      environment: env.NODE_ENV,
-      ok: true,
-      requestId: req.requestId,
-      service: "ecg-insight-api",
-      timestamp: new Date().toISOString(),
-      uptimeSeconds: Math.round(process.uptime()),
-    });
+  app.get("/health", async (req, res, next) => {
+    try {
+      const snapshot = await productionReadinessSnapshot();
+      res.status(snapshot.ok ? 200 : 503).json({
+        ...snapshot,
+        requestId: req.requestId,
+        service: "api-gateway",
+        status: snapshot.ok ? "ok" : snapshot.status,
+        uptimeSeconds: Math.round(process.uptime()),
+      });
+    } catch (error) {
+      next(error);
+    }
   });
   app.get("/liveness", (req, res) => {
     res.json({ ok: true, requestId: req.requestId, uptimeSeconds: Math.round(process.uptime()) });

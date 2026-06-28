@@ -58,6 +58,10 @@ const envSchema = z
     BACKUP_RETENTION_DAYS: z.coerce.number().int().positive().default(30),
     COOKIE_DOMAIN: z.string().optional(),
     EXCEPTION_MONITORING_DSN: optionalUrl,
+    APPLE_OAUTH_CLIENT_ID: z.string().optional(),
+    APPLE_OAUTH_KEY_ID: z.string().optional(),
+    APPLE_OAUTH_PRIVATE_KEY: z.string().optional(),
+    APPLE_OAUTH_TEAM_ID: z.string().optional(),
     DATABASE_URL: z.string().url({
       message: "DATABASE_URL must be a valid PostgreSQL connection URL.",
     }),
@@ -70,8 +74,13 @@ const envSchema = z
     JWT_SECRET: z.string().min(32, {
       message: "JWT_SECRET must be at least 32 characters.",
     }),
+    GOOGLE_OAUTH_CLIENT_ID: z.string().optional(),
+    GOOGLE_OAUTH_CLIENT_SECRET: z.string().optional(),
     LOG_LEVEL: z.enum(["debug", "info", "warn", "error"]).default("info"),
+    MICROSOFT_OAUTH_CLIENT_ID: z.string().optional(),
+    MICROSOFT_OAUTH_CLIENT_SECRET: z.string().optional(),
     NODE_ENV: z.enum(["development", "test", "production"]),
+    OAUTH_CALLBACK_BASE_URL: optionalUrl,
     PORT: z.coerce.number().int().positive({
       message: "PORT must be a positive integer.",
     }),

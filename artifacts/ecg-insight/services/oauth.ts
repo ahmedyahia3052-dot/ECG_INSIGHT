@@ -1,4 +1,4 @@
-import { apiRequest } from "./api";
+import { apiRequest, API_URL } from "./api";
 
 export type OAuthProvider = "APPLE" | "GOOGLE" | "MICROSOFT";
 
@@ -15,7 +15,11 @@ export async function assertOAuthProviderReady(provider: OAuthProvider) {
   const { providers } = await listOAuthProviders();
   const status = providers.find((item) => item.provider === provider);
   if (!status?.configured) {
-    throw new Error(`${provider} sign-in is awaiting production OAuth client keys.`);
+    throw new Error("OAuth provider not configured by administrator");
   }
   return status;
+}
+
+export function oauthStartUrl(provider: OAuthProvider) {
+  return `${API_URL}/auth/${provider.toLowerCase()}`;
 }
