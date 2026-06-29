@@ -11,6 +11,15 @@ import { AppError } from "../../middleware/error";
 import { assertResourceAccess, canAccessCase, canAccessPatient } from "../../utils/resource-access";
 
 export const copilotRouter = Router();
+export const registeredCopilotRoutes = [
+  "GET /api/copilot/conversations",
+  "GET /api/copilot/conversations/:conversationId",
+  "PATCH /api/copilot/conversations/:conversationId/rename",
+  "PATCH /api/copilot/conversations/:conversationId/pin",
+  "PATCH /api/copilot/conversations/:conversationId/favorite",
+  "PATCH /api/copilot/conversations/:conversationId/archive",
+  "DELETE /api/copilot/conversations/:conversationId",
+] as const;
 
 copilotRouter.use(requireAuth);
 
@@ -876,7 +885,7 @@ copilotRouter.post("/conversations/:conversationId/duplicate", async (req, res, 
   }
 });
 
-copilotRouter.post("/conversations/:conversationId/archive", async (req, res, next) => {
+copilotRouter.patch("/conversations/:conversationId/archive", async (req, res, next) => {
   try {
     const current = await mutableConversationForUser(String(req.params.conversationId), req.auth!.id);
     const archivedAt = current.archivedAt ? null : new Date();
@@ -884,7 +893,7 @@ copilotRouter.post("/conversations/:conversationId/archive", async (req, res, ne
       data: archivedAt ? { archivedAt, favorite: false, isFavorite: false, isPinned: false } : { archivedAt: null, lastOpenedAt: new Date() },
       where: { id: current.id },
     });
-    res.json({ conversation: serializeConversation(conversation) });
+    res.json({ conversation: serializeConversation(conversation), success: true });
   } catch (error) {
     next(error);
   }
@@ -929,20 +938,7 @@ copilotRouter.patch("/conversations/:conversationId/rename", async (req, res, ne
       data: { title: body.title },
       where: { id: current.id },
     });
-    res.json({ conversation: serializeConversation(conversation) });
-  } catch (error) {
-    next(error);
-  }
-});
-
-copilotRouter.post("/conversations/:conversationId/pin", async (req, res, next) => {
-  try {
-    const current = await mutableConversationForUser(String(req.params.conversationId), req.auth!.id);
-    const conversation = await prisma.copilotConversation.update({
-      data: { isPinned: !current.isPinned },
-      where: { id: current.id },
-    });
-    res.json({ conversation: serializeConversation(conversation) });
+    res.json({ conversation: serializeConversation(conversation), success: true });
   } catch (error) {
     next(error);
   }
@@ -956,21 +952,7 @@ copilotRouter.patch("/conversations/:conversationId/pin", async (req, res, next)
       data: { isPinned: body.isPinned },
       where: { id: current.id },
     });
-    res.json({ conversation: serializeConversation(conversation) });
-  } catch (error) {
-    next(error);
-  }
-});
-
-copilotRouter.post("/conversations/:conversationId/favorite", async (req, res, next) => {
-  try {
-    const current = await mutableConversationForUser(String(req.params.conversationId), req.auth!.id);
-    const isFavorite = !(current.isFavorite || current.favorite);
-    const conversation = await prisma.copilotConversation.update({
-      data: { favorite: isFavorite, isFavorite },
-      where: { id: current.id },
-    });
-    res.json({ conversation: serializeConversation(conversation) });
+    res.json({ conversation: serializeConversation(conversation), success: true });
   } catch (error) {
     next(error);
   }
@@ -984,7 +966,7 @@ copilotRouter.patch("/conversations/:conversationId/favorite", async (req, res, 
       data: { favorite: body.isFavorite, isFavorite: body.isFavorite },
       where: { id: current.id },
     });
-    res.json({ conversation: serializeConversation(conversation) });
+    res.json({ conversation: serializeConversation(conversation), success: true });
   } catch (error) {
     next(error);
   }

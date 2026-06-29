@@ -99,10 +99,10 @@ for (const marker of [
   "prisma.eCGCase.findMany",
   "copilotRouter.post(\"/conversations/:conversationId/restore\"",
   "copilotRouter.patch(\"/conversations/:conversationId/rename\"",
-  "copilotRouter.post(\"/conversations/:conversationId/pin\"",
   "copilotRouter.patch(\"/conversations/:conversationId/pin\"",
-  "copilotRouter.post(\"/conversations/:conversationId/favorite\"",
   "copilotRouter.patch(\"/conversations/:conversationId/favorite\"",
+  "copilotRouter.patch(\"/conversations/:conversationId/archive\"",
+  "registeredCopilotRoutes",
   "mutableConversationForUser",
   "renameConversationSchema",
   "pinConversationSchema",
@@ -119,9 +119,10 @@ for (const marker of [
   assert(routes.includes(marker), `Copilot API stabilization marker missing: ${marker}`);
 }
 
-for (const marker of ["isPinned", "isFavorite", "archivedAt", "deletedAt", "lastOpenedAt", "restoreCopilotConversation", "renameConversation", "togglePin", "toggleFavorite", "toggleArchive", "deleteConversation", "renameCopilotConversation", "pinCopilotConversation", "favoriteCopilotConversation", "uploadCopilotAttachment", "streamCopilotMessage"]) {
+for (const marker of ["isPinned", "isFavorite", "archivedAt", "deletedAt", "lastOpenedAt", "restoreCopilotConversation", "renameConversation", "deleteConversation", "renameCopilotConversation", "pinCopilotConversation", "favoriteCopilotConversation", "archiveCopilotConversation", "uploadCopilotAttachment", "streamCopilotMessage"]) {
   assert(service.includes(marker), `Copilot service stabilization marker missing: ${marker}`);
 }
+assert(!service.includes("togglePin") && !service.includes("toggleFavorite") && !service.includes("toggleArchive"), "Copilot service must not keep deprecated POST toggle helpers.");
 
 assert(!workspace.includes("onPress={() => {}}"), "Workspace must not contain dead actions.");
 assert(!workspace.includes("title.replace(\" copy\""), "Rename action must not fake-copy titles.");

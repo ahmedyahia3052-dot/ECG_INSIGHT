@@ -13,6 +13,7 @@ import { inputSanitizer } from "./middleware/input-sanitizer";
 import { metricsSnapshot, requestMetrics } from "./middleware/observability";
 import { requestContext } from "./middleware/request-context";
 import { modulesRouter } from "./modules";
+import { registeredCopilotRoutes } from "./modules/copilot/copilot.routes";
 import { productionReadinessSnapshot } from "./modules/health/health.service";
 import { log } from "./utils/logger";
 
@@ -123,6 +124,7 @@ export function createApp() {
 
   app.use("/api", modulesRouter);
   app.use("/api/v1", modulesRouter);
+  log("info", "Registered AI Copilot routes.", { routes: registeredCopilotRoutes });
 
   app.use(notFoundHandler);
   app.use(errorHandler);

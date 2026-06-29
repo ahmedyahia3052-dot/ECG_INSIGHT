@@ -108,32 +108,18 @@ export async function renameConversation(accessToken: string, conversationId: st
 }
 
 export async function pinCopilotConversation(accessToken: string, conversationId: string, isPinned: boolean) {
-  return apiRequest<{ conversation: CopilotConversation }>(`/copilot/conversations/${conversationId}/pin`, {
+  return apiRequest<{ conversation: CopilotConversation; success: boolean }>(`/copilot/conversations/${conversationId}/pin`, {
     accessToken,
     body: JSON.stringify({ isPinned }),
     method: "PATCH",
   });
 }
 
-export async function togglePin(accessToken: string, conversationId: string, _isPinned?: boolean) {
-  return apiRequest<{ conversation: CopilotConversation }>(`/copilot/conversations/${conversationId}/pin`, {
-    accessToken,
-    method: "POST",
-  });
-}
-
 export async function favoriteCopilotConversation(accessToken: string, conversationId: string, isFavorite: boolean) {
-  return apiRequest<{ conversation: CopilotConversation }>(`/copilot/conversations/${conversationId}/favorite`, {
+  return apiRequest<{ conversation: CopilotConversation; success: boolean }>(`/copilot/conversations/${conversationId}/favorite`, {
     accessToken,
     body: JSON.stringify({ isFavorite }),
     method: "PATCH",
-  });
-}
-
-export async function toggleFavorite(accessToken: string, conversationId: string, _isFavorite?: boolean) {
-  return apiRequest<{ conversation: CopilotConversation }>(`/copilot/conversations/${conversationId}/favorite`, {
-    accessToken,
-    method: "POST",
   });
 }
 
@@ -154,11 +140,10 @@ export async function duplicateCopilotConversation(accessToken: string, conversa
 }
 
 export async function archiveCopilotConversation(accessToken: string, conversationId: string) {
-  return toggleArchive(accessToken, conversationId);
-}
-
-export async function toggleArchive(accessToken: string, conversationId: string) {
-  return apiRequest<{ conversation: CopilotConversation }>(`/copilot/conversations/${conversationId}/archive`, { accessToken, method: "POST" });
+  return apiRequest<{ conversation: CopilotConversation; success: boolean }>(`/copilot/conversations/${conversationId}/archive`, {
+    accessToken,
+    method: "PATCH",
+  });
 }
 
 export async function restoreCopilotConversation(accessToken: string, conversationId: string) {

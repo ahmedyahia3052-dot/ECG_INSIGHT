@@ -133,12 +133,12 @@ async function main() {
     assert(created.status === 201, "Create chat must succeed.");
     const conversationId = created.body.conversation.id;
 
-    const renamed = await request<{ conversation: { title: string } }>(`/copilot/conversations/${conversationId}/rename`, {
+    const renamed = await request<{ conversation: { title: string }; success: boolean }>(`/copilot/conversations/${conversationId}/rename`, {
       body: { title: "Renamed pinned favorite chat" },
       method: "PATCH",
       token,
     });
-    assert(renamed.status === 200, "Rename endpoint must persist.");
+    assert(renamed.status === 200 && renamed.body.success, "PATCH /api/copilot/conversations/:id/rename must return 200 and success=true.");
     assert(renamed.body.conversation.title === "Renamed pinned favorite chat", "Rename did not persist.");
 
     const forbiddenRename = await request<{ code: string }>(`/copilot/conversations/${conversationId}/rename`, {
@@ -155,39 +155,47 @@ async function main() {
     });
     assert(missingRename.status === 404, "Missing conversation actions must return 404.");
 
-    const pinned = await request<{ conversation: { isPinned: boolean } }>(`/copilot/conversations/${conversationId}/pin`, { method: "POST", token });
-    assert(pinned.status === 200 && pinned.body.conversation.isPinned, "POST pin must toggle isPinned on.");
-
-    const favorited = await request<{ conversation: { isFavorite: boolean } }>(`/copilot/conversations/${conversationId}/favorite`, { method: "POST", token });
-    assert(favorited.status === 200 && favorited.body.conversation.isFavorite, "POST favorite must toggle isFavorite on.");
-
-    const patchUnpinned = await request<{ conversation: { isPinned: boolean } }>(`/copilot/conversations/${conversationId}/pin`, {
-      body: { isPinned: false },
-      method: "PATCH",
-      token,
-    });
-    assert(patchUnpinned.status === 200 && !patchUnpinned.body.conversation.isPinned, "PATCH pin must persist explicit isPinned=false.");
-
-    const patchPinned = await request<{ conversation: { isPinned: boolean } }>(`/copilot/conversations/${conversationId}/pin`, {
+    const pinned = await request<{ conversation: { isPinned: boolean }; success: boolean }>(`/copilot/conversations/${conversationId}/pin`, {
       body: { isPinned: true },
       method: "PATCH",
       token,
     });
-    assert(patchPinned.status === 200 && patchPinned.body.conversation.isPinned, "PATCH pin must persist explicit isPinned=true.");
+    assert(pinned.status === 200 && pinned.body.success && pinned.body.conversation.isPinned, "PATCH pin must persist isPinned on.");
 
-    const patchUnfavorited = await request<{ conversation: { isFavorite: boolean } }>(`/copilot/conversations/${conversationId}/favorite`, {
-      body: { isFavorite: false },
-      method: "PATCH",
-      token,
-    });
-    assert(patchUnfavorited.status === 200 && !patchUnfavorited.body.conversation.isFavorite, "PATCH favorite must persist explicit isFavorite=false.");
-
-    const patchFavorited = await request<{ conversation: { isFavorite: boolean } }>(`/copilot/conversations/${conversationId}/favorite`, {
+    const favorited = await request<{ conversation: { isFavorite: boolean }; success: boolean }>(`/copilot/conversations/${conversationId}/favorite`, {
       body: { isFavorite: true },
       method: "PATCH",
       token,
     });
-    assert(patchFavorited.status === 200 && patchFavorited.body.conversation.isFavorite, "PATCH favorite must persist explicit isFavorite=true.");
+    assert(favorited.status === 200 && favorited.body.success && favorited.body.conversation.isFavorite, "PATCH favorite must persist isFavorite on.");
+
+    const patchUnpinned = await request<{ conversation: { isPinned: boolean }; success: boolean }>(`/copilot/conversations/${conversationId}/pin`, {
+      body: { isPinned: false },
+      method: "PATCH",
+      token,
+    });
+    assert(patchUnpinned.status === 200 && patchUnpinned.body.success && !patchUnpinned.body.conversation.isPinned, "PATCH pin must persist explicit isPinned=false.");
+
+    const patchPinned = await request<{ conversation: { isPinned: boolean }; success: boolean }>(`/copilot/conversations/${conversationId}/pin`, {
+      body: { isPinned: true },
+      method: "PATCH",
+      token,
+    });
+    assert(patchPinned.status === 200 && patchPinned.body.success && patchPinned.body.conversation.isPinned, "PATCH pin must persist explicit isPinned=true.");
+
+    const patchUnfavorited = await request<{ conversation: { isFavorite: boolean }; success: boolean }>(`/copilot/conversations/${conversationId}/favorite`, {
+      body: { isFavorite: false },
+      method: "PATCH",
+      token,
+    });
+    assert(patchUnfavorited.status === 200 && patchUnfavorited.body.success && !patchUnfavorited.body.conversation.isFavorite, "PATCH favorite must persist explicit isFavorite=false.");
+
+    const patchFavorited = await request<{ conversation: { isFavorite: boolean }; success: boolean }>(`/copilot/conversations/${conversationId}/favorite`, {
+      body: { isFavorite: true },
+      method: "PATCH",
+      token,
+    });
+    assert(patchFavorited.status === 200 && patchFavorited.body.success && patchFavorited.body.conversation.isFavorite, "PATCH favorite must persist explicit isFavorite=true.");
 
     const listed = await request<{ conversations: Array<{ id: string; isFavorite: boolean; isPinned: boolean; title: string }> }>("/copilot/conversations?q=Renamed", { token });
     assert(listed.status === 200 && listed.body.conversations.some((item) => item.id === conversationId && item.isPinned && item.isFavorite), "Search/list must restore persisted conversation state.");
@@ -224,21 +232,21 @@ async function main() {
     assert(restoredUserMessage.attachments.some((attachment) => attachment.kind === "labs"), "Labs attachment chip must persist in conversation history.");
     assert(restoredUserMessage.attachments.filter((attachment) => attachment.kind === "file").length === 2, "Multiple generic file attachments must persist.");
 
-    const archived = await request<{ conversation: { archivedAt?: string } }>(`/copilot/conversations/${conversationId}/archive`, { method: "POST", token });
-    assert(archived.status === 200 && Boolean(archived.body.conversation.archivedAt), "Archive chat must persist.");
+    const archived = await request<{ conversation: { archivedAt?: string }; success: boolean }>(`/copilot/conversations/${conversationId}/archive`, { method: "PATCH", token });
+    assert(archived.status === 200 && archived.body.success && Boolean(archived.body.conversation.archivedAt), "PATCH archive must persist archivedAt.");
 
-    const restoredArchive = await request<{ conversation: { archivedAt?: string } }>(`/copilot/conversations/${conversationId}/archive`, { method: "POST", token });
-    assert(restoredArchive.status === 200 && !restoredArchive.body.conversation.archivedAt, "Archive endpoint must toggle archived state off.");
+    const restoredArchive = await request<{ conversation: { archivedAt?: string }; success: boolean }>(`/copilot/conversations/${conversationId}/archive`, { method: "PATCH", token });
+    assert(restoredArchive.status === 200 && restoredArchive.body.success && !restoredArchive.body.conversation.archivedAt, "PATCH archive must toggle archivedAt off.");
 
-    const repinned = await request<{ conversation: { isPinned: boolean } }>(`/copilot/conversations/${conversationId}/pin`, { method: "POST", token });
-    assert(repinned.status === 200 && repinned.body.conversation.isPinned, "POST pin must toggle isPinned on after archive clears state.");
-    const unpinned = await request<{ conversation: { isPinned: boolean } }>(`/copilot/conversations/${conversationId}/pin`, { method: "POST", token });
-    assert(unpinned.status === 200 && !unpinned.body.conversation.isPinned, "POST pin must toggle isPinned off.");
+    const repinned = await request<{ conversation: { isPinned: boolean }; success: boolean }>(`/copilot/conversations/${conversationId}/pin`, { body: { isPinned: true }, method: "PATCH", token });
+    assert(repinned.status === 200 && repinned.body.success && repinned.body.conversation.isPinned, "PATCH pin must persist isPinned on after archive clears state.");
+    const unpinned = await request<{ conversation: { isPinned: boolean }; success: boolean }>(`/copilot/conversations/${conversationId}/pin`, { body: { isPinned: false }, method: "PATCH", token });
+    assert(unpinned.status === 200 && unpinned.body.success && !unpinned.body.conversation.isPinned, "PATCH pin must persist isPinned off.");
 
-    const refavorited = await request<{ conversation: { isFavorite: boolean } }>(`/copilot/conversations/${conversationId}/favorite`, { method: "POST", token });
-    assert(refavorited.status === 200 && refavorited.body.conversation.isFavorite, "POST favorite must toggle isFavorite on after archive clears state.");
-    const unfavorited = await request<{ conversation: { isFavorite: boolean } }>(`/copilot/conversations/${conversationId}/favorite`, { method: "POST", token });
-    assert(unfavorited.status === 200 && !unfavorited.body.conversation.isFavorite, "POST favorite must toggle isFavorite off.");
+    const refavorited = await request<{ conversation: { isFavorite: boolean }; success: boolean }>(`/copilot/conversations/${conversationId}/favorite`, { body: { isFavorite: true }, method: "PATCH", token });
+    assert(refavorited.status === 200 && refavorited.body.success && refavorited.body.conversation.isFavorite, "PATCH favorite must persist isFavorite on after archive clears state.");
+    const unfavorited = await request<{ conversation: { isFavorite: boolean }; success: boolean }>(`/copilot/conversations/${conversationId}/favorite`, { body: { isFavorite: false }, method: "PATCH", token });
+    assert(unfavorited.status === 200 && unfavorited.body.success && !unfavorited.body.conversation.isFavorite, "PATCH favorite must persist isFavorite off.");
 
     const duplicated = await request<{ conversation: { id: string } }>(`/copilot/conversations/${conversationId}/duplicate`, { method: "POST", token });
     assert(duplicated.status === 201 && duplicated.body.conversation.id !== conversationId, "Duplicate chat must create a new persisted conversation.");
