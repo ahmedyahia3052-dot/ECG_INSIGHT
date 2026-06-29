@@ -2,18 +2,21 @@ import { useQuery } from "@tanstack/react-query";
 import React from "react";
 import { StyleSheet, Text, View } from "react-native";
 
-import { Badge, Card, medicalTheme, PageSection, SectionHeader, StatCard } from "@/components/enterprise/EnterpriseUI";
+import { Badge, Card, EmptyState, medicalTheme, PageSection, SectionHeader, StatCard } from "@/components/enterprise/EnterpriseUI";
 import { useAuth } from "@/context/AuthContext";
 import { getBillingHistory, getMySubscription, getUsageDashboard, listSubscriptionPlans } from "@/services/subscriptions";
 
 export default function BillingSubscriptionScreen() {
-  const { authToken } = useAuth();
+  const { authToken, canAccess } = useAuth();
   const token = authToken?.token;
-  const subscriptionQuery = useQuery({ enabled: !!token, queryFn: () => getMySubscription(token!), queryKey: ["enterprise-my-subscription", token], retry: false });
-  const plansQuery = useQuery({ enabled: !!token, queryFn: () => listSubscriptionPlans(token!), queryKey: ["enterprise-subscription-plans", token], retry: false });
-  const billingQuery = useQuery({ enabled: !!token, queryFn: () => getBillingHistory(token!), queryKey: ["enterprise-billing-history", token], retry: false });
-  const usageQuery = useQuery({ enabled: !!token, queryFn: () => getUsageDashboard(token!), queryKey: ["enterprise-usage-dashboard", token], retry: false });
+  const allowed = canAccess(["admin", "super_admin"]);
+  const subscriptionQuery = useQuery({ enabled: !!token && allowed, queryFn: () => getMySubscription(token!), queryKey: ["enterprise-my-subscription", token], retry: false });
+  const plansQuery = useQuery({ enabled: !!token && allowed, queryFn: () => listSubscriptionPlans(token!), queryKey: ["enterprise-subscription-plans", token], retry: false });
+  const billingQuery = useQuery({ enabled: !!token && allowed, queryFn: () => getBillingHistory(token!), queryKey: ["enterprise-billing-history", token], retry: false });
+  const usageQuery = useQuery({ enabled: !!token && allowed, queryFn: () => getUsageDashboard(token!), queryKey: ["enterprise-usage-dashboard", token], retry: false });
   const subscription = subscriptionQuery.data;
+
+  if (!allowed) return <EmptyState title="Admin access required" message="Only administrators can open subscription controls." />;
 
   return (
     <PageSection>

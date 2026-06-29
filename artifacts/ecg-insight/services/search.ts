@@ -1,6 +1,6 @@
 import { apiRequest } from "./api";
 
-export type GlobalSearchResultType = "case" | "doctor" | "organization" | "patient" | "report";
+export type GlobalSearchResultType = "case" | "doctor" | "employee" | "organization" | "patient" | "report";
 
 export interface GlobalSearchResult {
   id: string;

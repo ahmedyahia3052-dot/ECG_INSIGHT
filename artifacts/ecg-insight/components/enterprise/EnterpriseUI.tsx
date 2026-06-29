@@ -27,7 +27,7 @@ import { medicalTheme } from "@/theme/medicalTheme";
 export { medicalTheme };
 
 type NavItem = {
-  group: "ACCOUNT" | "ADMINISTRATION" | "CLINICAL" | "WORKSPACE";
+  group: "CLINICAL" | "DEVELOPER" | "WORKSPACE";
   href: string;
   icon: keyof typeof Feather.glyphMap;
   minRole?: "admin" | "doctor" | "student" | "super_admin";
@@ -43,19 +43,22 @@ const NAV_ITEMS: NavItem[] = [
   { group: "CLINICAL", href: "/patients", icon: "users", title: "Patients" },
   { group: "CLINICAL", href: "/reports", icon: "file-text", title: "Reports" },
   { group: "WORKSPACE", href: "/analytics", icon: "bar-chart-2", title: "Analytics" },
+  { group: "WORKSPACE", href: "/team-management", icon: "briefcase", minRole: "admin", title: "Organizations" },
+  { group: "WORKSPACE", href: "/team-management", icon: "user-plus", minRole: "admin", title: "Employees" },
   { group: "WORKSPACE", href: "/notifications", icon: "bell", title: "Notifications" },
-  { group: "ADMINISTRATION", href: "/admin-dashboard", icon: "shield", minRole: "admin", title: "Admin Dashboard" },
-  { group: "ADMINISTRATION", href: "/team-management", icon: "user-plus", minRole: "admin", title: "Team Management" },
-  { group: "ADMINISTRATION", href: "/owner/licenses", icon: "award", minRole: "super_admin", ownerOnly: true, title: "License Management" },
-  { group: "ADMINISTRATION", href: "/billing-subscription", icon: "credit-card", title: "Billing & Subscription" },
-  { group: "ACCOUNT", href: "/profile", icon: "user", title: "Profile" },
-  { group: "ACCOUNT", href: "/settings", icon: "settings", title: "Settings" },
+  { group: "WORKSPACE", href: "/support", icon: "life-buoy", title: "Support" },
+  { group: "WORKSPACE", href: "/settings", icon: "settings", title: "Settings" },
+  { group: "WORKSPACE", href: "/profile", icon: "user", title: "Profile" },
+  { group: "DEVELOPER", href: "/admin-dashboard", icon: "shield", minRole: "admin", title: "Admin Controls" },
+  { group: "DEVELOPER", href: "/billing-subscription", icon: "credit-card", minRole: "admin", title: "Subscription Controls" },
+  { group: "DEVELOPER", href: "/owner/licenses", icon: "award", minRole: "super_admin", ownerOnly: true, title: "License Controls" },
 ];
 
 const PAGE_TITLES: Record<string, { subtitle: string; title: string }> = {
   "/analytics": { subtitle: "Enterprise BI, trends, workload, and quality signals.", title: "Analytics" },
   "/admin-dashboard": { subtitle: "Administrative overview, users, subscriptions, and platform health.", title: "Admin Dashboard" },
   "/billing-subscription": { subtitle: "Subscription plan, quota, billing, and license status.", title: "Billing & Subscription" },
+  "/support": { subtitle: "Contact support and submit operational requests.", title: "Support" },
   "/dashboard": { subtitle: "Executive medical command center for ECG operations.", title: "Dashboard" },
   "/ecg-analysis": { subtitle: "Review cases, AI findings, validation, and report generation.", title: "ECG Analysis" },
   "/ecg-cases": { subtitle: "Enterprise ECG case workflow, review, approval, and reports.", title: "ECG Cases" },
@@ -112,8 +115,10 @@ export function EnterpriseShell({ children }: PropsWithChildren) {
     debouncedSearch,
     drawerOpen,
     focusSearch,
+    hydrateDashboardState,
     notificationFilter,
     notificationOpen,
+    notificationSearch,
     openDrawer,
     recentSearches,
     rememberSearch,
@@ -122,6 +127,7 @@ export function EnterpriseShell({ children }: PropsWithChildren) {
     searchText,
     setDebouncedSearch,
     setNotificationFilter,
+    setNotificationSearch,
     setRecentSearches,
     setSearchText,
     sidebarCollapsed,
@@ -137,8 +143,14 @@ export function EnterpriseShell({ children }: PropsWithChildren) {
   }), [user?.isOwner, user?.protectedOwner, user?.role]);
   const notificationQuery = useQuery({
     enabled: !!authToken?.token,
-    queryFn: () => listNotifications(authToken!.token, new URLSearchParams({ pageSize: "30" })),
-    queryKey: ["enterprise-shell-notifications", authToken?.token],
+    queryFn: () => {
+      const params = new URLSearchParams({ pageSize: "50" });
+      if (notificationSearch.trim()) params.set("q", notificationSearch.trim());
+      return listNotifications(authToken!.token, params);
+    },
+    queryKey: ["enterprise-shell-notifications", authToken?.token, notificationSearch],
+    refetchInterval: 15_000,
+    refetchIntervalInBackground: true,
     retry: false,
   });
   const searchQuery = useQuery({
@@ -147,13 +159,16 @@ export function EnterpriseShell({ children }: PropsWithChildren) {
     queryKey: ["global-search", authToken?.token, debouncedSearch.trim()],
     retry: false,
   });
-  const unreadCount = notificationQuery.data?.notifications.filter((item) => !item.read).length ?? 0;
-  const filteredNotifications = useMemo(() => (notificationQuery.data?.notifications ?? []).filter((item) => notificationMatchesFilter(item, notificationFilter)), [notificationFilter, notificationQuery.data?.notifications]);
+  const notifications = notificationQuery.data?.notifications ?? [];
+  const unreadCount = notifications.filter((item) => !item.read).length;
+  const criticalCount = notifications.filter((item) => isCriticalNotification(item)).length;
+  const filteredNotifications = useMemo(() => notifications.filter((item) => notificationMatchesFilter(item, notificationFilter)), [notificationFilter, notifications]);
   const searchResults = searchQuery.data?.results ?? [];
   const showSearchPanel = searchFocused && (searchText.trim().length > 0 || recentSearches.length > 0);
   const invalidateNotifications = () => {
-    void queryClient.invalidateQueries({ queryKey: ["enterprise-shell-notifications", authToken?.token] });
+    void queryClient.invalidateQueries({ queryKey: ["enterprise-shell-notifications"] });
     void queryClient.invalidateQueries({ queryKey: ["enterprise-notifications", authToken?.token] });
+    void queryClient.invalidateQueries({ queryKey: ["enterprise-dashboard-notifications", authToken?.token] });
   };
   const readNotificationMutation = useMutation({
     mutationFn: (id: string) => markNotificationRead(authToken!.token, id),
@@ -185,6 +200,10 @@ export function EnterpriseShell({ children }: PropsWithChildren) {
     readNotificationMutation.mutate(notification.id);
     navigate(notification.actionUrl ?? (notification.caseId ? `/ecg-cases/${notification.caseId}` : notification.patientId ? `/patients/${notification.patientId}` : notification.reportId ? `/reports/${notification.reportId}` : "/notifications"));
   };
+
+  useEffect(() => {
+    hydrateDashboardState();
+  }, [hydrateDashboardState]);
 
   useEffect(() => {
     if (!notificationOpen || typeof document === "undefined") return undefined;
@@ -259,7 +278,7 @@ export function EnterpriseShell({ children }: PropsWithChildren) {
       ) : null}
 
       <ScrollView contentContainerStyle={[styles.navScroll, sidebarCompact && styles.navScrollCollapsed]} showsVerticalScrollIndicator style={styles.navScrollArea}>
-        {(["CLINICAL", "WORKSPACE", "ADMINISTRATION", "ACCOUNT"] as const).map((group) => {
+        {(["CLINICAL", "WORKSPACE", "DEVELOPER"] as const).map((group) => {
           const groupItems = navItems.filter((item) => item.group === group);
           if (!groupItems.length) return null;
           return (
@@ -272,7 +291,7 @@ export function EnterpriseShell({ children }: PropsWithChildren) {
                   <Pressable
                     accessibilityRole="button"
                     accessibilityLabel={`Open ${item.title}`}
-                    key={item.href}
+                    key={`${item.group}-${item.href}-${item.title}`}
                     onHoverIn={() => setHoveredNav(item.href)}
                     onHoverOut={() => setHoveredNav(null)}
                     onPress={() => navigate(item.href)}
@@ -283,7 +302,7 @@ export function EnterpriseShell({ children }: PropsWithChildren) {
                       <Feather name={item.icon} size={18} color={active || hovered ? medicalTheme.primary : medicalTheme.muted} />
                     </View>
                     {!sidebarCompact ? <Text style={[styles.navText, active && styles.navTextActive]}>{item.title}</Text> : null}
-                    {item.href === "/notifications" ? <View style={styles.badgeDot} /> : null}
+                    {item.href === "/notifications" && unreadCount ? <View style={styles.badgeDot} /> : null}
                     {sidebarCompact && hovered ? <View style={styles.tooltip}><Text style={styles.tooltipText}>{item.title}</Text></View> : null}
                   </Pressable>
                 );
@@ -400,39 +419,65 @@ export function EnterpriseShell({ children }: PropsWithChildren) {
           <Pressable style={styles.notificationBackdrop} onPress={closeNotificationCenter} />
           <Card style={styles.notificationDrawer}>
             <SectionHeader
-              title="Notification Center"
-              subtitle={`${unreadCount} unread • ${notificationQuery.data?.total ?? 0} total`}
-              action={<PrimaryButton label="Read All" onPress={() => readAllNotificationMutation.mutate()} variant="outline" />}
+              title="Alerts"
+              subtitle="Clinical, system, subscription, and workflow notifications from live APIs."
+              action={<PrimaryButton disabled={!unreadCount || readAllNotificationMutation.isPending} label="Read All" onPress={() => readAllNotificationMutation.mutate()} variant="outline" />}
             />
+            <View style={styles.notificationSearchBox}>
+              <Feather name="search" size={15} color={medicalTheme.muted} />
+              <TextInput
+                accessibilityLabel="Search notifications"
+                onChangeText={setNotificationSearch}
+                placeholder="Search notifications..."
+                placeholderTextColor={medicalTheme.muted}
+                style={styles.notificationSearchInput}
+                value={notificationSearch}
+              />
+            </View>
+            <View style={styles.notificationCounterRow}>
+              <View style={styles.notificationCounterCard}>
+                <Text style={[styles.notificationCounterValue, { color: medicalTheme.critical }]}>{criticalCount}</Text>
+                <Text style={styles.notificationCounterLabel}>Critical</Text>
+              </View>
+              <View style={styles.notificationCounterCard}>
+                <Text style={[styles.notificationCounterValue, { color: medicalTheme.primary }]}>{unreadCount}</Text>
+                <Text style={styles.notificationCounterLabel}>Unread</Text>
+              </View>
+              <View style={styles.notificationCounterCard}>
+                <Text style={[styles.notificationCounterValue, { color: medicalTheme.success }]}>{notificationQuery.data?.total ?? notifications.length}</Text>
+                <Text style={styles.notificationCounterLabel}>Total</Text>
+              </View>
+            </View>
             <View style={styles.notificationFilters}>
-              {(["all", "unread", "critical", "system", "license", "ai"] as const).map((filter) => (
-                <PrimaryButton key={filter} label={filter} onPress={() => setNotificationFilter(filter)} variant={notificationFilter === filter ? "primary" : "outline"} />
+              {(["all", "unread", "critical", "system", "license"] as const).map((filter) => (
+                <PrimaryButton key={filter} label={notificationFilterLabel(filter)} onPress={() => setNotificationFilter(filter)} variant={notificationFilter === filter ? "primary" : "outline"} />
               ))}
             </View>
             <ScrollView style={styles.notificationList} showsVerticalScrollIndicator>
               {filteredNotifications.length ? filteredNotifications.map((notification) => (
-                <View key={notification.id} style={styles.notificationRow}>
-                  <View style={styles.notificationIcon}>
-                    <Feather name={notificationIcon(notification)} size={16} color={notificationColor(notification)} />
+                <View key={notification.id} style={[styles.notificationCard, isCriticalNotification(notification) && styles.notificationCardCritical]}>
+                  <View style={styles.notificationCardHeader}>
+                    <View style={styles.notificationTitleRow}>
+                      <View style={styles.notificationIcon}>
+                        <Feather name={notificationIcon(notification)} size={16} color={notificationColor(notification)} />
+                      </View>
+                      <Text numberOfLines={1} style={styles.notificationTitle}>{notification.title}</Text>
+                    </View>
+                    <Badge label={notificationStatusLabel(notification)} tone={isCriticalNotification(notification) ? "critical" : notification.read ? "muted" : "primary"} />
                   </View>
-                  <Pressable onPress={() => openNotification(notification)} style={styles.notificationTextWrap}>
-                    <Text style={styles.notificationTitle}>{notification.title}</Text>
-                    <Text numberOfLines={3} style={styles.notificationMessage}>{notification.message}</Text>
-                    <Text style={styles.notificationMeta}>{formatDate(notification.timestamp)} • {notification.read ? "Read" : "Unread"}</Text>
-                  </Pressable>
+                  <Text numberOfLines={3} style={styles.notificationMessage}>{notification.message}</Text>
+                  <Text style={styles.notificationMeta}>{classifyNotification(notification)} • {formatDate(notification.timestamp)}</Text>
                   <View style={styles.notificationActions}>
-                    <Badge label={notification.type} tone={notification.type === "critical" ? "critical" : "primary"} />
-                    <Pressable accessibilityLabel="Mark notification read" onPress={() => readNotificationMutation.mutate(notification.id)} style={styles.smallIconButton}>
-                      <Feather name="check" size={14} color={medicalTheme.success} />
-                    </Pressable>
-                    <Pressable accessibilityLabel="Dismiss notification" onPress={() => deleteNotificationMutation.mutate(notification.id)} style={styles.smallIconButton}>
-                      <Feather name="trash-2" size={14} color={medicalTheme.critical} />
-                    </Pressable>
+                    {!notification.read ? <PrimaryButton disabled={readNotificationMutation.isPending} label="Mark read" onPress={() => readNotificationMutation.mutate(notification.id)} variant="outline" /> : null}
+                    <PrimaryButton label="Open details" onPress={() => openNotification(notification)} variant="outline" />
+                    <PrimaryButton disabled={deleteNotificationMutation.isPending} label="Clear" onPress={() => deleteNotificationMutation.mutate(notification.id)} variant="danger" />
                   </View>
                 </View>
-              )) : <EmptyState title="No notifications" message="No notifications match this filter." />}
+              )) : (
+                <EmptyState title={notificationQuery.isLoading ? "Loading alerts..." : "No critical alerts"} message={notificationQuery.isError ? "Unable to load live notifications. Please try again." : "STEMI alerts, urgent reviews, failed analyses, subscription notices, and system events will appear here."} />
+              )}
             </ScrollView>
-            <PrimaryButton label="Open Full Notification Center" onPress={() => navigate("/notifications")} variant="outline" />
+            <PrimaryButton label="Open Notification History" onPress={() => navigate("/notifications")} variant="outline" />
           </Card>
         </View>
       ) : null}
@@ -441,16 +486,47 @@ export function EnterpriseShell({ children }: PropsWithChildren) {
   );
 }
 
-function notificationMatchesFilter(notification: NotificationRecord, filter: "ai" | "all" | "critical" | "license" | "system" | "unread") {
+function notificationMatchesFilter(notification: NotificationRecord, filter: "all" | "critical" | "license" | "system" | "unread") {
   const haystack = `${notification.type} ${notification.entityType ?? ""} ${notification.title} ${notification.message}`.toLowerCase();
   if (filter === "all") return true;
   if (filter === "unread") return !notification.read;
+  if (filter === "critical") return isCriticalNotification(notification);
+  if (filter === "license") return haystack.includes("license") || haystack.includes("subscription") || haystack.includes("billing");
+  if (filter === "system") return haystack.includes("system") || haystack.includes("sync") || haystack.includes("failed");
   return haystack.includes(filter);
+}
+
+function notificationFilterLabel(filter: "all" | "critical" | "license" | "system" | "unread") {
+  if (filter === "all") return "All";
+  if (filter === "unread") return "Unread";
+  if (filter === "critical") return "Critical";
+  if (filter === "system") return "System";
+  return "License";
+}
+
+function isCriticalNotification(notification: NotificationRecord) {
+  const haystack = `${notification.type} ${notification.category ?? ""} ${notification.title} ${notification.message}`.toLowerCase();
+  return haystack.includes("critical") || haystack.includes("stemi") || haystack.includes("urgent") || haystack.includes("failed");
+}
+
+function classifyNotification(notification: NotificationRecord) {
+  const haystack = `${notification.type} ${notification.category ?? ""} ${notification.title} ${notification.message}`.toLowerCase();
+  if (haystack.includes("stemi")) return "STEMI";
+  if (haystack.includes("subscription") || haystack.includes("license") || haystack.includes("billing")) return "License";
+  if (haystack.includes("system") || haystack.includes("sync") || haystack.includes("failed")) return "System";
+  if (haystack.includes("urgent") || haystack.includes("review")) return "Urgent review";
+  return "Clinical";
+}
+
+function notificationStatusLabel(notification: NotificationRecord) {
+  if (isCriticalNotification(notification)) return "Critical";
+  return notification.read ? "Read" : "Unread";
 }
 
 function searchResultIcon(type: GlobalSearchResult["type"]): keyof typeof Feather.glyphMap {
   if (type === "case") return "activity";
   if (type === "doctor") return "user-check";
+  if (type === "employee") return "briefcase";
   if (type === "organization") return "briefcase";
   if (type === "report") return "file-text";
   return "users";
@@ -459,6 +535,7 @@ function searchResultIcon(type: GlobalSearchResult["type"]): keyof typeof Feathe
 function searchResultTypeLabel(type: GlobalSearchResult["type"]) {
   if (type === "case") return "ECG Case";
   if (type === "doctor") return "Doctor";
+  if (type === "employee") return "Employee";
   if (type === "organization") return "Organization";
   if (type === "report") return "Report";
   return "Patient";
@@ -467,8 +544,7 @@ function searchResultTypeLabel(type: GlobalSearchResult["type"]) {
 function notificationIcon(notification: NotificationRecord): keyof typeof Feather.glyphMap {
   const haystack = `${notification.type} ${notification.entityType ?? ""} ${notification.title}`.toLowerCase();
   if (haystack.includes("critical")) return "alert-triangle";
-  if (haystack.includes("license")) return "award";
-  if (haystack.includes("ai")) return "cpu";
+  if (haystack.includes("license") || haystack.includes("subscription")) return "award";
   if (haystack.includes("system")) return "server";
   return "bell";
 }
@@ -638,18 +714,26 @@ const styles = StyleSheet.create({
   navScrollCollapsed: { alignItems: "center", paddingHorizontal: 10 },
   navText: { color: medicalTheme.muted, flex: 1, fontSize: 14, fontWeight: "800" },
   navTextActive: { color: medicalTheme.text },
-  notificationActions: { flexDirection: "row", gap: 6 },
+  notificationActions: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   notificationBackdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: "rgba(2,6,23,0.08)" },
-  notificationDrawer: { backgroundColor: "rgba(12,26,45,0.96)", gap: 12, maxHeight: 600, position: "absolute", right: 18, shadowColor: "#000", shadowOpacity: 0.34, shadowRadius: 28, top: 76, width: 420, zIndex: 80 },
+  notificationCard: { backgroundColor: medicalTheme.surface, borderColor: medicalTheme.border, borderRadius: 16, borderWidth: 1, gap: 9, marginBottom: 10, padding: 12 },
+  notificationCardCritical: { borderColor: medicalTheme.critical },
+  notificationCardHeader: { alignItems: "center", flexDirection: "row", gap: 10, justifyContent: "space-between" },
+  notificationCounterCard: { alignItems: "center", backgroundColor: medicalTheme.surface, borderColor: medicalTheme.border, borderRadius: 14, borderWidth: 1, flex: 1, gap: 3, minHeight: 72, padding: 10 },
+  notificationCounterLabel: { color: medicalTheme.muted, fontSize: 10, fontWeight: "900", letterSpacing: 0.6, textTransform: "uppercase" },
+  notificationCounterRow: { flexDirection: "row", gap: 8 },
+  notificationCounterValue: { fontSize: 25, fontWeight: "900" },
+  notificationDrawer: { backgroundColor: "rgba(12,26,45,0.98)", gap: 12, maxHeight: 650, position: "absolute", right: 18, shadowColor: "#000", shadowOpacity: 0.34, shadowRadius: 28, top: 76, width: 440, zIndex: 80 },
   notificationFilters: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   notificationIcon: { alignItems: "center", backgroundColor: medicalTheme.surface, borderColor: medicalTheme.border, borderRadius: 12, borderWidth: 1, height: 38, justifyContent: "center", width: 38 },
-  notificationList: { maxHeight: 390 },
+  notificationList: { maxHeight: 330 },
   notificationMessage: { color: medicalTheme.muted, fontSize: 12, lineHeight: 17 },
   notificationMeta: { color: medicalTheme.primary, fontSize: 10, fontWeight: "900", marginTop: 4, textTransform: "uppercase" },
   notificationOverlay: { ...StyleSheet.absoluteFillObject, zIndex: 70 },
-  notificationRow: { alignItems: "center", borderBottomColor: medicalTheme.border, borderBottomWidth: 1, flexDirection: "row", gap: 10, paddingVertical: 10 },
-  notificationTextWrap: { flex: 1, gap: 2 },
-  notificationTitle: { color: medicalTheme.text, fontSize: 13, fontWeight: "900" },
+  notificationSearchBox: { alignItems: "center", backgroundColor: medicalTheme.surface, borderColor: medicalTheme.border, borderRadius: 13, borderWidth: 1, flexDirection: "row", gap: 8, minHeight: 42, paddingHorizontal: 10 },
+  notificationSearchInput: { color: medicalTheme.text, flex: 1, fontSize: 13 },
+  notificationTitle: { color: medicalTheme.text, flex: 1, fontSize: 13, fontWeight: "900" },
+  notificationTitleRow: { alignItems: "center", flex: 1, flexDirection: "row", gap: 10, minWidth: 0 },
   pageScroll: { gap: 16, padding: 18, paddingBottom: 42 },
   pageSubtitle: { color: medicalTheme.muted, fontSize: 13, lineHeight: 19, marginTop: 3 },
   pageTitle: { color: medicalTheme.text, fontSize: 26, fontWeight: "900", letterSpacing: -0.6 },

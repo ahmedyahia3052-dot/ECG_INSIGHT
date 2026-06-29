@@ -8,7 +8,7 @@ export const searchRouter = Router();
 
 searchRouter.use(requireAuth);
 
-type GlobalSearchType = "case" | "doctor" | "organization" | "patient" | "report";
+type GlobalSearchType = "case" | "doctor" | "employee" | "organization" | "patient" | "report";
 
 type GlobalSearchResult = {
   id: string;
@@ -57,7 +57,7 @@ searchRouter.get("/", async (req, res, next) => {
       return;
     }
 
-    const [patients, cases, reports, organizations, doctors] = await Promise.all([
+    const [patients, cases, reports, organizations, doctors, employees] = await Promise.all([
       prisma.patient.findMany({
         orderBy: { updatedAt: "desc" },
         take: 8,
@@ -119,6 +119,21 @@ searchRouter.get("/", async (req, res, next) => {
           role: { in: ["DOCTOR", "ADMIN", "SUPER_ADMIN"] },
         },
       }),
+      prisma.user.findMany({
+        orderBy: { updatedAt: "desc" },
+        take: 8,
+        where: {
+          isActive: true,
+          OR: [
+            { name: { contains: q, mode: "insensitive" } },
+            { email: { contains: q, mode: "insensitive" } },
+            { employeeId: { contains: q, mode: "insensitive" } },
+            { department: { contains: q, mode: "insensitive" } },
+            { positionTitle: { contains: q, mode: "insensitive" } },
+            { institution: { contains: q, mode: "insensitive" } },
+          ],
+        },
+      }),
     ]);
 
     const results: GlobalSearchResult[] = [
@@ -160,6 +175,14 @@ searchRouter.get("/", async (req, res, next) => {
         subtitle: [doctor.email, doctor.specialization, doctor.institution].filter(Boolean).join(" • ") || "Clinical user",
         title: doctor.name,
         type: "doctor" as const,
+        url: "/team-management",
+      })),
+      ...employees.map((employee) => ({
+        id: employee.id,
+        meta: employee.employeeId ? `Employee ${employee.employeeId}` : employee.role.toLowerCase().replace(/_/g, " "),
+        subtitle: [employee.email, employee.department, employee.positionTitle, employee.institution].filter(Boolean).join(" • ") || "Employee record",
+        title: employee.name,
+        type: "employee" as const,
         url: "/team-management",
       })),
     ];

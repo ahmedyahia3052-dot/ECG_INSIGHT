@@ -2,84 +2,85 @@ import { Feather } from "@expo/vector-icons";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { usePathname } from "expo-router";
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { PanResponder, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, useWindowDimensions, View } from "react-native";
 
 import { useAuth } from "@/context/AuthContext";
 import { useDashboardStore } from "@/context/DashboardStore";
 import {
-  copilotExportUrl,
   deleteCopilotConversation,
-  getCopilotAnalytics,
   getCopilotConversation,
   getCopilotSettings,
   listCopilotConversations,
   sendCopilotMessage,
-  updateCopilotConversation,
-  updateCopilotSettings,
   type CopilotConversation,
   type CopilotMessage,
   type CopilotTag,
 } from "@/services/copilot";
 import { medicalTheme } from "@/theme/medicalTheme";
 
-const tags: CopilotTag[] = ["ECG Interpretation", "Clinical Summary", "Occupational Fitness", "Differential Diagnosis", "Follow-up"];
-const disclaimer = "AI assistance only. Final diagnosis and clinical decisions remain the responsibility of the physician.";
+type QuickPrompt = {
+  label: string;
+  prompt: string;
+  tag: CopilotTag;
+};
+
+const quickPrompts: QuickPrompt[] = [
+  { label: "Explain ECG", prompt: "Explain the active ECG findings and highlight urgent abnormalities.", tag: "ECG Interpretation" },
+  { label: "Report Help", prompt: "Draft concise report assistance for the current ECG workflow.", tag: "Clinical Summary" },
+  { label: "Patient Summary", prompt: "Summarize the relevant patient context and ECG history.", tag: "Clinical Summary" },
+  { label: "Follow-up Plan", prompt: "Suggest follow-up recommendations and safety considerations.", tag: "Follow-up" },
+  { label: "Differential", prompt: "List a focused differential diagnosis and discriminating ECG clues.", tag: "Differential Diagnosis" },
+];
 
 export function MedicalAICopilot() {
   const pathname = usePathname();
   const queryClient = useQueryClient();
-  const { authToken, user } = useAuth();
+  const { width } = useWindowDimensions();
+  const { authToken } = useAuth();
   const token = authToken?.token;
-  const [search, setSearch] = useState("");
-  const [selectedId, setSelectedId] = useState<string | undefined>();
   const [question, setQuestion] = useState("");
-  const [tag, setTag] = useState<CopilotTag>("ECG Interpretation");
+  const [selectedId, setSelectedId] = useState<string | undefined>();
   const [typingMessage, setTypingMessage] = useState("");
   const typingCleanup = useRef<(() => void) | null>(null);
+  const dragStart = useRef({ bottom: 24, right: 24 });
   const {
-    assistantFullscreen: fullscreen,
-    assistantMinimized: minimized,
-    assistantOpen: open,
-    assistantPosition: position,
+    assistantFullscreen,
+    assistantMinimized,
+    assistantOpen,
+    assistantPosition,
+    assistantSize,
     closeAssistant,
     openAssistant,
     setAssistantPosition,
+    setAssistantSize,
     toggleAssistantFullscreen,
     toggleAssistantMinimized,
   } = useDashboardStore();
 
   const context = useMemo(() => contextFromPath(pathname), [pathname]);
-  const isOwner = user?.email?.toLowerCase() === "ahmedyahia3052@gmail.com";
-
-  const settingsQuery = useQuery({
+  const panelSize = assistantFullscreen ? undefined : assistantSize;
+  const enabledQuery = useQuery({
     enabled: !!token,
     queryFn: () => getCopilotSettings(token!),
     queryKey: ["copilot-settings", token],
     retry: false,
   });
   const conversationsQuery = useQuery({
-    enabled: !!token && open,
-    queryFn: () => listCopilotConversations(token!, search),
-    queryKey: ["copilot-conversations", token, search],
+    enabled: !!token && assistantOpen,
+    queryFn: () => listCopilotConversations(token!),
+    queryKey: ["copilot-conversations", token],
     retry: false,
   });
   const selectedQuery = useQuery({
-    enabled: !!token && !!selectedId && open,
+    enabled: !!token && !!selectedId && assistantOpen,
     queryFn: () => getCopilotConversation(token!, selectedId!),
     queryKey: ["copilot-conversation", token, selectedId],
     retry: false,
   });
-  const analyticsQuery = useQuery({
-    enabled: !!token && open && isOwner,
-    queryFn: () => getCopilotAnalytics(token!),
-    queryKey: ["copilot-analytics", token],
-    retry: false,
-  });
 
-  const messages = selectedQuery.data?.messages ?? [];
+  const enabled = enabledQuery.data?.settings.enabled ?? true;
   const conversations = conversationsQuery.data?.conversations ?? [];
-  const unread = messages.filter((message) => message.role === "assistant").length ? 0 : 1;
-  const enabled = settingsQuery.data?.settings.enabled ?? true;
+  const messages = selectedQuery.data?.messages ?? [];
   const latestAssistant = [...messages].reverse().find((message) => message.role === "assistant");
 
   const invalidate = () => {
@@ -89,22 +90,23 @@ export function MedicalAICopilot() {
 
   const startTyping = (content: string) => {
     typingCleanup.current?.();
+    setTypingMessage("");
     typingCleanup.current = animateTyping(content, setTypingMessage);
   };
 
   const sendMutation = useMutation({
-    mutationFn: () => sendCopilotMessage(token!, { ...context, conversationId: selectedId, question, tag }),
+    mutationFn: (input: QuickPrompt | { label?: string; prompt: string; tag: CopilotTag }) => sendCopilotMessage(token!, {
+      ...context,
+      conversationId: selectedId,
+      question: input.prompt,
+      tag: input.tag,
+    }),
     onSuccess: (payload) => {
       setSelectedId(payload.conversation.id);
       setQuestion("");
-      setTypingMessage("");
       startTyping(payload.message.content);
       invalidate();
     },
-  });
-  const updateMutation = useMutation({
-    mutationFn: ({ id, input }: { id: string; input: Partial<CopilotConversation> }) => updateCopilotConversation(token!, id, input),
-    onSuccess: invalidate,
   });
   const deleteMutation = useMutation({
     mutationFn: (id: string) => deleteCopilotConversation(token!, id),
@@ -113,14 +115,24 @@ export function MedicalAICopilot() {
       invalidate();
     },
   });
-  const settingsMutation = useMutation({
-    mutationFn: (enabledNext: boolean) => updateCopilotSettings(token!, { enabled: enabledNext, provider: settingsQuery.data?.settings.provider ?? "RuleBasedRAG" }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["copilot-settings", token] }),
-  });
+
+  const panResponder = useMemo(() => PanResponder.create({
+    onMoveShouldSetPanResponder: (_event, gesture) => Math.abs(gesture.dx) > 4 || Math.abs(gesture.dy) > 4,
+    onPanResponderGrant: () => {
+      dragStart.current = assistantPosition;
+    },
+    onPanResponderMove: (_event, gesture) => {
+      if (assistantFullscreen) return;
+      setAssistantPosition({
+        bottom: Math.max(12, dragStart.current.bottom - gesture.dy),
+        right: Math.min(Math.max(12, dragStart.current.right - gesture.dx), Math.max(12, width - 80)),
+      });
+    },
+  }), [assistantFullscreen, assistantPosition, setAssistantPosition, width]);
 
   useEffect(() => {
-    setTag(context.contextType === "patient" ? "Clinical Summary" : context.contextType === "case" ? "ECG Interpretation" : "ECG Interpretation");
-  }, [context.contextType]);
+    if (!selectedId && conversations[0]?.id) setSelectedId(conversations[0].id);
+  }, [conversations, selectedId]);
 
   useEffect(() => {
     if (Platform.OS !== "web" || typeof window === "undefined" || !token) return undefined;
@@ -128,138 +140,113 @@ export function MedicalAICopilot() {
       const prompt = (event as CustomEvent<{ prompt?: string }>).detail?.prompt;
       if (!prompt) return;
       openAssistant();
-      setQuestion(prompt);
-      void sendCopilotMessage(token, { ...context, conversationId: selectedId, question: prompt, tag: "ECG Interpretation" }).then((payload) => {
-        setSelectedId(payload.conversation.id);
-        setQuestion("");
-        setTypingMessage("");
-        startTyping(payload.message.content);
-        invalidate();
-      });
+      sendMutation.mutate({ prompt, tag: "ECG Interpretation" });
     };
     window.addEventListener("medical-copilot:ask", askFromFinding);
     return () => window.removeEventListener("medical-copilot:ask", askFromFinding);
-  }, [context, selectedId, token]);
+  }, [openAssistant, sendMutation, token]);
 
   useEffect(() => {
-    if (!open) {
+    if (!assistantOpen) {
       typingCleanup.current?.();
       typingCleanup.current = null;
       setTypingMessage("");
     }
-  }, [open]);
+  }, [assistantOpen]);
 
   useEffect(() => () => typingCleanup.current?.(), []);
 
   if (!token) return null;
 
-  if (!open) {
+  if (!assistantOpen) {
     return (
       <Pressable
-        accessibilityLabel="Open AI Clinical Copilot"
+        accessibilityLabel="Open AI assistant"
         accessibilityRole="button"
         onPress={openAssistant}
-        style={[styles.floatingButton, position]}
+        style={[styles.floatingButton, assistantPosition]}
       >
-        <Feather name="cpu" size={24} color={medicalTheme.background} />
-        {unread ? <View style={styles.unreadBadge}><Text style={styles.unreadText}>{unread}</Text></View> : null}
+        <Feather name="message-circle" size={18} color={medicalTheme.primary} />
+        <Text style={styles.floatingText}>AI Assistant</Text>
       </Pressable>
     );
   }
 
   return (
-    <View style={[styles.widget, fullscreen && styles.fullscreen, minimized && styles.minimized, !fullscreen && position]}>
-      <View style={styles.header}>
+    <View style={[styles.widget, assistantFullscreen && styles.fullscreen, !assistantFullscreen && panelSize, !assistantFullscreen && assistantPosition, assistantMinimized && styles.minimized]}>
+      <View style={styles.header} {...panResponder.panHandlers}>
         <View style={styles.headerTitle}>
-          <Text style={styles.title}>AI Clinical Copilot</Text>
-          <Text style={styles.subtitle}>{enabled ? "Clinical RAG assistant" : "Disabled by owner"}</Text>
+          <Text style={styles.title}>AI Assistant</Text>
+          <Text style={styles.subtitle}>{enabled ? "Persistent clinical assistant" : "Temporarily disabled"}</Text>
         </View>
         <View style={styles.headerActions}>
-          <Pressable onPress={() => setAssistantPosition({ ...position, bottom: position.bottom === 24 ? 96 : 24 })} style={styles.iconButton}><Feather name="move" size={15} color={medicalTheme.primary} /></Pressable>
-          <Pressable onPress={toggleAssistantMinimized} style={styles.iconButton}><Feather name="minus" size={15} color={medicalTheme.primary} /></Pressable>
-          <Pressable onPress={toggleAssistantFullscreen} style={styles.iconButton}><Feather name={fullscreen ? "minimize-2" : "maximize-2"} size={15} color={medicalTheme.primary} /></Pressable>
-          <Pressable onPress={closeAssistant} style={styles.iconButton}><Feather name="x" size={15} color={medicalTheme.critical} /></Pressable>
+          <IconButton icon="move" label="Drag assistant" onPress={() => setAssistantPosition({ ...assistantPosition, bottom: assistantPosition.bottom === 24 ? 96 : 24 })} />
+          <IconButton icon="maximize" label="Resize assistant" onPress={() => setAssistantSize(nextSize(assistantSize))} />
+          <IconButton icon={assistantMinimized ? "plus" : "minus"} label="Minimize assistant" onPress={toggleAssistantMinimized} />
+          <IconButton icon={assistantFullscreen ? "minimize-2" : "maximize-2"} label="Maximize assistant" onPress={toggleAssistantFullscreen} />
+          <IconButton icon="x" label="Close assistant" onPress={closeAssistant} tone="critical" />
         </View>
       </View>
 
-      {!minimized ? (
+      {!assistantMinimized ? (
         <View style={styles.body}>
-          <View style={styles.sidebar}>
-            <TextInput placeholder="Search conversations..." placeholderTextColor={medicalTheme.muted} onChangeText={setSearch} style={styles.search} value={search} />
-            <PrimaryButton label="New Conversation" onPress={() => setSelectedId(undefined)} />
-            <ScrollView style={styles.conversationList}>
-              {conversations.map((conversation) => (
-                <Pressable key={conversation.id} onPress={() => setSelectedId(conversation.id)} style={[styles.conversationItem, selectedId === conversation.id && styles.conversationActive]}>
-                  <Text numberOfLines={1} style={styles.conversationTitle}>{conversation.title}</Text>
-                  <Text style={styles.conversationMeta}>{conversation.tag}{conversation.favorite ? " • Favorite" : ""}</Text>
-                </Pressable>
-              ))}
-            </ScrollView>
-            {selectedId ? (
-              <View style={styles.row}>
-                <PrimaryButton label="Rename" onPress={() => updateMutation.mutate({ id: selectedId, input: { title: `Clinical chat ${new Date().toLocaleTimeString()}` } })} variant="outline" />
-                <PrimaryButton label="Favorite" onPress={() => updateMutation.mutate({ id: selectedId, input: { favorite: true } })} variant="outline" />
-                <PrimaryButton label="Delete" onPress={() => deleteMutation.mutate(selectedId)} variant="danger" />
-              </View>
-            ) : null}
+          <Text style={styles.disclaimer}>AI assistance only. Final diagnosis and clinical decisions remain the responsibility of the physician.</Text>
+          <View style={styles.quickGrid}>
+            {quickPrompts.map((item) => (
+              <Pressable
+                accessibilityRole="button"
+                disabled={!enabled || sendMutation.isPending}
+                key={item.label}
+                onPress={() => sendMutation.mutate(item)}
+                style={styles.quickAction}
+              >
+                <Text style={styles.quickText}>{item.label}</Text>
+                <Feather name="arrow-right" size={14} color={medicalTheme.primary} />
+              </Pressable>
+            ))}
           </View>
 
-          <View style={styles.chat}>
-            <Text style={styles.disclaimer}>{disclaimer}</Text>
-            <View style={styles.contextCard}>
-              <Badge label="Current Context" tone="primary" />
-              <Text style={styles.contextText}>{contextLabel(context)}</Text>
-            </View>
-            {latestAssistant ? <RagEvidence message={latestAssistant} /> : null}
-            <View style={styles.tagRow}>
-              {tags.map((item) => <PrimaryButton key={item} label={item} onPress={() => setTag(item)} variant={tag === item ? "primary" : "outline"} />)}
-            </View>
-            <ScrollView style={styles.messages}>
-              {messages.map((message) => <MessageBubble key={message.id} message={message} />)}
-              {typingMessage ? <MessageBubble message={{ citations: [], content: typingMessage, createdAt: new Date().toISOString(), id: "typing", role: "assistant" }} /> : null}
-              {!messages.length && !typingMessage ? (
-                <Text style={styles.emptyText}>Ask: Explain this ECG, summarize patient history, suggest differentials, occupational concerns, or follow-up recommendations.</Text>
-              ) : null}
-            </ScrollView>
-            <View style={styles.composer}>
-              <TextInput
-                multiline
-                onChangeText={setQuestion}
-                placeholder="Ask the Medical AI Copilot..."
-                placeholderTextColor={medicalTheme.muted}
-                style={styles.input}
-                value={question}
-              />
-              <PrimaryButton disabled={!enabled || !question.trim() || sendMutation.isPending} label={sendMutation.isPending ? "Thinking..." : "Send"} onPress={() => sendMutation.mutate()} />
-            </View>
-            {selectedId ? <PrimaryButton label="Export Conversation PDF" onPress={() => exportConversation(selectedId, token)} variant="outline" /> : null}
-            {isOwner ? (
-              <View style={styles.ownerPanel}>
-                <Text style={styles.ownerTitle}>Owner Controls</Text>
-                <PrimaryButton label={enabled ? "Disable Copilot" : "Enable Copilot"} onPress={() => settingsMutation.mutate(!enabled)} variant={enabled ? "danger" : "primary"} />
-                <Text style={styles.ownerMetric}>Provider: {settingsQuery.data?.settings.provider ?? "RuleBasedRAG"}</Text>
-                <Text style={styles.ownerMetric}>Conversations: {analyticsQuery.data?.analytics.totalConversations ?? 0} • Active users: {analyticsQuery.data?.analytics.activeUsers ?? 0} • Avg response: {analyticsQuery.data?.analytics.averageResponseTimeMs ?? 0} ms</Text>
-                <Text style={styles.ownerMetric}>Top diagnoses: {(analyticsQuery.data?.analytics.topDiagnosesRequested ?? []).slice(0, 3).map((item) => `${item.diagnosis} (${item.count})`).join(", ") || "No diagnosis analytics yet"}</Text>
-              </View>
-            ) : null}
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.conversationStrip}>
+            {conversations.map((conversation) => (
+              <Pressable key={conversation.id} onPress={() => setSelectedId(conversation.id)} style={[styles.conversationChip, selectedId === conversation.id && styles.conversationChipActive]}>
+                <Text numberOfLines={1} style={styles.conversationText}>{conversation.title}</Text>
+              </Pressable>
+            ))}
+          </ScrollView>
+
+          <ScrollView style={styles.messages}>
+            {messages.slice(-6).map((message) => <MessageBubble key={message.id} message={message} />)}
+            {typingMessage ? <MessageBubble message={{ citations: [], content: typingMessage, createdAt: new Date().toISOString(), id: "typing", role: "assistant" }} /> : null}
+            {!messages.length && !typingMessage ? <Text style={styles.emptyText}>Choose a quick action or ask about ECG interpretation, reports, patient summary, follow-up, or differential diagnosis.</Text> : null}
+          </ScrollView>
+
+          {latestAssistant?.confidence !== undefined ? <Text style={styles.confidence}>Last response confidence {Math.round(latestAssistant.confidence * 100)}%</Text> : null}
+
+          <View style={styles.composer}>
+            <TextInput
+              multiline
+              onChangeText={setQuestion}
+              placeholder="Ask a clinical question..."
+              placeholderTextColor={medicalTheme.muted}
+              style={styles.input}
+              value={question}
+            />
+            <Pressable
+              accessibilityRole="button"
+              disabled={!enabled || !question.trim() || sendMutation.isPending}
+              onPress={() => sendMutation.mutate({ prompt: question, tag: tagForContext(context.contextType) })}
+              style={[styles.sendButton, (!enabled || !question.trim() || sendMutation.isPending) && styles.disabled]}
+            >
+              <Feather name="send" size={16} color={medicalTheme.background} />
+            </Pressable>
           </View>
+          {selectedId ? (
+            <Pressable accessibilityRole="button" onPress={() => deleteMutation.mutate(selectedId)} style={styles.clearButton}>
+              <Text style={styles.clearText}>Clear current conversation</Text>
+            </Pressable>
+          ) : null}
         </View>
       ) : null}
-    </View>
-  );
-}
-
-function RagEvidence({ message }: { message: CopilotMessage }) {
-  const sources = message.citations?.slice(0, 4) ?? [];
-  const knowledgeTags = Array.from(new Set(message.citations?.flatMap((citation) => citation.tags ?? []) ?? [])).slice(0, 8);
-  return (
-    <View style={styles.evidencePanel}>
-      <View style={styles.evidenceHeader}>
-        <Text style={styles.evidenceTitle}>RAG Evidence</Text>
-        {message.confidence !== undefined ? <Text style={styles.evidenceConfidence}>{Math.round(message.confidence * 100)}% confidence</Text> : null}
-      </View>
-      <Text style={styles.evidenceText}>Sources Used: {sources.map((source) => source.label).join(" • ") || "ECG Knowledge Base"}</Text>
-      <Text style={styles.evidenceText}>Knowledge Tags: {knowledgeTags.join(", ") || "general-ecg"}</Text>
     </View>
   );
 }
@@ -268,61 +255,18 @@ function MessageBubble({ message }: { message: CopilotMessage }) {
   const assistant = message.role === "assistant";
   return (
     <View style={[styles.message, assistant ? styles.assistantMessage : styles.userMessage]}>
-      <Text style={styles.messageRole}>{assistant ? "AI Clinical Copilot" : "You"}</Text>
-      <MarkdownText value={message.content} />
-      {message.confidence !== undefined ? <Text style={styles.confidence}>Confidence: {Math.round(message.confidence * 100)}%</Text> : null}
-      {message.citations?.length ? (
-        <View style={styles.citations}>
-          {message.citations.map((citation) => <Text key={`${citation.type}-${citation.id}`} style={styles.citation}>[{citation.type}] {citation.label} - {citation.source}</Text>)}
-        </View>
-      ) : null}
+      <Text style={styles.messageRole}>{assistant ? "Assistant" : "You"}</Text>
+      <Text style={styles.messageText}>{message.content}</Text>
+      {message.citations?.length ? <Text style={styles.citations}>{message.citations.slice(0, 2).map((citation) => citation.label).join(" • ")}</Text> : null}
     </View>
   );
 }
 
-function Badge({ label, tone = "primary" }: { label: string; tone?: "critical" | "primary" | "success" | "warning" }) {
-  const color = tone === "critical" ? medicalTheme.critical : tone === "success" ? medicalTheme.success : tone === "warning" ? medicalTheme.warning : medicalTheme.primary;
+function IconButton({ icon, label, onPress, tone = "primary" }: { icon: keyof typeof Feather.glyphMap; label: string; onPress: () => void; tone?: "critical" | "primary" }) {
   return (
-    <View style={[styles.badge, { borderColor: color }]}>
-      <Text style={[styles.badgeText, { color }]}>{label}</Text>
-    </View>
-  );
-}
-
-function PrimaryButton({
-  disabled,
-  label,
-  onPress,
-  variant = "primary",
-}: {
-  disabled?: boolean;
-  label: string;
-  onPress: () => void;
-  variant?: "danger" | "outline" | "primary";
-}) {
-  return (
-    <Pressable
-      accessibilityRole="button"
-      disabled={disabled}
-      onPress={onPress}
-      style={[styles.button, variant === "outline" && styles.buttonOutline, variant === "danger" && styles.buttonDanger, disabled && styles.buttonDisabled]}
-    >
-      <Text style={[styles.buttonText, variant === "outline" && styles.buttonTextOutline]}>{label}</Text>
+    <Pressable accessibilityLabel={label} accessibilityRole="button" onPress={onPress} style={styles.iconButton}>
+      <Feather name={icon} size={14} color={tone === "critical" ? medicalTheme.critical : medicalTheme.primary} />
     </Pressable>
-  );
-}
-
-function MarkdownText({ value }: { value: string }) {
-  return (
-    <View style={styles.markdown}>
-      {value.split(/\n/).map((line, index) => {
-        if (line.startsWith("## ")) return <Text key={index} style={styles.markdownHeading}>{line.replace(/^## /, "")}</Text>;
-        if (line.startsWith("- ")) return <Text key={index} style={styles.markdownBullet}>• {line.replace(/^- /, "")}</Text>;
-        if (/^\|/.test(line)) return <Text key={index} style={styles.markdownCode}>{line}</Text>;
-        if (/^```/.test(line)) return <Text key={index} style={styles.markdownCode}>{line}</Text>;
-        return <Text key={index} style={styles.messageText}>{line}</Text>;
-      })}
-    </View>
   );
 }
 
@@ -334,10 +278,16 @@ function contextFromPath(pathname: string) {
   return { contextPath: pathname, contextType: "global" as const };
 }
 
-function contextLabel(context: ReturnType<typeof contextFromPath>) {
-  if (context.contextType === "case") return `Patient -> ECG Case ${context.caseId} -> Reports and prior ECGs`;
-  if (context.contextType === "patient") return `Patient ${context.patientId} -> ECG history -> Reports and documents`;
-  return "Global ECG knowledge only. Open a patient profile or ECG case for patient-specific RAG.";
+function tagForContext(contextType: "case" | "global" | "patient"): CopilotTag {
+  if (contextType === "patient") return "Clinical Summary";
+  if (contextType === "case") return "ECG Interpretation";
+  return "Differential Diagnosis";
+}
+
+function nextSize(size: { height: number; width: number }) {
+  if (size.width < 380) return { height: 500, width: 420 };
+  if (size.width < 520) return { height: 580, width: 560 };
+  return { height: 420, width: 320 };
 }
 
 function animateTyping(text: string, setValue: (value: string) => void) {
@@ -347,81 +297,47 @@ function animateTyping(text: string, setValue: (value: string) => void) {
   }
   let index = 0;
   const timer = window.setInterval(() => {
-    index += 18;
+    index += 20;
     setValue(text.slice(0, index));
     if (index >= text.length) window.clearInterval(timer);
   }, 18);
   return () => window.clearInterval(timer);
 }
 
-function exportConversation(conversationId: string, token: string) {
-  if (Platform.OS !== "web" || typeof window === "undefined") return;
-  void fetch(copilotExportUrl(conversationId), { headers: { authorization: `Bearer ${token}` } })
-    .then((response) => response.blob())
-    .then((blob) => {
-      const url = URL.createObjectURL(blob);
-      window.open(url, "_blank", "noopener,noreferrer");
-      setTimeout(() => URL.revokeObjectURL(url), 60_000);
-    });
-}
-
 const styles = StyleSheet.create({
   assistantMessage: { alignSelf: "flex-start", backgroundColor: medicalTheme.surface, borderColor: medicalTheme.border },
-  badge: { alignSelf: "flex-start", backgroundColor: "rgba(20,221,230,0.08)", borderRadius: 999, borderWidth: 1, paddingHorizontal: 8, paddingVertical: 4 },
-  badgeText: { fontSize: 10, fontWeight: "900", textTransform: "uppercase" },
-  body: { flex: 1, flexDirection: "row", gap: 12, minHeight: 0 },
-  button: { alignItems: "center", backgroundColor: medicalTheme.primary, borderRadius: 12, justifyContent: "center", minHeight: 36, paddingHorizontal: 10, paddingVertical: 8 },
-  buttonDanger: { backgroundColor: medicalTheme.critical },
-  buttonDisabled: { opacity: 0.45 },
-  buttonOutline: { backgroundColor: "transparent", borderColor: medicalTheme.border, borderWidth: 1 },
-  buttonText: { color: medicalTheme.background, fontSize: 11, fontWeight: "900" },
-  buttonTextOutline: { color: medicalTheme.primary },
-  chat: { flex: 1, gap: 10, minWidth: 0 },
-  citation: { color: medicalTheme.primary, fontSize: 10, fontWeight: "800" },
-  citations: { gap: 3, marginTop: 6 },
-  composer: { alignItems: "flex-end", flexDirection: "row", gap: 8 },
-  confidence: { color: medicalTheme.success, fontSize: 11, fontWeight: "900", marginTop: 4 },
-  contextCard: { alignItems: "center", backgroundColor: medicalTheme.surface, borderColor: medicalTheme.border, borderRadius: 12, borderWidth: 1, flexDirection: "row", gap: 8, padding: 9 },
-  contextText: { color: medicalTheme.muted, flex: 1, fontSize: 11, fontWeight: "800" },
-  conversationActive: { borderColor: medicalTheme.primary },
-  conversationItem: { backgroundColor: medicalTheme.surface, borderColor: medicalTheme.border, borderRadius: 12, borderWidth: 1, gap: 4, padding: 10 },
-  conversationList: { maxHeight: 260 },
-  conversationMeta: { color: medicalTheme.muted, fontSize: 10, fontWeight: "800" },
-  conversationTitle: { color: medicalTheme.text, fontSize: 12, fontWeight: "900" },
-  disclaimer: { color: medicalTheme.warning, fontSize: 11, fontWeight: "900" },
-  emptyText: { color: medicalTheme.muted, fontSize: 13, fontWeight: "700", lineHeight: 20, padding: 14 },
-  evidenceConfidence: { color: medicalTheme.success, fontSize: 11, fontWeight: "900" },
-  evidenceHeader: { alignItems: "center", flexDirection: "row", justifyContent: "space-between" },
-  evidencePanel: { backgroundColor: "#071D2D", borderColor: "#164E63", borderRadius: 12, borderWidth: 1, gap: 5, padding: 10 },
-  evidenceText: { color: medicalTheme.muted, fontSize: 11, fontWeight: "800", lineHeight: 16 },
-  evidenceTitle: { color: medicalTheme.text, fontSize: 12, fontWeight: "900" },
-  floatingButton: { alignItems: "center", backgroundColor: medicalTheme.primary, borderRadius: 999, bottom: 24, height: 58, justifyContent: "center", position: "absolute", right: 24, shadowColor: medicalTheme.primary, shadowOpacity: 0.36, shadowRadius: 16, width: 58, zIndex: 100 },
-  fullscreen: { bottom: 18, left: 18, position: "absolute", right: 18, top: 18, width: "auto" },
-  header: { alignItems: "center", borderBottomColor: medicalTheme.border, borderBottomWidth: 1, flexDirection: "row", gap: 8, justifyContent: "space-between", paddingBottom: 10 },
+  body: { flex: 1, gap: 10, minHeight: 0 },
+  citations: { color: medicalTheme.primary, fontSize: 10, fontWeight: "800", marginTop: 4 },
+  clearButton: { alignSelf: "flex-start" },
+  clearText: { color: medicalTheme.critical, fontSize: 11, fontWeight: "900" },
+  composer: { alignItems: "center", flexDirection: "row", gap: 8 },
+  confidence: { color: medicalTheme.success, fontSize: 11, fontWeight: "900" },
+  conversationChip: { backgroundColor: medicalTheme.surface, borderColor: medicalTheme.border, borderRadius: 999, borderWidth: 1, maxWidth: 170, paddingHorizontal: 10, paddingVertical: 7 },
+  conversationChipActive: { borderColor: medicalTheme.primary },
+  conversationStrip: { gap: 8 },
+  conversationText: { color: medicalTheme.text, fontSize: 11, fontWeight: "900" },
+  disabled: { opacity: 0.45 },
+  disclaimer: { color: medicalTheme.warning, fontSize: 11, fontWeight: "900", lineHeight: 16 },
+  emptyText: { color: medicalTheme.muted, fontSize: 12, fontWeight: "700", lineHeight: 18, paddingVertical: 8 },
+  floatingButton: { alignItems: "center", backgroundColor: medicalTheme.card, borderColor: medicalTheme.border, borderRadius: 999, borderWidth: 1, bottom: 24, flexDirection: "row", gap: 8, minHeight: 50, paddingHorizontal: 14, position: "absolute", right: 24, shadowColor: "#000", shadowOpacity: 0.28, shadowRadius: 18, zIndex: 100 },
+  floatingText: { color: medicalTheme.text, fontSize: 13, fontWeight: "900" },
+  fullscreen: { bottom: 18, left: 18, position: "absolute", right: 18, top: 18 },
+  header: { alignItems: "center", borderBottomColor: medicalTheme.border, borderBottomWidth: 1, cursor: "move" as never, flexDirection: "row", gap: 8, justifyContent: "space-between", paddingBottom: 10 },
   headerActions: { flexDirection: "row", gap: 6 },
-  headerTitle: { flex: 1 },
+  headerTitle: { flex: 1, minWidth: 0 },
   iconButton: { alignItems: "center", backgroundColor: medicalTheme.surface, borderColor: medicalTheme.border, borderRadius: 9, borderWidth: 1, height: 30, justifyContent: "center", width: 30 },
-  input: { backgroundColor: medicalTheme.surface, borderColor: medicalTheme.border, borderRadius: 14, borderWidth: 1, color: medicalTheme.text, flex: 1, maxHeight: 110, minHeight: 46, padding: 10 },
-  markdown: { gap: 2 },
-  markdownBullet: { color: medicalTheme.text, fontSize: 12, lineHeight: 19 },
-  markdownCode: { backgroundColor: "#020617", borderRadius: 6, color: "#BAE6FD", fontFamily: "monospace", fontSize: 11, padding: 4 },
-  markdownHeading: { color: medicalTheme.text, fontSize: 14, fontWeight: "900", marginTop: 4 },
-  message: { borderRadius: 14, borderWidth: 1, gap: 3, maxWidth: "92%", padding: 10 },
+  input: { backgroundColor: medicalTheme.surface, borderColor: medicalTheme.border, borderRadius: 14, borderWidth: 1, color: medicalTheme.text, flex: 1, maxHeight: 90, minHeight: 42, padding: 10 },
+  message: { borderRadius: 14, borderWidth: 1, gap: 3, maxWidth: "94%", padding: 10 },
   messageRole: { color: medicalTheme.primary, fontSize: 10, fontWeight: "900", textTransform: "uppercase" },
-  messageText: { color: medicalTheme.text, fontSize: 12, lineHeight: 19 },
-  messages: { flex: 1, minHeight: 260 },
+  messageText: { color: medicalTheme.text, fontSize: 12, lineHeight: 18 },
+  messages: { flex: 1, minHeight: 100 },
   minimized: { height: 58, overflow: "hidden" },
-  ownerMetric: { color: medicalTheme.muted, fontSize: 11, fontWeight: "800" },
-  ownerPanel: { backgroundColor: medicalTheme.surface, borderColor: medicalTheme.border, borderRadius: 12, borderWidth: 1, gap: 8, padding: 10 },
-  ownerTitle: { color: medicalTheme.text, fontSize: 12, fontWeight: "900" },
-  row: { flexDirection: "row", flexWrap: "wrap", gap: 6 },
-  search: { backgroundColor: medicalTheme.surface, borderColor: medicalTheme.border, borderRadius: 12, borderWidth: 1, color: medicalTheme.text, minHeight: 40, paddingHorizontal: 10 },
-  sidebar: { gap: 8, width: 210 },
+  quickAction: { alignItems: "center", backgroundColor: medicalTheme.surface, borderColor: medicalTheme.border, borderRadius: 13, borderWidth: 1, flexDirection: "row", gap: 8, justifyContent: "space-between", minHeight: 42, paddingHorizontal: 10 },
+  quickGrid: { gap: 8 },
+  quickText: { color: medicalTheme.text, fontSize: 12, fontWeight: "900" },
+  sendButton: { alignItems: "center", backgroundColor: medicalTheme.primary, borderRadius: 12, height: 42, justifyContent: "center", width: 42 },
   subtitle: { color: medicalTheme.muted, fontSize: 11, fontWeight: "800" },
-  tagRow: { flexDirection: "row", flexWrap: "wrap", gap: 6 },
-  title: { color: medicalTheme.text, fontSize: 16, fontWeight: "900" },
-  unreadBadge: { alignItems: "center", backgroundColor: medicalTheme.critical, borderRadius: 99, minWidth: 20, paddingHorizontal: 5, position: "absolute", right: -2, top: -2 },
-  unreadText: { color: "#fff", fontSize: 10, fontWeight: "900" },
+  title: { color: medicalTheme.text, fontSize: 15, fontWeight: "900" },
   userMessage: { alignSelf: "flex-end", backgroundColor: "#0E3345", borderColor: "#1F7085" },
-  widget: { backgroundColor: medicalTheme.card, borderColor: medicalTheme.border, borderRadius: 20, borderWidth: 1, bottom: 24, height: 660, maxHeight: "88%", padding: 14, position: "absolute", right: 24, shadowColor: "#000", shadowOpacity: 0.35, shadowRadius: 24, width: 780, zIndex: 100 },
+  widget: { backgroundColor: medicalTheme.card, borderColor: medicalTheme.border, borderRadius: 20, borderWidth: 1, bottom: 24, padding: 14, position: "absolute", right: 24, shadowColor: "#000", shadowOpacity: 0.35, shadowRadius: 24, zIndex: 100 },
 });
