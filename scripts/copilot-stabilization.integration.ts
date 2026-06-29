@@ -28,12 +28,18 @@ for (const marker of [
   "renameModalOpen",
   "renameCopilotConversation",
   "openRenameDialog",
+  "Unable to rename conversation.",
+  "Conversation renamed.",
   "Pin",
   "Unpin",
   "pinCopilotConversation",
+  "Unable to pin conversation.",
+  "Conversation pinned.",
   "Favorite",
   "Unfavorite",
   "favoriteCopilotConversation",
+  "Unable to favorite conversation.",
+  "Conversation added to favorites.",
   "Archive",
   "Restore",
   "Delete",
@@ -48,6 +54,20 @@ for (const marker of [
   "Copy answer",
   "applyConversationPatch",
   "setQueriesData",
+  "ConversationAction",
+  "actionNotice",
+  "toggleVoiceInput",
+  "stopVoiceInput",
+  "isRecording",
+  "openFilePicker",
+  "uploadComposerFile",
+  "AttachmentChip",
+  "setAttachments",
+  "attachmentIds",
+  "Voice input is not supported in this browser.",
+  "Microphone denied.",
+  "Unsupported format.",
+  "File too large.",
   "📌",
   "★",
 ]) {
@@ -56,7 +76,7 @@ for (const marker of [
 
 assert(conversationRoute.includes("useLocalSearchParams") && conversationRoute.includes("conversationId") && conversationRoute.includes("CopilotWorkspaceScreen"), "Dynamic /copilot/:conversationId route must restore workspace state.");
 
-for (const marker of ["isPinned", "isFavorite", "archivedAt", "lastOpenedAt", "@@index([isPinned])", "@@index([isFavorite])", "@@index([archivedAt])", "@@index([lastOpenedAt])"]) {
+for (const marker of ["CopilotAttachment", "isPinned", "isFavorite", "archivedAt", "lastOpenedAt", "@@index([isPinned])", "@@index([isFavorite])", "@@index([archivedAt])", "@@index([lastOpenedAt])"]) {
   assert(schema.includes(marker), `Prisma schema missing copilot persistence marker: ${marker}`);
 }
 
@@ -75,6 +95,9 @@ for (const marker of [
   "renameConversationSchema",
   "pinConversationSchema",
   "favoriteConversationSchema",
+  "uploadAttachmentSchema",
+  "copilotRouter.post(\"/attachments\"",
+  "copilotAttachment",
   "duplicate",
   "archivedAt: new Date()",
   "archivedAt: null",
@@ -83,7 +106,7 @@ for (const marker of [
   assert(routes.includes(marker), `Copilot API stabilization marker missing: ${marker}`);
 }
 
-for (const marker of ["isPinned", "isFavorite", "archivedAt", "lastOpenedAt", "restoreCopilotConversation", "renameCopilotConversation", "pinCopilotConversation", "favoriteCopilotConversation", "streamCopilotMessage"]) {
+for (const marker of ["isPinned", "isFavorite", "archivedAt", "lastOpenedAt", "restoreCopilotConversation", "renameCopilotConversation", "pinCopilotConversation", "favoriteCopilotConversation", "uploadCopilotAttachment", "streamCopilotMessage"]) {
   assert(service.includes(marker), `Copilot service stabilization marker missing: ${marker}`);
 }
 

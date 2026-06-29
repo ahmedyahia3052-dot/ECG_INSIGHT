@@ -1,9 +1,14 @@
+import fs from "node:fs";
+import path from "node:path";
+import { randomUUID } from "node:crypto";
+import multer from "multer";
 import { Router } from "express";
 import type { Prisma } from "@prisma/client";
 import { z } from "zod";
 import { prisma } from "../../config/prisma";
 import { requireAuth, requireRole } from "../../middleware/auth";
 import { AppError } from "../../middleware/error";
+import { assertResourceAccess, canAccessCase, canAccessPatient } from "../../utils/resource-access";
 
 export const copilotRouter = Router();
 
@@ -12,8 +17,11 @@ copilotRouter.use(requireAuth);
 const OWNER_EMAIL = "ahmedyahia3052@gmail.com";
 const DISCLAIMER = "AI assistance only. Final diagnosis and clinical decisions remain the responsibility of the physician.";
 const tags = ["ECG Interpretation", "Clinical Summary", "Occupational Fitness", "Differential Diagnosis", "Follow-up"] as const;
+const attachmentRoot = path.resolve(process.cwd(), "uploads", "copilot");
+fs.mkdirSync(attachmentRoot, { recursive: true });
 
 type Citation = { id: string; label: string; source: string; tags?: string[]; type: string };
+type AttachmentKind = "ecg" | "echo" | "labs" | "file";
 
 type ClinicalContext = {
   criticalAlerts: string[];
@@ -91,16 +99,84 @@ const favoriteConversationSchema = z.object({
   isFavorite: z.boolean(),
 });
 
+const attachmentKinds = ["ecg", "echo", "labs", "file"] as const;
+const attachmentSchema = z.object({
+  attachmentIds: z.array(z.string().trim().min(1)).max(12).default([]),
+});
+
 const chatSchema = contextSchema.extend({
+  attachmentIds: attachmentSchema.shape.attachmentIds,
   conversationId: z.string().optional(),
   question: z.string().trim().min(1).max(4000),
   tag: z.enum(tags).default("ECG Interpretation"),
 });
 type ChatInput = z.infer<typeof chatSchema>;
 
+const uploadAttachmentSchema = contextSchema.extend({
+  conversationId: z.string().optional(),
+  kind: z.enum(attachmentKinds),
+});
+
 const settingsSchema = z.object({
   enabled: z.boolean(),
   provider: z.string().trim().min(1).max(80),
+});
+
+const attachmentRules: Record<AttachmentKind, { extensions: Set<string>; maxBytes: number; mime: Set<string> }> = {
+  ecg: {
+    extensions: new Set([".jpg", ".jpeg", ".png", ".pdf"]),
+    maxBytes: 25 * 1024 * 1024,
+    mime: new Set(["application/pdf", "image/jpeg", "image/jpg", "image/png"]),
+  },
+  echo: {
+    extensions: new Set([".jpg", ".jpeg", ".png", ".pdf"]),
+    maxBytes: 25 * 1024 * 1024,
+    mime: new Set(["application/pdf", "image/jpeg", "image/jpg", "image/png"]),
+  },
+  labs: {
+    extensions: new Set([".csv", ".jpg", ".jpeg", ".png", ".pdf"]),
+    maxBytes: 20 * 1024 * 1024,
+    mime: new Set(["application/pdf", "image/jpeg", "image/jpg", "image/png", "text/csv", "application/vnd.ms-excel"]),
+  },
+  file: {
+    extensions: new Set([".csv", ".docx", ".jpg", ".jpeg", ".pdf", ".png", ".txt"]),
+    maxBytes: 20 * 1024 * 1024,
+    mime: new Set(["application/pdf", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "image/jpeg", "image/jpg", "image/png", "text/csv", "text/plain"]),
+  },
+};
+
+function safeAttachmentName(originalName: string) {
+  const ext = path.extname(originalName).toLowerCase();
+  if (!Object.values(attachmentRules).some((rule) => rule.extensions.has(ext))) {
+    throw new AppError(400, "Unsupported format.", "UNSUPPORTED_FORMAT");
+  }
+  return `${Date.now()}-${randomUUID()}${ext}`;
+}
+
+const attachmentStorage = multer.diskStorage({
+  destination: (_req, _file, cb) => cb(null, attachmentRoot),
+  filename: (_req, file, cb) => {
+    try {
+      cb(null, safeAttachmentName(file.originalname));
+    } catch (error) {
+      cb(error as Error, "");
+    }
+  },
+});
+
+const uploadAttachment = multer({
+  fileFilter: (req, file, cb) => {
+    const kind = typeof req.body?.kind === "string" && attachmentKinds.includes(req.body.kind) ? req.body.kind as AttachmentKind : "file";
+    const rules = attachmentRules[kind];
+    const ext = path.extname(file.originalname).toLowerCase();
+    if (!rules.extensions.has(ext) || (!rules.mime.has(file.mimetype) && file.mimetype !== "application/octet-stream")) {
+      cb(new AppError(400, "Unsupported format.", "UNSUPPORTED_FORMAT"));
+      return;
+    }
+    cb(null, true);
+  },
+  limits: { fileSize: 25 * 1024 * 1024 },
+  storage: attachmentStorage,
 });
 
 function ownerOnly(req: { auth?: { id: string } }) {
@@ -152,7 +228,37 @@ function serializeConversation(conversation: {
   };
 }
 
+function serializeAttachment(attachment: {
+  caseId: string | null;
+  conversationId: string | null;
+  createdAt: Date;
+  id: string;
+  kind: string;
+  messageId: string | null;
+  mimeType: string;
+  originalName: string;
+  patientId: string | null;
+  sizeBytes: number;
+  storedName: string;
+}) {
+  return {
+    caseId: attachment.caseId ?? undefined,
+    conversationId: attachment.conversationId ?? undefined,
+    createdAt: attachment.createdAt.toISOString(),
+    downloadUrl: `/api/copilot/attachments/${attachment.id}/download`,
+    id: attachment.id,
+    kind: attachment.kind,
+    messageId: attachment.messageId ?? undefined,
+    mimeType: attachment.mimeType,
+    originalName: attachment.originalName,
+    patientId: attachment.patientId ?? undefined,
+    sizeBytes: attachment.sizeBytes,
+    storedName: attachment.storedName,
+  };
+}
+
 function serializeMessage(message: {
+  attachments?: Array<Parameters<typeof serializeAttachment>[0]>;
   citations: Prisma.JsonValue | null;
   confidence: number | null;
   content: string;
@@ -162,6 +268,7 @@ function serializeMessage(message: {
   role: string;
 }) {
   return {
+    attachments: message.attachments?.map(serializeAttachment) ?? [],
     citations: message.citations ?? [],
     confidence: message.confidence ?? undefined,
     content: message.content,
@@ -499,13 +606,34 @@ async function executeCopilotChat(input: ChatInput, userId: string, started = Da
           userId,
         },
       });
-  await prisma.copilotMessage.create({
+  const userMessage = await prisma.copilotMessage.create({
     data: { content: input.question, conversationId: conversation.id, role: "user" },
+    include: { attachments: true },
   });
+  if (input.attachmentIds.length) {
+    const ownedAttachments = await prisma.copilotAttachment.findMany({
+      where: { id: { in: input.attachmentIds }, userId },
+    });
+    if (ownedAttachments.length !== input.attachmentIds.length) {
+      throw new AppError(404, "One or more Copilot attachments were not found.", "COPILOT_ATTACHMENT_NOT_FOUND");
+    }
+    await prisma.copilotAttachment.updateMany({
+      data: { conversationId: conversation.id, messageId: userMessage.id },
+      where: { id: { in: input.attachmentIds }, userId },
+    });
+    userMessage.attachments = await prisma.copilotAttachment.findMany({
+      orderBy: { createdAt: "asc" },
+      where: { messageId: userMessage.id },
+    });
+  }
   const clinicalContext = await retrieveClinicalContext({ caseId: input.caseId ?? conversation.caseId ?? undefined, patientId: input.patientId ?? conversation.patientId ?? undefined });
   const knowledge = await retrieveKnowledge(input.question, clinicalContext);
-  const prompt = buildPrompt(input.question, clinicalContext, knowledge.hits);
-  const result = generateClinicalResponse({ context: clinicalContext, knowledge: knowledge.hits, prompt, question: input.question });
+  const attachmentContext = userMessage.attachments.length
+    ? `\nAttachments: ${userMessage.attachments.map((attachment) => `${attachment.kind.toUpperCase()} ${attachment.originalName} (${attachment.mimeType}, ${attachment.sizeBytes} bytes)`).join(" | ")}`
+    : "";
+  const enrichedQuestion = `${input.question}${attachmentContext}`;
+  const prompt = buildPrompt(enrichedQuestion, clinicalContext, knowledge.hits);
+  const result = generateClinicalResponse({ context: clinicalContext, knowledge: knowledge.hits, prompt, question: enrichedQuestion });
   const responseTimeMs = Date.now() - started;
   const assistant = await prisma.copilotMessage.create({
     data: {
@@ -524,7 +652,7 @@ async function executeCopilotChat(input: ChatInput, userId: string, started = Da
     data: { lastOpenedAt: new Date(), tag, updatedAt: new Date() },
     where: { id: conversation.id },
   });
-  return { assistant, conversation: updatedConversation, result, responseTimeMs };
+  return { assistant, conversation: updatedConversation, result, responseTimeMs, userMessage };
 }
 
 async function auditCopilotError(userId: string, error: unknown, question?: string) {
@@ -572,6 +700,63 @@ copilotRouter.put("/settings", requireRole("SUPER_ADMIN"), async (req, res, next
       where: { id: current.id },
     });
     res.json({ settings: updated });
+  } catch (error) {
+    next(error);
+  }
+});
+
+copilotRouter.post("/attachments", requireRole("DOCTOR"), uploadAttachment.single("file"), async (req, res, next) => {
+  try {
+    if (!req.file) throw new AppError(400, "Upload failed.", "FILE_REQUIRED");
+    const body = uploadAttachmentSchema.parse(req.body);
+    const rules = attachmentRules[body.kind];
+    if (req.file.size > rules.maxBytes) {
+      fs.rmSync(req.file.path, { force: true });
+      throw new AppError(400, "File too large.", "FILE_TOO_LARGE");
+    }
+    if (body.patientId) assertResourceAccess(await canAccessPatient(body.patientId, req.auth!));
+    if (body.caseId) assertResourceAccess(await canAccessCase(body.caseId, req.auth!));
+    if (body.conversationId) await conversationForUser(body.conversationId, req.auth!.id);
+    const attachment = await prisma.copilotAttachment.create({
+      data: {
+        caseId: body.caseId,
+        conversationId: body.conversationId,
+        kind: body.kind,
+        mimeType: req.file.mimetype,
+        originalName: req.file.originalname,
+        patientId: body.patientId,
+        sizeBytes: req.file.size,
+        storagePath: req.file.path,
+        storedName: req.file.filename,
+        userId: req.auth!.id,
+      },
+    });
+    await prisma.auditLog.create({
+      data: {
+        action: "CASE_UPDATED",
+        actorId: req.auth!.id,
+        caseId: body.caseId,
+        entityId: attachment.id,
+        entityType: "CopilotAttachment",
+        message: `Copilot ${body.kind} attachment uploaded: ${attachment.originalName}.`,
+        metadata: { kind: body.kind, mimeType: attachment.mimeType, sizeBytes: attachment.sizeBytes },
+        patientId: body.patientId,
+      },
+    }).catch(() => undefined);
+    res.status(201).json({ attachment: serializeAttachment(attachment) });
+  } catch (error) {
+    if (req.file?.path) fs.rmSync(req.file.path, { force: true });
+    next(error);
+  }
+});
+
+copilotRouter.get("/attachments/:attachmentId/download", async (req, res, next) => {
+  try {
+    const attachment = await prisma.copilotAttachment.findFirst({
+      where: { id: String(req.params.attachmentId), userId: req.auth!.id },
+    });
+    if (!attachment) throw new AppError(404, "Copilot attachment not found.", "COPILOT_ATTACHMENT_NOT_FOUND");
+    res.download(attachment.storagePath, attachment.originalName);
   } catch (error) {
     next(error);
   }
@@ -716,6 +901,7 @@ copilotRouter.get("/conversations/:conversationId", async (req, res, next) => {
       where: { id: current.id },
     });
     const messages = await prisma.copilotMessage.findMany({
+      include: { attachments: { orderBy: { createdAt: "asc" } } },
       orderBy: { createdAt: "asc" },
       where: { conversationId: conversation.id },
     });
@@ -818,10 +1004,11 @@ copilotRouter.post("/chat", requireRole("DOCTOR"), async (req, res, next) => {
   try {
     const started = Date.now();
     const body = chatSchema.parse(req.body);
-    const { assistant, conversation } = await executeCopilotChat(body, req.auth!.id, started);
+    const { assistant, conversation, userMessage } = await executeCopilotChat(body, req.auth!.id, started);
     res.status(201).json({
       conversation: serializeConversation(conversation),
       message: serializeMessage(assistant),
+      userMessage: serializeMessage(userMessage),
       streaming: true,
     });
   } catch (error) {
@@ -845,10 +1032,10 @@ copilotRouter.post("/chat/stream", requireRole("DOCTOR"), async (req, res, next)
     writeSse(res, "status", { message: "AI is analyzing ECG..." });
     writeSse(res, "status", { message: "Reviewing previous ECGs..." });
     writeSse(res, "status", { message: "Generating recommendations..." });
-    const { assistant, conversation } = await executeCopilotChat(body, req.auth!.id, started);
-    writeSse(res, "conversation", { conversation: serializeConversation(conversation), message: serializeMessage(assistant) });
+    const { assistant, conversation, userMessage } = await executeCopilotChat(body, req.auth!.id, started);
+    writeSse(res, "conversation", { conversation: serializeConversation(conversation), message: serializeMessage(assistant), userMessage: serializeMessage(userMessage) });
     await streamAssistantContent(assistant.content, res, () => closed);
-    if (!closed) writeSse(res, "done", { conversation: serializeConversation(conversation), message: serializeMessage(assistant) });
+    if (!closed) writeSse(res, "done", { conversation: serializeConversation(conversation), message: serializeMessage(assistant), userMessage: serializeMessage(userMessage) });
     res.end();
   } catch (error) {
     await auditCopilotError(req.auth!.id, error, typeof req.body?.question === "string" ? req.body.question : undefined);

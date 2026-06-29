@@ -26,7 +26,23 @@ export interface CopilotCitation {
   type: string;
 }
 
+export interface CopilotAttachment {
+  caseId?: string;
+  conversationId?: string;
+  createdAt: string;
+  downloadUrl: string;
+  id: string;
+  kind: "ecg" | "echo" | "file" | "labs";
+  messageId?: string;
+  mimeType: string;
+  originalName: string;
+  patientId?: string;
+  sizeBytes: number;
+  storedName: string;
+}
+
 export interface CopilotMessage {
+  attachments?: CopilotAttachment[];
   citations: CopilotCitation[];
   confidence?: number;
   content: string;
@@ -37,6 +53,7 @@ export interface CopilotMessage {
 }
 
 export type CopilotChatInput = {
+  attachmentIds?: string[];
   caseId?: string;
   contextPath?: string;
   contextType: "case" | "global" | "patient";
@@ -45,7 +62,7 @@ export type CopilotChatInput = {
   question: string;
   tag: CopilotTag;
 };
-export type CopilotStreamEvent = { conversation?: CopilotConversation; message?: CopilotMessage; status?: string; token?: string; type: "conversation" | "done" | "error" | "status" | "token" };
+export type CopilotStreamEvent = { conversation?: CopilotConversation; message?: CopilotMessage; status?: string; token?: string; type: "conversation" | "done" | "error" | "status" | "token"; userMessage?: CopilotMessage };
 
 export interface CopilotSettings {
   enabled: boolean;
@@ -122,9 +139,18 @@ export async function restoreCopilotConversation(accessToken: string, conversati
 }
 
 export async function sendCopilotMessage(accessToken: string, input: CopilotChatInput) {
-  return apiRequest<{ conversation: CopilotConversation; message: CopilotMessage; streaming: boolean }>("/copilot/chat", {
+  return apiRequest<{ conversation: CopilotConversation; message: CopilotMessage; streaming: boolean; userMessage: CopilotMessage }>("/copilot/chat", {
     accessToken,
     body: JSON.stringify(input),
+    method: "POST",
+  });
+}
+
+export async function uploadCopilotAttachment(accessToken: string, formData: FormData) {
+  return apiRequest<{ attachment: CopilotAttachment }>("/copilot/attachments", {
+    accessToken,
+    body: formData,
+    headers: {},
     method: "POST",
   });
 }
@@ -201,7 +227,7 @@ function parseSseEvent(block: string) {
   const dataLine = block.split("\n").find((line) => line.startsWith("data:"));
   if (!eventLine || !dataLine) return null;
   const type = eventLine.replace("event:", "").trim() as "conversation" | "done" | "error" | "status" | "token";
-  const data = JSON.parse(dataLine.replace("data:", "").trim()) as { conversation?: CopilotConversation; message?: CopilotMessage | string; token?: string };
+  const data = JSON.parse(dataLine.replace("data:", "").trim()) as { conversation?: CopilotConversation; message?: CopilotMessage | string; token?: string; userMessage?: CopilotMessage };
   if (type === "status" || type === "error") return { status: typeof data.message === "string" ? data.message : undefined, type };
-  return { conversation: data.conversation, message: typeof data.message === "string" ? undefined : data.message, token: data.token, type };
+  return { conversation: data.conversation, message: typeof data.message === "string" ? undefined : data.message, token: data.token, type, userMessage: data.userMessage };
 }

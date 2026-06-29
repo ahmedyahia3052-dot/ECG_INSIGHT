@@ -19,6 +19,8 @@ import {
   renameCopilotConversation,
   restoreCopilotConversation,
   streamCopilotMessage,
+  uploadCopilotAttachment,
+  type CopilotAttachment,
   type CopilotCitation,
   type CopilotConversation,
   type CopilotMessage,
@@ -30,6 +32,30 @@ type WorkspacePrompt = {
   label: string;
   prompt: string;
   tag: CopilotTag;
+};
+
+type AttachmentKind = "ecg" | "echo" | "file" | "labs";
+type SpeechRecognitionLike = {
+  continuous: boolean;
+  interimResults: boolean;
+  lang: string;
+  onend: (() => void) | null;
+  onerror: ((event: { error?: string }) => void) | null;
+  onresult: ((event: { results: ArrayLike<{ 0: { transcript: string }; isFinal: boolean }> }) => void) | null;
+  start: () => void;
+  stop: () => void;
+};
+
+type SpeechWindow = Window & {
+  SpeechRecognition?: new () => SpeechRecognitionLike;
+  webkitSpeechRecognition?: new () => SpeechRecognitionLike;
+};
+
+const ATTACHMENT_RULES: Record<AttachmentKind, { accept: string; extensions: string[]; maxBytes: number; multiple: boolean }> = {
+  ecg: { accept: ".jpg,.jpeg,.png,.pdf,image/jpeg,image/png,application/pdf", extensions: [".jpg", ".jpeg", ".png", ".pdf"], maxBytes: 25 * 1024 * 1024, multiple: false },
+  echo: { accept: ".jpg,.jpeg,.png,.pdf,image/jpeg,image/png,application/pdf", extensions: [".jpg", ".jpeg", ".png", ".pdf"], maxBytes: 25 * 1024 * 1024, multiple: false },
+  labs: { accept: ".csv,.jpg,.jpeg,.png,.pdf,text/csv,image/jpeg,image/png,application/pdf", extensions: [".csv", ".jpg", ".jpeg", ".png", ".pdf"], maxBytes: 20 * 1024 * 1024, multiple: false },
+  file: { accept: ".pdf,.docx,.txt,.csv,.jpg,.jpeg,.png,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain,text/csv,image/jpeg,image/png", extensions: [".csv", ".docx", ".jpg", ".jpeg", ".pdf", ".png", ".txt"], maxBytes: 20 * 1024 * 1024, multiple: true },
 };
 
 const ACTIONS: WorkspacePrompt[] = [
@@ -54,6 +80,7 @@ export default function CopilotRoute() {
 export function CopilotWorkspaceScreen({ routeConversationId }: { routeConversationId?: string }) {
   const queryClient = useQueryClient();
   const router = useRouter();
+  const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
   const scrollRef = useRef<ScrollView>(null);
   const streamAbort = useRef<AbortController | null>(null);
   const { width } = useWindowDimensions();
@@ -61,7 +88,10 @@ export function CopilotWorkspaceScreen({ routeConversationId }: { routeConversat
   const token = authToken?.token;
   const [conversationSearch, setConversationSearch] = useState("");
   const [contextOpen, setContextOpen] = useState(false);
+  const [actionNotice, setActionNotice] = useState<{ tone: "error" | "success"; text: string } | undefined>();
+  const [attachments, setAttachments] = useState<CopilotAttachment[]>([]);
   const [draft, setDraft] = useState("");
+  const [isRecording, setIsRecording] = useState(false);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [renameModalOpen, setRenameModalOpen] = useState(false);
   const [renameTitle, setRenameTitle] = useState("");
@@ -135,6 +165,110 @@ export function CopilotWorkspaceScreen({ routeConversationId }: { routeConversat
     if (conversation.id === selectedId) setRenameTitle(conversation.title);
   }, [applyConversationPatch, selectedId]);
 
+  const showActionNotice = useCallback((text: string, tone: "error" | "success" = "success") => {
+    setActionNotice({ text, tone });
+  }, []);
+
+  const stopVoiceInput = useCallback(() => {
+    recognitionRef.current?.stop();
+    recognitionRef.current = null;
+    setIsRecording(false);
+  }, []);
+
+  const uploadComposerFile = useCallback(async (file: File, kind: AttachmentKind) => {
+    if (!token) {
+      showActionNotice("Upload failed.", "error");
+      return;
+    }
+    const rule = ATTACHMENT_RULES[kind];
+    const extension = file.name.slice(file.name.lastIndexOf(".")).toLowerCase();
+    if (!rule.extensions.includes(extension)) {
+      showActionNotice("Unsupported format.", "error");
+      return;
+    }
+    if (file.size > rule.maxBytes) {
+      showActionNotice("File too large.", "error");
+      return;
+    }
+    if (kind === "ecg" && attachments.some((item) => item.kind === "ecg")) {
+      const replace = typeof window !== "undefined" ? window.confirm("An ECG is already attached. Replace it?") : false;
+      if (!replace) return;
+      setAttachments((current) => current.filter((item) => item.kind !== "ecg"));
+    }
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("kind", kind);
+    formData.append("contextType", currentCase ? "case" : currentPatient ? "patient" : "global");
+    if (currentPatient?.id) formData.append("patientId", currentPatient.id);
+    if (currentCase?.id) formData.append("caseId", currentCase.id);
+    if (selectedId) formData.append("conversationId", selectedId);
+    try {
+      const payload = await uploadCopilotAttachment(token, formData);
+      setAttachments((current) => kind === "ecg" ? current.filter((item) => item.kind !== "ecg").concat(payload.attachment) : current.concat(payload.attachment));
+      showActionNotice(`${payload.attachment.originalName} uploaded.`);
+    } catch {
+      showActionNotice("Upload failed.", "error");
+    }
+  }, [attachments, currentCase, currentPatient, selectedId, showActionNotice, token]);
+
+  const openFilePicker = useCallback((kind: AttachmentKind) => {
+    if (Platform.OS !== "web" || typeof document === "undefined") {
+      showActionNotice("Upload failed.", "error");
+      return;
+    }
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = ATTACHMENT_RULES[kind].accept;
+    input.multiple = ATTACHMENT_RULES[kind].multiple;
+    input.onchange = () => {
+      const files = Array.from(input.files ?? []);
+      if (!files.length) return;
+      void Promise.all(files.map((file) => uploadComposerFile(file, kind)));
+    };
+    input.click();
+  }, [showActionNotice, uploadComposerFile]);
+
+  const toggleVoiceInput = useCallback(() => {
+    if (isRecording) {
+      stopVoiceInput();
+      return;
+    }
+    if (Platform.OS !== "web" || typeof window === "undefined") {
+      showActionNotice("Voice input is not supported in this browser.", "error");
+      return;
+    }
+    const speechWindow = window as SpeechWindow;
+    const Recognition = speechWindow.SpeechRecognition ?? speechWindow.webkitSpeechRecognition;
+    if (!Recognition) {
+      showActionNotice("Voice input is not supported in this browser.", "error");
+      return;
+    }
+    try {
+      const recognition = new Recognition();
+      recognition.continuous = true;
+      recognition.interimResults = true;
+      recognition.lang = "en-US";
+      recognition.onresult = (event) => {
+        const transcript = Array.from(event.results)
+          .map((result) => result[0].transcript)
+          .join(" ")
+          .trim();
+        if (transcript) setDraft((current) => `${current}${current ? " " : ""}${transcript}`.trimStart());
+      };
+      recognition.onerror = (event) => {
+        stopVoiceInput();
+        showActionNotice(event.error === "not-allowed" ? "Microphone denied." : "Upload failed.", "error");
+      };
+      recognition.onend = () => setIsRecording(false);
+      recognitionRef.current = recognition;
+      recognition.start();
+      setIsRecording(true);
+      showActionNotice("Voice recording started.");
+    } catch {
+      showActionNotice("Microphone denied.", "error");
+    }
+  }, [isRecording, showActionNotice, stopVoiceInput]);
+
   const navigateConversation = useCallback((conversationId: string) => {
     setSelectedId(conversationId);
     setMobileSidebarOpen(false);
@@ -168,9 +302,13 @@ export function CopilotWorkspaceScreen({ routeConversationId }: { routeConversat
       commitConversation(payload.conversation);
       setRenameModalOpen(false);
       setRenameTarget(undefined);
+      showActionNotice("Conversation renamed.");
       invalidate();
     },
-    onError: invalidate,
+    onError: () => {
+      showActionNotice("Unable to rename conversation.", "error");
+      invalidate();
+    },
   });
 
   const pinMutation = useMutation({
@@ -180,9 +318,13 @@ export function CopilotWorkspaceScreen({ routeConversationId }: { routeConversat
     },
     onSuccess: (payload) => {
       commitConversation(payload.conversation);
+      showActionNotice(payload.conversation.isPinned ? "Conversation pinned." : "Conversation unpinned.");
       invalidate();
     },
-    onError: invalidate,
+    onError: () => {
+      showActionNotice("Unable to pin conversation.", "error");
+      invalidate();
+    },
   });
 
   const favoriteMutation = useMutation({
@@ -192,9 +334,13 @@ export function CopilotWorkspaceScreen({ routeConversationId }: { routeConversat
     },
     onSuccess: (payload) => {
       commitConversation(payload.conversation);
+      showActionNotice(payload.conversation.isFavorite ? "Conversation added to favorites." : "Conversation removed from favorites.");
       invalidate();
     },
-    onError: invalidate,
+    onError: () => {
+      showActionNotice("Unable to favorite conversation.", "error");
+      invalidate();
+    },
   });
 
   const deleteMutation = useMutation({
@@ -239,7 +385,7 @@ export function CopilotWorkspaceScreen({ routeConversationId }: { routeConversat
   });
 
   const sendMutation = useMutation({
-    mutationFn: async (input: { prompt: string; tag: CopilotTag }) => {
+    mutationFn: async (input: { attachmentIds: string[]; prompt: string; tag: CopilotTag }) => {
       const controller = new AbortController();
       streamAbort.current = controller;
       setStatus("Loading clinical context...");
@@ -247,6 +393,7 @@ export function CopilotWorkspaceScreen({ routeConversationId }: { routeConversat
       let finalConversation: CopilotConversation | undefined;
       await streamCopilotMessage(token!, {
         caseId: currentCase?.id,
+        attachmentIds: input.attachmentIds,
         contextPath: "/copilot",
         contextType: currentCase ? "case" : currentPatient ? "patient" : "global",
         conversationId: selectedId,
@@ -266,6 +413,7 @@ export function CopilotWorkspaceScreen({ routeConversationId }: { routeConversat
       return finalConversation;
     },
     onSuccess: () => {
+      setAttachments([]);
       setDraft("");
       setStatus("");
       setStreamingMessage("");
@@ -303,29 +451,43 @@ export function CopilotWorkspaceScreen({ routeConversationId }: { routeConversat
   }, [messages.length, streamingMessage]);
 
   function sendPrompt(prompt: string, tag: CopilotTag) {
-    const trimmed = prompt.trim();
+    const trimmed = prompt.trim() || (attachments.length ? "Review the attached clinical files and summarize the relevant ECG, echo, labs, and document findings." : "");
     if (!trimmed || !token || sendMutation.isPending) return;
-    sendMutation.mutate({ prompt: trimmed, tag });
+    sendMutation.mutate({ attachmentIds: attachments.map((attachment) => attachment.id), prompt: trimmed, tag });
   }
 
   function saveRename() {
     const target = renameTarget ?? selectedConversation;
-    if (!target) return;
+    if (!target || !token) {
+      showActionNotice("Unable to rename conversation.", "error");
+      return;
+    }
     renameMutation.mutate({ conversationId: target.id, title: renameTitle.trim() || "Clinical copilot conversation" });
   }
 
   function openRenameDialog(conversation?: CopilotConversation) {
-    if (!conversation) return;
+    if (!conversation) {
+      showActionNotice("Select a conversation before renaming.", "error");
+      return;
+    }
     setRenameTarget(conversation);
     setRenameTitle(conversation.title);
     setRenameModalOpen(true);
   }
 
   function togglePin(conversation: CopilotConversation) {
+    if (!token) {
+      showActionNotice("Unable to pin conversation.", "error");
+      return;
+    }
     pinMutation.mutate({ conversationId: conversation.id, isPinned: !conversation.isPinned });
   }
 
   function toggleFavorite(conversation: CopilotConversation) {
+    if (!token) {
+      showActionNotice("Unable to favorite conversation.", "error");
+      return;
+    }
     favoriteMutation.mutate({ conversationId: conversation.id, isFavorite: !conversation.isFavorite });
   }
 
@@ -410,6 +572,15 @@ export function CopilotWorkspaceScreen({ routeConversationId }: { routeConversat
           ))}
         </View>
 
+        {actionNotice ? (
+          <View style={[styles.actionNotice, actionNotice.tone === "error" ? styles.actionNoticeError : styles.actionNoticeSuccess]}>
+            <Text style={styles.actionNoticeText}>{actionNotice.text}</Text>
+            <Pressable accessibilityLabel="Dismiss action message" accessibilityRole="button" onPress={() => setActionNotice(undefined)} style={styles.actionNoticeDismiss}>
+              <Feather name="x" size={13} color={medicalTheme.text} />
+            </Pressable>
+          </View>
+        ) : null}
+
         <Card style={styles.chatPanel}>
           <View style={styles.chatHeader}>
             <View style={styles.chatIdentity}>
@@ -432,8 +603,8 @@ export function CopilotWorkspaceScreen({ routeConversationId }: { routeConversat
             </View>
             <View style={styles.chatTools}>
               <HeaderTool disabled={!selectedConversation} icon="edit-2" label="Rename" onPress={() => openRenameDialog(selectedConversation)} />
-              <HeaderTool disabled={!selectedConversation || pinMutation.isPending} icon="map-pin" label={selectedConversation?.isPinned ? "Unpin" : "Pin"} onPress={() => selectedConversation && togglePin(selectedConversation)} />
-              <HeaderTool disabled={!selectedConversation || favoriteMutation.isPending} icon="star" label={selectedConversation?.isFavorite ? "Unfavorite" : "Favorite"} onPress={() => selectedConversation && toggleFavorite(selectedConversation)} />
+              <HeaderTool disabled={!selectedConversation || pinMutation.isPending} icon="map-pin" label={selectedConversation?.isPinned ? "📌 Pinned" : "Pin"} onPress={() => selectedConversation && togglePin(selectedConversation)} />
+              <HeaderTool disabled={!selectedConversation || favoriteMutation.isPending} icon="star" label={selectedConversation?.isFavorite ? "★ Favorite" : "Favorite"} onPress={() => selectedConversation && toggleFavorite(selectedConversation)} />
               <HeaderTool disabled={!messages.length || sendMutation.isPending} icon="refresh-cw" label="Regenerate" onPress={regenerateLastAnswer} />
               <HeaderTool disabled={!selectedId || sendMutation.isPending} icon="fast-forward" label="Continue" onPress={continueGeneration} />
             </View>
@@ -448,18 +619,29 @@ export function CopilotWorkspaceScreen({ routeConversationId }: { routeConversat
             ) : null}
             {messages.map((message) => <MessageCard key={message.id} message={message} />)}
             {status && !streamingMessage ? <Text style={styles.statusText}>{status}</Text> : null}
-            {streamingMessage ? <MessageCard message={{ citations: [], content: streamingMessage, createdAt: new Date().toISOString(), id: "streaming", role: "assistant" }} /> : null}
+            {streamingMessage ? <MessageCard message={{ attachments: [], citations: [], content: streamingMessage, createdAt: new Date().toISOString(), id: "streaming", role: "assistant" }} /> : null}
           </ScrollView>
 
           <View style={styles.composer}>
             <View style={styles.attachmentRow}>
-              <ComposerTool icon="mic" label="Voice" />
-              <ComposerTool icon="activity" label="Upload ECG" />
-              <ComposerTool icon="heart" label="Upload Echo" />
-              <ComposerTool icon="clipboard" label="Upload Labs" />
-              <ComposerTool icon="paperclip" label="Attach Files" />
+              <ComposerTool active={isRecording} icon="mic" label={isRecording ? "Stop Voice" : "Voice"} onPress={toggleVoiceInput} />
+              <ComposerTool icon="activity" label="Upload ECG" onPress={() => openFilePicker("ecg")} />
+              <ComposerTool icon="heart" label="Upload Echo" onPress={() => openFilePicker("echo")} />
+              <ComposerTool icon="clipboard" label="Upload Labs" onPress={() => openFilePicker("labs")} />
+              <ComposerTool icon="paperclip" label="Attach Files" onPress={() => openFilePicker("file")} />
               {Platform.OS === "web" ? <Text style={styles.dropHint}>Drag & drop supported by browser upload workflows</Text> : null}
             </View>
+            {attachments.length ? (
+              <View style={styles.attachmentPanel}>
+                {attachments.map((attachment) => (
+                  <AttachmentChip
+                    attachment={attachment}
+                    key={attachment.id}
+                    onRemove={() => setAttachments((current) => current.filter((item) => item.id !== attachment.id))}
+                  />
+                ))}
+              </View>
+            ) : null}
             <View style={styles.inputRow}>
               <TextInput
                 multiline
@@ -474,7 +656,7 @@ export function CopilotWorkspaceScreen({ routeConversationId }: { routeConversat
                 style={styles.composerInput}
                 value={draft}
               />
-              <PrimaryButton disabled={!draft.trim() || sendMutation.isPending} icon="send" label="Send" onPress={() => sendPrompt(draft, "Clinical Summary")} />
+              <PrimaryButton disabled={(!draft.trim() && !attachments.length) || sendMutation.isPending} icon="send" label="Send" onPress={() => sendPrompt(draft, "Clinical Summary")} />
               <PrimaryButton disabled={!sendMutation.isPending} icon="square" label="Stop" onPress={() => { streamAbort.current?.abort(); setStatus(""); setStreamingMessage(""); }} variant="outline" />
             </View>
             <Text style={styles.counter}>{characterCount}/8000 • Enter sends • Shift+Enter creates a new line</Text>
@@ -570,9 +752,9 @@ function ConversationGroup({
             <Text style={styles.conversationMeta}>{conversation.tag} • {new Date(conversation.updatedAt).toLocaleDateString()}</Text>
           </Pressable>
           <View style={styles.conversationMenu}>
-            <MiniAction icon="edit-2" label="Rename" onPress={() => onRename(conversation)} />
-            <MiniAction icon="map-pin" label={conversation.isPinned ? "Unpin" : "Pin"} onPress={() => onPin(conversation)} />
-            <MiniAction icon="star" label={conversation.isFavorite ? "Unfavorite" : "Favorite"} onPress={() => onFavorite(conversation)} />
+            <ConversationAction icon="edit-2" label="Rename" onPress={() => onRename(conversation)} />
+            <ConversationAction active={conversation.isPinned} activeText="📌 Pinned" icon="map-pin" label={conversation.isPinned ? "Unpin" : "Pin"} onPress={() => onPin(conversation)} />
+            <ConversationAction active={conversation.isFavorite} activeText="★ Favorite" icon="star" label={conversation.isFavorite ? "Unfavorite" : "Favorite"} onPress={() => onFavorite(conversation)} />
             {conversation.archivedAt ? <MiniAction icon="corner-up-left" label="Restore" onPress={() => onRestore(conversation.id)} /> : <MiniAction icon="archive" label="Archive" onPress={() => onArchive(conversation.id)} />}
             <MiniAction icon="copy" label="Duplicate" onPress={() => onDuplicate(conversation.id)} />
             <MiniAction icon="trash-2" label="Delete" onPress={() => onDelete(conversation.id)} tone="danger" />
@@ -592,6 +774,11 @@ function MessageCard({ message }: { message: CopilotMessage }) {
         <Text style={styles.messageTime}>{new Date(message.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</Text>
       </View>
       <RichMedicalText content={message.content} />
+      {message.attachments?.length ? (
+        <View style={styles.messageAttachments}>
+          {message.attachments.map((attachment) => <AttachmentChip attachment={attachment} key={attachment.id} />)}
+        </View>
+      ) : null}
       {message.citations?.length ? <CitationList citations={message.citations} /> : null}
       {assistant ? (
         <View style={styles.answerTools}>
@@ -670,13 +857,45 @@ function MiniAction({ icon, label, onPress, tone }: { icon: keyof typeof Feather
   );
 }
 
-function ComposerTool({ icon, label }: { icon: keyof typeof Feather.glyphMap; label: string }) {
+function ConversationAction({ active, activeText, icon, label, onPress }: { active?: boolean; activeText?: string; icon: keyof typeof Feather.glyphMap; label: string; onPress: () => void }) {
   return (
-    <Pressable accessibilityRole="button" style={styles.composerTool}>
+    <Pressable accessibilityLabel={label} accessibilityRole="button" onPress={onPress} style={[styles.conversationAction, active && styles.conversationActionActive]}>
+      <Feather name={icon} size={12} color={active ? medicalTheme.primary : medicalTheme.text} />
+      <Text style={[styles.conversationActionText, active && styles.conversationActionTextActive]}>{active && activeText ? activeText : label}</Text>
+    </Pressable>
+  );
+}
+
+function AttachmentChip({ attachment, onRemove }: { attachment: CopilotAttachment; onRemove?: () => void }) {
+  return (
+    <View style={styles.attachmentChip}>
+      <Feather name={attachment.kind === "ecg" ? "activity" : attachment.kind === "echo" ? "heart" : attachment.kind === "labs" ? "clipboard" : "paperclip"} size={13} color={medicalTheme.primary} />
+      <View style={styles.attachmentChipText}>
+        <Text numberOfLines={1} style={styles.attachmentName}>{attachment.originalName}</Text>
+        <Text style={styles.attachmentMeta}>{attachment.kind.toUpperCase()} • {formatFileSize(attachment.sizeBytes)}</Text>
+      </View>
+      {onRemove ? (
+        <Pressable accessibilityLabel={`Remove ${attachment.originalName}`} accessibilityRole="button" onPress={onRemove} style={styles.attachmentRemove}>
+          <Feather name="x" size={12} color={medicalTheme.text} />
+        </Pressable>
+      ) : null}
+    </View>
+  );
+}
+
+function ComposerTool({ active, icon, label, onPress }: { active?: boolean; icon: keyof typeof Feather.glyphMap; label: string; onPress: () => void }) {
+  return (
+    <Pressable accessibilityRole="button" onPress={onPress} style={[styles.composerTool, active && styles.composerToolActive]}>
       <Feather name={icon} size={13} color={medicalTheme.primary} />
       <Text style={styles.composerToolText}>{label}</Text>
     </Pressable>
   );
+}
+
+function formatFileSize(sizeBytes: number) {
+  if (sizeBytes < 1024) return `${sizeBytes} B`;
+  if (sizeBytes < 1024 * 1024) return `${Math.round(sizeBytes / 1024)} KB`;
+  return `${(sizeBytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
 function copyText(content: string) {
@@ -689,10 +908,21 @@ const glassBorder = "rgba(148,163,184,0.22)";
 
 const styles = StyleSheet.create({
   actionBar: { alignItems: "center", flexDirection: "row", flexWrap: "wrap", gap: 9, paddingBottom: 2 },
+  actionNotice: { alignItems: "center", borderRadius: 16, borderWidth: 1, flexDirection: "row", gap: 10, justifyContent: "space-between", paddingHorizontal: 12, paddingVertical: 10 },
+  actionNoticeDismiss: { alignItems: "center", borderRadius: 999, height: 24, justifyContent: "center", width: 24 },
+  actionNoticeError: { backgroundColor: "rgba(239,68,68,0.12)", borderColor: "rgba(239,68,68,0.35)" },
+  actionNoticeSuccess: { backgroundColor: "rgba(34,197,94,0.1)", borderColor: "rgba(34,197,94,0.28)" },
+  actionNoticeText: { color: medicalTheme.text, flex: 1, fontSize: 12, fontWeight: "900" },
   actionPill: { alignItems: "center", backgroundColor: "rgba(15,23,42,0.72)", borderColor: glassBorder, borderRadius: 999, borderWidth: 1, flexDirection: "row", gap: 7, paddingHorizontal: 12, paddingVertical: 9 },
   actionText: { color: medicalTheme.text, fontSize: 12, fontWeight: "900" },
   answerTools: { alignItems: "center", flexDirection: "row", gap: 10, marginTop: 8 },
   assistantMessage: { alignSelf: "flex-start", backgroundColor: "rgba(8,18,34,0.96)", borderColor: "rgba(20,221,230,0.22)" },
+  attachmentChip: { alignItems: "center", backgroundColor: "rgba(20,221,230,0.08)", borderColor: glassBorder, borderRadius: 14, borderWidth: 1, flexDirection: "row", gap: 8, maxWidth: 260, paddingHorizontal: 10, paddingVertical: 8 },
+  attachmentChipText: { flex: 1, minWidth: 0 },
+  attachmentMeta: { color: medicalTheme.muted, fontSize: 10, fontWeight: "800" },
+  attachmentName: { color: medicalTheme.text, fontSize: 12, fontWeight: "900" },
+  attachmentPanel: { borderColor: "rgba(148,163,184,0.16)", borderRadius: 16, borderWidth: 1, flexDirection: "row", flexWrap: "wrap", gap: 8, padding: 8 },
+  attachmentRemove: { alignItems: "center", backgroundColor: "rgba(239,68,68,0.18)", borderRadius: 999, height: 22, justifyContent: "center", width: 22 },
   attachmentRow: { alignItems: "center", flexDirection: "row", flexWrap: "wrap", gap: 8 },
   avatarGlow: { alignItems: "center", backgroundColor: "rgba(20,221,230,0.12)", borderColor: "rgba(20,221,230,0.35)", borderRadius: 16, borderWidth: 1, height: 44, justifyContent: "center", shadowColor: medicalTheme.primary, shadowOpacity: 0.3, shadowRadius: 18, width: 44 },
   chatHeader: { alignItems: "center", borderBottomColor: glassBorder, borderBottomWidth: 1, flexDirection: "row", flexWrap: "wrap", gap: 12, justifyContent: "space-between", paddingBottom: 12 },
@@ -708,6 +938,7 @@ const styles = StyleSheet.create({
   composer: { backgroundColor: "rgba(15,23,42,0.92)", borderColor: glassBorder, borderRadius: 22, borderWidth: 1, gap: 10, padding: 12 },
   composerInput: { color: medicalTheme.text, flex: 1, fontSize: 14, lineHeight: 21, maxHeight: 150, minHeight: 54, minWidth: 240, padding: 10 },
   composerTool: { alignItems: "center", backgroundColor: "rgba(20,221,230,0.08)", borderColor: glassBorder, borderRadius: 999, borderWidth: 1, flexDirection: "row", gap: 6, paddingHorizontal: 9, paddingVertical: 6 },
+  composerToolActive: { backgroundColor: "rgba(239,68,68,0.16)", borderColor: "rgba(239,68,68,0.45)" },
   composerToolText: { color: medicalTheme.text, fontSize: 11, fontWeight: "900" },
   confidence: { color: medicalTheme.success, fontSize: 11, fontWeight: "900" },
   contextBody: { gap: 8, paddingBottom: 12 },
@@ -724,6 +955,10 @@ const styles = StyleSheet.create({
   contextValue: { color: medicalTheme.text, fontSize: 13, fontWeight: "800", lineHeight: 18 },
   conversationItem: { backgroundColor: "rgba(15,33,53,0.64)", borderColor: "transparent", borderRadius: 16, borderWidth: 1, gap: 8, padding: 10 },
   conversationItemActive: { borderColor: medicalTheme.primary, shadowColor: medicalTheme.primary, shadowOpacity: 0.24, shadowRadius: 16 },
+  conversationAction: { alignItems: "center", backgroundColor: "rgba(2,6,23,0.34)", borderColor: glassBorder, borderRadius: 999, borderWidth: 1, flexDirection: "row", gap: 5, minHeight: 28, paddingHorizontal: 8, paddingVertical: 5 },
+  conversationActionActive: { backgroundColor: "rgba(20,221,230,0.12)", borderColor: "rgba(20,221,230,0.45)" },
+  conversationActionText: { color: medicalTheme.text, fontSize: 10, fontWeight: "900" },
+  conversationActionTextActive: { color: medicalTheme.primary },
   conversationMenu: { flexDirection: "row", flexWrap: "wrap", gap: 4 },
   conversationMeta: { color: medicalTheme.muted, fontSize: 10, fontWeight: "800" },
   conversationSelect: { gap: 4 },
@@ -748,6 +983,7 @@ const styles = StyleSheet.create({
   messageBullet: { color: medicalTheme.text, fontSize: 14, lineHeight: 22, paddingLeft: 8 },
   messageHeading: { color: medicalTheme.text, fontSize: 16, fontWeight: "900", marginTop: 8 },
   messageList: { gap: 12, paddingBottom: 18 },
+  messageAttachments: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 8 },
   messageRole: { color: medicalTheme.primary, fontSize: 10, fontWeight: "900", textTransform: "uppercase" },
   messageSpace: { height: 5 },
   messageSubheading: { color: medicalTheme.primary, fontSize: 14, fontWeight: "900", marginTop: 6 },

@@ -56,6 +56,17 @@ for (const marker of [
   "sidebar",
   "mobileSidebarOpen",
   "Shift+Enter",
+  "toggleVoiceInput",
+  "SpeechRecognition",
+  "openFilePicker",
+  "uploadComposerFile",
+  "AttachmentChip",
+  "attachmentPanel",
+  "attachmentIds",
+  "Upload failed.",
+  "Unsupported format.",
+  "File too large.",
+  "Microphone denied.",
 ]) {
   assert(workspace.includes(marker), `Enterprise workspace marker missing: ${marker}`);
 }
@@ -64,11 +75,11 @@ assert(!workspace.includes("quickGrid"), "Legacy quick action grid must be remov
 assert(!workspace.includes("conversationStrip"), "Legacy conversation strip must be removed.");
 assert(!workspace.includes("sidebarScroll"), "Nested sidebar scrolling must be removed.");
 
-for (const marker of ["streamCopilotMessage", "getCopilotConversation", "listCopilotConversations", "updateCopilotConversation", "deleteCopilotConversation"]) {
+for (const marker of ["streamCopilotMessage", "getCopilotConversation", "listCopilotConversations", "updateCopilotConversation", "deleteCopilotConversation", "uploadCopilotAttachment"]) {
   assert(copilotService.includes(marker), `Copilot service missing real workflow marker: ${marker}`);
 }
 
-for (const marker of ["retrieveClinicalContext", "Previous ECGs", "Documents:", "DISCLAIMER", "Confidence Score", "citations", "responseTimeMs", "copilotUsageEvent", "/chat/stream"]) {
+for (const marker of ["retrieveClinicalContext", "Previous ECGs", "Documents:", "DISCLAIMER", "Confidence Score", "citations", "responseTimeMs", "copilotUsageEvent", "/chat/stream", "/attachments", "CopilotAttachment"]) {
   assert(copilotRoutes.includes(marker), `Copilot backend missing real context/safety/observability marker: ${marker}`);
 }
 

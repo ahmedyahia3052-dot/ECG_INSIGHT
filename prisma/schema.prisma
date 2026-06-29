@@ -2432,6 +2432,7 @@ model CopilotConversation {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
   messages    CopilotMessage[]
+  attachments CopilotAttachment[]
 
   @@index([userId])
   @@index([patientId])
@@ -2455,9 +2456,36 @@ model CopilotMessage {
   responseTimeMs Int?
   createdAt      DateTime @default(now())
   conversation   CopilotConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  attachments    CopilotAttachment[]
 
   @@index([conversationId])
   @@index([role])
+  @@index([createdAt])
+}
+
+model CopilotAttachment {
+  id             String   @id @default(cuid())
+  conversationId String?
+  messageId      String?
+  userId         String
+  patientId      String?
+  caseId         String?
+  kind           String
+  originalName   String
+  storedName     String
+  mimeType       String
+  sizeBytes      Int
+  storagePath    String
+  createdAt      DateTime @default(now())
+  conversation   CopilotConversation? @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  message        CopilotMessage?      @relation(fields: [messageId], references: [id], onDelete: SetNull)
+
+  @@index([conversationId])
+  @@index([messageId])
+  @@index([userId])
+  @@index([patientId])
+  @@index([caseId])
+  @@index([kind])
   @@index([createdAt])
 }
 

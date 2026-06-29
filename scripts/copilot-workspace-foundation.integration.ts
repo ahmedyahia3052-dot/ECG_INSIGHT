@@ -45,6 +45,15 @@ for (const marker of [
   "Upload Echo",
   "Upload Labs",
   "Attach Files",
+  "toggleVoiceInput",
+  "openFilePicker",
+  "uploadComposerFile",
+  "AttachmentChip",
+  "attachmentIds",
+  "Voice input is not supported in this browser.",
+  "Microphone denied.",
+  "Unsupported format.",
+  "File too large.",
   "Drag & drop",
   "streamCopilotMessage",
   "createCopilotConversation",
@@ -63,7 +72,7 @@ assert(dashboard.includes('label="Open AI Copilot"') && dashboard.includes('rout
 assert(enterpriseShell.includes('href: "/copilot"'), "Enterprise navigation must expose /copilot.");
 assert(!enterpriseShell.includes("<MedicalAICopilot"), "Enterprise shell must not mount the retired floating Copilot widget.");
 
-for (const marker of ["CopilotConversation", "CopilotMessage", "@@index([userId])", "@@index([conversationId])", "@@index([isPinned])", "@@index([isFavorite])", "@@index([archivedAt])"]) {
+for (const marker of ["CopilotAttachment", "CopilotConversation", "CopilotMessage", "@@index([userId])", "@@index([conversationId])", "@@index([messageId])", "@@index([isPinned])", "@@index([isFavorite])", "@@index([archivedAt])"]) {
   assert(prismaSchema.includes(marker), `Prisma copilot persistence model is missing marker: ${marker}`);
 }
 
@@ -73,15 +82,17 @@ for (const marker of [
   'copilotRouter.patch("/conversations/:conversationId"',
   'copilotRouter.delete("/conversations/:conversationId"',
   'copilotRouter.post("/chat/stream"',
+  'copilotRouter.post("/attachments"',
   "conversationForUser",
   "retrieveClinicalContext",
+  "prisma.copilotAttachment",
   "prisma.copilotConversation",
   "prisma.copilotMessage",
 ]) {
   assert(copilotRoutes.includes(marker), `Copilot API is missing real CRUD/chat marker: ${marker}`);
 }
 
-for (const marker of ["createCopilotConversation", "renameCopilotConversation", "pinCopilotConversation", "favoriteCopilotConversation", "deleteCopilotConversation", "streamCopilotMessage", "credentials: \"include\"", "X-CSRF-Token"]) {
+for (const marker of ["createCopilotConversation", "renameCopilotConversation", "pinCopilotConversation", "favoriteCopilotConversation", "deleteCopilotConversation", "streamCopilotMessage", "uploadCopilotAttachment", "credentials: \"include\"", "X-CSRF-Token"]) {
   assert(copilotService.includes(marker), `Copilot frontend service is missing marker: ${marker}`);
 }
 

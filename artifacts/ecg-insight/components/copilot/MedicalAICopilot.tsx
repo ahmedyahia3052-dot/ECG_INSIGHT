@@ -397,7 +397,7 @@ export function MedicalAICopilot() {
                   />
                 ))}
                 {sendMutation.isPending && !typingMessage ? <Text style={styles.thinking}>{streamStatus || "AI is thinking..."}</Text> : null}
-                {typingMessage ? <MessageBubble bookmarked={false} expandedCitationId={expandedCitationId} message={{ citations: [], content: typingMessage, createdAt: new Date().toISOString(), id: "typing", role: "assistant" }} onBookmark={() => undefined} onCopy={() => copyMessage(typingMessage)} onEdit={() => undefined} onRemove={() => undefined} onRetry={() => undefined} onToggleCitation={setExpandedCitationId} pending /> : null}
+                {typingMessage ? <MessageBubble bookmarked={false} expandedCitationId={expandedCitationId} message={{ attachments: [], citations: [], content: typingMessage, createdAt: new Date().toISOString(), id: "typing", role: "assistant" }} onBookmark={() => undefined} onCopy={() => copyMessage(typingMessage)} onEdit={() => undefined} onRemove={() => undefined} onRetry={() => undefined} onToggleCitation={setExpandedCitationId} pending /> : null}
                 {!messages.length && !typingMessage && !selectedQuery.isLoading ? <Text style={styles.emptyText}>Start a new clinical conversation or choose a recent chat. Messages stay fully visible in this scroll area.</Text> : null}
               </ScrollView>
 

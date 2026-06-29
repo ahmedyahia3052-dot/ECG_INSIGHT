@@ -26,6 +26,7 @@ async function cleanup(prefix: string) {
   });
   const conversationIds = conversations.map((conversation) => conversation.id);
   await prisma.copilotUsageEvent.deleteMany({ where: { OR: [{ userId: { in: userIds } }, { conversationId: { in: conversationIds } }] } });
+  await prisma.copilotAttachment.deleteMany({ where: { OR: [{ userId: { in: userIds } }, { conversationId: { in: conversationIds } }] } });
   await prisma.copilotMessage.deleteMany({ where: { conversationId: { in: conversationIds } } });
   await prisma.copilotConversation.deleteMany({ where: { id: { in: conversationIds } } });
   await prisma.userSession.deleteMany({ where: { userId: { in: userIds } } });
@@ -83,6 +84,21 @@ async function main() {
     return { body: body as T, response, status: response.status };
   }
 
+  async function uploadAttachment(kind: "ecg" | "echo" | "file" | "labs", fileName: string, mimeType: string, token: string, conversationId: string) {
+    const formData = new FormData();
+    formData.append("kind", kind);
+    formData.append("contextType", "global");
+    formData.append("conversationId", conversationId);
+    formData.append("file", new Blob([`clinical fixture for ${kind}`], { type: mimeType }), fileName);
+    const response = await fetch(`${baseUrl}/copilot/attachments`, {
+      body: formData,
+      headers: { authorization: `Bearer ${token}` },
+      method: "POST",
+    });
+    const body = await response.json() as { attachment: { id: string; kind: string; originalName: string; sizeBytes: number } };
+    return { body, status: response.status };
+  }
+
   try {
     const login = await request<{ accessToken: string }>("/auth/login", {
       body: { email: user.email, password: "StrongPass123!", rememberMe: true },
@@ -111,8 +127,18 @@ async function main() {
     const listed = await request<{ conversations: Array<{ id: string; isFavorite: boolean; isPinned: boolean; title: string }> }>("/copilot/conversations?q=Renamed", { token });
     assert(listed.status === 200 && listed.body.conversations.some((item) => item.id === conversationId && item.isPinned && item.isFavorite), "Search/list must restore persisted conversation state.");
 
+    const ecgAttachment = await uploadAttachment("ecg", "ECG_001.png", "image/png", token, conversationId);
+    const echoAttachment = await uploadAttachment("echo", "Echo_Report.pdf", "application/pdf", token, conversationId);
+    const labsAttachment = await uploadAttachment("labs", "Labs_May2026.csv", "text/csv", token, conversationId);
+    const genericOne = await uploadAttachment("file", "Notes.txt", "text/plain", token, conversationId);
+    const genericTwo = await uploadAttachment("file", "Referral.pdf", "application/pdf", token, conversationId);
+    for (const upload of [ecgAttachment, echoAttachment, labsAttachment, genericOne, genericTwo]) {
+      assert(upload.status === 201 && Boolean(upload.body.attachment.id), `Attachment upload failed for ${upload.body?.attachment?.originalName ?? "unknown file"}.`);
+    }
+    const attachmentIds = [ecgAttachment, echoAttachment, labsAttachment, genericOne, genericTwo].map((upload) => upload.body.attachment.id);
+
     const stream = await fetch(`${baseUrl}/copilot/chat/stream`, {
-      body: JSON.stringify({ contextType: "global", conversationId, question: "Interpret this ECG and provide follow-up recommendations.", tag: "ECG Interpretation" }),
+      body: JSON.stringify({ attachmentIds, contextType: "global", conversationId, question: "Interpret this ECG and provide follow-up recommendations.", tag: "ECG Interpretation" }),
       headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
       method: "POST",
     });
@@ -122,10 +148,16 @@ async function main() {
     assert(events.some((event) => event.event === "token"), "Streaming response must emit token events.");
     assert(events.some((event) => event.event === "done"), "Streaming response must emit done event.");
 
-    const restored = await request<{ conversation: { id: string; lastOpenedAt?: string }; messages: Array<{ content: string; role: string }> }>(`/copilot/conversations/${conversationId}`, { token });
+    const restored = await request<{ conversation: { id: string; lastOpenedAt?: string }; messages: Array<{ attachments?: Array<{ id: string; kind: string; originalName: string }>; content: string; role: string }> }>(`/copilot/conversations/${conversationId}`, { token });
     assert(restored.status === 200 && restored.body.conversation.id === conversationId, "Deep-linked conversation restore must succeed.");
     assert(Boolean(restored.body.conversation.lastOpenedAt), "Restore must update lastOpenedAt for refresh/back-forward persistence.");
     assert(restored.body.messages.some((message) => message.role === "user") && restored.body.messages.some((message) => message.role === "assistant"), "Message persistence must include user and assistant messages.");
+    const restoredUserMessage = restored.body.messages.find((message) => message.role === "user" && message.attachments?.length);
+    assert(restoredUserMessage?.attachments?.length === 5, "Refresh persistence must restore all Copilot message attachments.");
+    assert(restoredUserMessage.attachments.some((attachment) => attachment.kind === "ecg" && attachment.originalName === "ECG_001.png"), "ECG attachment must persist in conversation history.");
+    assert(restoredUserMessage.attachments.some((attachment) => attachment.kind === "echo"), "Echo attachment badge must persist in conversation history.");
+    assert(restoredUserMessage.attachments.some((attachment) => attachment.kind === "labs"), "Labs attachment chip must persist in conversation history.");
+    assert(restoredUserMessage.attachments.filter((attachment) => attachment.kind === "file").length === 2, "Multiple generic file attachments must persist.");
 
     const archived = await request<{ conversation: { archivedAt?: string } }>(`/copilot/conversations/${conversationId}/archive`, { method: "POST", token });
     assert(archived.status === 200 && Boolean(archived.body.conversation.archivedAt), "Archive chat must persist.");
