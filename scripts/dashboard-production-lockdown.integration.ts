@@ -38,21 +38,31 @@ const notificationPage = read("artifacts/ecg-insight/app/(protected)/notificatio
 const supportPage = read("artifacts/ecg-insight/app/(protected)/support.tsx");
 const searchService = read("artifacts/ecg-insight/services/search.ts");
 const searchRoutes = read("server/src/modules/search/search.routes.ts");
+const analyticsPage = read("artifacts/ecg-insight/app/(protected)/analytics.tsx");
+const patientProfilePage = read("artifacts/ecg-insight/app/(protected)/patients/[id].tsx");
+const copilotRoutes = read("server/src/modules/copilot/copilot.routes.ts");
+const notificationCenterService = read("server/src/notifications/notification-center.service.ts");
+const casesRoutes = read("server/src/cases/cases.routes.ts");
+const aiService = read("server/src/ai/ai.service.ts");
+const ecgClinicalService = read("server/src/modules/ecg-files/ecg-clinical.service.ts");
+const ocrRoutes = read("server/src/modules/ocr/ocr.routes.ts");
+const supportRoutes = read("server/src/modules/support/support.routes.ts");
 
 assert(enterpriseShell.includes("ProtectedRoute") && enterpriseShell.includes("EnterpriseShell"), "Protected shell must own the dashboard architecture.");
 assert((enterpriseShell.match(/<MedicalAICopilot/g) ?? []).length === 1, "Exactly one assistant owner may render in the dashboard shell.");
 assert((enterpriseShell.match(/accessibilityLabel=\"Notifications\"/g) ?? []).length === 1, "Exactly one notification bell may render in the dashboard shell.");
-for (const marker of ["CLINICAL", "WORKSPACE", "DEVELOPER", "/support", "refetchInterval: 15_000", "notificationSearch", "Open Notification History"]) {
+for (const marker of ["CLINICAL", "WORKSPACE", "DEVELOPER", "/support", "refetchInterval: 15_000", "notificationSearch", "Open Notification History", "PremiumNotificationCard", "RefreshControl", "PanResponder", "hapticReadyInteraction", "notificationDrawerMobile"]) {
   assert(enterpriseShell.includes(marker), `Enterprise shell is missing production dashboard marker: ${marker}`);
 }
 for (const forbidden of ["AI Clinical Copilot", "\"ai\"] as const", "/(tabs)", "@/components/bolt", "@/components/dashboard"]) {
   assert(!enterpriseShell.includes(forbidden), `Enterprise shell must not contain legacy/conflicting marker: ${forbidden}`);
 }
 
-for (const marker of ["AI Assistant", "quickPrompts", "PanResponder", "setAssistantSize", "sendCopilotMessage", "listCopilotConversations", "getCopilotConversation", "medical-copilot:ask"]) {
+for (const marker of ["AI Assistant", "quickPrompts", "PanResponder", "setAssistantSize", "sendCopilotMessage", "listCopilotConversations", "getCopilotConversation", "medical-copilot:ask", "updateCopilotConversation", "copilotExportUrl", "Regenerate", "Archive", "MarkdownText", "expandedCitationId"]) {
   assert(assistant.includes(marker), `Lightweight assistant is missing production marker: ${marker}`);
 }
 assert(!assistant.includes("AI Clinical Copilot"), "Large AI Clinical Copilot UX must be removed.");
+assert(!assistant.includes("onPress={() => {}}"), "Assistant must not contain dead button handlers.");
 
 for (const marker of ["notificationSearch", "assistantSize", "hydrateDashboardState", "ecg-insight:dashboard-layout", "persistLayout"]) {
   assert(dashboardStore.includes(marker), `Dashboard store is missing centralized state marker: ${marker}`);
@@ -67,5 +77,33 @@ assert(searchService.includes("\"employee\""), "Global search service must expos
 for (const marker of ["employeeId", "positionTitle", "type: \"employee\"", "Employee record"]) {
   assert(searchRoutes.includes(marker), `Backend search must include employee marker: ${marker}`);
 }
+
+for (const forbidden of ["Normal: 8", "Abnormal: 3", "Math.random", "onPress={() => {}}", "coming soon", "placeholder widget", "fake widget"]) {
+  assert(!enterpriseShell.toLowerCase().includes(forbidden.toLowerCase()), `Enterprise shell contains forbidden dead/fake marker: ${forbidden}`);
+  assert(!analyticsPage.toLowerCase().includes(forbidden.toLowerCase()), `Analytics page contains forbidden dead/fake marker: ${forbidden}`);
+  assert(!patientProfilePage.toLowerCase().includes(forbidden.toLowerCase()), `Patient profile contains forbidden dead/fake marker: ${forbidden}`);
+}
+assert(analyticsPage.includes("No analytics yet") && analyticsPage.includes("diagnosisDistribution ?? {}"), "Analytics charts must use real empty states instead of fake fallback values.");
+assert(patientProfilePage.includes("onOpen={(item)") && patientProfilePage.includes("metadata.caseId") && patientProfilePage.includes("metadata.reportId"), "Patient timeline actions must resolve to real routes or tabs.");
+
+for (const marker of ["retrieveClinicalContext", "Patient Profile", "Previous ECG", "Cardiovascular Document", "retrieveKnowledge", "ECG Knowledge Base", "DISCLAIMER", "citations", "favorite", "updateConversationSchema"]) {
+  assert(copilotRoutes.includes(marker), `Copilot backend is missing context/RAG/persistence marker: ${marker}`);
+}
+for (const marker of ["createUnifiedNotification", "unreadNotificationCount", "processScheduledNotifications", "emitRealtime", "REPORT_GENERATION", "read: false"]) {
+  assert(notificationCenterService.includes(marker), `Notification center backend is missing persistence/realtime marker: ${marker}`);
+}
+for (const marker of ["ECG uploaded", "New ECG Case Assigned", "Critical ECG case", "ECG Review Completed"]) {
+  assert(casesRoutes.includes(marker), `Case workflow must generate notification marker: ${marker}`);
+}
+for (const marker of ["AI analysis completed", "Immediate clinical review required", "createNotification"]) {
+  assert(aiService.includes(marker), `AI workflow must generate notification marker: ${marker}`);
+}
+for (const marker of ["createNotification", "ClinicalAlert"]) {
+  assert(ecgClinicalService.includes(marker), `ECG clinical file workflow must generate alert/notification marker: ${marker}`);
+}
+for (const marker of ["OCR failure", "notifyOcrFailure", "createNotification"]) {
+  assert(ocrRoutes.includes(marker), `OCR workflow must generate failure notification marker: ${marker}`);
+}
+assert(supportRoutes.includes("SupportTicket") && supportRoutes.includes("createNotification"), "Support tickets must persist and notify operators.");
 
 console.log("Dashboard production lockdown integration checks passed.");

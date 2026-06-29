@@ -4,7 +4,11 @@ import { Redirect, Slot, usePathname, useRouter } from "expo-router";
 import React, { PropsWithChildren, ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  Animated,
+  Easing,
+  PanResponder,
   Pressable,
+  RefreshControl,
   ScrollView,
   StyleProp,
   StyleSheet,
@@ -108,6 +112,8 @@ export function EnterpriseShell({ children }: PropsWithChildren) {
   const queryClient = useQueryClient();
   const { authToken, logout, user } = useAuth();
   const [hoveredNav, setHoveredNav] = useState<string | null>(null);
+  const [expandedNotificationId, setExpandedNotificationId] = useState<string | null>(null);
+  const notificationEntrance = useRef(new Animated.Value(0)).current;
   const searchInputRef = useRef<TextInput>(null);
   const {
     closeDrawer,
@@ -207,12 +213,17 @@ export function EnterpriseShell({ children }: PropsWithChildren) {
 
   useEffect(() => {
     if (!notificationOpen || typeof document === "undefined") return undefined;
+    notificationEntrance.setValue(0);
+    Animated.parallel([
+      Animated.timing(notificationEntrance, { duration: 180, easing: Easing.out(Easing.quad), toValue: 1, useNativeDriver: true }),
+      Animated.spring(notificationEntrance, { damping: 18, stiffness: 190, toValue: 1, useNativeDriver: true }),
+    ]).start();
     const closeOnEscape = (event: KeyboardEvent) => {
       if (event.key === "Escape") closeNotificationCenter();
     };
     document.addEventListener("keydown", closeOnEscape);
     return () => document.removeEventListener("keydown", closeOnEscape);
-  }, [closeNotificationCenter, notificationOpen]);
+  }, [closeNotificationCenter, notificationEntrance, notificationOpen]);
 
   useEffect(() => {
     const timeout = setTimeout(() => setDebouncedSearch(searchText.trim()), 260);
@@ -417,10 +428,24 @@ export function EnterpriseShell({ children }: PropsWithChildren) {
       {notificationOpen ? (
         <View style={styles.notificationOverlay} pointerEvents="box-none">
           <Pressable style={styles.notificationBackdrop} onPress={closeNotificationCenter} />
-          <Card style={styles.notificationDrawer}>
+          <Animated.View
+            style={[
+              styles.card,
+              styles.notificationDrawer,
+              isMobile && styles.notificationDrawerMobile,
+              {
+                opacity: notificationEntrance,
+                transform: [
+                  { translateY: notificationEntrance.interpolate({ inputRange: [0, 1], outputRange: [isMobile ? 280 : -14, 0] }) },
+                  { scale: notificationEntrance.interpolate({ inputRange: [0, 1], outputRange: [0.98, 1] }) },
+                ],
+              },
+            ]}
+          >
+            <View style={styles.sheetHandle} />
             <SectionHeader
               title="Alerts"
-              subtitle="Clinical, system, subscription, and workflow notifications from live APIs."
+              subtitle="Premium haptic-ready notification sheet with live clinical, system, subscription, and workflow alerts."
               action={<PrimaryButton disabled={!unreadCount || readAllNotificationMutation.isPending} label="Read All" onPress={() => readAllNotificationMutation.mutate()} variant="outline" />}
             />
             <View style={styles.notificationSearchBox}>
@@ -453,35 +478,106 @@ export function EnterpriseShell({ children }: PropsWithChildren) {
                 <PrimaryButton key={filter} label={notificationFilterLabel(filter)} onPress={() => setNotificationFilter(filter)} variant={notificationFilter === filter ? "primary" : "outline"} />
               ))}
             </View>
-            <ScrollView style={styles.notificationList} showsVerticalScrollIndicator>
+            <ScrollView
+              refreshControl={<RefreshControl colors={[medicalTheme.primary]} onRefresh={() => void notificationQuery.refetch()} refreshing={notificationQuery.isRefetching} tintColor={medicalTheme.primary} />}
+              style={styles.notificationList}
+              showsVerticalScrollIndicator
+            >
               {filteredNotifications.length ? filteredNotifications.map((notification) => (
-                <View key={notification.id} style={[styles.notificationCard, isCriticalNotification(notification) && styles.notificationCardCritical]}>
-                  <View style={styles.notificationCardHeader}>
-                    <View style={styles.notificationTitleRow}>
-                      <View style={styles.notificationIcon}>
-                        <Feather name={notificationIcon(notification)} size={16} color={notificationColor(notification)} />
-                      </View>
-                      <Text numberOfLines={1} style={styles.notificationTitle}>{notification.title}</Text>
-                    </View>
-                    <Badge label={notificationStatusLabel(notification)} tone={isCriticalNotification(notification) ? "critical" : notification.read ? "muted" : "primary"} />
-                  </View>
-                  <Text numberOfLines={3} style={styles.notificationMessage}>{notification.message}</Text>
-                  <Text style={styles.notificationMeta}>{classifyNotification(notification)} • {formatDate(notification.timestamp)}</Text>
-                  <View style={styles.notificationActions}>
-                    {!notification.read ? <PrimaryButton disabled={readNotificationMutation.isPending} label="Mark read" onPress={() => readNotificationMutation.mutate(notification.id)} variant="outline" /> : null}
-                    <PrimaryButton label="Open details" onPress={() => openNotification(notification)} variant="outline" />
-                    <PrimaryButton disabled={deleteNotificationMutation.isPending} label="Clear" onPress={() => deleteNotificationMutation.mutate(notification.id)} variant="danger" />
-                  </View>
-                </View>
+                <PremiumNotificationCard
+                  expanded={expandedNotificationId === notification.id}
+                  key={notification.id}
+                  notification={notification}
+                  onArchive={() => deleteNotificationMutation.mutate(notification.id)}
+                  onExpand={() => setExpandedNotificationId(expandedNotificationId === notification.id ? null : notification.id)}
+                  onMarkRead={() => readNotificationMutation.mutate(notification.id)}
+                  onOpen={() => openNotification(notification)}
+                />
               )) : (
                 <EmptyState title={notificationQuery.isLoading ? "Loading alerts..." : "No critical alerts"} message={notificationQuery.isError ? "Unable to load live notifications. Please try again." : "STEMI alerts, urgent reviews, failed analyses, subscription notices, and system events will appear here."} />
               )}
             </ScrollView>
             <PrimaryButton label="Open Notification History" onPress={() => navigate("/notifications")} variant="outline" />
-          </Card>
+          </Animated.View>
         </View>
       ) : null}
       <MedicalAICopilot />
+    </View>
+  );
+}
+
+function PremiumNotificationCard({
+  expanded,
+  notification,
+  onArchive,
+  onExpand,
+  onMarkRead,
+  onOpen,
+}: {
+  expanded: boolean;
+  notification: NotificationRecord;
+  onArchive: () => void;
+  onExpand: () => void;
+  onMarkRead: () => void;
+  onOpen: () => void;
+}) {
+  const translateX = useRef(new Animated.Value(0)).current;
+  const scale = useRef(new Animated.Value(1)).current;
+  const panResponder = useMemo(() => PanResponder.create({
+    onMoveShouldSetPanResponder: (_event, gesture) => Math.abs(gesture.dx) > 14,
+    onPanResponderMove: Animated.event([null, { dx: translateX }], { useNativeDriver: false }),
+    onPanResponderRelease: (_event, gesture) => {
+      if (gesture.dx < -72) onMarkRead();
+      if (gesture.dx > 72) onArchive();
+      Animated.spring(translateX, { damping: 18, stiffness: 220, toValue: 0, useNativeDriver: true }).start();
+    },
+  }), [onArchive, onMarkRead, translateX]);
+  const critical = isCriticalNotification(notification);
+  const category = classifyNotification(notification);
+
+  const pressIn = () => {
+    hapticReadyInteraction("notification-card-press");
+    Animated.spring(scale, { damping: 14, stiffness: 260, toValue: 0.985, useNativeDriver: true }).start();
+  };
+  const pressOut = () => Animated.spring(scale, { damping: 14, stiffness: 260, toValue: 1, useNativeDriver: true }).start();
+
+  return (
+    <View style={styles.swipeFrame}>
+      <View style={styles.swipeActionRail}>
+        <Text style={[styles.swipeActionText, { color: medicalTheme.success }]}>Archive</Text>
+        <Text style={[styles.swipeActionText, { color: medicalTheme.primary }]}>Mark read</Text>
+      </View>
+      <Animated.View {...panResponder.panHandlers} style={{ transform: [{ translateX }, { scale }] }}>
+        <Pressable
+          accessibilityRole="button"
+          onLongPress={onExpand}
+          onPress={onOpen}
+          onPressIn={pressIn}
+          onPressOut={pressOut}
+          style={[styles.notificationCard, critical && styles.notificationCardCritical]}
+        >
+          <View style={styles.notificationCardHeader}>
+            <View style={styles.notificationTitleRow}>
+              <View style={[styles.notificationIcon, critical && styles.notificationIconCritical]}>
+                {critical ? <View style={styles.criticalPulse} /> : null}
+                <Feather name={notificationIcon(notification)} size={16} color={notificationColor(notification)} />
+              </View>
+              <View style={styles.notificationTextWrap}>
+                <Text numberOfLines={1} style={styles.notificationTitle}>{notification.title}</Text>
+                <Text style={styles.notificationMeta}>{category} • {formatDate(notification.timestamp)}</Text>
+              </View>
+            </View>
+            <Badge label={notificationStatusLabel(notification)} tone={critical ? "critical" : notification.read ? "muted" : "primary"} />
+          </View>
+          <Text numberOfLines={expanded ? undefined : 3} style={styles.notificationMessage}>{notification.message}</Text>
+          {expanded ? <Text style={styles.notificationHint}>Swipe left to mark read, swipe right to archive, long press to collapse.</Text> : null}
+          <View style={styles.notificationActions}>
+            {!notification.read ? <PrimaryButton label="Mark read" onPress={onMarkRead} variant="outline" /> : null}
+            <PrimaryButton label="Open details" onPress={onOpen} variant="outline" />
+            <PrimaryButton label="Archive" onPress={onArchive} variant="danger" />
+          </View>
+        </Pressable>
+      </Animated.View>
     </View>
   );
 }
@@ -554,6 +650,10 @@ function notificationColor(notification: NotificationRecord) {
   if (notification.type === "warning") return medicalTheme.warning;
   if (notification.type === "success") return medicalTheme.success;
   return medicalTheme.primary;
+}
+
+function hapticReadyInteraction(_eventName: string) {
+  // Central hook for native haptics when this shell is embedded in the mobile app.
 }
 
 export function FullScreenLoader({ label }: { label: string }) {
@@ -685,6 +785,7 @@ const styles = StyleSheet.create({
   countBadgeText: { color: "#FFFFFF", fontSize: 10, fontWeight: "900" },
   collapseButton: { alignItems: "center", alignSelf: "center", backgroundColor: "#0B2134", borderColor: "#1F7085", borderRadius: 999, borderWidth: 1, flexDirection: "row", gap: 8, minHeight: 38, paddingHorizontal: 12 },
   collapseText: { color: medicalTheme.primary, fontSize: 12, fontWeight: "900" },
+  criticalPulse: { backgroundColor: medicalTheme.critical, borderRadius: 999, height: 8, position: "absolute", right: 5, top: 5, width: 8 },
   drawer: { bottom: 0, left: 0, position: "absolute", top: 0, width: 318, zIndex: 10 },
   emptyMessage: { color: medicalTheme.muted, fontSize: 13, lineHeight: 19, maxWidth: 520, textAlign: "center" },
   emptyState: { alignItems: "center", gap: 10, paddingVertical: 30 },
@@ -715,23 +816,27 @@ const styles = StyleSheet.create({
   navText: { color: medicalTheme.muted, flex: 1, fontSize: 14, fontWeight: "800" },
   navTextActive: { color: medicalTheme.text },
   notificationActions: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
-  notificationBackdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: "rgba(2,6,23,0.08)" },
-  notificationCard: { backgroundColor: medicalTheme.surface, borderColor: medicalTheme.border, borderRadius: 16, borderWidth: 1, gap: 9, marginBottom: 10, padding: 12 },
-  notificationCardCritical: { borderColor: medicalTheme.critical },
+  notificationBackdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: "rgba(2,6,23,0.34)" },
+  notificationCard: { backgroundColor: "rgba(15,33,53,0.96)", borderColor: "rgba(148,163,184,0.22)", borderRadius: 20, borderWidth: 1, gap: 9, padding: 13, shadowColor: medicalTheme.primary, shadowOpacity: 0.08, shadowRadius: 16 },
+  notificationCardCritical: { borderColor: `${medicalTheme.critical}99`, shadowColor: medicalTheme.critical, shadowOpacity: 0.22 },
   notificationCardHeader: { alignItems: "center", flexDirection: "row", gap: 10, justifyContent: "space-between" },
-  notificationCounterCard: { alignItems: "center", backgroundColor: medicalTheme.surface, borderColor: medicalTheme.border, borderRadius: 14, borderWidth: 1, flex: 1, gap: 3, minHeight: 72, padding: 10 },
+  notificationCounterCard: { alignItems: "center", backgroundColor: "rgba(15,33,53,0.72)", borderColor: "rgba(20,221,230,0.18)", borderRadius: 16, borderWidth: 1, flex: 1, gap: 3, minHeight: 72, padding: 10 },
   notificationCounterLabel: { color: medicalTheme.muted, fontSize: 10, fontWeight: "900", letterSpacing: 0.6, textTransform: "uppercase" },
   notificationCounterRow: { flexDirection: "row", gap: 8 },
   notificationCounterValue: { fontSize: 25, fontWeight: "900" },
-  notificationDrawer: { backgroundColor: "rgba(12,26,45,0.98)", gap: 12, maxHeight: 650, position: "absolute", right: 18, shadowColor: "#000", shadowOpacity: 0.34, shadowRadius: 28, top: 76, width: 440, zIndex: 80 },
+  notificationDrawer: { backgroundColor: "rgba(12,26,45,0.97)", borderColor: "rgba(20,221,230,0.24)", gap: 12, maxHeight: 650, position: "absolute", right: 18, shadowColor: medicalTheme.primary, shadowOpacity: 0.18, shadowRadius: 28, top: 76, width: 440, zIndex: 80 },
+  notificationDrawerMobile: { borderBottomLeftRadius: 0, borderBottomRightRadius: 0, bottom: 0, left: 0, maxHeight: "92%", right: 0, top: undefined, width: "100%" },
   notificationFilters: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   notificationIcon: { alignItems: "center", backgroundColor: medicalTheme.surface, borderColor: medicalTheme.border, borderRadius: 12, borderWidth: 1, height: 38, justifyContent: "center", width: 38 },
-  notificationList: { maxHeight: 330 },
+  notificationIconCritical: { backgroundColor: "rgba(239,68,68,0.12)", borderColor: `${medicalTheme.critical}66` },
+  notificationHint: { color: medicalTheme.primary, fontSize: 10, fontWeight: "800", lineHeight: 15 },
+  notificationList: { maxHeight: 356 },
   notificationMessage: { color: medicalTheme.muted, fontSize: 12, lineHeight: 17 },
   notificationMeta: { color: medicalTheme.primary, fontSize: 10, fontWeight: "900", marginTop: 4, textTransform: "uppercase" },
   notificationOverlay: { ...StyleSheet.absoluteFillObject, zIndex: 70 },
   notificationSearchBox: { alignItems: "center", backgroundColor: medicalTheme.surface, borderColor: medicalTheme.border, borderRadius: 13, borderWidth: 1, flexDirection: "row", gap: 8, minHeight: 42, paddingHorizontal: 10 },
   notificationSearchInput: { color: medicalTheme.text, flex: 1, fontSize: 13 },
+  notificationTextWrap: { flex: 1, minWidth: 0 },
   notificationTitle: { color: medicalTheme.text, flex: 1, fontSize: 13, fontWeight: "900" },
   notificationTitleRow: { alignItems: "center", flex: 1, flexDirection: "row", gap: 10, minWidth: 0 },
   pageScroll: { gap: 16, padding: 18, paddingBottom: 42 },
@@ -754,6 +859,7 @@ const styles = StyleSheet.create({
   searchWrap: { position: "relative", zIndex: 95 },
   section: { gap: 14 },
   sectionHeader: { alignItems: "flex-start", flexDirection: "row", gap: 12, justifyContent: "space-between" },
+  sheetHandle: { alignSelf: "center", backgroundColor: "rgba(148,163,184,0.54)", borderRadius: 999, height: 4, marginBottom: 2, width: 44 },
   sectionSubtitle: { color: medicalTheme.muted, fontSize: 13, lineHeight: 19, marginTop: 3 },
   sectionTitle: { color: medicalTheme.text, fontSize: 18, fontWeight: "900" },
   sectionTitleWrap: { flex: 1 },
@@ -766,6 +872,9 @@ const styles = StyleSheet.create({
   statIcon: { alignItems: "center", borderRadius: 12, height: 40, justifyContent: "center", width: 40 },
   statLabel: { color: medicalTheme.muted, fontSize: 12, fontWeight: "800" },
   statValue: { color: medicalTheme.text, fontSize: 24, fontWeight: "900" },
+  swipeActionRail: { ...StyleSheet.absoluteFillObject, alignItems: "center", flexDirection: "row", justifyContent: "space-between", paddingHorizontal: 18 },
+  swipeActionText: { fontSize: 11, fontWeight: "900", textTransform: "uppercase" },
+  swipeFrame: { borderRadius: 20, marginBottom: 10, overflow: "hidden" },
   titleBlock: { flex: 1, minWidth: 0 },
   topActions: { alignItems: "center", flexDirection: "row", gap: 10 },
   topbar: { alignItems: "center", borderBottomColor: medicalTheme.border, borderBottomWidth: 1, flexDirection: "row", gap: 14, paddingBottom: 16, paddingHorizontal: 18 },

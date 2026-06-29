@@ -3,6 +3,7 @@ import { z } from "zod";
 
 import { prisma } from "../../config/prisma";
 import { validateBody } from "../../middleware/validate";
+import { createNotification } from "../../utils/notifications";
 
 const createSupportTicketSchema = z.object({
   email: z.string().trim().email(),
@@ -26,9 +27,19 @@ supportRouter.post("/tickets", validateBody(createSupportTicketSchema), async (r
         createdAt: true,
         email: true,
         id: true,
+        name: true,
         status: true,
         subject: true,
       },
+    });
+    await createNotification({
+      actionUrl: "/support",
+      entityId: ticket.id,
+      entityType: "SupportTicket",
+      message: `${ticket.name} submitted a support ticket: ${ticket.subject}.`,
+      targetRole: "ADMIN",
+      title: "New support ticket",
+      type: "INFO",
     });
     res.status(201).json({ ticket });
   } catch (error) {

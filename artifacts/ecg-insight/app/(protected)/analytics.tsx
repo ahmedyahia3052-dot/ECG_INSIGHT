@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import React from "react";
 import { StyleSheet, Text, View } from "react-native";
 
-import { Card, medicalTheme, PageSection, SectionHeader, StatCard } from "@/components/enterprise/EnterpriseUI";
+import { Card, EmptyState, medicalTheme, PageSection, SectionHeader, StatCard } from "@/components/enterprise/EnterpriseUI";
 import { useAuth } from "@/context/AuthContext";
 import { getAIStatistics } from "@/services/ai";
 import { listCases, listPatients } from "@/services/clinical";
@@ -21,6 +21,7 @@ export default function AnalyticsScreen() {
   const patients = patientsQuery.data?.patients ?? [];
   const critical = cases.filter((item) => item.priority === "critical").length;
   const signedReports = reports.filter((item) => item.status === "signed").length;
+  const diagnosisDistribution = Object.values(aiQuery.data?.statistics.diagnosisDistribution ?? {});
 
   return (
     <PageSection>
@@ -33,7 +34,7 @@ export default function AnalyticsScreen() {
       </View>
       <View style={styles.grid}>
         <ChartCard title="ECG Volume Trends" values={[cases.length, Math.max(1, cases.length - 2), cases.length + 3, cases.length + 7]} />
-        <ChartCard title="Arrhythmia Distribution" values={Object.values(aiQuery.data?.statistics.diagnosisDistribution ?? { Normal: 8, Abnormal: 3, Critical: critical })} />
+        <ChartCard loading={aiQuery.isLoading} title="Arrhythmia Distribution" values={diagnosisDistribution} />
         <ChartCard title="Critical Case Distribution" values={[critical, cases.filter((item) => item.priority === "high").length, cases.filter((item) => item.priority === "medium").length]} />
         <ChartCard title="Department Performance" values={[patients.length, reports.length, signedReports]} />
         <ChartCard title="Physician Workload" values={[reports.filter((item) => item.status === "draft").length, reports.filter((item) => item.status === "under_review").length, signedReports]} />
@@ -42,11 +43,13 @@ export default function AnalyticsScreen() {
   );
 }
 
-function ChartCard({ title, values }: { title: string; values: number[] }) {
+function ChartCard({ loading = false, title, values }: { loading?: boolean; title: string; values: number[] }) {
   const max = Math.max(...values, 1);
   return (
     <Card style={styles.chartCard}>
       <SectionHeader title={title} />
+      {loading ? <Text style={styles.loadingText}>Loading live analytics...</Text> : null}
+      {!loading && !values.length ? <EmptyState title="No analytics yet" message="This chart will populate after real clinical data is available." /> : null}
       <View style={styles.chart}>
         {values.map((value, index) => (
           <View key={`${title}-${index}`} style={styles.barWrap}>
@@ -66,5 +69,6 @@ const styles = StyleSheet.create({
   chart: { alignItems: "flex-end", flexDirection: "row", gap: 10, height: 180 },
   chartCard: { flex: 1, gap: 14, minWidth: 300 },
   grid: { flexDirection: "row", flexWrap: "wrap", gap: 16 },
+  loadingText: { color: medicalTheme.muted, fontSize: 12, fontWeight: "800" },
   statGrid: { flexDirection: "row", flexWrap: "wrap", gap: 14 },
 });

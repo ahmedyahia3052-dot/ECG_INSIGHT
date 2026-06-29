@@ -119,7 +119,21 @@ export default function PatientProfileScreen() {
 
       {activeTab === "overview" ? <OverviewTab patient={patient} cases={cases} reports={reports} criticalCases={criticalCases} abnormalCases={abnormalCases} pendingReviews={pendingReviews} /> : null}
       {activeTab === "ecg" ? <EcgCasesTab cases={cases} onGenerateReport={(caseId) => reportMutation.mutate(caseId)} onNew={() => router.push("/ecg-cases/new" as never)} onOpen={(caseId) => router.push(`/ecg-cases/${caseId}` as never)} onReview={(caseId) => router.push(`/ecg-cases/${caseId}/review` as never)} /> : null}
-      {activeTab === "timeline" ? <TimelineTab cases={cases} timeline={timeline} /> : null}
+      {activeTab === "timeline" ? (
+        <TimelineTab
+          cases={cases}
+          onOpen={(item) => {
+            const metadata = item.metadata && typeof item.metadata === "object" ? item.metadata as Record<string, unknown> : {};
+            const caseId = typeof metadata.caseId === "string" ? metadata.caseId : undefined;
+            const reportId = typeof metadata.reportId === "string" ? metadata.reportId : undefined;
+            if (reportId || item.type.toLowerCase().includes("report")) router.push(`/reports/${reportId ?? item.id}` as never);
+            else if (caseId || item.type.toLowerCase().includes("ecg") || item.type.toLowerCase().includes("case")) router.push(`/ecg-cases/${caseId ?? item.id}` as never);
+            else if (item.type.toLowerCase().includes("document")) setActiveTab("documents");
+            else setActiveTab("overview");
+          }}
+          timeline={timeline}
+        />
+      ) : null}
       {activeTab === "documents" ? (
         <DocumentsTab
           category={documentCategory}
@@ -238,9 +252,10 @@ function EcgCasesTab({ cases, onGenerateReport, onNew, onOpen, onReview }: {
   );
 }
 
-function TimelineTab({ cases, timeline }: {
+function TimelineTab({ cases, onOpen, timeline }: {
   cases: Array<{ aiDiagnosis?: string; aiModelVersion?: string; caseId: string; caseNumber?: string; confidenceScore?: number; finalDiagnosis?: string; id: string; severity?: string; uploadDate: string }>;
-  timeline: Array<{ createdAt: string; id: string; notes?: string; title: string; type: string }>;
+  onOpen: (item: { createdAt: string; id: string; metadata?: unknown; notes?: string; title: string; type: string }) => void;
+  timeline: Array<{ createdAt: string; id: string; metadata?: unknown; notes?: string; title: string; type: string }>;
 }) {
   return (
     <Card style={styles.panelFull}>
@@ -264,7 +279,7 @@ function TimelineTab({ cases, timeline }: {
             <Text style={styles.muted}>{formatDate(item.createdAt)} • {new Date(item.createdAt).toLocaleTimeString()} • {item.type.replace(/_/g, " ")}</Text>
             <Text style={styles.infoLabel}>{item.notes ?? "Clinical event persisted in patient timeline."}</Text>
           </View>
-          <PrimaryButton label="Open Item" onPress={() => {}} variant="outline" />
+          <PrimaryButton label="Open Item" onPress={() => onOpen(item)} variant="outline" />
         </View>
       )) : <EmptyState title="No timeline events" message="ECG uploads, AI analysis, reports, procedures, and document events will appear here." />}
     </Card>
