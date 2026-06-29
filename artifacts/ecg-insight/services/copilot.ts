@@ -174,6 +174,18 @@ export async function uploadCopilotAttachment(accessToken: string, formData: For
   });
 }
 
+export async function downloadCopilotExport(accessToken: string, conversationId: string, format: "pdf" | "txt") {
+  const response = await fetch(format === "pdf" ? copilotExportUrl(conversationId) : copilotExportTxtUrl(conversationId), {
+    credentials: "include",
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+    },
+    method: "GET",
+  });
+  if (!response.ok) throw new Error(`Copilot export failed with status ${response.status}`);
+  return response.blob();
+}
+
 export async function streamCopilotMessage(
   accessToken: string,
   input: CopilotChatInput,

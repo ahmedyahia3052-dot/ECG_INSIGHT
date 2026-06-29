@@ -72,6 +72,8 @@ for (const marker of [
   "Export PDF",
   "Export TXT",
   "Share",
+  "downloadCopilotExport",
+  "downloadBlob",
   "Unsupported format.",
   "File too large.",
   "📌",

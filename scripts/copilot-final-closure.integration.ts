@@ -74,6 +74,8 @@ for (const marker of [
   "Share",
   "shareConversation",
   "exportConversation",
+  "downloadCopilotExport",
+  "downloadBlob",
 ]) {
   assert(workspace.includes(marker), `Enterprise workspace marker missing: ${marker}`);
 }
@@ -82,7 +84,7 @@ assert(!workspace.includes("quickGrid"), "Legacy quick action grid must be remov
 assert(!workspace.includes("conversationStrip"), "Legacy conversation strip must be removed.");
 assert(!workspace.includes("sidebarScroll"), "Nested sidebar scrolling must be removed.");
 
-for (const marker of ["copilotExportTxtUrl", "copilotExportUrl", "streamCopilotMessage", "getCopilotConversation", "listCopilotConversations", "updateCopilotConversation", "deleteCopilotConversation", "uploadCopilotAttachment"]) {
+for (const marker of ["copilotExportTxtUrl", "copilotExportUrl", "downloadCopilotExport", "streamCopilotMessage", "getCopilotConversation", "listCopilotConversations", "updateCopilotConversation", "deleteCopilotConversation", "uploadCopilotAttachment"]) {
   assert(copilotService.includes(marker), `Copilot service missing real workflow marker: ${marker}`);
 }
 

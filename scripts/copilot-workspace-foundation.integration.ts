@@ -59,12 +59,13 @@ for (const marker of [
   "Export PDF",
   "Export TXT",
   "Share",
+  "downloadBlob",
+  "downloadCopilotExport",
   "WORKSPACE_STATE_KEY",
   "localStorage.setItem",
   "localStorage.getItem",
   "Unsupported format.",
   "File too large.",
-  "Drag & drop",
   "streamCopilotMessage",
   "createCopilotConversation",
   "renameCopilotConversation",
@@ -104,7 +105,7 @@ for (const marker of [
   assert(copilotRoutes.includes(marker), `Copilot API is missing real CRUD/chat marker: ${marker}`);
 }
 
-for (const marker of ["copilotExportTxtUrl", "copilotExportUrl", "createCopilotConversation", "renameConversation", "togglePin", "toggleFavorite", "toggleArchive", "deleteConversation", "renameCopilotConversation", "pinCopilotConversation", "favoriteCopilotConversation", "deleteCopilotConversation", "streamCopilotMessage", "uploadCopilotAttachment", "credentials: \"include\"", "X-CSRF-Token"]) {
+for (const marker of ["copilotExportTxtUrl", "copilotExportUrl", "downloadCopilotExport", "createCopilotConversation", "renameConversation", "togglePin", "toggleFavorite", "toggleArchive", "deleteConversation", "renameCopilotConversation", "pinCopilotConversation", "favoriteCopilotConversation", "deleteCopilotConversation", "streamCopilotMessage", "uploadCopilotAttachment", "credentials: \"include\"", "X-CSRF-Token"]) {
   assert(copilotService.includes(marker), `Copilot frontend service is missing marker: ${marker}`);
 }
 

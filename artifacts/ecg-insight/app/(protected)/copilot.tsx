@@ -9,10 +9,9 @@ import { useAuth } from "@/context/AuthContext";
 import { listCases, listPatients } from "@/services/clinical";
 import {
   archiveCopilotConversation,
-  copilotExportTxtUrl,
-  copilotExportUrl,
   createCopilotConversation,
   deleteCopilotConversation,
+  downloadCopilotExport,
   duplicateCopilotConversation,
   favoriteCopilotConversation,
   getCopilotConversation,
@@ -533,33 +532,42 @@ export function CopilotWorkspaceScreen({ routeConversationId }: { routeConversat
     sendPrompt("Continue the previous clinical answer with the same structure, context, citations, and safety caveats.", selectedConversation?.tag ?? "Clinical Summary");
   }
 
-  function exportConversation(format: "pdf" | "txt") {
+  async function exportConversation(format: "pdf" | "txt") {
     if (!selectedId || !token || typeof window === "undefined") {
       showActionNotice("Select a conversation before exporting.", "error");
       return;
     }
-    const baseUrl = format === "pdf" ? copilotExportUrl(selectedId) : copilotExportTxtUrl(selectedId);
-    const separator = baseUrl.includes("?") ? "&" : "?";
-    window.open(`${baseUrl}${separator}token=${encodeURIComponent(token)}`, "_blank", "noopener,noreferrer");
-    showActionNotice(format === "pdf" ? "PDF export opened." : "TXT export opened.");
+    try {
+      const blob = await downloadCopilotExport(token, selectedId, format);
+      downloadBlob(blob, `${selectedConversation?.title ?? "copilot-conversation"}.${format}`);
+      showActionNotice(format === "pdf" ? "PDF export downloaded." : "TXT export downloaded.");
+    } catch {
+      showActionNotice("Export failed.", "error");
+    }
   }
 
-  function shareConversation() {
+  async function shareConversation() {
     if (!selectedId || !token || typeof window === "undefined") {
       showActionNotice("Select a conversation before sharing.", "error");
       return;
     }
-    const url = `${copilotExportUrl(selectedId)}?token=${encodeURIComponent(token)}`;
-    const webNavigator = navigator as Navigator & { share?: (data: { title: string; url: string }) => Promise<void> };
-    if (webNavigator.share) {
-      void webNavigator.share({ title: "ECG Insight AI Copilot conversation", url }).then(() => showActionNotice("Share sheet opened.")).catch(() => showActionNotice("Share cancelled.", "error"));
-      return;
+    try {
+      const blob = await downloadCopilotExport(token, selectedId, "pdf");
+      const file = new File([blob], `${safeFileName(selectedConversation?.title ?? "copilot-conversation")}.pdf`, { type: "application/pdf" });
+      const webNavigator = navigator as Navigator & {
+        canShare?: (data: { files: File[] }) => boolean;
+        share?: (data: { files: File[]; title: string }) => Promise<void>;
+      };
+      if (webNavigator.share && (!webNavigator.canShare || webNavigator.canShare({ files: [file] }))) {
+        await webNavigator.share({ files: [file], title: "ECG Insight AI Copilot conversation" });
+        showActionNotice("Share sheet opened.");
+        return;
+      }
+      downloadBlob(blob, file.name);
+      showActionNotice("Share sheet unavailable. PDF export downloaded.");
+    } catch {
+      showActionNotice("Share failed.", "error");
     }
-    if ("clipboard" in navigator) {
-      void navigator.clipboard.writeText(url).then(() => showActionNotice("Share link copied."));
-      return;
-    }
-    showActionNotice("Share is not supported by this browser.", "error");
   }
 
   const sidebarVisible = !isMobile || mobileSidebarOpen;
@@ -704,7 +712,6 @@ export function CopilotWorkspaceScreen({ routeConversationId }: { routeConversat
               <ComposerTool icon="heart" label="Upload Echo" onPress={() => openFilePicker("echo")} />
               <ComposerTool icon="clipboard" label="Upload Labs" onPress={() => openFilePicker("labs")} />
               <ComposerTool icon="paperclip" label="Attach Files" onPress={() => openFilePicker("file")} />
-              {Platform.OS === "web" ? <Text style={styles.dropHint}>Drag & drop supported by browser upload workflows</Text> : null}
             </View>
             {attachments.length ? (
               <View style={styles.attachmentPanel}>
@@ -983,6 +990,24 @@ function copyText(content: string) {
   if (typeof navigator !== "undefined" && "clipboard" in navigator) {
     void navigator.clipboard.writeText(content);
   }
+}
+
+function downloadBlob(blob: Blob, filename: string) {
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = safeFileName(filename);
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+function safeFileName(filename: string) {
+  const dotIndex = filename.lastIndexOf(".");
+  const extension = dotIndex >= 0 ? filename.slice(dotIndex) : "";
+  const basename = dotIndex >= 0 ? filename.slice(0, dotIndex) : filename;
+  return `${basename.replace(/[^a-z0-9]+/gi, "-").replace(/^-|-$/g, "") || "copilot-conversation"}${extension}`;
 }
 
 const glassBorder = "rgba(148,163,184,0.22)";
