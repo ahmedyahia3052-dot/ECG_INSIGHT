@@ -6,7 +6,7 @@ import { z } from "zod";
 
 import { AuthCard, AuthMessage, AuthPrimaryButton, AuthTextField, AuthToggle, premiumAuthTheme, PremiumAuthShell } from "@/components/auth/PremiumAuth";
 import { useAuth } from "@/context/AuthContext";
-import { assertOAuthProviderReady, oauthStartUrl, type OAuthProvider } from "@/services/oauth";
+import { assertOAuthProviderReady, listOAuthProviders, oauthStartUrl, type OAuthProvider, type OAuthProviderStatus } from "@/services/oauth";
 
 const loginSchema = z.object({
   email: z.string().trim().min(1, "Email is required.").email("Enter a valid email address."),
@@ -21,12 +21,20 @@ export default function LoginScreen() {
   const [remember, setRemember] = useState(true);
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
+  const [oauthProviders, setOauthProviders] = useState<OAuthProviderStatus[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [oauthLoading, setOauthLoading] = useState<OAuthProvider | null>(null);
+  const configuredProviders = oauthProviders.filter((provider) => provider.configured);
 
   useEffect(() => {
     if (!isLoading && isAuthenticated) router.replace("/dashboard" as never);
   }, [isAuthenticated, isLoading, router]);
+
+  useEffect(() => {
+    listOAuthProviders()
+      .then(({ providers }) => setOauthProviders(providers))
+      .catch(() => setOauthProviders([]));
+  }, []);
 
   const submit = async () => {
     setError("");
@@ -54,8 +62,8 @@ export default function LoginScreen() {
     try {
       await assertOAuthProviderReady(provider);
       await Linking.openURL(oauthStartUrl(provider));
-    } catch (requestError) {
-      setError(requestError instanceof Error ? requestError.message : `${provider} sign-in is unavailable.`);
+    } catch {
+      setError("Social sign in will be available in production deployment.");
     } finally {
       setOauthLoading(null);
     }
@@ -109,8 +117,9 @@ export default function LoginScreen() {
 
         <AuthPrimaryButton disabled={submitting} icon="log-in" label={submitting ? "Signing in..." : "Sign In"} onPress={submit} />
 
-        <View style={styles.oauthGrid}>
-          {(["GOOGLE", "APPLE", "MICROSOFT"] as OAuthProvider[]).map((provider) => (
+        {configuredProviders.length ? (
+          <View style={styles.oauthGrid}>
+            {configuredProviders.map(({ provider }) => (
             <AuthPrimaryButton
               disabled={oauthLoading !== null}
               key={provider}
@@ -118,8 +127,9 @@ export default function LoginScreen() {
               onPress={() => void startOAuth(provider)}
               variant="outline"
             />
-          ))}
-        </View>
+            ))}
+          </View>
+        ) : <AuthMessage message="Social sign in will be available in production deployment." />}
 
         <Text style={styles.createText}>
           New to ECG Insight? <Link href="/register" style={styles.link}>Create Account</Link>

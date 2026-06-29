@@ -9,13 +9,20 @@ export interface User {
   id: string;
   name: string;
   email: string;
-  accountType?: "INDIVIDUAL" | "ORGANIZATION";
+  accountType?: "INDIVIDUAL" | "HOSPITAL" | "CLINIC" | "HEALTHCARE_ORGANIZATION" | "COMPANY" | "ENTERPRISE_ORGANIZATION" | "UNIVERSITY" | "RESEARCH_CENTER" | "ORGANIZATION";
+  department?: string;
+  employeeId?: string;
   phoneNumber?: string;
   phoneVerified?: boolean;
   role: UserRole;
   specialization?: string;
   institution?: string;
   organizationId?: string;
+  organizationCountry?: string;
+  organizationEmail?: string;
+  organizationName?: string;
+  organizationType?: string;
+  positionTitle?: string;
   registrationRole?: string;
   avatarInitials: string;
   emailVerified?: boolean;
@@ -59,14 +66,19 @@ interface AuthContextType {
     institution?: string,
     specialization?: string,
     registration?: {
-      accountType?: "INDIVIDUAL" | "ORGANIZATION";
+      accountType?: "INDIVIDUAL" | "HOSPITAL" | "CLINIC" | "HEALTHCARE_ORGANIZATION" | "COMPANY" | "ENTERPRISE_ORGANIZATION" | "UNIVERSITY" | "RESEARCH_CENTER" | "ORGANIZATION";
+      department?: string;
+      employeeId?: string;
       organizationCity?: string;
       organizationCountry?: string;
+      organizationEmail?: string;
       organizationName?: string;
       organizationType?: string;
+      positionTitle?: string;
       registrationRole?: string;
     }
   ) => Promise<{ success: boolean; error?: string }>;
+  updateProfile: (input: { department?: string | null; employeeId?: string | null; institution?: string | null; name?: string; organizationCountry?: string | null; organizationEmail?: string | null; organizationName?: string | null; organizationType?: string | null; positionTitle?: string | null; specialization?: string | null }) => Promise<{ success: boolean; error?: string }>;
   requestPhoneOtp: (phoneNumber: string, purpose?: "LOGIN" | "REGISTER", name?: string) => Promise<{ success: boolean; otp?: string; error?: string }>;
   verifyPhoneOtp: (phoneNumber: string, otp: string, rememberMe?: boolean) => Promise<{ success: boolean; error?: string }>;
   oauthLogin: (provider: "GOOGLE" | "APPLE" | "MICROSOFT", providerUserId: string, email?: string, name?: string) => Promise<{ success: boolean; error?: string }>;
@@ -158,6 +170,7 @@ const AuthContext = createContext<AuthContextType>({
   login: async () => ({ success: false }),
   logout: async () => {},
   register: async () => ({ success: false }),
+  updateProfile: async () => ({ success: false }),
   requestPhoneOtp: async () => ({ success: false }),
   verifyPhoneOtp: async () => ({ success: false }),
   oauthLogin: async () => ({ success: false }),
@@ -278,11 +291,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       institution?: string,
       specialization?: string,
       registration?: {
-        accountType?: "INDIVIDUAL" | "ORGANIZATION";
+        accountType?: "INDIVIDUAL" | "HOSPITAL" | "CLINIC" | "HEALTHCARE_ORGANIZATION" | "COMPANY" | "ENTERPRISE_ORGANIZATION" | "UNIVERSITY" | "RESEARCH_CENTER" | "ORGANIZATION";
+        department?: string;
+        employeeId?: string;
         organizationCity?: string;
         organizationCountry?: string;
+        organizationEmail?: string;
         organizationName?: string;
         organizationType?: string;
+        positionTitle?: string;
         registrationRole?: string;
       }
     ) => {
@@ -303,6 +320,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     },
     [setState]
+  );
+
+  const updateProfile = useCallback(
+    async (input: { department?: string | null; employeeId?: string | null; institution?: string | null; name?: string; organizationCountry?: string | null; organizationEmail?: string | null; organizationName?: string | null; organizationType?: string | null; positionTitle?: string | null; specialization?: string | null }) => {
+      try {
+        const payload = await apiRequest<{ user: User }>("/auth/me", {
+          accessToken,
+          body: JSON.stringify(input),
+          method: "PATCH",
+        });
+        setState({ user: payload.user });
+        return { success: true };
+      } catch (error) {
+        return { success: false, error: errorMessage(error, "Profile update failed.") };
+      }
+    },
+    [accessToken, setState],
   );
 
   const requestPhoneOtp = useCallback(async (phoneNumber: string, purpose: "LOGIN" | "REGISTER" = "LOGIN", name?: string) => {
@@ -506,6 +540,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         login,
         logout,
         register,
+        updateProfile,
         requestPhoneOtp,
         verifyPhoneOtp,
         oauthLogin,

@@ -205,8 +205,6 @@ export default function DashboardScreen() {
         currentTime={currentTime}
         displayName={greetingName}
         greeting={currentGreeting}
-        notifications={unread}
-        onNotifications={() => router.push("/(tabs)/notification-center")}
         planName={String(planName)}
         roleTitle={roleTitle}
       />
@@ -293,7 +291,6 @@ export default function DashboardScreen() {
         <QuickActionCard icon="user-plus" label="New Patient" onPress={() => router.push("/(tabs)/history")} />
         <QuickActionCard icon="radio" label="Live Monitor" onPress={() => router.push("/(tabs)")} />
         <QuickActionCard icon="file-text" label="Reports" onPress={() => router.push("/(tabs)/reports-dashboard")} />
-        <QuickActionCard icon="bell" label="Notifications" onPress={() => router.push("/(tabs)/notification-center")} />
         <QuickActionCard icon="bar-chart-2" label="Analytics" onPress={() => router.push("/(tabs)/population-analytics" as never)} />
       </ScrollView>
 
@@ -458,8 +455,6 @@ function MobileHomeHeader({
   currentTime,
   displayName,
   greeting,
-  notifications,
-  onNotifications,
   planName,
   roleTitle,
 }: {
@@ -468,8 +463,6 @@ function MobileHomeHeader({
   currentTime: string;
   displayName: string;
   greeting: string;
-  notifications: number;
-  onNotifications: () => void;
   planName: string;
   roleTitle: string;
 }) {
@@ -497,19 +490,6 @@ function MobileHomeHeader({
         </View>
         <Text style={[styles.headerTime, { color: colors.textSecondary }]}>{currentDate} · {currentTime}</Text>
       </View>
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel="Notifications"
-        onPress={onNotifications}
-        style={[styles.notificationButton, { borderColor: colors.gradientBorder }]}
-      >
-        <Feather name="bell" size={19} color={colors.primary} />
-        {notifications ? (
-          <View style={[styles.notificationDot, { backgroundColor: colors.destructive }]}>
-            <Text style={styles.notificationText}>{Math.min(notifications, 9)}</Text>
-          </View>
-        ) : null}
-      </Pressable>
     </Animated.View>
   );
 }
@@ -1047,9 +1027,6 @@ const styles = StyleSheet.create({
   monitorStats: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   monitorStatValue: { fontFamily: "Inter_700Bold", fontSize: 13 },
   navGrid: { gap: 10 },
-  notificationButton: { alignItems: "center", borderRadius: 16, borderWidth: 1, height: 48, justifyContent: "center", width: 48 },
-  notificationDot: { alignItems: "center", borderRadius: 999, height: 18, justifyContent: "center", position: "absolute", right: -4, top: -5, width: 18 },
-  notificationText: { color: "#fff", fontFamily: "Inter_700Bold", fontSize: 10 },
   offlineCard: { gap: 8 },
   panel: { gap: 12 },
   quickActionCard: { alignItems: "center", borderRadius: 22, borderWidth: 1, gap: 10, justifyContent: "center", minHeight: 92, minWidth: 132, padding: 14 },

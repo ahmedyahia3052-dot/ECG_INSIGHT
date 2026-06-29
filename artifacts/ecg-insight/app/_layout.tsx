@@ -15,7 +15,6 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { MobileSyncStatus } from "@/components/mobile/MobileSyncStatus";
-import { LiveNotificationBell } from "@/components/notifications/LiveNotificationBell";
 import { AuthProvider, useAuth } from "@/context/AuthContext";
 import { ApiError } from "@/services/api";
 
@@ -32,6 +31,11 @@ const queryClient = new QueryClient({
     },
   },
 });
+
+function captureFrontendError(error: unknown, context: string) {
+  // Keep production users on a graceful UI while still surfacing diagnostics locally.
+  console.error(`[ECG Insight] ${context}`, error);
+}
 
 function RootLayoutNav() {
   return (
@@ -68,7 +72,6 @@ function AuthenticatedChrome() {
 
   return (
     <>
-      <LiveNotificationBell />
       <MobileSyncStatus />
     </>
   );
@@ -88,6 +91,18 @@ export default function RootLayout() {
     }
   }, [fontsLoaded, fontError]);
 
+  useEffect(() => {
+    if (typeof window === "undefined") return undefined;
+    const onError = (event: ErrorEvent) => captureFrontendError(event.error ?? event.message, "Unhandled frontend error");
+    const onRejection = (event: PromiseRejectionEvent) => captureFrontendError(event.reason, "Unhandled promise rejection");
+    window.addEventListener("error", onError);
+    window.addEventListener("unhandledrejection", onRejection);
+    return () => {
+      window.removeEventListener("error", onError);
+      window.removeEventListener("unhandledrejection", onRejection);
+    };
+  }, []);
+
   if (!fontsLoaded && !fontError) {
     return (
       <View style={styles.bootScreen}>
@@ -99,7 +114,7 @@ export default function RootLayout() {
 
   return (
     <SafeAreaProvider style={styles.appRoot}>
-      <ErrorBoundary>
+      <ErrorBoundary onError={(error, stackTrace) => captureFrontendError({ error, stackTrace }, "React error boundary")}>
         <QueryClientProvider client={queryClient}>
           <GestureHandlerRootView style={{ flex: 1 }}>
             <AuthProvider>

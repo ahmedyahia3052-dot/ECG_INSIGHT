@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { useRouter } from "expo-router";
-import React from "react";
-import { StyleSheet, Text, View } from "react-native";
+import React, { useEffect, useState } from "react";
+import { StyleSheet, Text, TextInput, View } from "react-native";
 import { useAuth } from "@/context/AuthContext";
 import { useColors, useThemePreference, type ThemePreference } from "@/hooks/useColors";
 import { getMySubscription } from "@/services/subscriptions";
@@ -20,13 +20,34 @@ export default function ProfileScreen() {
   const colors = useColors();
   const router = useRouter();
   const { setThemePreference, themePreference } = useThemePreference();
-  const { authToken, isImpersonating, logout, stopImpersonation, user } = useAuth();
+  const { authToken, isImpersonating, logout, stopImpersonation, updateProfile, user } = useAuth();
+  const [department, setDepartment] = useState("");
+  const [employeeId, setEmployeeId] = useState("");
+  const [institution, setInstitution] = useState("");
+  const [organizationCountry, setOrganizationCountry] = useState("");
+  const [organizationEmail, setOrganizationEmail] = useState("");
+  const [organizationName, setOrganizationName] = useState("");
+  const [organizationType, setOrganizationType] = useState("");
+  const [positionTitle, setPositionTitle] = useState("");
+  const [profileMessage, setProfileMessage] = useState("");
+  const [savingProfile, setSavingProfile] = useState(false);
   const subscriptionQuery = useQuery({
     enabled: !!authToken?.token,
     queryFn: async () => getMySubscription(authToken!.token),
     queryKey: ["bolt-profile-subscription", authToken?.token],
     retry: false,
   });
+
+  useEffect(() => {
+    setDepartment(user?.department ?? "");
+    setEmployeeId(user?.employeeId ?? "");
+    setInstitution(user?.institution ?? "");
+    setOrganizationCountry(user?.organizationCountry ?? "");
+    setOrganizationEmail(user?.organizationEmail ?? "");
+    setOrganizationName(user?.organizationName ?? user?.institution ?? "");
+    setOrganizationType(user?.organizationType ?? "");
+    setPositionTitle(user?.positionTitle ?? "");
+  }, [user?.department, user?.employeeId, user?.institution, user?.organizationCountry, user?.organizationEmail, user?.organizationName, user?.organizationType, user?.positionTitle]);
 
   if (!user) {
     return (
@@ -48,6 +69,23 @@ export default function ProfileScreen() {
   async function handleLogout() {
     await logout();
     router.replace("/login");
+  }
+
+  async function handleSaveProfile() {
+    setSavingProfile(true);
+    setProfileMessage("");
+    const result = await updateProfile({
+      department: department.trim() || null,
+      employeeId: employeeId.trim() || null,
+      institution: institution.trim() || null,
+      organizationCountry: organizationCountry.trim() || null,
+      organizationEmail: organizationEmail.trim() || null,
+      organizationName: organizationName.trim() || null,
+      organizationType: organizationType.trim() || null,
+      positionTitle: positionTitle.trim() || null,
+    });
+    setSavingProfile(false);
+    setProfileMessage(result.success ? "Profile details saved." : result.error ?? "Profile update failed.");
   }
 
   return (
@@ -77,6 +115,43 @@ export default function ProfileScreen() {
             {user.emailVerified ? <BoltBadge icon="check-circle" label="Verified" tone="success" /> : <BoltBadge label="Email unverified" tone="warning" />}
           </View>
         </View>
+      </BoltCard>
+
+      <BoltCard style={styles.settings}>
+        <Text style={[styles.sectionTitle, { color: colors.text }]}>Organization Profile</Text>
+        <Text style={[styles.meta, { color: colors.textSecondary }]}>Account type: {user.accountType?.replace(/_/g, " ") ?? "INDIVIDUAL"}</Text>
+        <View style={styles.formGrid}>
+          <View style={styles.fieldGroup}>
+            <Text style={[styles.fieldLabel, { color: colors.textSecondary }]}>Organization / Institution</Text>
+            <TextInput onChangeText={(value) => { setInstitution(value); setOrganizationName(value); }} placeholder="Organization" placeholderTextColor={colors.textSecondary} style={[styles.input, { borderColor: colors.border, color: colors.text }]} value={organizationName || institution} />
+          </View>
+          <View style={styles.fieldGroup}>
+            <Text style={[styles.fieldLabel, { color: colors.textSecondary }]}>Organization Type</Text>
+            <TextInput onChangeText={setOrganizationType} placeholder="Hospital" placeholderTextColor={colors.textSecondary} style={[styles.input, { borderColor: colors.border, color: colors.text }]} value={organizationType} />
+          </View>
+          <View style={styles.fieldGroup}>
+            <Text style={[styles.fieldLabel, { color: colors.textSecondary }]}>Organization Email</Text>
+            <TextInput autoCapitalize="none" keyboardType="email-address" onChangeText={setOrganizationEmail} placeholder="admin@hospital.org" placeholderTextColor={colors.textSecondary} style={[styles.input, { borderColor: colors.border, color: colors.text }]} value={organizationEmail} />
+          </View>
+          <View style={styles.fieldGroup}>
+            <Text style={[styles.fieldLabel, { color: colors.textSecondary }]}>Department</Text>
+            <TextInput onChangeText={setDepartment} placeholder="Cardiology" placeholderTextColor={colors.textSecondary} style={[styles.input, { borderColor: colors.border, color: colors.text }]} value={department} />
+          </View>
+          <View style={styles.fieldGroup}>
+            <Text style={[styles.fieldLabel, { color: colors.textSecondary }]}>Position / Job Title</Text>
+            <TextInput onChangeText={setPositionTitle} placeholder="Consultant Cardiologist" placeholderTextColor={colors.textSecondary} style={[styles.input, { borderColor: colors.border, color: colors.text }]} value={positionTitle} />
+          </View>
+          <View style={styles.fieldGroup}>
+            <Text style={[styles.fieldLabel, { color: colors.textSecondary }]}>Country</Text>
+            <TextInput onChangeText={setOrganizationCountry} placeholder="United States" placeholderTextColor={colors.textSecondary} style={[styles.input, { borderColor: colors.border, color: colors.text }]} value={organizationCountry} />
+          </View>
+          <View style={styles.fieldGroup}>
+            <Text style={[styles.fieldLabel, { color: colors.textSecondary }]}>Employee ID</Text>
+            <TextInput onChangeText={setEmployeeId} placeholder="EMP-1042" placeholderTextColor={colors.textSecondary} style={[styles.input, { borderColor: colors.border, color: colors.text }]} value={employeeId} />
+          </View>
+        </View>
+        {profileMessage ? <Text style={[styles.meta, { color: colors.textSecondary }]}>{profileMessage}</Text> : null}
+        <BoltButton label={savingProfile ? "Saving..." : "Save Profile Details"} onPress={handleSaveProfile} variant="outline" />
       </BoltCard>
 
       <View style={styles.statsRow}>
@@ -130,12 +205,16 @@ const styles = StyleSheet.create({
   avatarText: { color: "#fff", fontFamily: "Inter_700Bold", fontSize: 18 },
   badgeRow: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   cardHeader: { alignItems: "center", flexDirection: "row", justifyContent: "space-between" },
+  fieldGroup: { flex: 1, gap: 6, minWidth: 220 },
+  fieldLabel: { fontFamily: "Inter_700Bold", fontSize: 12 },
+  formGrid: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
   impersonation: { alignItems: "center", flexDirection: "row", gap: 10 },
   impersonationText: { flex: 1, fontFamily: "Inter_700Bold", fontSize: 13 },
   meta: { fontFamily: "Inter_400Regular", fontSize: 13, lineHeight: 20 },
   name: { fontFamily: "Inter_700Bold", fontSize: 19 },
   profileCard: { alignItems: "center", flexDirection: "row", gap: 14 },
   profileMain: { flex: 1, gap: 6 },
+  input: { borderRadius: 14, borderWidth: 1, fontFamily: "Inter_600SemiBold", fontSize: 14, paddingHorizontal: 12, paddingVertical: 10 },
   sectionTitle: { fontFamily: "Inter_700Bold", fontSize: 18 },
   settings: { gap: 10 },
   statsRow: { flexDirection: "row", gap: 10 },

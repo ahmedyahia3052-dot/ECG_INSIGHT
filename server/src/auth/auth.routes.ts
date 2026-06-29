@@ -31,6 +31,7 @@ import {
   resendVerificationEmail,
   resetPassword,
   setupOwnerPassword,
+  organizationTypeForRegistration,
   verifyPhoneOtp,
   verifyEmail,
 } from "./auth.service";
@@ -87,6 +88,13 @@ authRouter.post("/phone/verify", validateBody(verifyPhoneOtpSchema), async (req,
 authRouter.get("/oauth/providers", (_req, res) => {
   res.json({ providers: oauthProviderStatuses() });
 });
+
+authRouter.get("/oauth/google", startOAuth("GOOGLE"));
+authRouter.get("/oauth/google/callback", ...completeOAuth("GOOGLE"));
+authRouter.get("/oauth/apple", startOAuth("APPLE"));
+authRouter.get("/oauth/apple/callback", ...completeOAuth("APPLE"));
+authRouter.get("/oauth/microsoft", startOAuth("MICROSOFT"));
+authRouter.get("/oauth/microsoft/callback", ...completeOAuth("MICROSOFT"));
 
 authRouter.get("/google", startOAuth("GOOGLE"));
 authRouter.get("/google/callback", ...completeOAuth("GOOGLE"));
@@ -184,7 +192,7 @@ authRouter.get("/me", requireAuth, async (req, res, next) => {
   try {
     const user = await prisma.user.findUnique({
       where: { id: req.auth!.id },
-      include: { subscription: true },
+      include: { organization: true, subscription: true },
     });
     res.json({ user: user ? serializeUser(user) : null });
   } catch (error) {
@@ -194,14 +202,48 @@ authRouter.get("/me", requireAuth, async (req, res, next) => {
 
 authRouter.patch("/me", requireAuth, validateBody(updateProfileSchema), async (req, res, next) => {
   try {
-    const user = await prisma.user.update({
-      data: {
-        institution: req.body.institution,
-        name: req.body.name,
-        specialization: req.body.specialization,
-      },
-      include: { subscription: true },
-      where: { id: req.auth!.id },
+    const user = await prisma.$transaction(async (tx) => {
+      const current = await tx.user.findUnique({ where: { id: req.auth!.id } });
+      const hasOrganizationUpdate = req.body.organizationName !== undefined || req.body.organizationCountry !== undefined || req.body.organizationEmail !== undefined || req.body.organizationType !== undefined;
+      let organizationId = current?.organizationId ?? null;
+
+      if (hasOrganizationUpdate && current) {
+        if (organizationId) {
+          await tx.organization.update({
+            data: {
+              country: req.body.organizationCountry,
+              email: req.body.organizationEmail,
+              name: req.body.organizationName ?? undefined,
+              type: req.body.organizationType ? organizationTypeForRegistration(req.body.organizationType) : undefined,
+            },
+            where: { id: organizationId },
+          });
+        } else if (req.body.organizationName) {
+          const organization = await tx.organization.create({
+            data: {
+              country: req.body.organizationCountry ?? undefined,
+              email: req.body.organizationEmail ?? current.email,
+              name: req.body.organizationName,
+              type: organizationTypeForRegistration(req.body.organizationType ?? undefined),
+            },
+          });
+          organizationId = organization.id;
+        }
+      }
+
+      return tx.user.update({
+        data: {
+          department: req.body.department,
+          employeeId: req.body.employeeId,
+          institution: req.body.institution ?? req.body.organizationName,
+          name: req.body.name,
+          organizationId,
+          positionTitle: req.body.positionTitle,
+          specialization: req.body.specialization,
+        },
+        include: { organization: true, subscription: true },
+        where: { id: req.auth!.id },
+      });
     });
     res.json({ user: serializeUser(user) });
   } catch (error) {

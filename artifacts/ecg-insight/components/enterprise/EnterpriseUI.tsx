@@ -1,7 +1,7 @@
 import { Feather } from "@expo/vector-icons";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Redirect, Slot, usePathname, useRouter } from "expo-router";
-import React, { PropsWithChildren, ReactNode, useEffect, useMemo, useState } from "react";
+import React, { PropsWithChildren, ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Pressable,
@@ -20,6 +20,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAuth } from "@/context/AuthContext";
 import { MedicalAICopilot } from "@/components/copilot/MedicalAICopilot";
 import { deleteNotification, listNotifications, markAllNotificationsRead, markNotificationRead, type NotificationRecord } from "@/services/collaboration";
+import { globalSearch, type GlobalSearchResult } from "@/services/search";
 import { medicalTheme } from "@/theme/medicalTheme";
 
 export { medicalTheme };
@@ -106,8 +107,12 @@ export function EnterpriseShell({ children }: PropsWithChildren) {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [hoveredNav, setHoveredNav] = useState<string | null>(null);
   const [searchFocused, setSearchFocused] = useState(false);
+  const [searchText, setSearchText] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [recentSearches, setRecentSearches] = useState<string[]>([]);
   const [notificationOpen, setNotificationOpen] = useState(false);
   const [notificationFilter, setNotificationFilter] = useState<"ai" | "all" | "critical" | "license" | "system" | "unread">("all");
+  const searchInputRef = useRef<TextInput>(null);
   const isMobile = width < 860;
   const sidebarCompact = !isMobile && sidebarCollapsed;
   const meta = pageMeta(pathname);
@@ -121,8 +126,16 @@ export function EnterpriseShell({ children }: PropsWithChildren) {
     queryKey: ["enterprise-shell-notifications", authToken?.token],
     retry: false,
   });
+  const searchQuery = useQuery({
+    enabled: !!authToken?.token && debouncedSearch.trim().length >= 2,
+    queryFn: () => globalSearch(authToken!.token, debouncedSearch.trim()),
+    queryKey: ["global-search", authToken?.token, debouncedSearch.trim()],
+    retry: false,
+  });
   const unreadCount = notificationQuery.data?.notifications.filter((item) => !item.read).length ?? 0;
   const filteredNotifications = useMemo(() => (notificationQuery.data?.notifications ?? []).filter((item) => notificationMatchesFilter(item, notificationFilter)), [notificationFilter, notificationQuery.data?.notifications]);
+  const searchResults = searchQuery.data?.results ?? [];
+  const showSearchPanel = searchFocused && (searchText.trim().length > 0 || recentSearches.length > 0);
   const invalidateNotifications = () => {
     void queryClient.invalidateQueries({ queryKey: ["enterprise-shell-notifications", authToken?.token] });
     void queryClient.invalidateQueries({ queryKey: ["enterprise-notifications", authToken?.token] });
@@ -143,7 +156,25 @@ export function EnterpriseShell({ children }: PropsWithChildren) {
   const navigate = (href: string) => {
     setDrawerOpen(false);
     setNotificationOpen(false);
+    setSearchFocused(false);
     router.push(href as never);
+  };
+
+  const rememberSearch = (value: string) => {
+    const normalized = value.trim();
+    if (!normalized) return;
+    setRecentSearches((current) => {
+      const next = [normalized, ...current.filter((item) => item.toLowerCase() !== normalized.toLowerCase())].slice(0, 6);
+      if (typeof window !== "undefined") window.localStorage.setItem("ecg-insight:recent-searches", JSON.stringify(next));
+      return next;
+    });
+  };
+
+  const openSearchResult = (result: GlobalSearchResult) => {
+    rememberSearch(searchText || result.title);
+    setSearchText("");
+    setDebouncedSearch("");
+    navigate(result.url);
   };
 
   const openNotification = (notification: NotificationRecord) => {
@@ -159,6 +190,35 @@ export function EnterpriseShell({ children }: PropsWithChildren) {
     document.addEventListener("keydown", closeOnEscape);
     return () => document.removeEventListener("keydown", closeOnEscape);
   }, [notificationOpen]);
+
+  useEffect(() => {
+    const timeout = setTimeout(() => setDebouncedSearch(searchText.trim()), 260);
+    return () => clearTimeout(timeout);
+  }, [searchText]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      const stored = window.localStorage.getItem("ecg-insight:recent-searches");
+      if (stored) setRecentSearches(JSON.parse(stored) as string[]);
+    } catch {
+      setRecentSearches([]);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (typeof document === "undefined") return undefined;
+    const focusSearch = (event: KeyboardEvent) => {
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "k") {
+        event.preventDefault();
+        searchInputRef.current?.focus();
+        setSearchFocused(true);
+      }
+      if (event.key === "Escape") setSearchFocused(false);
+    };
+    document.addEventListener("keydown", focusSearch);
+    return () => document.removeEventListener("keydown", focusSearch);
+  }, []);
 
   const sidebar = (
     <View style={[styles.sidebar, sidebarCompact && styles.sidebarCollapsed, isMobile && styles.drawer, { paddingTop: isMobile ? insets.top + 18 : 24 }]}>
@@ -194,7 +254,7 @@ export function EnterpriseShell({ children }: PropsWithChildren) {
         </Pressable>
       ) : null}
 
-      <ScrollView contentContainerStyle={[styles.navScroll, sidebarCompact && styles.navScrollCollapsed]} showsVerticalScrollIndicator={false}>
+      <ScrollView contentContainerStyle={[styles.navScroll, sidebarCompact && styles.navScrollCollapsed]} showsVerticalScrollIndicator style={styles.navScrollArea}>
         {(["CLINICAL", "WORKSPACE", "ADMINISTRATION", "ACCOUNT"] as const).map((group) => {
           const groupItems = navItems.filter((item) => item.group === group);
           if (!groupItems.length) return null;
@@ -263,17 +323,63 @@ export function EnterpriseShell({ children }: PropsWithChildren) {
             <Text style={styles.pageSubtitle}>{meta.subtitle}</Text>
           </View>
           <View style={styles.topActions}>
-            <View style={[styles.searchBox, searchFocused && styles.searchBoxFocused]}>
-              <Feather name="search" size={16} color={medicalTheme.muted} />
-              <TextInput
-                accessibilityLabel="Global search"
-                onBlur={() => setSearchFocused(false)}
-                onFocus={() => setSearchFocused(true)}
-                placeholder="Search patient, ECG ID, report, physician..."
-                placeholderTextColor={medicalTheme.muted}
-                style={styles.searchInput}
-              />
-              <Text style={styles.shortcutHint}>Ctrl+K</Text>
+            <View style={styles.searchWrap}>
+              <View style={[styles.searchBox, searchFocused && styles.searchBoxFocused]}>
+                <Feather name="search" size={16} color={medicalTheme.muted} />
+                <TextInput
+                  accessibilityLabel="Global search"
+                  onBlur={() => setTimeout(() => setSearchFocused(false), 140)}
+                  onChangeText={setSearchText}
+                  onFocus={() => setSearchFocused(true)}
+                  onSubmitEditing={() => {
+                    const firstResult = searchResults[0];
+                    if (firstResult) openSearchResult(firstResult);
+                    else rememberSearch(searchText);
+                  }}
+                  placeholder="Search patient, ECG ID, report, physician..."
+                  placeholderTextColor={medicalTheme.muted}
+                  ref={searchInputRef}
+                  returnKeyType="search"
+                  style={styles.searchInput}
+                  value={searchText}
+                />
+                {searchText ? (
+                  <Pressable accessibilityLabel="Clear search" onPress={() => setSearchText("")}>
+                    <Feather name="x" size={15} color={medicalTheme.muted} />
+                  </Pressable>
+                ) : <Text style={styles.shortcutHint}>Ctrl+K</Text>}
+              </View>
+              {showSearchPanel ? (
+                <Card style={styles.searchPanel}>
+                  {searchText.trim().length < 2 ? (
+                    <>
+                      <Text style={styles.searchPanelTitle}>Recent searches</Text>
+                      {recentSearches.length ? recentSearches.map((item) => (
+                        <Pressable key={item} onPress={() => setSearchText(item)} style={styles.searchRecentRow}>
+                          <Feather name="clock" size={14} color={medicalTheme.primary} />
+                          <Text style={styles.searchResultTitle}>{item}</Text>
+                        </Pressable>
+                      )) : <Text style={styles.searchEmptyText}>Start typing to search patients, ECG cases, reports, organizations, and doctors.</Text>}
+                    </>
+                  ) : searchQuery.isLoading ? (
+                    <Text style={styles.searchEmptyText}>Searching clinical workspace...</Text>
+                  ) : searchQuery.isError ? (
+                    <Text style={styles.searchErrorText}>Search is temporarily unavailable. Please try again.</Text>
+                  ) : searchResults.length ? (
+                    searchResults.map((result) => (
+                      <Pressable key={`${result.type}-${result.id}`} onPress={() => openSearchResult(result)} style={styles.searchResultRow}>
+                        <View style={styles.searchResultIcon}>
+                          <Feather name={searchResultIcon(result.type)} size={15} color={medicalTheme.primary} />
+                        </View>
+                        <View style={styles.searchResultText}>
+                          <Text numberOfLines={1} style={styles.searchResultTitle}>{result.title}</Text>
+                          <Text numberOfLines={1} style={styles.searchResultSubtitle}>{searchResultTypeLabel(result.type)}{result.meta ? ` • ${result.meta}` : ""}{result.subtitle ? ` • ${result.subtitle}` : ""}</Text>
+                        </View>
+                      </Pressable>
+                    ))
+                  ) : <Text style={styles.searchEmptyText}>No matching clinical records found.</Text>}
+                </Card>
+              ) : null}
             </View>
             <Pressable accessibilityLabel="Notifications" accessibilityRole="button" onPress={() => setNotificationOpen((value) => !value)} style={styles.iconButton}>
               <Feather name="bell" size={18} color={medicalTheme.text} />
@@ -336,6 +442,22 @@ function notificationMatchesFilter(notification: NotificationRecord, filter: "ai
   if (filter === "all") return true;
   if (filter === "unread") return !notification.read;
   return haystack.includes(filter);
+}
+
+function searchResultIcon(type: GlobalSearchResult["type"]): keyof typeof Feather.glyphMap {
+  if (type === "case") return "activity";
+  if (type === "doctor") return "user-check";
+  if (type === "organization") return "briefcase";
+  if (type === "report") return "file-text";
+  return "users";
+}
+
+function searchResultTypeLabel(type: GlobalSearchResult["type"]) {
+  if (type === "case") return "ECG Case";
+  if (type === "doctor") return "Doctor";
+  if (type === "organization") return "Organization";
+  if (type === "report") return "Report";
+  return "Patient";
 }
 
 function notificationIcon(notification: NotificationRecord): keyof typeof Feather.glyphMap {
@@ -508,6 +630,7 @@ const styles = StyleSheet.create({
   navItemCollapsed: { justifyContent: "center", paddingHorizontal: 0, width: 48 },
   navItemHover: { backgroundColor: "rgba(20,221,230,0.08)", borderColor: "rgba(20,221,230,0.22)" },
   navScroll: { gap: 18, padding: 18, paddingBottom: 6 },
+  navScrollArea: { flex: 1 },
   navScrollCollapsed: { alignItems: "center", paddingHorizontal: 10 },
   navText: { color: medicalTheme.muted, flex: 1, fontSize: 14, fontWeight: "800" },
   navTextActive: { color: medicalTheme.text },
@@ -529,7 +652,18 @@ const styles = StyleSheet.create({
   breadcrumb: { color: medicalTheme.primary, fontSize: 11, fontWeight: "900", letterSpacing: 0.8, textTransform: "uppercase" },
   searchBox: { alignItems: "center", backgroundColor: medicalTheme.card, borderColor: medicalTheme.border, borderRadius: 12, borderWidth: 1, flexDirection: "row", gap: 8, minHeight: 44, paddingHorizontal: 12, width: 280 },
   searchBoxFocused: { borderColor: medicalTheme.primary, shadowColor: medicalTheme.primary, shadowOpacity: 0.2, shadowRadius: 14 },
+  searchEmptyText: { color: medicalTheme.muted, fontSize: 12, fontWeight: "700", lineHeight: 18, padding: 10 },
+  searchErrorText: { color: medicalTheme.critical, fontSize: 12, fontWeight: "800", lineHeight: 18, padding: 10 },
   searchInput: { color: medicalTheme.text, flex: 1, fontSize: 13 },
+  searchPanel: { backgroundColor: "rgba(12,26,45,0.98)", gap: 6, maxHeight: 430, padding: 10, position: "absolute", right: 0, shadowColor: "#000", shadowOpacity: 0.34, shadowRadius: 24, top: 52, width: 380, zIndex: 90 },
+  searchPanelTitle: { color: medicalTheme.text, fontSize: 12, fontWeight: "900", letterSpacing: 0.6, paddingHorizontal: 8, paddingVertical: 6, textTransform: "uppercase" },
+  searchRecentRow: { alignItems: "center", borderRadius: 12, flexDirection: "row", gap: 9, minHeight: 38, paddingHorizontal: 10 },
+  searchResultIcon: { alignItems: "center", backgroundColor: medicalTheme.surface, borderColor: medicalTheme.border, borderRadius: 10, borderWidth: 1, height: 34, justifyContent: "center", width: 34 },
+  searchResultRow: { alignItems: "center", borderRadius: 12, flexDirection: "row", gap: 10, padding: 9 },
+  searchResultSubtitle: { color: medicalTheme.muted, fontSize: 11, fontWeight: "700", marginTop: 2 },
+  searchResultText: { flex: 1, minWidth: 0 },
+  searchResultTitle: { color: medicalTheme.text, fontSize: 13, fontWeight: "900" },
+  searchWrap: { position: "relative", zIndex: 95 },
   section: { gap: 14 },
   sectionHeader: { alignItems: "flex-start", flexDirection: "row", gap: 12, justifyContent: "space-between" },
   sectionSubtitle: { color: medicalTheme.muted, fontSize: 13, lineHeight: 19, marginTop: 3 },

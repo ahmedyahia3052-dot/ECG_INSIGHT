@@ -8,6 +8,17 @@ export const searchRouter = Router();
 
 searchRouter.use(requireAuth);
 
+type GlobalSearchType = "case" | "doctor" | "organization" | "patient" | "report";
+
+type GlobalSearchResult = {
+  id: string;
+  meta?: string;
+  subtitle?: string;
+  title: string;
+  type: GlobalSearchType;
+  url: string;
+};
+
 function queryText(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
 }
@@ -37,6 +48,127 @@ function patientWhere(reqQuery: Record<string, unknown>): Prisma.PatientWhereInp
       : {}),
   };
 }
+
+searchRouter.get("/", async (req, res, next) => {
+  try {
+    const q = queryText(req.query["q"]);
+    if (q.length < 2) {
+      res.json({ query: q, results: [], total: 0 });
+      return;
+    }
+
+    const [patients, cases, reports, organizations, doctors] = await Promise.all([
+      prisma.patient.findMany({
+        orderBy: { updatedAt: "desc" },
+        take: 8,
+        where: patientWhere({ q }),
+      }),
+      prisma.eCGCase.findMany({
+        include: { patient: true },
+        orderBy: { updatedAt: "desc" },
+        take: 8,
+        where: {
+          OR: [
+            { caseId: { contains: q, mode: "insensitive" } },
+            { caseNumber: { contains: q, mode: "insensitive" } },
+            { aiDiagnosis: { contains: q, mode: "insensitive" } },
+            { doctorDiagnosis: { contains: q, mode: "insensitive" } },
+            { finalDiagnosis: { contains: q, mode: "insensitive" } },
+            { patient: { OR: [{ firstName: { contains: q, mode: "insensitive" } }, { lastName: { contains: q, mode: "insensitive" } }, { medicalRecordNumber: { contains: q, mode: "insensitive" } }] } },
+          ],
+        },
+      }),
+      prisma.clinicalReport.findMany({
+        include: { patient: true },
+        orderBy: { updatedAt: "desc" },
+        take: 8,
+        where: {
+          OR: [
+            { reportNumber: { contains: q, mode: "insensitive" } },
+            { physicianName: { contains: q, mode: "insensitive" } },
+            { organizationName: { contains: q, mode: "insensitive" } },
+            { finalPhysicianImpression: { contains: q, mode: "insensitive" } },
+            { patient: { OR: [{ firstName: { contains: q, mode: "insensitive" } }, { lastName: { contains: q, mode: "insensitive" } }, { medicalRecordNumber: { contains: q, mode: "insensitive" } }] } },
+          ],
+        },
+      }),
+      prisma.organization.findMany({
+        orderBy: { updatedAt: "desc" },
+        take: 8,
+        where: {
+          OR: [
+            { name: { contains: q, mode: "insensitive" } },
+            { email: { contains: q, mode: "insensitive" } },
+            { country: { contains: q, mode: "insensitive" } },
+            { city: { contains: q, mode: "insensitive" } },
+          ],
+        },
+      }),
+      prisma.user.findMany({
+        orderBy: { updatedAt: "desc" },
+        take: 8,
+        where: {
+          isActive: true,
+          OR: [
+            { name: { contains: q, mode: "insensitive" } },
+            { email: { contains: q, mode: "insensitive" } },
+            { specialization: { contains: q, mode: "insensitive" } },
+            { institution: { contains: q, mode: "insensitive" } },
+            { registrationRole: { contains: q, mode: "insensitive" } },
+          ],
+          role: { in: ["DOCTOR", "ADMIN", "SUPER_ADMIN"] },
+        },
+      }),
+    ]);
+
+    const results: GlobalSearchResult[] = [
+      ...patients.map((patient) => ({
+        id: patient.id,
+        meta: `MRN ${patient.medicalRecordNumber}`,
+        subtitle: [patient.email, patient.phone, patient.employeeId].filter(Boolean).join(" • ") || "Patient record",
+        title: `${patient.firstName} ${patient.lastName}`.trim(),
+        type: "patient" as const,
+        url: `/patients/${patient.id}`,
+      })),
+      ...cases.map((ecgCase) => ({
+        id: ecgCase.id,
+        meta: ecgCase.status.toLowerCase().replace(/_/g, " "),
+        subtitle: `${ecgCase.patient.firstName} ${ecgCase.patient.lastName}`.trim(),
+        title: ecgCase.caseNumber ?? ecgCase.caseId,
+        type: "case" as const,
+        url: `/ecg-cases/${ecgCase.id}`,
+      })),
+      ...reports.map((report) => ({
+        id: report.id,
+        meta: report.status.toLowerCase().replace(/_/g, " "),
+        subtitle: `${report.patient.firstName} ${report.patient.lastName}`.trim() || report.physicianName,
+        title: report.reportNumber,
+        type: "report" as const,
+        url: `/reports/${report.id}`,
+      })),
+      ...organizations.map((organization) => ({
+        id: organization.id,
+        meta: organization.type.toLowerCase().replace(/_/g, " "),
+        subtitle: [organization.email, organization.city, organization.country].filter(Boolean).join(" • ") || "Organization",
+        title: organization.name,
+        type: "organization" as const,
+        url: "/team-management",
+      })),
+      ...doctors.map((doctor) => ({
+        id: doctor.id,
+        meta: doctor.role.toLowerCase().replace(/_/g, " "),
+        subtitle: [doctor.email, doctor.specialization, doctor.institution].filter(Boolean).join(" • ") || "Clinical user",
+        title: doctor.name,
+        type: "doctor" as const,
+        url: "/team-management",
+      })),
+    ];
+
+    res.json({ query: q, results, total: results.length });
+  } catch (error) {
+    next(error);
+  }
+});
 
 searchRouter.get("/patients", async (req, res, next) => {
   try {

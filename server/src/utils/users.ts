@@ -1,4 +1,4 @@
-import type { Role, SubscriptionTier, User } from "@prisma/client";
+import type { Organization, Role, SubscriptionTier, User } from "@prisma/client";
 
 export type ApiRole = "super_admin" | "admin" | "corporate_client" | "doctor" | "student" | "user";
 export type ApiSubscriptionTier = "free" | "clinic" | "hospital" | "basic" | "professional" | "unlimited" | "lifetime" | "enterprise";
@@ -65,13 +65,23 @@ function publicUserTier(tier: SubscriptionTier): Exclude<ApiSubscriptionTier, "l
   return toApiTier(tier) as Exclude<ApiSubscriptionTier, "lifetime" | "unlimited">;
 }
 
+function organizationTypeLabel(type: Organization["type"]) {
+  if (type === "HOSPITAL") return "Hospital";
+  if (type === "CLINIC") return "Clinic";
+  if (type === "COMPANY") return "Company";
+  if (type === "GOVERNMENT") return "Government Institution";
+  return "Healthcare Organization";
+}
+
 export function serializeUser(
   user: Pick<
     User,
     | "avatarInitials"
     | "accountType"
+    | "department"
     | "email"
     | "emailVerified"
+    | "employeeId"
     | "id"
     | "institution"
     | "isActive"
@@ -83,6 +93,7 @@ export function serializeUser(
     | "organizationId"
     | "ownerPasswordSetupRequired"
     | "ownerTwoFactorRequired"
+    | "positionTitle"
     | "protectedOwner"
     | "role"
     | "phoneNumber"
@@ -93,6 +104,7 @@ export function serializeUser(
     | "createdAt"
     | "updatedAt"
   > & {
+    organization?: Pick<Organization, "country" | "email" | "name" | "type"> | null;
     subscription?: { tier: SubscriptionTier } | null;
   },
 ) {
@@ -100,8 +112,10 @@ export function serializeUser(
     avatarInitials: user.avatarInitials,
     accountType: user.accountType,
     caseCount: 0,
+    department: user.department ?? undefined,
     email: user.email,
     emailVerified: user.emailVerified,
+    employeeId: user.employeeId ?? undefined,
     id: user.id,
     institution: user.institution ?? undefined,
     isActive: user.isActive,
@@ -113,10 +127,15 @@ export function serializeUser(
     lifetimeGrantedBy: user.lifetimeGrantedBy ?? undefined,
     licenseNumber: user.licenseNumber ?? undefined,
     name: user.name,
+    organizationCountry: user.organization?.country ?? undefined,
+    organizationEmail: user.organization?.email ?? undefined,
     organizationId: user.organizationId ?? undefined,
+    organizationName: user.organization?.name ?? undefined,
+    organizationType: user.organization ? organizationTypeLabel(user.organization.type) : undefined,
     ownerPasswordSetupRequired: user.ownerPasswordSetupRequired,
     ownerTwoFactorRequired: user.ownerTwoFactorRequired,
     protectedOwner: user.protectedOwner,
+    positionTitle: user.positionTitle ?? undefined,
     phoneNumber: user.phoneNumber ?? undefined,
     phoneVerified: user.phoneVerified,
     role: toApiRole(user.role),

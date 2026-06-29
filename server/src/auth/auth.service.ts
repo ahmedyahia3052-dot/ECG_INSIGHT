@@ -21,7 +21,7 @@ const PASSWORD_MAX_AGE_DAYS = 90;
 const MAX_CONCURRENT_SESSIONS = 5;
 const CAPTCHA_FAILED_ATTEMPTS = 3;
 
-function organizationTypeForRegistration(type?: string) {
+export function organizationTypeForRegistration(type?: string) {
   switch (type) {
     case "Hospital":
       return "HOSPITAL" as const;
@@ -29,11 +29,30 @@ function organizationTypeForRegistration(type?: string) {
       return "CLINIC" as const;
     case "Company":
       return "COMPANY" as const;
+    case "Healthcare Organization":
+    case "Healthcare Network":
+    case "Occupational Health Center":
+      return "OTHER" as const;
+    case "University":
+    case "Research Center":
+    case "Medical School":
+      return "OTHER" as const;
     case "Government Institution":
       return "GOVERNMENT" as const;
     default:
       return "OTHER" as const;
   }
+}
+
+function organizationTypeFromAccountType(accountType?: string) {
+  if (accountType === "HOSPITAL") return "Hospital";
+  if (accountType === "CLINIC") return "Clinic";
+  if (accountType === "COMPANY") return "Company";
+  if (accountType === "ENTERPRISE_ORGANIZATION") return "Healthcare Organization";
+  if (accountType === "UNIVERSITY") return "University";
+  if (accountType === "RESEARCH_CENTER") return "Research Center";
+  if (accountType === "HEALTHCARE_ORGANIZATION") return "Healthcare Organization";
+  return undefined;
 }
 
 function registrationRoleFor(role: string, explicitRole?: string) {
@@ -42,6 +61,10 @@ function registrationRoleFor(role: string, explicitRole?: string) {
   if (role === "student") return "Medical Student";
   if (role === "admin") return "Administrator";
   return "Doctor";
+}
+
+function requiresOrganization(accountType?: string) {
+  return Boolean(accountType && accountType !== "INDIVIDUAL");
 }
 
 function assertPasswordPolicy(password: string) {
@@ -205,7 +228,7 @@ export async function issueAuthResponse(input: {
 }) {
   const user = await prisma.user.findUnique({
     where: { id: input.userId },
-    include: { subscription: true },
+    include: { organization: true, subscription: true },
   });
   if (!user || !user.isActive) {
     throw new AppError(403, "User account is inactive or unavailable.", "USER_INACTIVE");
@@ -229,15 +252,19 @@ export async function issueAuthResponse(input: {
 export async function registerUser(
   body: {
     email?: string;
-    accountType?: "INDIVIDUAL" | "ORGANIZATION";
+    accountType?: "INDIVIDUAL" | "HOSPITAL" | "CLINIC" | "HEALTHCARE_ORGANIZATION" | "COMPANY" | "ENTERPRISE_ORGANIZATION" | "UNIVERSITY" | "RESEARCH_CENTER" | "ORGANIZATION";
+    department?: string;
+    employeeId?: string;
     institution?: string;
     name: string;
     organizationCity?: string;
     organizationCountry?: string;
+    organizationEmail?: string;
     organizationName?: string;
     organizationType?: string;
     password?: string;
     phoneNumber?: string;
+    positionTitle?: string;
     role: "admin" | "corporate_client" | "doctor" | "student" | "user";
     registrationRole?: string;
     specialization?: string;
@@ -257,14 +284,14 @@ export async function registerUser(
   const passwordHash = await hashPassword(body.password ?? createOpaqueToken(48));
   const user = await prisma.$transaction(async (tx) => {
     const organization =
-      body.accountType === "ORGANIZATION"
+      requiresOrganization(body.accountType)
         ? await tx.organization.create({
             data: {
               city: body.organizationCity,
               country: body.organizationCountry,
-              email,
+              email: body.organizationEmail ?? email,
               name: body.organizationName ?? body.institution ?? `${body.name} Organization`,
-              type: organizationTypeForRegistration(body.organizationType),
+              type: organizationTypeForRegistration(body.organizationType ?? organizationTypeFromAccountType(body.accountType)),
             },
           })
         : null;
@@ -273,14 +300,17 @@ export async function registerUser(
       data: {
         accountType: body.accountType ?? "INDIVIDUAL",
         avatarInitials: initialsForName(body.name),
+        department: body.department,
         email,
         emailVerificationExpiresAt: new Date(Date.now() + 1000 * 60 * 60 * 24),
         emailVerificationTokenHash: hashToken(emailToken),
+        employeeId: body.employeeId,
         institution: body.institution ?? body.organizationName,
         name: body.name,
         organizationId: organization?.id,
         passwordHash,
         phoneNumber,
+        positionTitle: body.positionTitle,
         registrationRole: registrationRoleFor(body.role, body.registrationRole),
         role: fromApiRole(body.role),
         specialization: body.specialization ?? registrationRoleFor(body.role, body.registrationRole),
@@ -291,7 +321,7 @@ export async function registerUser(
           },
         },
       },
-      include: { subscription: true },
+      include: { organization: true, subscription: true },
     });
 
     await tx.passwordHistory.create({
@@ -324,7 +354,7 @@ export async function loginUser(
 ) {
   const user = await prisma.user.findUnique({
     where: { email: body.email.trim().toLowerCase() },
-    include: { subscription: true },
+    include: { organization: true, subscription: true },
   });
   if (user?.lockedUntil && user.lockedUntil > new Date()) {
     throw new AppError(423, "Account is temporarily locked after failed login attempts.", "ACCOUNT_LOCKED");
@@ -444,7 +474,7 @@ export async function verifyPhoneOtp(body: { otp: string; phoneNumber: string; r
     if (otp) await prisma.phoneOtp.update({ data: { attempts: otp.attempts + 1 }, where: { id: otp.id } });
     throw new AppError(400, "Phone OTP is invalid or expired.", "PHONE_OTP_INVALID");
   }
-  const user = await prisma.user.findUnique({ where: { id: otp.userId ?? "" }, include: { subscription: true } });
+  const user = await prisma.user.findUnique({ where: { id: otp.userId ?? "" }, include: { organization: true, subscription: true } });
   if (!user) throw new AppError(404, "User not found.", "USER_NOT_FOUND");
   await prisma.phoneOtp.update({ data: { consumedAt: new Date() }, where: { id: otp.id } });
   await prisma.user.update({ data: { phoneVerified: true }, where: { id: user.id } });
@@ -507,7 +537,7 @@ export async function refreshSession(req: Request, res: Response) {
   const claims = verifyRefreshToken(refreshToken);
   const session = await prisma.session.findUnique({
     where: { id: claims.sessionId },
-    include: { user: { include: { subscription: true } } },
+    include: { user: { include: { organization: true, subscription: true } } },
   });
 
   if (!session || session.expiresAt <= new Date() || session.revokedAt) {

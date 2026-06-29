@@ -1,7 +1,7 @@
 import { Feather } from "@expo/vector-icons";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { usePathname } from "expo-router";
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 
 import { useAuth } from "@/context/AuthContext";
@@ -38,6 +38,7 @@ export function MedicalAICopilot() {
   const [question, setQuestion] = useState("");
   const [tag, setTag] = useState<CopilotTag>("ECG Interpretation");
   const [typingMessage, setTypingMessage] = useState("");
+  const typingCleanup = useRef<(() => void) | null>(null);
 
   const context = useMemo(() => contextFromPath(pathname), [pathname]);
   const isOwner = user?.email?.toLowerCase() === "ahmedyahia3052@gmail.com";
@@ -78,13 +79,18 @@ export function MedicalAICopilot() {
     if (selectedId) void queryClient.invalidateQueries({ queryKey: ["copilot-conversation", token, selectedId] });
   };
 
+  const startTyping = (content: string) => {
+    typingCleanup.current?.();
+    typingCleanup.current = animateTyping(content, setTypingMessage);
+  };
+
   const sendMutation = useMutation({
     mutationFn: () => sendCopilotMessage(token!, { ...context, conversationId: selectedId, question, tag }),
     onSuccess: (payload) => {
       setSelectedId(payload.conversation.id);
       setQuestion("");
       setTypingMessage("");
-      animateTyping(payload.message.content, setTypingMessage);
+      startTyping(payload.message.content);
       invalidate();
     },
   });
@@ -120,7 +126,7 @@ export function MedicalAICopilot() {
         setSelectedId(payload.conversation.id);
         setQuestion("");
         setTypingMessage("");
-        animateTyping(payload.message.content, setTypingMessage);
+        startTyping(payload.message.content);
         invalidate();
       });
     };
@@ -128,12 +134,22 @@ export function MedicalAICopilot() {
     return () => window.removeEventListener("medical-copilot:ask", askFromFinding);
   }, [context, selectedId, token]);
 
+  useEffect(() => {
+    if (!open) {
+      typingCleanup.current?.();
+      typingCleanup.current = null;
+      setTypingMessage("");
+    }
+  }, [open]);
+
+  useEffect(() => () => typingCleanup.current?.(), []);
+
   if (!token) return null;
 
   if (!open) {
     return (
       <Pressable
-        accessibilityLabel="Open Medical AI Copilot"
+        accessibilityLabel="Open AI Clinical Copilot"
         accessibilityRole="button"
         onPress={() => setOpen(true)}
         style={[styles.floatingButton, position]}
@@ -148,7 +164,7 @@ export function MedicalAICopilot() {
     <View style={[styles.widget, fullscreen && styles.fullscreen, minimized && styles.minimized, !fullscreen && position]}>
       <View style={styles.header}>
         <View style={styles.headerTitle}>
-          <Text style={styles.title}>Medical AI Copilot</Text>
+          <Text style={styles.title}>AI Clinical Copilot</Text>
           <Text style={styles.subtitle}>{enabled ? "Clinical RAG assistant" : "Disabled by owner"}</Text>
         </View>
         <View style={styles.headerActions}>
@@ -245,7 +261,7 @@ function MessageBubble({ message }: { message: CopilotMessage }) {
   const assistant = message.role === "assistant";
   return (
     <View style={[styles.message, assistant ? styles.assistantMessage : styles.userMessage]}>
-      <Text style={styles.messageRole}>{assistant ? "Medical AI Copilot" : "You"}</Text>
+      <Text style={styles.messageRole}>{assistant ? "AI Clinical Copilot" : "You"}</Text>
       <MarkdownText value={message.content} />
       {message.confidence !== undefined ? <Text style={styles.confidence}>Confidence: {Math.round(message.confidence * 100)}%</Text> : null}
       {message.citations?.length ? (
@@ -320,7 +336,7 @@ function contextLabel(context: ReturnType<typeof contextFromPath>) {
 function animateTyping(text: string, setValue: (value: string) => void) {
   if (Platform.OS !== "web") {
     setValue(text);
-    return;
+    return () => undefined;
   }
   let index = 0;
   const timer = window.setInterval(() => {
@@ -328,6 +344,7 @@ function animateTyping(text: string, setValue: (value: string) => void) {
     setValue(text.slice(0, index));
     if (index >= text.length) window.clearInterval(timer);
   }, 18);
+  return () => window.clearInterval(timer);
 }
 
 function exportConversation(conversationId: string, token: string) {
