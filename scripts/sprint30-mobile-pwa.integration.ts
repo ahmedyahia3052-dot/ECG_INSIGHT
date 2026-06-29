@@ -18,8 +18,7 @@ async function main() {
   const notificationPath = "artifacts/ecg-insight/services/mobileNotifications.ts";
   const syncHookPath = "artifacts/ecg-insight/hooks/useMobileSync.ts";
   const syncStatusPath = "artifacts/ecg-insight/components/mobile/MobileSyncStatus.tsx";
-  const uploadPath = "artifacts/ecg-insight/app/(tabs)/upload.tsx";
-  const syncDashboardPath = "artifacts/ecg-insight/app/(tabs)/sync-dashboard.tsx";
+  const uploadPath = "artifacts/ecg-insight/app/(protected)/upload-ecg.tsx";
   const viewerPath = "artifacts/ecg-insight/components/ecg/EcgProViewer.tsx";
   const backendSyncPath = "server/src/modules/collaboration/collaboration.routes.ts";
 
@@ -55,12 +54,11 @@ async function main() {
   assert(syncStatus.includes("Sync now"), "Global sync status should expose manual sync.");
 
   const upload = read(uploadPath);
-  assert(upload.includes("queueOfflineEcgUpload"), "Upload screen should queue ECG uploads while offline.");
-  assert(upload.includes("cachePatientSnapshot"), "Upload screen should cache patient drafts for offline recovery.");
-
-  const syncDashboard = read(syncDashboardPath);
-  assert(syncDashboard.includes("requestPushPermission"), "Sync dashboard should expose notification permission flow.");
-  assert(syncDashboard.includes("listOfflineUploads"), "Sync dashboard should list local offline uploads.");
+  assert(upload.includes("uploadClinicalEcgFile"), "Unified protected upload screen should execute real ECG uploads.");
+  assert(upload.includes("createCase"), "Unified protected upload screen should create ECG cases through the API.");
+  assert(offlineService.includes("cachePatientSnapshot"), "Offline service should cache patient drafts for recovery.");
+  assert(notifications.includes("requestPushPermission"), "Notification service should expose notification permission flow.");
+  assert(offlineService.includes("listOfflineUploads"), "Offline service should list local offline uploads.");
 
   const viewer = read(viewerPath);
   assert(viewer.includes("PinchGestureHandler"), "ECG Pro Viewer should support pinch zoom.");

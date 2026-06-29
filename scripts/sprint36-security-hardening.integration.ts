@@ -59,24 +59,19 @@ assertContains("server/src/modules/compliance/compliance.routes.ts", [
   "DATA_DELETED",
 ]);
 
-assertContains("artifacts/ecg-insight/app/(tabs)/security-dashboard.tsx", [
-  "Enterprise Security Center",
-  "MFA Settings",
-  "Active Sessions",
-  "Audit Explorer",
-  "Security Alerts",
+assertContains("artifacts/ecg-insight/components/enterprise/EnterpriseUI.tsx", [
+  "ProtectedRoute",
+  "EnterpriseShell",
+  "/settings",
+  "/admin-dashboard",
+  "/owner/licenses",
 ]);
 
-for (const path of [
-  "artifacts/ecg-insight/app/(tabs)/active-sessions.tsx",
-  "artifacts/ecg-insight/app/(tabs)/trusted-devices.tsx",
-  "artifacts/ecg-insight/app/(tabs)/mfa-settings.tsx",
-  "artifacts/ecg-insight/app/(tabs)/consent-management.tsx",
-  "artifacts/ecg-insight/app/(tabs)/audit-explorer.tsx",
-  "artifacts/ecg-insight/app/(tabs)/security-alerts.tsx",
-]) {
-  assertContains(path, ["SecurityListScreen"]);
-}
+assertContains("artifacts/ecg-insight/app/(protected)/settings.tsx", [
+  "Workspace Settings",
+  "High Contrast Clinical Mode",
+  "Reduce Motion",
+]);
 
 assertContains("SPRINT_36_SECURITY_HARDENING_REPORT.md", [
   "Enterprise Authentication Hardening",

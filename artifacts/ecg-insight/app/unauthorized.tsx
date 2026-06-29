@@ -18,7 +18,7 @@ export default function UnauthorizedScreen() {
     <SafeAreaView style={styles.container}>
       <Text style={styles.title}>Unauthorized</Text>
       <Text style={styles.message}>You do not have permission to access this protected owner or admin area.</Text>
-      <Pressable style={styles.button} onPress={() => router.replace("/(tabs)/" as any)}>
+      <Pressable style={styles.button} onPress={() => router.replace("/dashboard" as never)}>
         <Text style={styles.buttonText}>Return Home</Text>
       </Pressable>
     </SafeAreaView>

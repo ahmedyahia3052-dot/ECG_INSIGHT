@@ -141,10 +141,10 @@ async function main() {
   response = await request(`/security/mfa/${mfaSetup.method.id}`, { method: "DELETE", token: ownerSession.accessToken });
   assert(response.status === 200, "Owner should be able to disable MFA.");
 
-  const adminLayout = readFileSync("artifacts/ecg-insight/app/admin/_layout.tsx", "utf8");
-  const profileScreen = readFileSync("artifacts/ecg-insight/app/(tabs)/profile.tsx", "utf8");
-  assert(adminLayout.includes("/unauthorized"), "Unauthorized route redirect is missing.");
-  assert(profileScreen.includes('user.role === "super_admin"'), "Owner/admin navigation should be hidden from non-super-admin users.");
+  const protectedShell = readFileSync("artifacts/ecg-insight/components/enterprise/EnterpriseUI.tsx", "utf8");
+  const unauthorizedScreen = readFileSync("artifacts/ecg-insight/app/unauthorized.tsx", "utf8");
+  assert(unauthorizedScreen.includes("/dashboard"), "Unauthorized route should return users to the protected dashboard.");
+  assert(protectedShell.includes("ownerOnly") && protectedShell.includes("/owner/licenses"), "Owner/admin navigation should be hidden from non-owner users.");
 
   await new Promise<void>((resolve, reject) => server.close((error) => (error ? reject(error) : resolve())));
   await cleanupUsers([owner.id, superAdmin.id, doctor.id]);

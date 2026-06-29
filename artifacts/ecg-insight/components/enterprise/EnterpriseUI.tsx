@@ -18,6 +18,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useAuth } from "@/context/AuthContext";
+import { useDashboardStore } from "@/context/DashboardStore";
 import { MedicalAICopilot } from "@/components/copilot/MedicalAICopilot";
 import { deleteNotification, listNotifications, markAllNotificationsRead, markNotificationRead, type NotificationRecord } from "@/services/collaboration";
 import { globalSearch, type GlobalSearchResult } from "@/services/search";
@@ -103,16 +104,30 @@ export function EnterpriseShell({ children }: PropsWithChildren) {
   const insets = useSafeAreaInsets();
   const queryClient = useQueryClient();
   const { authToken, logout, user } = useAuth();
-  const [drawerOpen, setDrawerOpen] = useState(false);
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [hoveredNav, setHoveredNav] = useState<string | null>(null);
-  const [searchFocused, setSearchFocused] = useState(false);
-  const [searchText, setSearchText] = useState("");
-  const [debouncedSearch, setDebouncedSearch] = useState("");
-  const [recentSearches, setRecentSearches] = useState<string[]>([]);
-  const [notificationOpen, setNotificationOpen] = useState(false);
-  const [notificationFilter, setNotificationFilter] = useState<"ai" | "all" | "critical" | "license" | "system" | "unread">("all");
   const searchInputRef = useRef<TextInput>(null);
+  const {
+    closeDrawer,
+    closeNotificationCenter,
+    debouncedSearch,
+    drawerOpen,
+    focusSearch,
+    notificationFilter,
+    notificationOpen,
+    openDrawer,
+    recentSearches,
+    rememberSearch,
+    resetSearch,
+    searchFocused,
+    searchText,
+    setDebouncedSearch,
+    setNotificationFilter,
+    setRecentSearches,
+    setSearchText,
+    sidebarCollapsed,
+    toggleNotificationCenter,
+    toggleSidebarCollapsed,
+  } = useDashboardStore();
   const isMobile = width < 860;
   const sidebarCompact = !isMobile && sidebarCollapsed;
   const meta = pageMeta(pathname);
@@ -154,26 +169,15 @@ export function EnterpriseShell({ children }: PropsWithChildren) {
   });
 
   const navigate = (href: string) => {
-    setDrawerOpen(false);
-    setNotificationOpen(false);
-    setSearchFocused(false);
+    closeDrawer();
+    closeNotificationCenter();
+    focusSearch(false);
     router.push(href as never);
-  };
-
-  const rememberSearch = (value: string) => {
-    const normalized = value.trim();
-    if (!normalized) return;
-    setRecentSearches((current) => {
-      const next = [normalized, ...current.filter((item) => item.toLowerCase() !== normalized.toLowerCase())].slice(0, 6);
-      if (typeof window !== "undefined") window.localStorage.setItem("ecg-insight:recent-searches", JSON.stringify(next));
-      return next;
-    });
   };
 
   const openSearchResult = (result: GlobalSearchResult) => {
     rememberSearch(searchText || result.title);
-    setSearchText("");
-    setDebouncedSearch("");
+    resetSearch();
     navigate(result.url);
   };
 
@@ -185,11 +189,11 @@ export function EnterpriseShell({ children }: PropsWithChildren) {
   useEffect(() => {
     if (!notificationOpen || typeof document === "undefined") return undefined;
     const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setNotificationOpen(false);
+      if (event.key === "Escape") closeNotificationCenter();
     };
     document.addEventListener("keydown", closeOnEscape);
     return () => document.removeEventListener("keydown", closeOnEscape);
-  }, [notificationOpen]);
+  }, [closeNotificationCenter, notificationOpen]);
 
   useEffect(() => {
     const timeout = setTimeout(() => setDebouncedSearch(searchText.trim()), 260);
@@ -208,17 +212,17 @@ export function EnterpriseShell({ children }: PropsWithChildren) {
 
   useEffect(() => {
     if (typeof document === "undefined") return undefined;
-    const focusSearch = (event: KeyboardEvent) => {
+    const handleSearchShortcut = (event: KeyboardEvent) => {
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "k") {
         event.preventDefault();
         searchInputRef.current?.focus();
-        setSearchFocused(true);
+        focusSearch(true);
       }
-      if (event.key === "Escape") setSearchFocused(false);
+      if (event.key === "Escape") focusSearch(false);
     };
-    document.addEventListener("keydown", focusSearch);
-    return () => document.removeEventListener("keydown", focusSearch);
-  }, []);
+    document.addEventListener("keydown", handleSearchShortcut);
+    return () => document.removeEventListener("keydown", handleSearchShortcut);
+  }, [focusSearch]);
 
   const sidebar = (
     <View style={[styles.sidebar, sidebarCompact && styles.sidebarCollapsed, isMobile && styles.drawer, { paddingTop: isMobile ? insets.top + 18 : 24 }]}>
@@ -246,7 +250,7 @@ export function EnterpriseShell({ children }: PropsWithChildren) {
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
-          onPress={() => setSidebarCollapsed((value) => !value)}
+          onPress={toggleSidebarCollapsed}
           style={styles.collapseButton}
         >
           <Feather name={sidebarCollapsed ? "chevrons-right" : "chevrons-left"} size={17} color={medicalTheme.primary} />
@@ -306,14 +310,14 @@ export function EnterpriseShell({ children }: PropsWithChildren) {
       {!isMobile ? sidebar : null}
       {isMobile && drawerOpen ? (
         <View style={styles.mobileOverlay}>
-          <Pressable style={styles.backdrop} onPress={() => setDrawerOpen(false)} />
+          <Pressable style={styles.backdrop} onPress={closeDrawer} />
           {sidebar}
         </View>
       ) : null}
       <View style={styles.contentRoot}>
         <View style={[styles.topbar, { paddingTop: isMobile ? insets.top + 12 : 18 }]}>
           {isMobile ? (
-            <Pressable accessibilityRole="button" accessibilityLabel="Open navigation" onPress={() => setDrawerOpen(true)} style={styles.iconButton}>
+            <Pressable accessibilityRole="button" accessibilityLabel="Open navigation" onPress={openDrawer} style={styles.iconButton}>
               <Feather name="menu" size={20} color={medicalTheme.text} />
             </Pressable>
           ) : null}
@@ -328,9 +332,9 @@ export function EnterpriseShell({ children }: PropsWithChildren) {
                 <Feather name="search" size={16} color={medicalTheme.muted} />
                 <TextInput
                   accessibilityLabel="Global search"
-                  onBlur={() => setTimeout(() => setSearchFocused(false), 140)}
+                  onBlur={() => setTimeout(() => focusSearch(false), 140)}
                   onChangeText={setSearchText}
-                  onFocus={() => setSearchFocused(true)}
+                  onFocus={() => focusSearch(true)}
                   onSubmitEditing={() => {
                     const firstResult = searchResults[0];
                     if (firstResult) openSearchResult(firstResult);
@@ -381,7 +385,7 @@ export function EnterpriseShell({ children }: PropsWithChildren) {
                 </Card>
               ) : null}
             </View>
-            <Pressable accessibilityLabel="Notifications" accessibilityRole="button" onPress={() => setNotificationOpen((value) => !value)} style={styles.iconButton}>
+            <Pressable accessibilityLabel="Notifications" accessibilityRole="button" onPress={toggleNotificationCenter} style={styles.iconButton}>
               <Feather name="bell" size={18} color={medicalTheme.text} />
               {unreadCount ? <View style={styles.countBadge}><Text style={styles.countBadgeText}>{unreadCount > 9 ? "9+" : unreadCount}</Text></View> : null}
             </Pressable>
@@ -393,7 +397,7 @@ export function EnterpriseShell({ children }: PropsWithChildren) {
       </View>
       {notificationOpen ? (
         <View style={styles.notificationOverlay} pointerEvents="box-none">
-          <Pressable style={styles.notificationBackdrop} onPress={() => setNotificationOpen(false)} />
+          <Pressable style={styles.notificationBackdrop} onPress={closeNotificationCenter} />
           <Card style={styles.notificationDrawer}>
             <SectionHeader
               title="Notification Center"

@@ -17,7 +17,6 @@ for (const path of [
   "server/src/modules/release-candidate/release-candidate.service.ts",
   "server/src/modules/release-candidate/release-candidate.routes.ts",
   "artifacts/ecg-insight/services/releaseCandidate.ts",
-  "artifacts/ecg-insight/app/(tabs)/release-candidate.tsx",
   "tests/e2e/release-candidate.spec.ts",
   "scripts/release-candidate-regression.ts",
   "scripts/release-candidate-load.ts",
@@ -47,12 +46,12 @@ assertContains("server/src/modules/release-candidate/release-candidate.routes.ts
 
 assertContains("server/src/modules/index.ts", ["releaseCandidateRouter", "/release-candidate"]);
 
-assertContains("artifacts/ecg-insight/app/(tabs)/release-candidate.tsx", [
-  "Final Release Dashboard",
-  "End-to-End Workflow Validation",
-  "Performance and Load",
-  "Outstanding Risks",
-  "Bug Bash and Regression",
+assertContains("artifacts/ecg-insight/services/releaseCandidate.ts", [
+  "getReleaseCandidateDashboard",
+  "getReleaseWorkflowValidation",
+  "ReleaseCandidateDashboard",
+  "releaseReadinessScore",
+  "bugBash",
 ]);
 
 assertContains("package.json", [

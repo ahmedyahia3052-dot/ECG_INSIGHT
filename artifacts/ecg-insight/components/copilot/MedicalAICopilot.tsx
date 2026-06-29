@@ -5,6 +5,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 
 import { useAuth } from "@/context/AuthContext";
+import { useDashboardStore } from "@/context/DashboardStore";
 import {
   copilotExportUrl,
   deleteCopilotConversation,
@@ -29,16 +30,23 @@ export function MedicalAICopilot() {
   const queryClient = useQueryClient();
   const { authToken, user } = useAuth();
   const token = authToken?.token;
-  const [open, setOpen] = useState(false);
-  const [fullscreen, setFullscreen] = useState(false);
-  const [minimized, setMinimized] = useState(false);
-  const [position, setPosition] = useState({ bottom: 24, right: 24 });
   const [search, setSearch] = useState("");
   const [selectedId, setSelectedId] = useState<string | undefined>();
   const [question, setQuestion] = useState("");
   const [tag, setTag] = useState<CopilotTag>("ECG Interpretation");
   const [typingMessage, setTypingMessage] = useState("");
   const typingCleanup = useRef<(() => void) | null>(null);
+  const {
+    assistantFullscreen: fullscreen,
+    assistantMinimized: minimized,
+    assistantOpen: open,
+    assistantPosition: position,
+    closeAssistant,
+    openAssistant,
+    setAssistantPosition,
+    toggleAssistantFullscreen,
+    toggleAssistantMinimized,
+  } = useDashboardStore();
 
   const context = useMemo(() => contextFromPath(pathname), [pathname]);
   const isOwner = user?.email?.toLowerCase() === "ahmedyahia3052@gmail.com";
@@ -119,8 +127,7 @@ export function MedicalAICopilot() {
     const askFromFinding = (event: Event) => {
       const prompt = (event as CustomEvent<{ prompt?: string }>).detail?.prompt;
       if (!prompt) return;
-      setOpen(true);
-      setMinimized(false);
+      openAssistant();
       setQuestion(prompt);
       void sendCopilotMessage(token, { ...context, conversationId: selectedId, question: prompt, tag: "ECG Interpretation" }).then((payload) => {
         setSelectedId(payload.conversation.id);
@@ -151,7 +158,7 @@ export function MedicalAICopilot() {
       <Pressable
         accessibilityLabel="Open AI Clinical Copilot"
         accessibilityRole="button"
-        onPress={() => setOpen(true)}
+        onPress={openAssistant}
         style={[styles.floatingButton, position]}
       >
         <Feather name="cpu" size={24} color={medicalTheme.background} />
@@ -168,10 +175,10 @@ export function MedicalAICopilot() {
           <Text style={styles.subtitle}>{enabled ? "Clinical RAG assistant" : "Disabled by owner"}</Text>
         </View>
         <View style={styles.headerActions}>
-          <Pressable onPress={() => setPosition((current) => ({ ...current, bottom: current.bottom === 24 ? 96 : 24 }))} style={styles.iconButton}><Feather name="move" size={15} color={medicalTheme.primary} /></Pressable>
-          <Pressable onPress={() => setMinimized((value) => !value)} style={styles.iconButton}><Feather name="minus" size={15} color={medicalTheme.primary} /></Pressable>
-          <Pressable onPress={() => setFullscreen((value) => !value)} style={styles.iconButton}><Feather name={fullscreen ? "minimize-2" : "maximize-2"} size={15} color={medicalTheme.primary} /></Pressable>
-          <Pressable onPress={() => setOpen(false)} style={styles.iconButton}><Feather name="x" size={15} color={medicalTheme.critical} /></Pressable>
+          <Pressable onPress={() => setAssistantPosition({ ...position, bottom: position.bottom === 24 ? 96 : 24 })} style={styles.iconButton}><Feather name="move" size={15} color={medicalTheme.primary} /></Pressable>
+          <Pressable onPress={toggleAssistantMinimized} style={styles.iconButton}><Feather name="minus" size={15} color={medicalTheme.primary} /></Pressable>
+          <Pressable onPress={toggleAssistantFullscreen} style={styles.iconButton}><Feather name={fullscreen ? "minimize-2" : "maximize-2"} size={15} color={medicalTheme.primary} /></Pressable>
+          <Pressable onPress={closeAssistant} style={styles.iconButton}><Feather name="x" size={15} color={medicalTheme.critical} /></Pressable>
         </View>
       </View>
 
