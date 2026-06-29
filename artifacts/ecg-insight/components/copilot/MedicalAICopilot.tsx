@@ -101,10 +101,10 @@ export function MedicalAICopilot() {
   const enabled = enabledQuery.data?.settings.enabled ?? true;
   const conversations = conversationsQuery.data?.conversations ?? [];
   const selectedConversation = conversations.find((conversation) => conversation.id === selectedId);
-  const archivedConversations = conversations.filter((conversation) => conversation.title.startsWith("[Archived]"));
-  const pinnedConversations = conversations.filter((conversation) => conversation.favorite && !conversation.title.startsWith("[Archived]"));
-  const favoriteConversations = pinnedConversations;
-  const recentConversations = conversations.filter((conversation) => !conversation.favorite && !conversation.title.startsWith("[Archived]"));
+  const archivedConversations = conversations.filter((conversation) => !!conversation.archivedAt);
+  const pinnedConversations = conversations.filter((conversation) => conversation.isPinned && !conversation.archivedAt);
+  const favoriteConversations = conversations.filter((conversation) => conversation.isFavorite && !conversation.archivedAt);
+  const recentConversations = conversations.filter((conversation) => !conversation.isPinned && !conversation.isFavorite && !conversation.archivedAt);
   const messages = selectedQuery.data?.messages ?? [];
   const latestAssistant = [...messages].reverse().find((message) => message.role === "assistant");
   const activeCaseId = context.caseId ?? selectedConversation?.caseId;
@@ -453,7 +453,7 @@ export function MedicalAICopilot() {
                   <View style={styles.conversationTools}>
                     <TextInput onChangeText={setRenameTitle} placeholder="Conversation title" placeholderTextColor={medicalTheme.muted} style={styles.renameInput} value={renameTitle} />
                     <Pressable accessibilityRole="button" onPress={() => updateMutation.mutate({ id: selectedId, input: { title: renameTitle || "Clinical conversation" } })} style={styles.smallPill}><Text style={styles.smallPillText}>Rename</Text></Pressable>
-                    <Pressable accessibilityRole="button" onPress={() => updateMutation.mutate({ id: selectedId, input: { favorite: !conversations.find((item) => item.id === selectedId)?.favorite } })} style={styles.smallPill}><Text style={styles.smallPillText}>Pin</Text></Pressable>
+                    <Pressable accessibilityRole="button" onPress={() => updateMutation.mutate({ id: selectedId, input: { isPinned: !conversations.find((item) => item.id === selectedId)?.isPinned } })} style={styles.smallPill}><Text style={styles.smallPillText}>Pin</Text></Pressable>
                     <Pressable accessibilityRole="button" onPress={() => exportConversationPdf(selectedId, token)} style={styles.smallPill}><Text style={styles.smallPillText}>Export PDF</Text></Pressable>
                     <Pressable accessibilityRole="button" onPress={() => exportConversationTxt(selectedId, token)} style={styles.smallPill}><Text style={styles.smallPillText}>Export TXT</Text></Pressable>
                     <Pressable accessibilityRole="button" onPress={() => shareConversation(selectedId, token)} style={styles.smallPill}><Text style={styles.smallPillText}>Share</Text></Pressable>

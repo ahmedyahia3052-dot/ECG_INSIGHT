@@ -3,11 +3,15 @@ import { API_URL, apiRequest } from "./api";
 export type CopilotTag = "Clinical Summary" | "Differential Diagnosis" | "ECG Interpretation" | "Follow-up" | "Occupational Fitness";
 
 export interface CopilotConversation {
+  archivedAt?: string;
   caseId?: string;
   contextType?: string;
   createdAt: string;
   favorite: boolean;
   id: string;
+  isFavorite: boolean;
+  isPinned: boolean;
+  lastOpenedAt?: string;
   patientId?: string;
   tag: CopilotTag;
   title: string;
@@ -87,6 +91,10 @@ export async function duplicateCopilotConversation(accessToken: string, conversa
 
 export async function archiveCopilotConversation(accessToken: string, conversationId: string) {
   return apiRequest<{ conversation: CopilotConversation }>(`/copilot/conversations/${conversationId}/archive`, { accessToken, method: "POST" });
+}
+
+export async function restoreCopilotConversation(accessToken: string, conversationId: string) {
+  return apiRequest<{ conversation: CopilotConversation }>(`/copilot/conversations/${conversationId}/restore`, { accessToken, method: "POST" });
 }
 
 export async function sendCopilotMessage(accessToken: string, input: CopilotChatInput) {

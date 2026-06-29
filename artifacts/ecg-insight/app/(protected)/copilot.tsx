@@ -1,5 +1,6 @@
 import { Feather } from "@expo/vector-icons";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useRouter } from "expo-router";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, useWindowDimensions, View } from "react-native";
 
@@ -7,10 +8,13 @@ import { Badge, Card, EmptyState, medicalTheme, PageSection, PrimaryButton, Sect
 import { useAuth } from "@/context/AuthContext";
 import { listCases, listPatients } from "@/services/clinical";
 import {
+  archiveCopilotConversation,
   createCopilotConversation,
   deleteCopilotConversation,
+  duplicateCopilotConversation,
   getCopilotConversation,
   listCopilotConversations,
+  restoreCopilotConversation,
   streamCopilotMessage,
   updateCopilotConversation,
   type CopilotConversation,
@@ -33,8 +37,13 @@ const QUICK_ACTIONS: WorkspacePrompt[] = [
   { label: "Follow-up Plan", prompt: "Create a practical follow-up plan with escalation criteria and referral indications.", tag: "Follow-up" },
 ];
 
-export default function CopilotWorkspaceScreen() {
+export default function CopilotRoute() {
+  return <CopilotWorkspaceScreen />;
+}
+
+export function CopilotWorkspaceScreen({ routeConversationId }: { routeConversationId?: string }) {
   const queryClient = useQueryClient();
+  const router = useRouter();
   const scrollRef = useRef<ScrollView>(null);
   const streamAbort = useRef<AbortController | null>(null);
   const { width } = useWindowDimensions();
@@ -80,8 +89,10 @@ export default function CopilotWorkspaceScreen() {
   const currentPatient = patientsQuery.data?.patients[0] ?? currentCase?.patient;
 
   const groupedConversations = useMemo(() => ({
-    favorites: conversations.filter((item) => item.favorite && !item.title.startsWith("[Archived]")),
-    recent: conversations.filter((item) => !item.favorite && !item.title.startsWith("[Archived]")),
+    archived: conversations.filter((item) => !!item.archivedAt),
+    favorites: conversations.filter((item) => item.isFavorite && !item.archivedAt),
+    pinned: conversations.filter((item) => item.isPinned && !item.archivedAt),
+    recent: conversations.filter((item) => !item.isPinned && !item.isFavorite && !item.archivedAt),
   }), [conversations]);
 
   const invalidate = () => {
@@ -100,6 +111,7 @@ export default function CopilotWorkspaceScreen() {
     onSuccess: (payload) => {
       setSelectedId(payload.conversation.id);
       setRenameTitle(payload.conversation.title);
+      router.push(`/copilot/${payload.conversation.id}` as never);
       invalidate();
     },
   });
@@ -115,6 +127,40 @@ export default function CopilotWorkspaceScreen() {
     onSuccess: () => {
       setSelectedId(undefined);
       setRenameTitle("");
+      router.replace("/copilot" as never);
+      invalidate();
+    },
+  });
+  const pinMutation = useMutation({
+    mutationFn: () => updateCopilotConversation(token!, selectedId!, { isPinned: !selectedConversation?.isPinned }),
+    onSuccess: invalidate,
+  });
+  const favoriteMutation = useMutation({
+    mutationFn: () => updateCopilotConversation(token!, selectedId!, { isFavorite: !selectedConversation?.isFavorite }),
+    onSuccess: invalidate,
+  });
+  const archiveMutation = useMutation({
+    mutationFn: () => archiveCopilotConversation(token!, selectedId!),
+    onSuccess: () => {
+      router.replace("/copilot" as never);
+      setSelectedId(undefined);
+      invalidate();
+    },
+  });
+  const restoreMutation = useMutation({
+    mutationFn: () => restoreCopilotConversation(token!, selectedId!),
+    onSuccess: (payload) => {
+      setSelectedId(payload.conversation.id);
+      router.push(`/copilot/${payload.conversation.id}` as never);
+      invalidate();
+    },
+  });
+  const duplicateMutation = useMutation({
+    mutationFn: () => duplicateCopilotConversation(token!, selectedId!),
+    onSuccess: (payload) => {
+      setSelectedId(payload.conversation.id);
+      setRenameTitle(payload.conversation.title);
+      router.push(`/copilot/${payload.conversation.id}` as never);
       invalidate();
     },
   });
@@ -140,6 +186,7 @@ export default function CopilotWorkspaceScreen() {
           finalConversation = event.conversation;
           setSelectedId(event.conversation.id);
           setRenameTitle(event.conversation.title);
+          router.replace(`/copilot/${event.conversation.id}` as never);
         }
       }, controller.signal);
       return finalConversation;
@@ -154,11 +201,16 @@ export default function CopilotWorkspaceScreen() {
   });
 
   useEffect(() => {
-    if (!selectedId && conversations[0]?.id) {
-      setSelectedId(conversations[0].id);
-      setRenameTitle(conversations[0].title);
-    }
-  }, [conversations, selectedId]);
+    restoreConversationFromRoute();
+  }, [restoreConversationFromRoute]);
+
+  useEffect(() => {
+    if (!routeConversationId && selectedId) setSelectedId(undefined);
+  }, [routeConversationId, selectedId]);
+
+  useEffect(() => {
+    if (selectedQuery.isError && routeConversationId) safeRouteFallback();
+  }, [routeConversationId, safeRouteFallback, selectedQuery.isError]);
 
   useEffect(() => {
     if (selectedConversation) setRenameTitle(selectedConversation.title);
@@ -174,6 +226,19 @@ export default function CopilotWorkspaceScreen() {
     sendMutation.mutate({ prompt: trimmed, tag });
   }
 
+  function loadConversationById(conversationId: string) {
+    setSelectedId(conversationId);
+  }
+
+  function restoreConversationFromRoute() {
+    if (routeConversationId && routeConversationId !== selectedId) loadConversationById(routeConversationId);
+  }
+
+  function safeRouteFallback() {
+    setSelectedId(undefined);
+    router.replace("/copilot" as never);
+  }
+
   return (
     <PageSection style={styles.page}>
       <Card style={styles.hero}>
@@ -185,6 +250,14 @@ export default function CopilotWorkspaceScreen() {
         <View style={styles.heroActions}>
           <PrimaryButton icon="plus" label="Create Conversation" onPress={() => createMutation.mutate()} />
           <PrimaryButton disabled={!selectedId || renameMutation.isPending} icon="edit-3" label="Rename Conversation" onPress={() => renameMutation.mutate()} variant="outline" />
+          <PrimaryButton disabled={!selectedId || pinMutation.isPending} icon="map-pin" label={selectedConversation?.isPinned ? "Unpin" : "Pin"} onPress={() => pinMutation.mutate()} variant="outline" />
+          <PrimaryButton disabled={!selectedId || favoriteMutation.isPending} icon="star" label={selectedConversation?.isFavorite ? "Unfavorite" : "Favorite"} onPress={() => favoriteMutation.mutate()} variant="outline" />
+          <PrimaryButton disabled={!selectedId || duplicateMutation.isPending} icon="copy" label="Duplicate" onPress={() => duplicateMutation.mutate()} variant="outline" />
+          {selectedConversation?.archivedAt ? (
+            <PrimaryButton disabled={!selectedId || restoreMutation.isPending} icon="corner-up-left" label="Restore" onPress={() => restoreMutation.mutate()} variant="outline" />
+          ) : (
+            <PrimaryButton disabled={!selectedId || archiveMutation.isPending} icon="archive" label="Archive" onPress={() => archiveMutation.mutate()} variant="outline" />
+          )}
           <PrimaryButton disabled={!selectedId || deleteMutation.isPending} icon="trash-2" label="Delete Conversation" onPress={() => deleteMutation.mutate()} variant="danger" />
         </View>
       </Card>
@@ -199,8 +272,10 @@ export default function CopilotWorkspaceScreen() {
             style={styles.searchInput}
             value={conversationSearch}
           />
-          <ConversationGroup conversations={groupedConversations.recent} onSelect={setSelectedId} selectedId={selectedId} title="Recent Chats" />
-          <ConversationGroup conversations={groupedConversations.favorites} onSelect={setSelectedId} selectedId={selectedId} title="Pinned / Favorites" />
+          <ConversationGroup conversations={groupedConversations.pinned} onSelect={(id) => router.push(`/copilot/${id}` as never)} selectedId={selectedId} title="Pinned" />
+          <ConversationGroup conversations={groupedConversations.favorites} onSelect={(id) => router.push(`/copilot/${id}` as never)} selectedId={selectedId} title="Favorites" />
+          <ConversationGroup conversations={groupedConversations.recent} onSelect={(id) => router.push(`/copilot/${id}` as never)} selectedId={selectedId} title="Recent" />
+          <ConversationGroup conversations={groupedConversations.archived} onSelect={(id) => router.push(`/copilot/${id}` as never)} selectedId={selectedId} title="Archive" />
         </Card>
 
         <Card style={styles.chatPanel}>

@@ -63,12 +63,18 @@ const contextSchema = z.object({
 });
 
 const createConversationSchema = contextSchema.extend({
+  isFavorite: z.boolean().default(false),
+  isPinned: z.boolean().default(false),
   tag: z.enum(tags).default("ECG Interpretation"),
   title: z.string().trim().min(1).max(160).default("New clinical conversation"),
 });
 
 const updateConversationSchema = z.object({
+  archivedAt: z.coerce.date().nullable().optional(),
   favorite: z.boolean().optional(),
+  isFavorite: z.boolean().optional(),
+  isPinned: z.boolean().optional(),
+  lastOpenedAt: z.coerce.date().nullable().optional(),
   tag: z.enum(tags).optional(),
   title: z.string().trim().min(1).max(160).optional(),
 });
@@ -103,22 +109,30 @@ async function settings() {
 }
 
 function serializeConversation(conversation: {
+  archivedAt: Date | null;
   caseId: string | null;
   contextType: string | null;
   createdAt: Date;
   favorite: boolean;
   id: string;
+  isFavorite: boolean;
+  isPinned: boolean;
+  lastOpenedAt: Date | null;
   patientId: string | null;
   tag: string;
   title: string;
   updatedAt: Date;
 }) {
   return {
+    archivedAt: conversation.archivedAt?.toISOString() ?? undefined,
     caseId: conversation.caseId ?? undefined,
     contextType: conversation.contextType ?? undefined,
     createdAt: conversation.createdAt.toISOString(),
-    favorite: conversation.favorite,
+    favorite: conversation.isFavorite || conversation.favorite,
     id: conversation.id,
+    isFavorite: conversation.isFavorite || conversation.favorite,
+    isPinned: conversation.isPinned,
+    lastOpenedAt: conversation.lastOpenedAt?.toISOString() ?? undefined,
     patientId: conversation.patientId ?? undefined,
     tag: conversation.tag,
     title: conversation.title,
@@ -495,7 +509,7 @@ async function executeCopilotChat(input: ChatInput, userId: string, started = Da
     data: { conversationId: conversation.id, question: `${input.question} | diagnoses:${knowledge.hits.map((hit) => hit.topic).slice(0, 4).join(",")}`, responseTimeMs, tag, userId },
   });
   const updatedConversation = await prisma.copilotConversation.update({
-    data: { tag, updatedAt: new Date() },
+    data: { lastOpenedAt: new Date(), tag, updatedAt: new Date() },
     where: { id: conversation.id },
   });
   return { assistant, conversation: updatedConversation, result, responseTimeMs };
@@ -554,12 +568,54 @@ copilotRouter.put("/settings", requireRole("SUPER_ADMIN"), async (req, res, next
 copilotRouter.get("/conversations", async (req, res, next) => {
   try {
     const query = z.object({ q: z.string().optional() }).parse(req.query);
+    const q = query.q?.trim();
+    const [matchingPatients, matchingCases] = q
+      ? await Promise.all([
+          prisma.patient.findMany({
+            select: { id: true },
+            take: 25,
+            where: {
+              OR: [
+                { firstName: { contains: q, mode: "insensitive" } },
+                { lastName: { contains: q, mode: "insensitive" } },
+                { fullName: { contains: q, mode: "insensitive" } },
+                { medicalRecordNumber: { contains: q, mode: "insensitive" } },
+                { patientCode: { contains: q, mode: "insensitive" } },
+              ],
+            },
+          }),
+          prisma.eCGCase.findMany({
+            select: { id: true },
+            take: 25,
+            where: {
+              OR: [
+                { id: { contains: q, mode: "insensitive" } },
+                { caseId: { contains: q, mode: "insensitive" } },
+                { caseNumber: { contains: q, mode: "insensitive" } },
+              ],
+            },
+          }),
+        ])
+      : [[], []];
+    const patientIds = matchingPatients.map((patient) => patient.id);
+    const caseIds = matchingCases.map((ecgCase) => ecgCase.id);
     const conversations = await prisma.copilotConversation.findMany({
-      orderBy: { updatedAt: "desc" },
+      orderBy: [{ isPinned: "desc" }, { lastOpenedAt: "desc" }, { updatedAt: "desc" }],
       take: 50,
       where: {
         userId: req.auth!.id,
-        ...(query.q ? { title: { contains: query.q, mode: "insensitive" } } : {}),
+        ...(q
+          ? {
+              OR: [
+                { title: { contains: q, mode: "insensitive" } },
+                { caseId: { contains: q, mode: "insensitive" } },
+                { patientId: { contains: q, mode: "insensitive" } },
+                { messages: { some: { content: { contains: q, mode: "insensitive" } } } },
+                ...(patientIds.length ? [{ patientId: { in: patientIds } }] : []),
+                ...(caseIds.length ? [{ caseId: { in: caseIds } }] : []),
+              ],
+            }
+          : {}),
       },
     });
     res.json({ conversations: conversations.map(serializeConversation) });
@@ -586,9 +642,13 @@ copilotRouter.post("/conversations/:conversationId/duplicate", async (req, res, 
     const messages = await prisma.copilotMessage.findMany({ orderBy: { createdAt: "asc" }, where: { conversationId: current.id } });
     const duplicated = await prisma.copilotConversation.create({
       data: {
+        archivedAt: null,
         caseId: current.caseId,
         contextType: current.contextType,
         favorite: false,
+        isFavorite: false,
+        isPinned: false,
+        lastOpenedAt: new Date(),
         patientId: current.patientId,
         tag: current.tag,
         title: `${current.title} copy`.slice(0, 160),
@@ -613,8 +673,23 @@ copilotRouter.post("/conversations/:conversationId/duplicate", async (req, res, 
 copilotRouter.post("/conversations/:conversationId/archive", async (req, res, next) => {
   try {
     const current = await conversationForUser(String(req.params.conversationId), req.auth!.id);
-    const title = current.title.startsWith("[Archived]") ? current.title : `[Archived] ${current.title}`.slice(0, 160);
-    const conversation = await prisma.copilotConversation.update({ data: { favorite: false, title }, where: { id: current.id } });
+    const conversation = await prisma.copilotConversation.update({
+      data: { archivedAt: new Date(), favorite: false, isFavorite: false, isPinned: false },
+      where: { id: current.id },
+    });
+    res.json({ conversation: serializeConversation(conversation) });
+  } catch (error) {
+    next(error);
+  }
+});
+
+copilotRouter.post("/conversations/:conversationId/restore", async (req, res, next) => {
+  try {
+    const current = await conversationForUser(String(req.params.conversationId), req.auth!.id);
+    const conversation = await prisma.copilotConversation.update({
+      data: { archivedAt: null, lastOpenedAt: new Date() },
+      where: { id: current.id },
+    });
     res.json({ conversation: serializeConversation(conversation) });
   } catch (error) {
     next(error);
@@ -623,7 +698,11 @@ copilotRouter.post("/conversations/:conversationId/archive", async (req, res, ne
 
 copilotRouter.get("/conversations/:conversationId", async (req, res, next) => {
   try {
-    const conversation = await conversationForUser(String(req.params.conversationId), req.auth!.id);
+    const current = await conversationForUser(String(req.params.conversationId), req.auth!.id);
+    const conversation = await prisma.copilotConversation.update({
+      data: { lastOpenedAt: new Date() },
+      where: { id: current.id },
+    });
     const messages = await prisma.copilotMessage.findMany({
       orderBy: { createdAt: "asc" },
       where: { conversationId: conversation.id },
@@ -661,7 +740,10 @@ copilotRouter.patch("/conversations/:conversationId", async (req, res, next) => 
   try {
     const current = await conversationForUser(String(req.params.conversationId), req.auth!.id);
     const body = updateConversationSchema.parse(req.body);
-    const conversation = await prisma.copilotConversation.update({ data: body, where: { id: current.id } });
+    const conversation = await prisma.copilotConversation.update({
+      data: { ...body, favorite: body.isFavorite ?? body.favorite },
+      where: { id: current.id },
+    });
     res.json({ conversation: serializeConversation(conversation) });
   } catch (error) {
     next(error);
