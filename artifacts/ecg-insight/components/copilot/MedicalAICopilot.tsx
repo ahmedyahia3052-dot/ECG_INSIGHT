@@ -6,6 +6,7 @@ import { PanResponder, Platform, Pressable, ScrollView, StyleSheet, Text, TextIn
 
 import { useAuth } from "@/context/AuthContext";
 import { useDashboardStore } from "@/context/DashboardStore";
+import { getCase, getPatient, type ApiECGCase, type ApiPatient } from "@/services/clinical";
 import {
   archiveCopilotConversation,
   copilotExportTxtUrl,
@@ -32,11 +33,14 @@ type QuickPrompt = {
 };
 
 const quickPrompts: QuickPrompt[] = [
-  { label: "Explain ECG", prompt: "Explain the active ECG findings and highlight urgent abnormalities.", tag: "ECG Interpretation" },
-  { label: "Impression", prompt: "Generate a concise ECG impression for physician review.", tag: "ECG Interpretation" },
-  { label: "Summary", prompt: "Summarize the relevant patient context and ECG history.", tag: "Clinical Summary" },
-  { label: "Follow-up", prompt: "Suggest follow-up recommendations and safety considerations.", tag: "Follow-up" },
-  { label: "Differential", prompt: "List a focused differential diagnosis and discriminating ECG clues.", tag: "Differential Diagnosis" },
+  { label: "Interpret ECG", prompt: "Interpret the loaded ECG, including rhythm, rate, axis, intervals, conduction abnormalities, ischemic changes, STEMI or NSTEMI concern, and urgent findings.", tag: "ECG Interpretation" },
+  { label: "Generate Impression", prompt: "Generate a concise physician-ready ECG impression using the loaded ECG and patient context.", tag: "ECG Interpretation" },
+  { label: "Patient Summary", prompt: "Summarize demographics, clinical history, occupational history, medications, previous ECGs, reports, notes, and uploaded documents for the current patient.", tag: "Clinical Summary" },
+  { label: "Differential Diagnosis", prompt: "List a focused differential diagnosis with discriminating ECG and clinical clues from the current context.", tag: "Differential Diagnosis" },
+  { label: "Occupational Fitness", prompt: "Assess occupational fitness, work restrictions, return-to-work considerations, and referral needs using current ECG and clinical context.", tag: "Occupational Fitness" },
+  { label: "Follow-up Plan", prompt: "Create a safe follow-up plan with escalation criteria, repeat ECG needs, referral indications, and patient safety advice.", tag: "Follow-up" },
+  { label: "Generate Report", prompt: "Draft a structured ECG report with findings, impression, recommendations, confidence score, citations, and physician disclaimer.", tag: "Clinical Summary" },
+  { label: "Explain Findings", prompt: "Explain the loaded ECG findings in clear clinical language with supporting context and guideline citations where available.", tag: "ECG Interpretation" },
 ];
 
 export function MedicalAICopilot() {
@@ -56,7 +60,6 @@ export function MedicalAICopilot() {
   const [streamStatus, setStreamStatus] = useState("");
   const [typingMessage, setTypingMessage] = useState("");
   const streamAbort = useRef<AbortController | null>(null);
-  const typingCleanup = useRef<(() => void) | null>(null);
   const dragStart = useRef({ bottom: 24, right: 24 });
   const messageScrollRef = useRef<ScrollView>(null);
   const {
@@ -97,22 +100,37 @@ export function MedicalAICopilot() {
 
   const enabled = enabledQuery.data?.settings.enabled ?? true;
   const conversations = conversationsQuery.data?.conversations ?? [];
+  const selectedConversation = conversations.find((conversation) => conversation.id === selectedId);
   const archivedConversations = conversations.filter((conversation) => conversation.title.startsWith("[Archived]"));
   const pinnedConversations = conversations.filter((conversation) => conversation.favorite && !conversation.title.startsWith("[Archived]"));
   const favoriteConversations = pinnedConversations;
   const recentConversations = conversations.filter((conversation) => !conversation.favorite && !conversation.title.startsWith("[Archived]"));
   const messages = selectedQuery.data?.messages ?? [];
   const latestAssistant = [...messages].reverse().find((message) => message.role === "assistant");
+  const activeCaseId = context.caseId ?? selectedConversation?.caseId;
+  const caseQuery = useQuery({
+    enabled: !!token && !!activeCaseId && assistantOpen,
+    queryFn: () => getCase(token!, activeCaseId!),
+    queryKey: ["copilot-active-case", token, activeCaseId],
+    retry: false,
+  });
+  const activePatientId = context.patientId ?? selectedConversation?.patientId ?? caseQuery.data?.case.patient.id;
+  const patientQuery = useQuery({
+    enabled: !!token && !!activePatientId && assistantOpen,
+    queryFn: () => getPatient(token!, activePatientId!),
+    queryKey: ["copilot-active-patient", token, activePatientId],
+    retry: false,
+  });
+  const contextSummary = clinicalContextSummary({
+    caseRecord: caseQuery.data?.case,
+    contextType: context.contextType,
+    patient: patientQuery.data?.patient ?? caseQuery.data?.case.patient,
+    pathname,
+  });
 
   const invalidate = () => {
     void queryClient.invalidateQueries({ queryKey: ["copilot-conversations", token] });
     if (selectedId) void queryClient.invalidateQueries({ queryKey: ["copilot-conversation", token, selectedId] });
-  };
-
-  const startTyping = (content: string) => {
-    typingCleanup.current?.();
-    setTypingMessage("");
-    typingCleanup.current = animateTyping(content, setTypingMessage);
   };
 
   const sendMutation = useMutation({
@@ -223,9 +241,7 @@ export function MedicalAICopilot() {
 
   useEffect(() => {
     if (!assistantOpen) {
-      typingCleanup.current?.();
       streamAbort.current?.abort();
-      typingCleanup.current = null;
       streamAbort.current = null;
       setTypingMessage("");
       setStreamStatus("");
@@ -236,28 +252,26 @@ export function MedicalAICopilot() {
     messageScrollRef.current?.scrollToEnd({ animated: true });
   }, [messages.length, typingMessage]);
 
-  useEffect(() => () => typingCleanup.current?.(), []);
-
   if (!token) return null;
 
   if (!assistantOpen) {
     return (
       <Pressable
-        accessibilityLabel="Open AI assistant"
+        accessibilityLabel="Open AI Clinical Copilot"
         accessibilityRole="button"
         onPress={openAssistant}
         style={[styles.floatingButton, assistantPosition]}
       >
         <Feather name="message-circle" size={18} color={medicalTheme.primary} />
-        <Text style={styles.floatingText}>AI Assistant</Text>
+        <Text style={styles.floatingText}>AI Clinical Copilot</Text>
       </Pressable>
     );
   }
 
   const conversationGroups = [
-    { conversations: pinnedConversations, icon: "map-pin" as const, title: "Pinned" },
-    { conversations: favoriteConversations, icon: "star" as const, title: "Favorites" },
     { conversations: recentConversations, icon: "clock" as const, title: "Recent Chats" },
+    { conversations: pinnedConversations, icon: "map-pin" as const, title: "Pinned Chats" },
+    { conversations: favoriteConversations, icon: "star" as const, title: "Favorites" },
     { conversations: archivedConversations, icon: "archive" as const, title: "Archived" },
   ];
 
@@ -265,24 +279,26 @@ export function MedicalAICopilot() {
     <View style={[styles.widget, assistantFullscreen && styles.fullscreen, !assistantFullscreen && panelSize, !assistantFullscreen && assistantPosition, assistantMinimized && styles.minimized]}>
       <View style={styles.header} {...panResponder.panHandlers}>
         <View style={styles.headerTitle}>
-          <Text style={styles.title}>AI Assistant</Text>
-          <Text style={styles.subtitle}>{enabled ? "Persistent clinical assistant" : "Temporarily disabled"}</Text>
+          <Text style={styles.title}>AI Clinical Copilot</Text>
+          <View style={styles.headerContextGrid}>
+            <Text numberOfLines={1} style={styles.headerContextText}>Patient: {contextSummary.patientName}</Text>
+            <Text numberOfLines={1} style={styles.headerContextText}>Current ECG: {contextSummary.currentEcgId}</Text>
+            <Text numberOfLines={1} style={styles.headerContextText}>Current Context: {contextSummary.currentContext}</Text>
+            <Text numberOfLines={1} style={styles.headerContextText}>Case Status: {contextSummary.caseStatus}</Text>
+          </View>
         </View>
         <View style={styles.headerActions}>
-          <IconButton icon="move" label="Drag assistant" onPress={() => setAssistantPosition({ ...assistantPosition, bottom: assistantPosition.bottom === 24 ? 96 : 24 })} />
-          <IconButton icon="sidebar" label="Dock assistant left" onPress={() => setAssistantPosition({ bottom: assistantPosition.bottom, right: Math.max(12, width - (assistantSize.width + 24)) })} />
-          <IconButton icon="align-right" label="Dock assistant right" onPress={() => setAssistantPosition({ bottom: assistantPosition.bottom, right: 24 })} />
-          <IconButton icon="maximize" label="Resize assistant" onPress={() => setAssistantSize(nextSize(assistantSize))} />
-          <IconButton icon={assistantMinimized ? "plus" : "minus"} label="Minimize assistant" onPress={toggleAssistantMinimized} />
-          <IconButton icon={assistantFullscreen ? "minimize-2" : "maximize-2"} label="Maximize assistant" onPress={toggleAssistantFullscreen} />
-          <IconButton icon="x" label="Close assistant" onPress={closeAssistant} tone="critical" />
+          <IconButton icon={assistantFullscreen ? "minimize-2" : "maximize-2"} label="Expand" onPress={toggleAssistantFullscreen} />
+          <IconButton icon="external-link" label="Pop-out" onPress={() => setAssistantSize(nextSize(assistantSize))} />
+          <IconButton icon={assistantMinimized ? "plus" : "minus"} label="Minimize" onPress={toggleAssistantMinimized} />
+          <IconButton icon="x" label="Close" onPress={closeAssistant} tone="critical" />
         </View>
       </View>
 
       {!assistantMinimized ? (
         <View style={styles.body}>
           <Text style={styles.disclaimer}>AI assistance only. Final diagnosis and clinical decisions remain the responsibility of the physician.</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.quickChips}>
+          <View style={styles.quickChips}>
             {quickPrompts.map((item) => (
               <Pressable
                 accessibilityRole="button"
@@ -297,10 +313,19 @@ export function MedicalAICopilot() {
                 <Text style={styles.quickText}>{item.label}</Text>
               </Pressable>
             ))}
-          </ScrollView>
+          </View>
 
           <View style={[styles.chatWorkspace, compactAssistant && styles.chatWorkspaceStacked]}>
             <View style={[styles.conversationSidebar, compactAssistant && styles.conversationSidebarMobile]}>
+              <View style={styles.contextPanel}>
+                <Text style={styles.contextPanelTitle}>Context Panel</Text>
+                <Text numberOfLines={1} style={styles.contextPanelLine}>Patient Name: {contextSummary.patientName}</Text>
+                <Text numberOfLines={1} style={styles.contextPanelLine}>Age: {contextSummary.age}</Text>
+                <Text numberOfLines={1} style={styles.contextPanelLine}>Gender: {contextSummary.gender}</Text>
+                <Text numberOfLines={1} style={styles.contextPanelLine}>Company: {contextSummary.company}</Text>
+                <Text numberOfLines={1} style={styles.contextPanelLine}>Case ID: {contextSummary.caseId}</Text>
+                <Text numberOfLines={1} style={styles.contextPanelLine}>Current ECG ID: {contextSummary.currentEcgId}</Text>
+              </View>
               <View style={styles.searchRow}>
                 <TextInput
                   onChangeText={setConversationSearch}
@@ -314,14 +339,14 @@ export function MedicalAICopilot() {
                   <Text style={styles.newChatText}>New</Text>
                 </Pressable>
               </View>
-              <ScrollView contentContainerStyle={styles.sidebarScrollContent} showsVerticalScrollIndicator style={styles.sidebarScroll}>
+              <View style={styles.sidebarStack}>
                 {conversationGroups.map((group) => (
                   <View key={group.title} style={styles.sidebarGroup}>
                     <View style={styles.sidebarGroupHeader}>
                       <Feather name={group.icon} size={12} color={medicalTheme.primary} />
                       <Text style={styles.sidebarGroupTitle}>{group.title}</Text>
                     </View>
-                    {group.conversations.length ? group.conversations.slice(0, 12).map((conversation) => (
+                    {group.conversations.length ? group.conversations.slice(0, 3).map((conversation) => (
                       <Pressable
                         accessibilityRole="button"
                         key={`${group.title}-${conversation.id}`}
@@ -334,7 +359,24 @@ export function MedicalAICopilot() {
                     )) : <Text style={styles.sidebarEmpty}>No {group.title.toLowerCase()}.</Text>}
                   </View>
                 ))}
-              </ScrollView>
+                <View style={styles.sidebarGroup}>
+                  <View style={styles.sidebarGroupHeader}>
+                    <Feather name="file-text" size={12} color={medicalTheme.primary} />
+                    <Text style={styles.sidebarGroupTitle}>Templates</Text>
+                  </View>
+                  {quickPrompts.slice(0, 4).map((template) => (
+                    <Pressable
+                      accessibilityRole="button"
+                      disabled={!enabled || sendMutation.isPending}
+                      key={`template-${template.label}`}
+                      onPress={() => sendClinicalPrompt(template)}
+                      style={styles.sidebarConversation}
+                    >
+                      <Text numberOfLines={1} style={styles.sidebarConversationTitle}>{template.label}</Text>
+                    </Pressable>
+                  ))}
+                </View>
+              </View>
             </View>
 
             <View style={styles.chatColumn}>
@@ -377,16 +419,20 @@ export function MedicalAICopilot() {
                     style={styles.input}
                     value={question}
                   />
-                  <Pressable accessibilityRole="button" onPress={() => attachClinicalFiles(setAttachments)} style={styles.composerIconButton}>
+                  <Pressable accessibilityLabel="Attach files" accessibilityRole="button" onPress={() => attachClinicalFiles(setAttachments)} style={styles.composerIconButton}>
                     <Feather name="paperclip" size={16} color={medicalTheme.primary} />
                   </Pressable>
-                  <Pressable accessibilityRole="button" onPress={() => setQuestion((current) => `${current}${current ? "\n" : ""}Voice note: `)} style={styles.composerIconButton}>
+                  <Pressable accessibilityLabel="Attach ECG" accessibilityRole="button" onPress={() => attachClinicalFiles(setAttachments)} style={styles.composerIconButton}>
+                    <Feather name="activity" size={16} color={medicalTheme.primary} />
+                  </Pressable>
+                  <Pressable accessibilityLabel="Voice input" accessibilityRole="button" onPress={() => setQuestion((current) => `${current}${current ? "\n" : ""}Voice note: `)} style={styles.composerIconButton}>
                     <Feather name="mic" size={16} color={medicalTheme.primary} />
                   </Pressable>
-                  <Pressable accessibilityRole="button" onPress={() => { streamAbort.current?.abort(); typingCleanup.current?.(); setTypingMessage(""); setStreamStatus(""); }} style={styles.composerIconButton}>
+                  <Pressable accessibilityLabel="Stop generation" accessibilityRole="button" onPress={() => { streamAbort.current?.abort(); setTypingMessage(""); setStreamStatus(""); }} style={styles.composerIconButton}>
                     <Feather name="square" size={15} color={medicalTheme.critical} />
                   </Pressable>
                   <Pressable
+                    accessibilityLabel="Send"
                     accessibilityRole="button"
                     disabled={!enabled || !question.trim() || sendMutation.isPending}
                     onPress={() => sendClinicalPrompt({ prompt: question, tag: tagForContext(context.contextType) })}
@@ -404,7 +450,7 @@ export function MedicalAICopilot() {
                   ))}
                 </View>
                 {selectedId ? (
-                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.conversationTools}>
+                  <View style={styles.conversationTools}>
                     <TextInput onChangeText={setRenameTitle} placeholder="Conversation title" placeholderTextColor={medicalTheme.muted} style={styles.renameInput} value={renameTitle} />
                     <Pressable accessibilityRole="button" onPress={() => updateMutation.mutate({ id: selectedId, input: { title: renameTitle || "Clinical conversation" } })} style={styles.smallPill}><Text style={styles.smallPillText}>Rename</Text></Pressable>
                     <Pressable accessibilityRole="button" onPress={() => updateMutation.mutate({ id: selectedId, input: { favorite: !conversations.find((item) => item.id === selectedId)?.favorite } })} style={styles.smallPill}><Text style={styles.smallPillText}>Pin</Text></Pressable>
@@ -416,7 +462,7 @@ export function MedicalAICopilot() {
                     <Pressable accessibilityRole="button" disabled={!lastPrompt || sendMutation.isPending} onPress={() => lastPrompt && sendMutation.mutate(lastPrompt)} style={[styles.smallPill, (!lastPrompt || sendMutation.isPending) && styles.disabled]}><Text style={styles.smallPillText}>Regenerate</Text></Pressable>
                     <Pressable accessibilityRole="button" onPress={() => archiveMutation.mutate(selectedId)} style={styles.smallPill}><Text style={styles.archiveText}>Archive</Text></Pressable>
                     <Pressable accessibilityRole="button" onPress={() => deleteMutation.mutate(selectedId)} style={styles.archivePill}><Text style={styles.archiveText}>Delete</Text></Pressable>
-                  </ScrollView>
+                  </View>
                 ) : null}
               </View>
             </View>
@@ -532,6 +578,31 @@ function contextFromPath(pathname: string) {
   return { contextPath: pathname, contextType: "global" as const };
 }
 
+function clinicalContextSummary({
+  caseRecord,
+  contextType,
+  patient,
+  pathname,
+}: {
+  caseRecord?: ApiECGCase;
+  contextType: "case" | "global" | "patient";
+  patient?: ApiPatient;
+  pathname: string;
+}) {
+  const fullName = patient ? patient.fullName ?? `${patient.firstName} ${patient.lastName}`.trim() : "Loaded by context engine";
+  const reportMatch = pathname.match(/\/reports\/([^/?]+)/);
+  return {
+    age: patient?.age ? String(patient.age) : "Loaded by context engine",
+    caseId: caseRecord?.caseNumber ?? caseRecord?.caseId ?? "Loaded by context engine",
+    caseStatus: caseRecord?.status ?? "Loaded by context engine",
+    company: patient?.company ?? patient?.contractor ?? patient?.department ?? "Loaded by context engine",
+    currentContext: reportMatch?.[1] ? `report:${reportMatch[1]}` : contextType,
+    currentEcgId: caseRecord?.caseId ?? caseRecord?.id ?? "Loaded by context engine",
+    gender: patient?.gender ?? "Loaded by context engine",
+    patientName: fullName || "Loaded by context engine",
+  };
+}
+
 function tagForContext(contextType: "case" | "global" | "patient"): CopilotTag {
   if (contextType === "patient") return "Clinical Summary";
   if (contextType === "case") return "ECG Interpretation";
@@ -542,20 +613,6 @@ function nextSize(size: { height: number; width: number }) {
   if (size.width < 380) return { height: 500, width: 420 };
   if (size.width < 520) return { height: 580, width: 560 };
   return { height: 420, width: 320 };
-}
-
-function animateTyping(text: string, setValue: (value: string) => void) {
-  if (Platform.OS !== "web") {
-    setValue(text);
-    return () => undefined;
-  }
-  let index = 0;
-  const timer = window.setInterval(() => {
-    index += 20;
-    setValue(text.slice(0, index));
-    if (index >= text.length) window.clearInterval(timer);
-  }, 18);
-  return () => window.clearInterval(timer);
 }
 
 function copyMessage(content: string) {
@@ -633,15 +690,14 @@ const styles = StyleSheet.create({
   clearButton: { alignSelf: "flex-start" },
   clearText: { color: medicalTheme.critical, fontSize: 11, fontWeight: "900" },
   composer: { alignItems: "flex-end", flexDirection: "row", gap: 8 },
-  composerIconButton: { alignItems: "center", backgroundColor: medicalTheme.surface, borderColor: medicalTheme.border, borderRadius: 12, borderWidth: 1, height: 42, justifyContent: "center", width: 42 },
+  composerIconButton: { alignItems: "center", backgroundColor: medicalTheme.surface, borderColor: medicalTheme.border, borderRadius: 12, borderWidth: 1, height: 42, justifyContent: "center", width: 36 },
   confidence: { color: medicalTheme.success, fontSize: 11, fontWeight: "900" },
-  conversationSidebar: { backgroundColor: "rgba(2,6,23,0.18)", borderColor: medicalTheme.border, borderRadius: 16, borderWidth: 1, flexBasis: 188, gap: 8, maxWidth: 220, minHeight: 0, padding: 8 },
-  conversationSidebarMobile: { flexBasis: 132, maxHeight: 150, maxWidth: "100%" },
-  conversationChip: { backgroundColor: "rgba(15,33,53,0.92)", borderColor: medicalTheme.border, borderRadius: 999, borderWidth: 1, maxWidth: 190, paddingHorizontal: 10, paddingVertical: 7 },
-  conversationChipActive: { borderColor: medicalTheme.primary },
-  conversationStrip: { gap: 8 },
-  conversationText: { color: medicalTheme.text, fontSize: 11, fontWeight: "900" },
-  conversationTools: { alignItems: "center", gap: 7, paddingTop: 4 },
+  contextPanel: { backgroundColor: "rgba(20,221,230,0.06)", borderColor: "rgba(20,221,230,0.18)", borderRadius: 12, borderWidth: 1, gap: 3, padding: 8 },
+  contextPanelLine: { color: medicalTheme.text, fontSize: 10, fontWeight: "700" },
+  contextPanelTitle: { color: medicalTheme.primary, fontSize: 10, fontWeight: "900", textTransform: "uppercase" },
+  conversationSidebar: { backgroundColor: "rgba(2,6,23,0.18)", borderColor: medicalTheme.border, borderRadius: 16, borderWidth: 1, flex: 0.2, gap: 8, maxWidth: 230, minHeight: 0, minWidth: 190, overflow: "hidden", padding: 8 },
+  conversationSidebarMobile: { flex: 0, maxHeight: 260, maxWidth: "100%", minWidth: "100%" },
+  conversationTools: { alignItems: "center", flexDirection: "row", flexWrap: "wrap", gap: 7, paddingTop: 4 },
   disabled: { opacity: 0.45 },
   disclaimer: { color: medicalTheme.warning, fontSize: 11, fontWeight: "900", lineHeight: 16 },
   emptyText: { color: medicalTheme.muted, fontSize: 12, fontWeight: "700", lineHeight: 18, paddingVertical: 8 },
@@ -651,6 +707,8 @@ const styles = StyleSheet.create({
   header: { alignItems: "center", borderBottomColor: medicalTheme.border, borderBottomWidth: 1, cursor: "move" as never, flexDirection: "row", gap: 8, justifyContent: "space-between", paddingBottom: 10 },
   historySearch: { backgroundColor: medicalTheme.surface, borderColor: medicalTheme.border, borderRadius: 12, borderWidth: 1, color: medicalTheme.text, flex: 1, minHeight: 36, paddingHorizontal: 10 },
   headerActions: { flexDirection: "row", gap: 6 },
+  headerContextGrid: { flexDirection: "row", flexWrap: "wrap", gap: 6, marginTop: 3 },
+  headerContextText: { color: medicalTheme.muted, flexBasis: "45%", flexGrow: 1, fontSize: 10, fontWeight: "800" },
   headerTitle: { flex: 1, minWidth: 0 },
   iconButton: { alignItems: "center", backgroundColor: medicalTheme.surface, borderColor: medicalTheme.border, borderRadius: 9, borderWidth: 1, height: 30, justifyContent: "center", width: 30 },
   input: { backgroundColor: medicalTheme.surface, borderColor: medicalTheme.border, borderRadius: 14, borderWidth: 1, color: medicalTheme.text, flex: 1, maxHeight: 96, minHeight: 48, padding: 10 },
@@ -672,9 +730,8 @@ const styles = StyleSheet.create({
   minimized: { height: 58, overflow: "hidden" },
   newChatButton: { alignItems: "center", backgroundColor: medicalTheme.primary, borderRadius: 10, flexDirection: "row", gap: 4, minHeight: 36, paddingHorizontal: 10 },
   newChatText: { color: medicalTheme.background, fontSize: 11, fontWeight: "900" },
-  quickAction: { alignItems: "center", backgroundColor: medicalTheme.surface, borderColor: medicalTheme.border, borderRadius: 999, borderWidth: 1, flexDirection: "row", gap: 6, minHeight: 32, paddingHorizontal: 12 },
-  quickChips: { gap: 8, paddingBottom: 2 },
-  quickGrid: { gap: 8 },
+  quickAction: { alignItems: "center", backgroundColor: medicalTheme.surface, borderColor: medicalTheme.border, borderRadius: 999, borderWidth: 1, flexDirection: "row", gap: 6, minHeight: 30, paddingHorizontal: 11 },
+  quickChips: { flexDirection: "row", flexWrap: "wrap", gap: 8, paddingBottom: 2 },
   quickText: { color: medicalTheme.text, fontSize: 11, fontWeight: "900" },
   sendButton: { alignItems: "center", backgroundColor: medicalTheme.primary, borderRadius: 12, height: 42, justifyContent: "center", width: 42 },
   smallPill: { alignItems: "center", backgroundColor: "rgba(20,221,230,0.09)", borderColor: "rgba(20,221,230,0.32)", borderRadius: 999, borderWidth: 1, minHeight: 32, paddingHorizontal: 11, paddingVertical: 7 },
@@ -687,8 +744,7 @@ const styles = StyleSheet.create({
   sidebarGroup: { gap: 6 },
   sidebarGroupHeader: { alignItems: "center", flexDirection: "row", gap: 5 },
   sidebarGroupTitle: { color: medicalTheme.primary, fontSize: 10, fontWeight: "900", textTransform: "uppercase" },
-  sidebarScroll: { flex: 1, minHeight: 0 },
-  sidebarScrollContent: { gap: 12, paddingBottom: 6 },
+  sidebarStack: { gap: 9, minHeight: 0, overflow: "hidden" },
   stickyComposer: { backgroundColor: "rgba(12,26,45,0.99)", borderColor: medicalTheme.border, borderRadius: 16, borderWidth: 1, bottom: 0, gap: 7, padding: 9, position: "sticky" as never },
   subtitle: { color: medicalTheme.muted, fontSize: 11, fontWeight: "800" },
   thinking: { color: medicalTheme.primary, fontSize: 12, fontWeight: "900", paddingVertical: 6 },
