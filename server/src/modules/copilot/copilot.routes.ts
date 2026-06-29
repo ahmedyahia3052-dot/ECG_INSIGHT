@@ -78,6 +78,7 @@ const chatSchema = contextSchema.extend({
   question: z.string().trim().min(1).max(4000),
   tag: z.enum(tags).default("ECG Interpretation"),
 });
+type ChatInput = z.infer<typeof chatSchema>;
 
 const settingsSchema = z.object({
   enabled: z.boolean(),
@@ -456,6 +457,76 @@ async function conversationForUser(conversationId: string, userId: string) {
   return conversation;
 }
 
+async function executeCopilotChat(input: ChatInput, userId: string, started = Date.now()) {
+  const currentSettings = await settings();
+  if (!currentSettings.enabled) throw new AppError(503, "Medical AI Copilot is disabled by the developer owner.", "COPILOT_DISABLED");
+  const tag = input.tag ?? classifyQuestion(input.question);
+  const conversation = input.conversationId
+    ? await conversationForUser(input.conversationId, userId)
+    : await prisma.copilotConversation.create({
+        data: {
+          caseId: input.caseId,
+          contextType: input.contextType,
+          patientId: input.patientId,
+          tag,
+          title: input.question.slice(0, 80),
+          userId,
+        },
+      });
+  await prisma.copilotMessage.create({
+    data: { content: input.question, conversationId: conversation.id, role: "user" },
+  });
+  const clinicalContext = await retrieveClinicalContext({ caseId: input.caseId ?? conversation.caseId ?? undefined, patientId: input.patientId ?? conversation.patientId ?? undefined });
+  const knowledge = await retrieveKnowledge(input.question, clinicalContext);
+  const prompt = buildPrompt(input.question, clinicalContext, knowledge.hits);
+  const result = generateClinicalResponse({ context: clinicalContext, knowledge: knowledge.hits, prompt, question: input.question });
+  const responseTimeMs = Date.now() - started;
+  const assistant = await prisma.copilotMessage.create({
+    data: {
+      citations: clinicalContext.sources.concat(knowledge.sources) as unknown as Prisma.InputJsonValue,
+      confidence: result.confidence,
+      content: result.content,
+      conversationId: conversation.id,
+      responseTimeMs,
+      role: "assistant",
+    },
+  });
+  await prisma.copilotUsageEvent.create({
+    data: { conversationId: conversation.id, question: `${input.question} | diagnoses:${knowledge.hits.map((hit) => hit.topic).slice(0, 4).join(",")}`, responseTimeMs, tag, userId },
+  });
+  const updatedConversation = await prisma.copilotConversation.update({
+    data: { tag, updatedAt: new Date() },
+    where: { id: conversation.id },
+  });
+  return { assistant, conversation: updatedConversation, result, responseTimeMs };
+}
+
+async function auditCopilotError(userId: string, error: unknown, question?: string) {
+  await prisma.auditLog.create({
+    data: {
+      action: "AI_ANALYSIS_FAILED",
+      actorId: userId,
+      entityType: "Copilot",
+      message: error instanceof Error ? error.message : "Copilot request failed.",
+      metadata: { question: question?.slice(0, 500) } as Prisma.InputJsonObject,
+    },
+  }).catch(() => undefined);
+}
+
+function writeSse(res: { write: (chunk: string) => void }, event: string, data: unknown) {
+  res.write(`event: ${event}\n`);
+  res.write(`data: ${JSON.stringify(data)}\n\n`);
+}
+
+async function streamAssistantContent(content: string, res: { write: (chunk: string) => void }, cancelled: () => boolean) {
+  const chunks = content.match(/.{1,18}(\s|$)/g) ?? [content];
+  for (const chunk of chunks) {
+    if (cancelled()) return;
+    writeSse(res, "token", { token: chunk });
+    await new Promise((resolve) => setTimeout(resolve, 8));
+  }
+}
+
 copilotRouter.get("/settings", async (_req, res, next) => {
   try {
     const current = await settings();
@@ -509,6 +580,47 @@ copilotRouter.post("/conversations", async (req, res, next) => {
   }
 });
 
+copilotRouter.post("/conversations/:conversationId/duplicate", async (req, res, next) => {
+  try {
+    const current = await conversationForUser(String(req.params.conversationId), req.auth!.id);
+    const messages = await prisma.copilotMessage.findMany({ orderBy: { createdAt: "asc" }, where: { conversationId: current.id } });
+    const duplicated = await prisma.copilotConversation.create({
+      data: {
+        caseId: current.caseId,
+        contextType: current.contextType,
+        favorite: false,
+        patientId: current.patientId,
+        tag: current.tag,
+        title: `${current.title} copy`.slice(0, 160),
+        userId: req.auth!.id,
+        messages: {
+          create: messages.map((message) => ({
+            citations: message.citations as Prisma.InputJsonValue | undefined,
+            confidence: message.confidence,
+            content: message.content,
+            responseTimeMs: message.responseTimeMs,
+            role: message.role,
+          })),
+        },
+      },
+    });
+    res.status(201).json({ conversation: serializeConversation(duplicated) });
+  } catch (error) {
+    next(error);
+  }
+});
+
+copilotRouter.post("/conversations/:conversationId/archive", async (req, res, next) => {
+  try {
+    const current = await conversationForUser(String(req.params.conversationId), req.auth!.id);
+    const title = current.title.startsWith("[Archived]") ? current.title : `[Archived] ${current.title}`.slice(0, 160);
+    const conversation = await prisma.copilotConversation.update({ data: { favorite: false, title }, where: { id: current.id } });
+    res.json({ conversation: serializeConversation(conversation) });
+  } catch (error) {
+    next(error);
+  }
+});
+
 copilotRouter.get("/conversations/:conversationId", async (req, res, next) => {
   try {
     const conversation = await conversationForUser(String(req.params.conversationId), req.auth!.id);
@@ -545,55 +657,48 @@ copilotRouter.delete("/conversations/:conversationId", async (req, res, next) =>
 
 copilotRouter.post("/chat", requireRole("DOCTOR"), async (req, res, next) => {
   try {
-    const currentSettings = await settings();
-    if (!currentSettings.enabled) throw new AppError(503, "Medical AI Copilot is disabled by the developer owner.", "COPILOT_DISABLED");
     const started = Date.now();
     const body = chatSchema.parse(req.body);
-    const tag = body.tag ?? classifyQuestion(body.question);
-    const conversation = body.conversationId
-      ? await conversationForUser(body.conversationId, req.auth!.id)
-      : await prisma.copilotConversation.create({
-          data: {
-            caseId: body.caseId,
-            contextType: body.contextType,
-            patientId: body.patientId,
-            tag,
-            title: body.question.slice(0, 80),
-            userId: req.auth!.id,
-          },
-        });
-    await prisma.copilotMessage.create({
-      data: { content: body.question, conversationId: conversation.id, role: "user" },
-    });
-    const clinicalContext = await retrieveClinicalContext({ caseId: body.caseId ?? conversation.caseId ?? undefined, patientId: body.patientId ?? conversation.patientId ?? undefined });
-    const knowledge = await retrieveKnowledge(body.question, clinicalContext);
-    const prompt = buildPrompt(body.question, clinicalContext, knowledge.hits);
-    const result = generateClinicalResponse({ context: clinicalContext, knowledge: knowledge.hits, prompt, question: body.question });
-    const responseTimeMs = Date.now() - started;
-    const assistant = await prisma.copilotMessage.create({
-      data: {
-        citations: clinicalContext.sources.concat(knowledge.sources) as unknown as Prisma.InputJsonValue,
-        confidence: result.confidence,
-        content: result.content,
-        conversationId: conversation.id,
-        responseTimeMs,
-        role: "assistant",
-      },
-    });
-    await prisma.copilotUsageEvent.create({
-      data: { conversationId: conversation.id, question: `${body.question} | diagnoses:${knowledge.hits.map((hit) => hit.topic).slice(0, 4).join(",")}`, responseTimeMs, tag, userId: req.auth!.id },
-    });
-    await prisma.copilotConversation.update({
-      data: { tag, updatedAt: new Date() },
-      where: { id: conversation.id },
-    });
+    const { assistant, conversation } = await executeCopilotChat(body, req.auth!.id, started);
     res.status(201).json({
-      conversation: serializeConversation({ ...conversation, tag, updatedAt: new Date() }),
+      conversation: serializeConversation(conversation),
       message: serializeMessage(assistant),
       streaming: true,
     });
   } catch (error) {
+    await auditCopilotError(req.auth!.id, error, typeof req.body?.question === "string" ? req.body.question : undefined);
     next(error);
+  }
+});
+
+copilotRouter.post("/chat/stream", requireRole("DOCTOR"), async (req, res, next) => {
+  let closed = false;
+  req.on("close", () => {
+    closed = true;
+  });
+  try {
+    const started = Date.now();
+    const body = chatSchema.parse(req.body);
+    res.status(201);
+    res.setHeader("content-type", "text/event-stream; charset=utf-8");
+    res.setHeader("cache-control", "no-cache, no-transform");
+    res.setHeader("connection", "keep-alive");
+    writeSse(res, "status", { message: "AI is analyzing ECG..." });
+    writeSse(res, "status", { message: "Reviewing previous ECGs..." });
+    writeSse(res, "status", { message: "Generating recommendations..." });
+    const { assistant, conversation } = await executeCopilotChat(body, req.auth!.id, started);
+    writeSse(res, "conversation", { conversation: serializeConversation(conversation), message: serializeMessage(assistant) });
+    await streamAssistantContent(assistant.content, res, () => closed);
+    if (!closed) writeSse(res, "done", { conversation: serializeConversation(conversation), message: serializeMessage(assistant) });
+    res.end();
+  } catch (error) {
+    await auditCopilotError(req.auth!.id, error, typeof req.body?.question === "string" ? req.body.question : undefined);
+    if (!res.headersSent) {
+      next(error);
+      return;
+    }
+    writeSse(res, "error", { message: error instanceof Error ? error.message : "Copilot stream failed." });
+    res.end();
   }
 });
 
@@ -635,6 +740,24 @@ copilotRouter.get("/conversations/:conversationId/export", async (req, res, next
     res.setHeader("content-type", "application/pdf");
     res.setHeader("content-disposition", `attachment; filename="${conversation.title.replace(/[^a-z0-9]+/gi, "-")}.pdf"`);
     res.send(minimalPdf(body));
+  } catch (error) {
+    next(error);
+  }
+});
+
+copilotRouter.get("/conversations/:conversationId/export.txt", async (req, res, next) => {
+  try {
+    const conversation = await conversationForUser(String(req.params.conversationId), req.auth!.id);
+    const messages = await prisma.copilotMessage.findMany({ orderBy: { createdAt: "asc" }, where: { conversationId: conversation.id } });
+    const body = [
+      "ECG Insight Medical AI Copilot Conversation",
+      `Title: ${conversation.title}`,
+      DISCLAIMER,
+      ...messages.map((message) => `${message.role.toUpperCase()} [${message.createdAt.toISOString()}]\n${message.content}`),
+    ].join("\n\n");
+    res.setHeader("content-type", "text/plain; charset=utf-8");
+    res.setHeader("content-disposition", `attachment; filename="${conversation.title.replace(/[^a-z0-9]+/gi, "-")}.txt"`);
+    res.send(body);
   } catch (error) {
     next(error);
   }

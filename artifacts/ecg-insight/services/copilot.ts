@@ -32,6 +32,17 @@ export interface CopilotMessage {
   role: "assistant" | "user";
 }
 
+export type CopilotChatInput = {
+  caseId?: string;
+  contextPath?: string;
+  contextType: "case" | "global" | "patient";
+  conversationId?: string;
+  patientId?: string;
+  question: string;
+  tag: CopilotTag;
+};
+export type CopilotStreamEvent = { conversation?: CopilotConversation; message?: CopilotMessage; status?: string; token?: string; type: "conversation" | "done" | "error" | "status" | "token" };
+
 export interface CopilotSettings {
   enabled: boolean;
   provider: string;
@@ -66,20 +77,49 @@ export async function deleteCopilotConversation(accessToken: string, conversatio
   return apiRequest<void>(`/copilot/conversations/${conversationId}`, { accessToken, method: "DELETE" });
 }
 
-export async function sendCopilotMessage(accessToken: string, input: {
-  caseId?: string;
-  contextPath?: string;
-  contextType: "case" | "global" | "patient";
-  conversationId?: string;
-  patientId?: string;
-  question: string;
-  tag: CopilotTag;
-}) {
+export async function duplicateCopilotConversation(accessToken: string, conversationId: string) {
+  return apiRequest<{ conversation: CopilotConversation }>(`/copilot/conversations/${conversationId}/duplicate`, { accessToken, method: "POST" });
+}
+
+export async function archiveCopilotConversation(accessToken: string, conversationId: string) {
+  return apiRequest<{ conversation: CopilotConversation }>(`/copilot/conversations/${conversationId}/archive`, { accessToken, method: "POST" });
+}
+
+export async function sendCopilotMessage(accessToken: string, input: CopilotChatInput) {
   return apiRequest<{ conversation: CopilotConversation; message: CopilotMessage; streaming: boolean }>("/copilot/chat", {
     accessToken,
     body: JSON.stringify(input),
     method: "POST",
   });
+}
+
+export async function streamCopilotMessage(
+  accessToken: string,
+  input: CopilotChatInput,
+  onEvent: (event: CopilotStreamEvent) => void,
+  signal?: AbortSignal,
+) {
+  const response = await fetch(`${API_URL}/copilot/chat/stream`, {
+    body: JSON.stringify(input),
+    headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
+    method: "POST",
+    signal,
+  });
+  if (!response.ok || !response.body) throw new Error(`Copilot stream failed with status ${response.status}`);
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    const events = buffer.split("\n\n");
+    buffer = events.pop() ?? "";
+    for (const eventBlock of events) {
+      const event = parseSseEvent(eventBlock);
+      if (event) onEvent(event);
+    }
+  }
 }
 
 export async function getCopilotSettings(accessToken: string) {
@@ -100,4 +140,18 @@ export async function getCopilotAnalytics(accessToken: string) {
 
 export function copilotExportUrl(conversationId: string) {
   return `${API_URL}/copilot/conversations/${conversationId}/export`;
+}
+
+export function copilotExportTxtUrl(conversationId: string) {
+  return `${API_URL}/copilot/conversations/${conversationId}/export.txt`;
+}
+
+function parseSseEvent(block: string) {
+  const eventLine = block.split("\n").find((line) => line.startsWith("event:"));
+  const dataLine = block.split("\n").find((line) => line.startsWith("data:"));
+  if (!eventLine || !dataLine) return null;
+  const type = eventLine.replace("event:", "").trim() as "conversation" | "done" | "error" | "status" | "token";
+  const data = JSON.parse(dataLine.replace("data:", "").trim()) as { conversation?: CopilotConversation; message?: CopilotMessage | string; token?: string };
+  if (type === "status" || type === "error") return { status: typeof data.message === "string" ? data.message : undefined, type };
+  return { conversation: data.conversation, message: typeof data.message === "string" ? undefined : data.message, token: data.token, type };
 }

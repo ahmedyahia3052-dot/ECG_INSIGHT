@@ -9,12 +9,13 @@ const adapter = new PrismaPg({
 const prisma = new PrismaClient({ adapter });
 
 const ORG_COUNT = 10;
-const DOCTOR_COUNT = 50;
+const DOCTOR_COUNT = 100;
 const PATIENT_COUNT = 1_000;
-const CASE_COUNT = 3_000;
+const CASE_COUNT = 10_000;
 const REPORT_COUNT = 1_000;
 const NOTIFICATION_COUNT = 5_000;
-const CONVERSATION_COUNT = 120;
+const CONVERSATION_COUNT = 1_000;
+const MESSAGE_COUNT = 10_000;
 
 const firstNames = ["Amina", "Omar", "Laila", "Youssef", "Mariam", "Karim", "Nour", "Hassan", "Salma", "Tarek", "Dina", "Mahmoud"];
 const lastNames = ["Hassan", "Mansour", "Yehia", "Farouk", "Mostafa", "Naguib", "Saleh", "Fahmy", "Ibrahim", "Kamel", "Adel", "Rashad"];
@@ -287,25 +288,22 @@ async function main() {
   });
   await prisma.copilotConversation.createMany({ data: conversationRows, skipDuplicates: true });
 
-  const messageRows = conversationRows.flatMap((conversation, index) => [
-    {
-      content: "Explain this ECG and summarize occupational fitness concerns.",
+  const messageRows = Array.from({ length: MESSAGE_COUNT }, (_, index) => {
+    const conversation = pick(conversationRows, index);
+    const assistant = index % 2 === 1;
+    return {
+      citations: assistant ? [{ id: conversation.caseId, label: "Current ECG", source: "ECG Case", type: "case" }] : undefined,
+      confidence: assistant ? 0.82 + (index % 12) / 100 : undefined,
+      content: assistant
+        ? "AI assistance only. Final diagnosis and clinical decisions remain the responsibility of the physician.\n\n## ECG Interpretation\nContext-aware review generated from the seeded ECG case, patient profile, prior reports, and ECG knowledge base.\n\n## Recommendations\n- Review symptoms and occupational role.\n- Compare with prior ECG.\n- Escalate if critical features are present."
+        : pick(["Explain this ECG.", "Generate impression.", "Compare with previous ECG.", "Occupational fitness?", "Need referral?"], index),
       conversationId: conversation.id,
       createdAt: daysAgo(index % 60),
-      id: `${conversation.id}-user`,
-      role: "user",
-    },
-    {
-      citations: [{ id: conversation.caseId, label: "Current ECG", source: "ECG Case", type: "case" }],
-      confidence: 0.86,
-      content: "AI assistance only. Final diagnosis and clinical decisions remain the responsibility of the physician.\n\n## ECG Interpretation\nContext-aware review generated from the seeded ECG case, patient profile, prior reports, and ECG knowledge base.\n\n## Recommendations\n- Review symptoms and occupational role.\n- Compare with prior ECG.\n- Escalate if critical features are present.",
-      conversationId: conversation.id,
-      createdAt: daysAgo(index % 60),
-      id: `${conversation.id}-assistant`,
-      responseTimeMs: 740,
-      role: "assistant",
-    },
-  ]);
+      id: `release-copilot-message-${padded(index + 1, 6)}`,
+      responseTimeMs: assistant ? 520 + (index % 900) : undefined,
+      role: assistant ? "assistant" : "user",
+    };
+  });
   await prisma.copilotMessage.createMany({ data: messageRows, skipDuplicates: true });
 
   await prisma.copilotSettings.upsert({
@@ -322,10 +320,12 @@ async function main() {
     prisma.clinicalReport.count({ where: { id: { startsWith: "release-report-" } } }),
     prisma.notification.count({ where: { id: { startsWith: "release-notification-" } } }),
     prisma.copilotConversation.count({ where: { id: { startsWith: "release-copilot-conversation-" } } }),
+    prisma.copilotMessage.count({ where: { id: { startsWith: "release-copilot-message-" } } }),
   ]);
 
   console.log("Enterprise dashboard release seed complete.", {
     copilotConversations: counts[6],
+    copilotMessages: counts[7],
     doctors: counts[1],
     ecgCases: counts[3],
     notifications: counts[5],

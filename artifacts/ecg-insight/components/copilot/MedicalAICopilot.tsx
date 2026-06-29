@@ -7,13 +7,17 @@ import { PanResponder, Platform, Pressable, ScrollView, StyleSheet, Text, TextIn
 import { useAuth } from "@/context/AuthContext";
 import { useDashboardStore } from "@/context/DashboardStore";
 import {
+  archiveCopilotConversation,
+  copilotExportTxtUrl,
   copilotExportUrl,
   deleteCopilotConversation,
+  duplicateCopilotConversation,
   getCopilotConversation,
   getCopilotSettings,
   listCopilotConversations,
-  sendCopilotMessage,
+  streamCopilotMessage,
   updateCopilotConversation,
+  type CopilotChatInput,
   type CopilotConversation,
   type CopilotMessage,
   type CopilotTag,
@@ -44,9 +48,13 @@ export function MedicalAICopilot() {
   const [conversationSearch, setConversationSearch] = useState("");
   const [renameTitle, setRenameTitle] = useState("");
   const [expandedCitationId, setExpandedCitationId] = useState<string | undefined>();
+  const [bookmarkedMessageIds, setBookmarkedMessageIds] = useState<string[]>([]);
+  const [attachments, setAttachments] = useState<Array<{ name: string; type: string }>>([]);
   const [lastPrompt, setLastPrompt] = useState<{ prompt: string; tag: CopilotTag } | undefined>();
   const [selectedId, setSelectedId] = useState<string | undefined>();
+  const [streamStatus, setStreamStatus] = useState("");
   const [typingMessage, setTypingMessage] = useState("");
+  const streamAbort = useRef<AbortController | null>(null);
   const typingCleanup = useRef<(() => void) | null>(null);
   const dragStart = useRef({ bottom: 24, right: 24 });
   const {
@@ -101,17 +109,35 @@ export function MedicalAICopilot() {
   };
 
   const sendMutation = useMutation({
-    mutationFn: (input: QuickPrompt | { label?: string; prompt: string; tag: CopilotTag }) => sendCopilotMessage(token!, {
+    mutationFn: async (input: QuickPrompt | { label?: string; prompt: string; tag: CopilotTag }) => {
+      const payload: CopilotChatInput = {
       ...context,
       conversationId: selectedId,
-      question: input.prompt,
+        question: withAttachmentContext(input.prompt, attachments),
       tag: input.tag,
-    }),
-    onSuccess: (payload) => {
-      setSelectedId(payload.conversation.id);
-      setRenameTitle(payload.conversation.title);
+      };
+      const controller = new AbortController();
+      streamAbort.current = controller;
+      setTypingMessage("");
+      setStreamStatus("AI is analyzing ECG...");
+      let finalPayload: { conversation: CopilotConversation; message: CopilotMessage } | undefined;
+      await streamCopilotMessage(token!, payload, (event) => {
+        if (event.type === "status") setStreamStatus(event.status ?? "");
+        if (event.type === "conversation" && event.conversation && event.message) {
+          finalPayload = { conversation: event.conversation, message: event.message };
+          setSelectedId(event.conversation.id);
+          setRenameTitle(event.conversation.title);
+        }
+        if (event.type === "token" && event.token) setTypingMessage((current) => `${current}${event.token}`);
+        if (event.type === "done" && event.conversation && event.message) finalPayload = { conversation: event.conversation, message: event.message };
+      }, controller.signal);
+      return finalPayload;
+    },
+    onSuccess: () => {
       setQuestion("");
-      startTyping(payload.message.content);
+      setAttachments([]);
+      setStreamStatus("");
+      streamAbort.current = null;
       invalidate();
     },
   });
@@ -126,6 +152,22 @@ export function MedicalAICopilot() {
     mutationFn: (id: string) => deleteCopilotConversation(token!, id),
     onSuccess: () => {
       setSelectedId(undefined);
+      invalidate();
+    },
+  });
+  const duplicateMutation = useMutation({
+    mutationFn: (id: string) => duplicateCopilotConversation(token!, id),
+    onSuccess: (payload) => {
+      setSelectedId(payload.conversation.id);
+      setRenameTitle(payload.conversation.title);
+      invalidate();
+    },
+  });
+  const archiveMutation = useMutation({
+    mutationFn: (id: string) => archiveCopilotConversation(token!, id),
+    onSuccess: (payload) => {
+      setSelectedId(payload.conversation.id);
+      setRenameTitle(payload.conversation.title);
       invalidate();
     },
   });
@@ -171,8 +213,11 @@ export function MedicalAICopilot() {
   useEffect(() => {
     if (!assistantOpen) {
       typingCleanup.current?.();
+      streamAbort.current?.abort();
       typingCleanup.current = null;
+      streamAbort.current = null;
       setTypingMessage("");
+      setStreamStatus("");
     }
   }, [assistantOpen]);
 
@@ -255,15 +300,19 @@ export function MedicalAICopilot() {
           <ScrollView style={styles.messages}>
             {messages.slice(-8).map((message) => (
               <MessageBubble
+                bookmarked={bookmarkedMessageIds.includes(message.id)}
                 expandedCitationId={expandedCitationId}
                 key={message.id}
                 message={message}
+                onBookmark={() => setBookmarkedMessageIds((current) => current.includes(message.id) ? current.filter((id) => id !== message.id) : [...current, message.id])}
                 onCopy={() => copyMessage(message.content)}
+                onEdit={() => message.role === "user" ? setQuestion(message.content) : undefined}
+                onRemove={() => setBookmarkedMessageIds((current) => current.filter((id) => id !== message.id))}
                 onToggleCitation={setExpandedCitationId}
               />
             ))}
-            {sendMutation.isPending && !typingMessage ? <Text style={styles.thinking}>AI is thinking...</Text> : null}
-            {typingMessage ? <MessageBubble expandedCitationId={expandedCitationId} message={{ citations: [], content: typingMessage, createdAt: new Date().toISOString(), id: "typing", role: "assistant" }} onCopy={() => copyMessage(typingMessage)} onToggleCitation={setExpandedCitationId} /> : null}
+            {sendMutation.isPending && !typingMessage ? <Text style={styles.thinking}>{streamStatus || "AI is thinking..."}</Text> : null}
+            {typingMessage ? <MessageBubble bookmarked={false} expandedCitationId={expandedCitationId} message={{ citations: [], content: typingMessage, createdAt: new Date().toISOString(), id: "typing", role: "assistant" }} onBookmark={() => undefined} onCopy={() => copyMessage(typingMessage)} onEdit={() => undefined} onRemove={() => undefined} onToggleCitation={setExpandedCitationId} /> : null}
             {!messages.length && !typingMessage ? <Text style={styles.emptyText}>Choose a quick action or ask about ECG interpretation, reports, patient summary, follow-up, or differential diagnosis.</Text> : null}
           </ScrollView>
 
@@ -273,6 +322,13 @@ export function MedicalAICopilot() {
             <TextInput
               multiline
               onChangeText={setQuestion}
+              onKeyPress={({ nativeEvent }) => {
+                if (Platform.OS !== "web") return;
+                const keyboardEvent = nativeEvent as unknown as { key?: string; shiftKey?: boolean };
+                if (keyboardEvent.key === "Enter" && !keyboardEvent.shiftKey && question.trim() && !sendMutation.isPending) {
+                  sendClinicalPrompt({ prompt: question, tag: tagForContext(context.contextType) });
+                }
+              }}
               placeholder="Ask a clinical question..."
               placeholderTextColor={medicalTheme.muted}
               style={styles.input}
@@ -281,15 +337,17 @@ export function MedicalAICopilot() {
             <Pressable
               accessibilityRole="button"
               disabled={!enabled || !question.trim() || sendMutation.isPending}
-              onPress={() => {
-                const payload = { prompt: question, tag: tagForContext(context.contextType) };
-                setLastPrompt(payload);
-                sendMutation.mutate(payload);
-              }}
+              onPress={() => sendClinicalPrompt({ prompt: question, tag: tagForContext(context.contextType) })}
               style={[styles.sendButton, (!enabled || !question.trim() || sendMutation.isPending) && styles.disabled]}
             >
               <Feather name="send" size={16} color={medicalTheme.background} />
             </Pressable>
+          </View>
+          <View style={styles.attachmentRow}>
+            <Pressable accessibilityRole="button" onPress={() => attachClinicalFiles(setAttachments)} style={styles.smallPill}>
+              <Text style={styles.smallPillText}>Attach ECG/PDF/Image</Text>
+            </Pressable>
+            {attachments.map((attachment) => <Text key={`${attachment.name}-${attachment.type}`} numberOfLines={1} style={styles.attachmentChip}>{attachment.name}</Text>)}
           </View>
           {selectedId ? (
             <View style={styles.conversationTools}>
@@ -301,16 +359,28 @@ export function MedicalAICopilot() {
                 <Text style={styles.smallPillText}>Pin</Text>
               </Pressable>
               <Pressable accessibilityRole="button" onPress={() => exportConversationPdf(selectedId, token)} style={styles.smallPill}>
-                <Text style={styles.smallPillText}>Export</Text>
+                <Text style={styles.smallPillText}>Export PDF</Text>
+              </Pressable>
+              <Pressable accessibilityRole="button" onPress={() => exportConversationTxt(selectedId, token)} style={styles.smallPill}>
+                <Text style={styles.smallPillText}>Export TXT</Text>
+              </Pressable>
+              <Pressable accessibilityRole="button" onPress={() => printConversation()} style={styles.smallPill}>
+                <Text style={styles.smallPillText}>Print</Text>
+              </Pressable>
+              <Pressable accessibilityRole="button" onPress={() => duplicateMutation.mutate(selectedId)} style={styles.smallPill}>
+                <Text style={styles.smallPillText}>Duplicate</Text>
               </Pressable>
               <Pressable accessibilityRole="button" disabled={!lastPrompt || sendMutation.isPending} onPress={() => lastPrompt && sendMutation.mutate(lastPrompt)} style={[styles.smallPill, (!lastPrompt || sendMutation.isPending) && styles.disabled]}>
                 <Text style={styles.smallPillText}>Regenerate</Text>
               </Pressable>
-              <Pressable accessibilityRole="button" onPress={() => { typingCleanup.current?.(); setTypingMessage(""); }} style={styles.smallPill}>
+              <Pressable accessibilityRole="button" onPress={() => { streamAbort.current?.abort(); typingCleanup.current?.(); setTypingMessage(""); setStreamStatus(""); }} style={styles.smallPill}>
                 <Text style={styles.smallPillText}>Stop</Text>
               </Pressable>
-              <Pressable accessibilityRole="button" onPress={() => deleteMutation.mutate(selectedId)} style={styles.archivePill}>
+              <Pressable accessibilityRole="button" onPress={() => archiveMutation.mutate(selectedId)} style={styles.smallPill}>
                 <Text style={styles.archiveText}>Archive</Text>
+              </Pressable>
+              <Pressable accessibilityRole="button" onPress={() => deleteMutation.mutate(selectedId)} style={styles.archivePill}>
+                <Text style={styles.archiveText}>Delete</Text>
               </Pressable>
             </View>
           ) : null}
@@ -318,17 +388,30 @@ export function MedicalAICopilot() {
       ) : null}
     </View>
   );
+
+  function sendClinicalPrompt(payload: { prompt: string; tag: CopilotTag }) {
+    setLastPrompt(payload);
+    sendMutation.mutate(payload);
+  }
 }
 
 function MessageBubble({
+  bookmarked,
   expandedCitationId,
   message,
+  onBookmark,
   onCopy,
+  onEdit,
+  onRemove,
   onToggleCitation,
 }: {
+  bookmarked: boolean;
   expandedCitationId?: string;
   message: CopilotMessage;
+  onBookmark: () => void;
   onCopy: () => void;
+  onEdit: () => void;
+  onRemove: () => void;
   onToggleCitation: (id?: string) => void;
 }) {
   const assistant = message.role === "assistant";
@@ -336,9 +419,20 @@ function MessageBubble({
     <View style={[styles.message, assistant ? styles.assistantMessage : styles.userMessage]}>
       <View style={styles.messageHeader}>
         <Text style={styles.messageRole}>{assistant ? "Assistant" : "You"} • {formatTime(message.createdAt)}</Text>
-        <Pressable accessibilityRole="button" onPress={onCopy}>
-          <Feather name="copy" size={13} color={medicalTheme.primary} />
-        </Pressable>
+        <View style={styles.messageActions}>
+          <Pressable accessibilityRole="button" onPress={onBookmark}>
+            <Feather name={bookmarked ? "star" : "bookmark"} size={13} color={bookmarked ? medicalTheme.warning : medicalTheme.primary} />
+          </Pressable>
+          <Pressable accessibilityRole="button" onPress={onEdit}>
+            <Feather name="edit-3" size={13} color={medicalTheme.primary} />
+          </Pressable>
+          <Pressable accessibilityRole="button" onPress={onCopy}>
+            <Feather name="copy" size={13} color={medicalTheme.primary} />
+          </Pressable>
+          <Pressable accessibilityRole="button" onPress={onRemove}>
+            <Feather name="trash-2" size={13} color={medicalTheme.critical} />
+          </Pressable>
+        </View>
       </View>
       <MarkdownText content={message.content} />
       {message.citations?.length ? (
@@ -428,6 +522,34 @@ function exportConversationPdf(conversationId: string, accessToken?: string) {
   window.open(`${copilotExportUrl(conversationId)}${separator}token=${encodeURIComponent(accessToken ?? "")}`, "_blank", "noopener,noreferrer");
 }
 
+function exportConversationTxt(conversationId: string, accessToken?: string) {
+  if (Platform.OS !== "web" || typeof window === "undefined") return;
+  const separator = copilotExportTxtUrl(conversationId).includes("?") ? "&" : "?";
+  window.open(`${copilotExportTxtUrl(conversationId)}${separator}token=${encodeURIComponent(accessToken ?? "")}`, "_blank", "noopener,noreferrer");
+}
+
+function printConversation() {
+  if (Platform.OS === "web" && typeof window !== "undefined") window.print();
+}
+
+function withAttachmentContext(prompt: string, attachments: Array<{ name: string; type: string }>) {
+  if (!attachments.length) return prompt;
+  return `${prompt}\n\nAttached clinical files for context: ${attachments.map((file) => `${file.name} (${file.type || "unknown type"})`).join(", ")}. Use only extracted or visible clinical content available in ECG Insight records; do not infer unsupported findings from file names alone.`;
+}
+
+function attachClinicalFiles(setAttachments: React.Dispatch<React.SetStateAction<Array<{ name: string; type: string }>>>) {
+  if (Platform.OS !== "web" || typeof document === "undefined") return;
+  const input = document.createElement("input");
+  input.type = "file";
+  input.multiple = true;
+  input.accept = ".pdf,.docx,.png,.jpg,.jpeg,.txt,.csv,application/pdf,image/*";
+  input.onchange = () => {
+    const files = Array.from(input.files ?? []).map((file) => ({ name: file.name, type: file.type }));
+    setAttachments((current) => [...current, ...files].slice(-8));
+  };
+  input.click();
+}
+
 function formatTime(value: string) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "now";
@@ -438,6 +560,8 @@ const styles = StyleSheet.create({
   archivePill: { alignItems: "center", backgroundColor: "rgba(239,68,68,0.16)", borderColor: `${medicalTheme.critical}66`, borderRadius: 999, borderWidth: 1, minHeight: 32, paddingHorizontal: 11, paddingVertical: 7 },
   archiveText: { color: medicalTheme.critical, fontSize: 11, fontWeight: "900" },
   assistantMessage: { alignSelf: "flex-start", backgroundColor: "rgba(15,33,53,0.96)", borderColor: medicalTheme.border },
+  attachmentChip: { backgroundColor: "rgba(20,221,230,0.08)", borderColor: "rgba(20,221,230,0.26)", borderRadius: 999, borderWidth: 1, color: medicalTheme.primary, flexShrink: 1, fontSize: 10, fontWeight: "800", maxWidth: 160, overflow: "hidden", paddingHorizontal: 9, paddingVertical: 6 },
+  attachmentRow: { alignItems: "center", flexDirection: "row", flexWrap: "wrap", gap: 6 },
   body: { flex: 1, gap: 10, minHeight: 0 },
   citationCard: { backgroundColor: "rgba(20,221,230,0.08)", borderColor: "rgba(20,221,230,0.26)", borderRadius: 10, borderWidth: 1, padding: 8 },
   citationDetails: { color: medicalTheme.muted, fontSize: 10, fontWeight: "700", marginTop: 3 },
@@ -470,6 +594,7 @@ const styles = StyleSheet.create({
   markdownStack: { gap: 1 },
   markdownTable: { backgroundColor: "rgba(2,6,23,0.22)", borderColor: medicalTheme.border, borderRadius: 8, borderWidth: 1, color: medicalTheme.text, fontFamily: Platform.select({ web: "monospace", default: undefined }), fontSize: 11, lineHeight: 17, padding: 6 },
   message: { borderRadius: 18, borderWidth: 1, gap: 3, maxWidth: "96%", padding: 11, shadowColor: medicalTheme.primary, shadowOpacity: 0.08, shadowRadius: 10 },
+  messageActions: { alignItems: "center", flexDirection: "row", gap: 9 },
   messageHeader: { alignItems: "center", flexDirection: "row", gap: 8, justifyContent: "space-between" },
   messageRole: { color: medicalTheme.primary, fontSize: 10, fontWeight: "900", textTransform: "uppercase" },
   messageText: { color: medicalTheme.text, fontSize: 12, lineHeight: 18 },

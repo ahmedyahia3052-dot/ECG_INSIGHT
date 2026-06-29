@@ -33,6 +33,7 @@ for (const legacyDir of [
 
 const enterpriseShell = read("artifacts/ecg-insight/components/enterprise/EnterpriseUI.tsx");
 const assistant = read("artifacts/ecg-insight/components/copilot/MedicalAICopilot.tsx");
+const copilotService = read("artifacts/ecg-insight/services/copilot.ts");
 const dashboardStore = read("artifacts/ecg-insight/context/DashboardStore.ts");
 const notificationPage = read("artifacts/ecg-insight/app/(protected)/notifications.tsx");
 const supportPage = read("artifacts/ecg-insight/app/(protected)/support.tsx");
@@ -60,11 +61,14 @@ for (const forbidden of ["AI Clinical Copilot", "\"ai\"] as const", "/(tabs)", "
   assert(!enterpriseShell.includes(forbidden), `Enterprise shell must not contain legacy/conflicting marker: ${forbidden}`);
 }
 
-for (const marker of ["AI Assistant", "quickPrompts", "PanResponder", "setAssistantSize", "sendCopilotMessage", "listCopilotConversations", "getCopilotConversation", "medical-copilot:ask", "updateCopilotConversation", "copilotExportUrl", "Regenerate", "Archive", "MarkdownText", "expandedCitationId"]) {
+for (const marker of ["AI Assistant", "quickPrompts", "PanResponder", "setAssistantSize", "streamCopilotMessage", "listCopilotConversations", "getCopilotConversation", "medical-copilot:ask", "updateCopilotConversation", "copilotExportUrl", "copilotExportTxtUrl", "Regenerate", "Duplicate", "Delete", "Archive", "Attach ECG/PDF/Image", "MarkdownText", "expandedCitationId"]) {
   assert(assistant.includes(marker), `Lightweight assistant is missing production marker: ${marker}`);
 }
 assert(!assistant.includes("AI Clinical Copilot"), "Large AI Clinical Copilot UX must be removed.");
 assert(!assistant.includes("onPress={() => {}}"), "Assistant must not contain dead button handlers.");
+for (const marker of ["streamCopilotMessage", "/copilot/chat/stream", "parseSseEvent", "duplicateCopilotConversation", "archiveCopilotConversation", "copilotExportTxtUrl"]) {
+  assert(copilotService.includes(marker), `Copilot frontend service is missing streaming/management marker: ${marker}`);
+}
 
 for (const marker of ["notificationSearch", "assistantSize", "hydrateDashboardState", "ecg-insight:dashboard-layout", "persistLayout"]) {
   assert(dashboardStore.includes(marker), `Dashboard store is missing centralized state marker: ${marker}`);
@@ -88,7 +92,7 @@ for (const forbidden of ["Normal: 8", "Abnormal: 3", "Math.random", "onPress={()
 assert(analyticsPage.includes("No analytics yet") && analyticsPage.includes("diagnosisDistribution ?? {}"), "Analytics charts must use real empty states instead of fake fallback values.");
 assert(patientProfilePage.includes("onOpen={(item)") && patientProfilePage.includes("metadata.caseId") && patientProfilePage.includes("metadata.reportId"), "Patient timeline actions must resolve to real routes or tabs.");
 
-for (const marker of ["retrieveClinicalContext", "Patient Profile", "Previous ECG", "Cardiovascular Document", "retrieveKnowledge", "ECG Knowledge Base", "DISCLAIMER", "citations", "favorite", "updateConversationSchema"]) {
+for (const marker of ["retrieveClinicalContext", "Patient Profile", "Previous ECG", "Cardiovascular Document", "retrieveKnowledge", "ECG Knowledge Base", "DISCLAIMER", "citations", "favorite", "updateConversationSchema", "/chat/stream", "writeSse", "streamAssistantContent", "duplicate", "archive", "export.txt", "auditCopilotError", "copilotUsageEvent"]) {
   assert(copilotRoutes.includes(marker), `Copilot backend is missing context/RAG/persistence marker: ${marker}`);
 }
 for (const marker of ["createUnifiedNotification", "unreadNotificationCount", "processScheduledNotifications", "emitRealtime", "REPORT_GENERATION", "read: false"]) {
@@ -108,7 +112,7 @@ for (const marker of ["OCR failure", "notifyOcrFailure", "createNotification"]) 
 }
 assert(supportRoutes.includes("SupportTicket") && supportRoutes.includes("createNotification"), "Support tickets must persist and notify operators.");
 assert(packageJson.includes("db:seed:enterprise-dashboard"), "Enterprise dashboard release seed command must be registered.");
-for (const marker of ["ORG_COUNT = 10", "DOCTOR_COUNT = 50", "PATIENT_COUNT = 1_000", "CASE_COUNT = 3_000", "REPORT_COUNT = 1_000", "NOTIFICATION_COUNT = 5_000", "CONVERSATION_COUNT", "release-copilot-conversation", "skipDuplicates", "RuleBasedRAG"]) {
+for (const marker of ["ORG_COUNT = 10", "DOCTOR_COUNT = 100", "PATIENT_COUNT = 1_000", "CASE_COUNT = 10_000", "REPORT_COUNT = 1_000", "NOTIFICATION_COUNT = 5_000", "CONVERSATION_COUNT = 1_000", "MESSAGE_COUNT = 10_000", "release-copilot-conversation", "release-copilot-message", "skipDuplicates", "RuleBasedRAG"]) {
   assert(enterpriseSeed.includes(marker), `Enterprise dashboard release seed is missing marker: ${marker}`);
 }
 
