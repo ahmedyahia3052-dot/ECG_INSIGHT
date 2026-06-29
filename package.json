@@ -12,6 +12,7 @@
     "backup:now": "tsx scripts/backup-now.ts",
     "backup:service": "tsx scripts/backup-service.ts",
     "db:seed": "tsx prisma/seed.ts",
+    "db:seed:enterprise-dashboard": "tsx scripts/enterprise-dashboard-release-seed.ts",
     "lint": "eslint server/src prisma artifacts/ecg-insight/app artifacts/ecg-insight/components artifacts/ecg-insight/context artifacts/ecg-insight/data artifacts/ecg-insight/hooks artifacts/ecg-insight/services --no-error-on-unmatched-pattern",
     "qa:accessibility": "playwright test --grep @accessibility",
     "qa:e2e": "playwright test",

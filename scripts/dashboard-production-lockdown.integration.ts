@@ -38,6 +38,8 @@ const notificationPage = read("artifacts/ecg-insight/app/(protected)/notificatio
 const supportPage = read("artifacts/ecg-insight/app/(protected)/support.tsx");
 const searchService = read("artifacts/ecg-insight/services/search.ts");
 const searchRoutes = read("server/src/modules/search/search.routes.ts");
+const packageJson = read("package.json");
+const enterpriseSeed = read("scripts/enterprise-dashboard-release-seed.ts");
 const analyticsPage = read("artifacts/ecg-insight/app/(protected)/analytics.tsx");
 const patientProfilePage = read("artifacts/ecg-insight/app/(protected)/patients/[id].tsx");
 const copilotRoutes = read("server/src/modules/copilot/copilot.routes.ts");
@@ -105,5 +107,9 @@ for (const marker of ["OCR failure", "notifyOcrFailure", "createNotification"]) 
   assert(ocrRoutes.includes(marker), `OCR workflow must generate failure notification marker: ${marker}`);
 }
 assert(supportRoutes.includes("SupportTicket") && supportRoutes.includes("createNotification"), "Support tickets must persist and notify operators.");
+assert(packageJson.includes("db:seed:enterprise-dashboard"), "Enterprise dashboard release seed command must be registered.");
+for (const marker of ["ORG_COUNT = 10", "DOCTOR_COUNT = 50", "PATIENT_COUNT = 1_000", "CASE_COUNT = 3_000", "REPORT_COUNT = 1_000", "NOTIFICATION_COUNT = 5_000", "CONVERSATION_COUNT", "release-copilot-conversation", "skipDuplicates", "RuleBasedRAG"]) {
+  assert(enterpriseSeed.includes(marker), `Enterprise dashboard release seed is missing marker: ${marker}`);
+}
 
 console.log("Dashboard production lockdown integration checks passed.");
