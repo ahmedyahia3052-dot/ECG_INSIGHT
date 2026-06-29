@@ -77,6 +77,30 @@ export async function updateCopilotConversation(accessToken: string, conversatio
   });
 }
 
+export async function renameCopilotConversation(accessToken: string, conversationId: string, title: string) {
+  return apiRequest<{ conversation: CopilotConversation }>(`/copilot/conversations/${conversationId}/rename`, {
+    accessToken,
+    body: JSON.stringify({ title }),
+    method: "PATCH",
+  });
+}
+
+export async function pinCopilotConversation(accessToken: string, conversationId: string, isPinned: boolean) {
+  return apiRequest<{ conversation: CopilotConversation }>(`/copilot/conversations/${conversationId}/pin`, {
+    accessToken,
+    body: JSON.stringify({ isPinned }),
+    method: "PATCH",
+  });
+}
+
+export async function favoriteCopilotConversation(accessToken: string, conversationId: string, isFavorite: boolean) {
+  return apiRequest<{ conversation: CopilotConversation }>(`/copilot/conversations/${conversationId}/favorite`, {
+    accessToken,
+    body: JSON.stringify({ isFavorite }),
+    method: "PATCH",
+  });
+}
+
 export async function deleteCopilotConversation(accessToken: string, conversationId: string) {
   return apiRequest<void>(`/copilot/conversations/${conversationId}`, { accessToken, method: "DELETE" });
 }
@@ -111,9 +135,15 @@ export async function streamCopilotMessage(
   onEvent: (event: CopilotStreamEvent) => void,
   signal?: AbortSignal,
 ) {
+  const csrfToken = csrfTokenFromCookie();
   const response = await fetch(`${API_URL}/copilot/chat/stream`, {
     body: JSON.stringify(input),
-    headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
+    credentials: "include",
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      "Content-Type": "application/json",
+      ...(csrfToken ? { "X-CSRF-Token": csrfToken } : {}),
+    },
     method: "POST",
     signal,
   });
@@ -156,6 +186,14 @@ export function copilotExportUrl(conversationId: string) {
 
 export function copilotExportTxtUrl(conversationId: string) {
   return `${API_URL}/copilot/conversations/${conversationId}/export.txt`;
+}
+
+function csrfTokenFromCookie() {
+  if (typeof document === "undefined") return null;
+  const cookie = document.cookie
+    .split("; ")
+    .find((entry) => entry.startsWith("ecg_csrf_token="));
+  return cookie ? decodeURIComponent(cookie.slice("ecg_csrf_token=".length)) : null;
 }
 
 function parseSseEvent(block: string) {

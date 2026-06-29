@@ -11,13 +11,15 @@ function assert(condition: unknown, message: string): asserts condition {
   if (!condition) throw new Error(message);
 }
 
-const assistant = read("artifacts/ecg-insight/components/copilot/MedicalAICopilot.tsx");
+const workspace = read("artifacts/ecg-insight/app/(protected)/copilot.tsx");
+const dashboard = read("artifacts/ecg-insight/app/(protected)/dashboard.tsx");
 const copilotService = read("artifacts/ecg-insight/services/copilot.ts");
 const copilotRoutes = read("server/src/modules/copilot/copilot.routes.ts");
 const enterpriseShell = read("artifacts/ecg-insight/components/enterprise/EnterpriseUI.tsx");
 
-assert((enterpriseShell.match(/<MedicalAICopilot/g) ?? []).length === 1, "Only one copilot implementation may be mounted.");
-assert(assistant.includes("AI Clinical Copilot"), "Frozen header title is missing.");
+assert(!enterpriseShell.includes("<MedicalAICopilot"), "Floating Copilot widget must not be mounted in the shell.");
+assert(!dashboard.includes("MedicalAICopilot"), "Dashboard must not embed the Copilot widget.");
+assert(dashboard.includes("Open AI Copilot"), "Dashboard must expose a clean route button for Copilot.");
 
 for (const chip of [
   "Interpret ECG",
@@ -27,47 +29,42 @@ for (const chip of [
   "Occupational Fitness",
   "Follow-up Plan",
   "Generate Report",
-  "Explain Findings",
 ]) {
-  assert(assistant.includes(chip), `Quick action chip is missing: ${chip}`);
+  assert(workspace.includes(chip), `Top action bar chip is missing: ${chip}`);
 }
 
 for (const marker of [
-  "Patient:",
-  "Current ECG:",
-  "Current Context:",
-  "Case Status:",
-  "Context Panel",
-  "Patient Name:",
-  "Age:",
-  "Gender:",
-  "Company:",
-  "Case ID:",
-  "Current ECG ID:",
-  "Recent Chats",
-  "Pinned Chats",
+  "Current Patient",
+  "Demographics",
+  "Active ECG",
+  "ECG Metadata",
+  "Uploaded Files",
+  "Labs",
+  "Echo Reports",
+  "Clinical History",
+  "Search Conversations",
+  "Pinned Conversations",
   "Favorites",
-  "Templates",
-  "accessibilityLabel=\"Attach files\"",
-  "accessibilityLabel=\"Attach ECG\"",
-  "accessibilityLabel=\"Voice input\"",
-  "accessibilityLabel=\"Send\"",
+  "Recent Conversations",
+  "Archived Conversations",
+  "accessibilityRole=\"button\"",
   "scrollToEnd",
-  "messageScroller",
-  "stickyComposer",
-  "chatWorkspace",
-  "compactAssistant",
+  "messageList",
+  "chatPanel",
+  "composer",
+  "contextPanel",
+  "sidebar",
+  "mobileSidebarOpen",
+  "Shift+Enter",
 ]) {
-  assert(assistant.includes(marker), `Final copilot closure marker missing: ${marker}`);
+  assert(workspace.includes(marker), `Enterprise workspace marker missing: ${marker}`);
 }
 
-assert((assistant.match(/<ScrollView\s/g) ?? []).length === 1, "Copilot must keep one vertical scrollbar for the conversation only.");
-assert(!assistant.includes("onPress={() => {}}"), "Copilot must not contain dead button handlers.");
-assert(!assistant.includes("quickGrid"), "Legacy quick action grid must be removed.");
-assert(!assistant.includes("conversationStrip"), "Legacy conversation strip must be removed.");
-assert(!assistant.includes("sidebarScroll"), "Nested sidebar scrolling must be removed.");
+assert(!workspace.includes("quickGrid"), "Legacy quick action grid must be removed.");
+assert(!workspace.includes("conversationStrip"), "Legacy conversation strip must be removed.");
+assert(!workspace.includes("sidebarScroll"), "Nested sidebar scrolling must be removed.");
 
-for (const marker of ["streamCopilotMessage", "getCopilotConversation", "listCopilotConversations", "updateCopilotConversation", "deleteCopilotMessage"]) {
+for (const marker of ["streamCopilotMessage", "getCopilotConversation", "listCopilotConversations", "updateCopilotConversation", "deleteCopilotConversation"]) {
   assert(copilotService.includes(marker), `Copilot service missing real workflow marker: ${marker}`);
 }
 

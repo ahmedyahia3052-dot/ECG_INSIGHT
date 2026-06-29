@@ -79,6 +79,18 @@ const updateConversationSchema = z.object({
   title: z.string().trim().min(1).max(160).optional(),
 });
 
+const renameConversationSchema = z.object({
+  title: z.string().trim().min(1).max(160),
+});
+
+const pinConversationSchema = z.object({
+  isPinned: z.boolean(),
+});
+
+const favoriteConversationSchema = z.object({
+  isFavorite: z.boolean(),
+});
+
 const chatSchema = contextSchema.extend({
   conversationId: z.string().optional(),
   question: z.string().trim().min(1).max(4000),
@@ -708,6 +720,48 @@ copilotRouter.get("/conversations/:conversationId", async (req, res, next) => {
       where: { conversationId: conversation.id },
     });
     res.json({ conversation: serializeConversation(conversation), messages: messages.map(serializeMessage) });
+  } catch (error) {
+    next(error);
+  }
+});
+
+copilotRouter.patch("/conversations/:conversationId/rename", async (req, res, next) => {
+  try {
+    const current = await conversationForUser(String(req.params.conversationId), req.auth!.id);
+    const body = renameConversationSchema.parse(req.body);
+    const conversation = await prisma.copilotConversation.update({
+      data: { title: body.title },
+      where: { id: current.id },
+    });
+    res.json({ conversation: serializeConversation(conversation) });
+  } catch (error) {
+    next(error);
+  }
+});
+
+copilotRouter.patch("/conversations/:conversationId/pin", async (req, res, next) => {
+  try {
+    const current = await conversationForUser(String(req.params.conversationId), req.auth!.id);
+    const body = pinConversationSchema.parse(req.body);
+    const conversation = await prisma.copilotConversation.update({
+      data: { isPinned: body.isPinned },
+      where: { id: current.id },
+    });
+    res.json({ conversation: serializeConversation(conversation) });
+  } catch (error) {
+    next(error);
+  }
+});
+
+copilotRouter.patch("/conversations/:conversationId/favorite", async (req, res, next) => {
+  try {
+    const current = await conversationForUser(String(req.params.conversationId), req.auth!.id);
+    const body = favoriteConversationSchema.parse(req.body);
+    const conversation = await prisma.copilotConversation.update({
+      data: { favorite: body.isFavorite, isFavorite: body.isFavorite },
+      where: { id: current.id },
+    });
+    res.json({ conversation: serializeConversation(conversation) });
   } catch (error) {
     next(error);
   }

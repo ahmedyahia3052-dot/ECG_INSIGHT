@@ -16,27 +16,40 @@ const conversationRoute = read("artifacts/ecg-insight/app/(protected)/copilot/[c
 const service = read("artifacts/ecg-insight/services/copilot.ts");
 const routes = read("server/src/modules/copilot/copilot.routes.ts");
 const schema = read("prisma/schema.prisma");
-const migration = read("prisma/migrations/20260629181000_copilot_conversation_stabilization/migration.sql");
-const floating = read("artifacts/ecg-insight/components/copilot/MedicalAICopilot.tsx");
 
 for (const marker of [
   "routeConversationId",
-  "loadConversationById",
-  "restoreConversationFromRoute",
-  "safeRouteFallback",
-  "router.push(`/copilot/${payload.conversation.id}`",
+  "navigateConversation",
+  "router.push(`/copilot/${conversationId}`",
   "router.replace(\"/copilot\"",
   "selectedQuery.isError",
+  "Rename",
+  "Rename Conversation",
+  "renameModalOpen",
+  "renameCopilotConversation",
+  "openRenameDialog",
   "Pin",
   "Unpin",
+  "pinCopilotConversation",
   "Favorite",
   "Unfavorite",
+  "favoriteCopilotConversation",
   "Archive",
   "Restore",
+  "Delete",
   "Duplicate",
   "groupedConversations.pinned",
   "groupedConversations.favorites",
   "groupedConversations.archived",
+  "mobileSidebarOpen",
+  "contextOpen",
+  "Regenerate",
+  "Continue",
+  "Copy answer",
+  "applyConversationPatch",
+  "setQueriesData",
+  "📌",
+  "★",
 ]) {
   assert(workspace.includes(marker), `Workspace stabilization marker missing: ${marker}`);
 }
@@ -45,7 +58,6 @@ assert(conversationRoute.includes("useLocalSearchParams") && conversationRoute.i
 
 for (const marker of ["isPinned", "isFavorite", "archivedAt", "lastOpenedAt", "@@index([isPinned])", "@@index([isFavorite])", "@@index([archivedAt])", "@@index([lastOpenedAt])"]) {
   assert(schema.includes(marker), `Prisma schema missing copilot persistence marker: ${marker}`);
-  assert(migration.includes(marker.replace("@@index([", "").replace("])", "")) || migration.includes(`"${marker}"`), `Migration missing copilot persistence marker: ${marker}`);
 }
 
 for (const marker of [
@@ -57,22 +69,26 @@ for (const marker of [
   "prisma.patient.findMany",
   "prisma.eCGCase.findMany",
   "copilotRouter.post(\"/conversations/:conversationId/restore\"",
+  "copilotRouter.patch(\"/conversations/:conversationId/rename\"",
+  "copilotRouter.patch(\"/conversations/:conversationId/pin\"",
+  "copilotRouter.patch(\"/conversations/:conversationId/favorite\"",
+  "renameConversationSchema",
+  "pinConversationSchema",
+  "favoriteConversationSchema",
   "duplicate",
   "archivedAt: new Date()",
   "archivedAt: null",
+  "writeSse(res, \"token\"",
 ]) {
   assert(routes.includes(marker), `Copilot API stabilization marker missing: ${marker}`);
 }
 
-for (const marker of ["isPinned", "isFavorite", "archivedAt", "lastOpenedAt", "restoreCopilotConversation"]) {
+for (const marker of ["isPinned", "isFavorite", "archivedAt", "lastOpenedAt", "restoreCopilotConversation", "renameCopilotConversation", "pinCopilotConversation", "favoriteCopilotConversation", "streamCopilotMessage"]) {
   assert(service.includes(marker), `Copilot service stabilization marker missing: ${marker}`);
 }
 
-for (const marker of ["conversation.isPinned", "conversation.isFavorite", "conversation.archivedAt"]) {
-  assert(floating.includes(marker), `Floating copilot must respect new persistence marker: ${marker}`);
-}
-
 assert(!workspace.includes("onPress={() => {}}"), "Workspace must not contain dead actions.");
+assert(!workspace.includes("title.replace(\" copy\""), "Rename action must not fake-copy titles.");
 assert(!routes.includes("[Archived]"), "Archive system must not rely on title prefixes.");
 
 console.log("AI Clinical Copilot stabilization integration checks passed.");

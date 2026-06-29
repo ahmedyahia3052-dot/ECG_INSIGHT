@@ -32,7 +32,8 @@ for (const legacyDir of [
 }
 
 const enterpriseShell = read("artifacts/ecg-insight/components/enterprise/EnterpriseUI.tsx");
-const assistant = read("artifacts/ecg-insight/components/copilot/MedicalAICopilot.tsx");
+const copilotWorkspace = read("artifacts/ecg-insight/app/(protected)/copilot.tsx");
+const dashboard = read("artifacts/ecg-insight/app/(protected)/dashboard.tsx");
 const copilotService = read("artifacts/ecg-insight/services/copilot.ts");
 const dashboardStore = read("artifacts/ecg-insight/context/DashboardStore.ts");
 const notificationPage = read("artifacts/ecg-insight/app/(protected)/notifications.tsx");
@@ -52,7 +53,8 @@ const ocrRoutes = read("server/src/modules/ocr/ocr.routes.ts");
 const supportRoutes = read("server/src/modules/support/support.routes.ts");
 
 assert(enterpriseShell.includes("ProtectedRoute") && enterpriseShell.includes("EnterpriseShell"), "Protected shell must own the dashboard architecture.");
-assert((enterpriseShell.match(/<MedicalAICopilot/g) ?? []).length === 1, "Exactly one assistant owner may render in the dashboard shell.");
+assert(!enterpriseShell.includes("<MedicalAICopilot"), "Dashboard shell must not mount the retired embedded Copilot widget.");
+assert(!dashboard.includes("MedicalAICopilot") && dashboard.includes("Open AI Copilot") && dashboard.includes('router.push("/copilot"'), "Dashboard must only expose Copilot as a clean /copilot entry point.");
 assert((enterpriseShell.match(/accessibilityLabel=\"Notifications\"/g) ?? []).length === 1, "Exactly one notification bell may render in the dashboard shell.");
 for (const marker of ["CLINICAL", "WORKSPACE", "DEVELOPER", "/support", "refetchInterval: 15_000", "notificationSearch", "Open Notification History", "PremiumNotificationCard", "RefreshControl", "PanResponder", "hapticReadyInteraction", "notificationDrawerMobile"]) {
   assert(enterpriseShell.includes(marker), `Enterprise shell is missing production dashboard marker: ${marker}`);
@@ -61,13 +63,13 @@ for (const forbidden of ["\"ai\"] as const", "/(tabs)", "@/components/bolt", "@/
   assert(!enterpriseShell.includes(forbidden), `Enterprise shell must not contain legacy/conflicting marker: ${forbidden}`);
 }
 
-for (const marker of ["AI Clinical Copilot", "quickPrompts", "PanResponder", "setAssistantSize", "streamCopilotMessage", "listCopilotConversations", "getCopilotConversation", "medical-copilot:ask", "updateCopilotConversation", "copilotExportUrl", "copilotExportTxtUrl", "Regenerate", "Duplicate", "Delete", "Archive", "attachClinicalFiles", "MarkdownText", "expandedCitationId"]) {
-  assert(assistant.includes(marker), `Lightweight assistant is missing production marker: ${marker}`);
+for (const marker of ["Clinical Copilot Workspace", "ACTIONS", "streamCopilotMessage", "listCopilotConversations", "getCopilotConversation", "renameMutation", "pinMutation", "favoriteMutation", "Regenerate", "Continue", "Duplicate", "Delete", "Archive", "Restore", "RichMedicalText", "CitationList", "ContextLine"]) {
+  assert(copilotWorkspace.includes(marker), `Full-page Copilot workspace is missing production marker: ${marker}`);
 }
-for (const marker of ["conversationSidebar", "sidebarGroupTitle", "chatWorkspace", "messageScroller", "messageListContent", "stickyComposer", "quickChips", "messageScrollRef", "scrollToEnd", "Share", "Voice note", "overflow: \"hidden\"", "position: \"sticky\""]) {
-  assert(assistant.includes(marker), `Final enterprise copilot UI is missing anti-clipping/layout marker: ${marker}`);
+for (const marker of ["sidebar", "groupTitle", "chatPanel", "messages", "messageList", "composer", "actionBar", "scrollToEnd", "Voice", "Attach Files", "overflow: \"hidden\"", "mobileSidebarOpen"]) {
+  assert(copilotWorkspace.includes(marker), `Final enterprise copilot UI is missing anti-clipping/layout marker: ${marker}`);
 }
-assert(!assistant.includes("onPress={() => {}}"), "Assistant must not contain dead button handlers.");
+assert(!copilotWorkspace.includes("onPress={() => {}}"), "Copilot workspace must not contain dead button handlers.");
 for (const marker of ["streamCopilotMessage", "/copilot/chat/stream", "parseSseEvent", "duplicateCopilotConversation", "archiveCopilotConversation", "copilotExportTxtUrl"]) {
   assert(copilotService.includes(marker), `Copilot frontend service is missing streaming/management marker: ${marker}`);
 }

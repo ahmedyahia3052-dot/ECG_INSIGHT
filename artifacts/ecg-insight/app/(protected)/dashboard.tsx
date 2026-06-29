@@ -96,6 +96,7 @@ export default function DashboardScreen() {
         <View style={styles.heroActions}>
           <PrimaryButton icon="upload-cloud" label="Upload ECG" onPress={() => router.push("/upload-ecg" as never)} />
           <PrimaryButton icon="activity" label="Analyze ECG" onPress={() => router.push("/ecg-analysis" as never)} variant="outline" />
+          <PrimaryButton icon="message-square" label="Open AI Copilot" onPress={() => router.push("/copilot" as never)} variant="outline" />
           <PrimaryButton icon="user-plus" label="Add Patient" onPress={() => router.push("/patients/create" as never)} variant="outline" />
           <PrimaryButton icon="file-plus" label="Generate Report" onPress={() => router.push("/reports" as never)} variant="outline" />
         </View>

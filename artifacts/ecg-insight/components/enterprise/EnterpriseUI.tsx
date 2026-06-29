@@ -23,7 +23,6 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useAuth } from "@/context/AuthContext";
 import { useDashboardStore } from "@/context/DashboardStore";
-import { MedicalAICopilot } from "@/components/copilot/MedicalAICopilot";
 import { deleteNotification, listNotifications, markAllNotificationsRead, markNotificationRead, type NotificationRecord } from "@/services/collaboration";
 import { globalSearch, type GlobalSearchResult } from "@/services/search";
 import { medicalTheme } from "@/theme/medicalTheme";
@@ -503,7 +502,6 @@ export function EnterpriseShell({ children }: PropsWithChildren) {
           </Animated.View>
         </View>
       ) : null}
-      {pathname === "/copilot" ? null : <MedicalAICopilot />}
     </View>
   );
 }
