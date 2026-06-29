@@ -61,8 +61,11 @@ for (const forbidden of ["AI Clinical Copilot", "\"ai\"] as const", "/(tabs)", "
   assert(!enterpriseShell.includes(forbidden), `Enterprise shell must not contain legacy/conflicting marker: ${forbidden}`);
 }
 
-for (const marker of ["AI Assistant", "quickPrompts", "PanResponder", "setAssistantSize", "streamCopilotMessage", "listCopilotConversations", "getCopilotConversation", "medical-copilot:ask", "updateCopilotConversation", "copilotExportUrl", "copilotExportTxtUrl", "Regenerate", "Duplicate", "Delete", "Archive", "Attach ECG/PDF/Image", "MarkdownText", "expandedCitationId"]) {
+for (const marker of ["AI Assistant", "quickPrompts", "PanResponder", "setAssistantSize", "streamCopilotMessage", "listCopilotConversations", "getCopilotConversation", "medical-copilot:ask", "updateCopilotConversation", "copilotExportUrl", "copilotExportTxtUrl", "Regenerate", "Duplicate", "Delete", "Archive", "attachClinicalFiles", "MarkdownText", "expandedCitationId"]) {
   assert(assistant.includes(marker), `Lightweight assistant is missing production marker: ${marker}`);
+}
+for (const marker of ["conversationSidebar", "sidebarGroupTitle", "chatWorkspace", "messageScroller", "messageListContent", "stickyComposer", "quickChips", "messageScrollRef", "scrollToEnd", "Share", "Voice note", "overflow: \"hidden\"", "position: \"sticky\""]) {
+  assert(assistant.includes(marker), `Final enterprise copilot UI is missing anti-clipping/layout marker: ${marker}`);
 }
 assert(!assistant.includes("AI Clinical Copilot"), "Large AI Clinical Copilot UX must be removed.");
 assert(!assistant.includes("onPress={() => {}}"), "Assistant must not contain dead button handlers.");

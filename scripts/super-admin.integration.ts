@@ -115,6 +115,10 @@ async function main() {
   assert(response.status === 201, "Registration should succeed.");
   const registeredUser = await prisma.user.findUniqueOrThrow({ include: { subscription: true }, where: { email: registeredEmail } });
   assert(registeredUser.subscription?.tier === "FREE", "Newly registered users must default to FREE.");
+  await prisma.user.update({
+    data: { emailVerificationExpiresAt: null, emailVerificationTokenHash: null, emailVerified: true },
+    where: { id: registeredUser.id },
+  });
 
   response = await request("/super-admin/plans", {
     body: { currency: "USD", features: ["Quota", "Billing"], isActive: true, monthlyQuota: 500, name: "Pro", plan: "PRO", price: 4900 },

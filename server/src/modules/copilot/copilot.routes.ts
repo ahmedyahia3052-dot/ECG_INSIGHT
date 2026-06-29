@@ -634,6 +634,29 @@ copilotRouter.get("/conversations/:conversationId", async (req, res, next) => {
   }
 });
 
+copilotRouter.delete("/conversations/:conversationId/messages/:messageId", async (req, res, next) => {
+  try {
+    const conversation = await conversationForUser(String(req.params.conversationId), req.auth!.id);
+    const message = await prisma.copilotMessage.findFirst({
+      where: { conversationId: conversation.id, id: String(req.params.messageId) },
+    });
+    if (!message) throw new AppError(404, "Copilot message not found.", "COPILOT_MESSAGE_NOT_FOUND");
+    await prisma.copilotMessage.delete({ where: { id: message.id } });
+    await prisma.auditLog.create({
+      data: {
+        action: "CASE_UPDATED",
+        actorId: req.auth!.id,
+        entityId: message.id,
+        entityType: "CopilotMessage",
+        message: "Copilot message deleted by conversation owner.",
+      },
+    }).catch(() => undefined);
+    res.status(204).send();
+  } catch (error) {
+    next(error);
+  }
+});
+
 copilotRouter.patch("/conversations/:conversationId", async (req, res, next) => {
   try {
     const current = await conversationForUser(String(req.params.conversationId), req.auth!.id);

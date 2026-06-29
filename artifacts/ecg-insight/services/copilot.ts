@@ -77,6 +77,10 @@ export async function deleteCopilotConversation(accessToken: string, conversatio
   return apiRequest<void>(`/copilot/conversations/${conversationId}`, { accessToken, method: "DELETE" });
 }
 
+export async function deleteCopilotMessage(accessToken: string, conversationId: string, messageId: string) {
+  return apiRequest<void>(`/copilot/conversations/${conversationId}/messages/${messageId}`, { accessToken, method: "DELETE" });
+}
+
 export async function duplicateCopilotConversation(accessToken: string, conversationId: string) {
   return apiRequest<{ conversation: CopilotConversation }>(`/copilot/conversations/${conversationId}/duplicate`, { accessToken, method: "POST" });
 }
