@@ -162,7 +162,7 @@ function apiErrorMessage(error: AxiosError) {
     code === "INVALID_CREDENTIALS" ? "Invalid email or password." :
     code === "USER_INACTIVE" ? "Your account is inactive." :
     status === 401 ? "Session expired." :
-    status === 403 ? "Invalid credentials." :
+    status === 403 ? payloadObject?.message ?? "Access denied." :
     status === 423 ? "Account locked." :
     status === 429 ? "Too many attempts." :
     status >= 500 ? "Unexpected server error." :

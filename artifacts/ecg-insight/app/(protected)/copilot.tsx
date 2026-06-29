@@ -7,6 +7,7 @@ import { Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, us
 import { Badge, Card, EmptyState, medicalTheme, PrimaryButton } from "@/components/enterprise/EnterpriseUI";
 import { useAuth } from "@/context/AuthContext";
 import { listCases, listPatients } from "@/services/clinical";
+import { ApiError } from "@/services/api";
 import {
   archiveCopilotConversation,
   createCopilotConversation,
@@ -173,6 +174,14 @@ export function CopilotWorkspaceScreen({ routeConversationId }: { routeConversat
     setActionNotice({ text, tone });
   }, []);
 
+  const showActionError = useCallback((fallback: string, error: unknown) => {
+    if (error instanceof ApiError) {
+      showActionNotice(error.message || fallback, "error");
+      return;
+    }
+    showActionNotice(fallback, "error");
+  }, [showActionNotice]);
+
   const stopVoiceInput = useCallback(() => {
     recognitionRef.current?.stop();
     recognitionRef.current = null;
@@ -312,8 +321,8 @@ export function CopilotWorkspaceScreen({ routeConversationId }: { routeConversat
       showActionNotice("Conversation renamed.");
       invalidate();
     },
-    onError: () => {
-      showActionNotice("Unable to rename conversation.", "error");
+    onError: (error) => {
+      showActionError("Rename failed.", error);
       invalidate();
     },
   });
@@ -328,8 +337,8 @@ export function CopilotWorkspaceScreen({ routeConversationId }: { routeConversat
       showActionNotice(payload.conversation.isPinned ? "Conversation pinned." : "Conversation unpinned.");
       invalidate();
     },
-    onError: () => {
-      showActionNotice("Unable to pin conversation.", "error");
+    onError: (error) => {
+      showActionError("Pin failed.", error);
       invalidate();
     },
   });
@@ -344,8 +353,8 @@ export function CopilotWorkspaceScreen({ routeConversationId }: { routeConversat
       showActionNotice(payload.conversation.isFavorite ? "Conversation added to favorites." : "Conversation removed from favorites.");
       invalidate();
     },
-    onError: () => {
-      showActionNotice("Unable to favorite conversation.", "error");
+    onError: (error) => {
+      showActionError("Favorite failed.", error);
       invalidate();
     },
   });

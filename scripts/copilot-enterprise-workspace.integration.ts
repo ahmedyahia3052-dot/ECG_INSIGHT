@@ -161,6 +161,34 @@ async function main() {
     const favorited = await request<{ conversation: { isFavorite: boolean } }>(`/copilot/conversations/${conversationId}/favorite`, { method: "POST", token });
     assert(favorited.status === 200 && favorited.body.conversation.isFavorite, "POST favorite must toggle isFavorite on.");
 
+    const patchUnpinned = await request<{ conversation: { isPinned: boolean } }>(`/copilot/conversations/${conversationId}/pin`, {
+      body: { isPinned: false },
+      method: "PATCH",
+      token,
+    });
+    assert(patchUnpinned.status === 200 && !patchUnpinned.body.conversation.isPinned, "PATCH pin must persist explicit isPinned=false.");
+
+    const patchPinned = await request<{ conversation: { isPinned: boolean } }>(`/copilot/conversations/${conversationId}/pin`, {
+      body: { isPinned: true },
+      method: "PATCH",
+      token,
+    });
+    assert(patchPinned.status === 200 && patchPinned.body.conversation.isPinned, "PATCH pin must persist explicit isPinned=true.");
+
+    const patchUnfavorited = await request<{ conversation: { isFavorite: boolean } }>(`/copilot/conversations/${conversationId}/favorite`, {
+      body: { isFavorite: false },
+      method: "PATCH",
+      token,
+    });
+    assert(patchUnfavorited.status === 200 && !patchUnfavorited.body.conversation.isFavorite, "PATCH favorite must persist explicit isFavorite=false.");
+
+    const patchFavorited = await request<{ conversation: { isFavorite: boolean } }>(`/copilot/conversations/${conversationId}/favorite`, {
+      body: { isFavorite: true },
+      method: "PATCH",
+      token,
+    });
+    assert(patchFavorited.status === 200 && patchFavorited.body.conversation.isFavorite, "PATCH favorite must persist explicit isFavorite=true.");
+
     const listed = await request<{ conversations: Array<{ id: string; isFavorite: boolean; isPinned: boolean; title: string }> }>("/copilot/conversations?q=Renamed", { token });
     assert(listed.status === 200 && listed.body.conversations.some((item) => item.id === conversationId && item.isPinned && item.isFavorite), "Search/list must restore persisted conversation state.");
 

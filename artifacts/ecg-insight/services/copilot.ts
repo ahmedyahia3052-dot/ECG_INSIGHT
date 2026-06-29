@@ -108,7 +108,11 @@ export async function renameConversation(accessToken: string, conversationId: st
 }
 
 export async function pinCopilotConversation(accessToken: string, conversationId: string, isPinned: boolean) {
-  return togglePin(accessToken, conversationId, isPinned);
+  return apiRequest<{ conversation: CopilotConversation }>(`/copilot/conversations/${conversationId}/pin`, {
+    accessToken,
+    body: JSON.stringify({ isPinned }),
+    method: "PATCH",
+  });
 }
 
 export async function togglePin(accessToken: string, conversationId: string, _isPinned?: boolean) {
@@ -119,7 +123,11 @@ export async function togglePin(accessToken: string, conversationId: string, _is
 }
 
 export async function favoriteCopilotConversation(accessToken: string, conversationId: string, isFavorite: boolean) {
-  return toggleFavorite(accessToken, conversationId, isFavorite);
+  return apiRequest<{ conversation: CopilotConversation }>(`/copilot/conversations/${conversationId}/favorite`, {
+    accessToken,
+    body: JSON.stringify({ isFavorite }),
+    method: "PATCH",
+  });
 }
 
 export async function toggleFavorite(accessToken: string, conversationId: string, _isFavorite?: boolean) {

@@ -108,6 +108,8 @@ for (const marker of [
 for (const marker of ["copilotExportTxtUrl", "copilotExportUrl", "downloadCopilotExport", "createCopilotConversation", "renameConversation", "togglePin", "toggleFavorite", "toggleArchive", "deleteConversation", "renameCopilotConversation", "pinCopilotConversation", "favoriteCopilotConversation", "deleteCopilotConversation", "streamCopilotMessage", "uploadCopilotAttachment", "credentials: \"include\"", "X-CSRF-Token"]) {
   assert(copilotService.includes(marker), `Copilot frontend service is missing marker: ${marker}`);
 }
+assert(copilotService.includes("body: JSON.stringify({ isPinned })") && copilotService.includes("method: \"PATCH\""), "Pin client must call the explicit PATCH endpoint with isPinned.");
+assert(copilotService.includes("body: JSON.stringify({ isFavorite })") && copilotService.includes("method: \"PATCH\""), "Favorite client must call the explicit PATCH endpoint with isFavorite.");
 
 assert(!workspace.includes("onPress={() => {}}"), "Copilot workspace must not contain dead buttons.");
 assert(!workspace.toLowerCase().includes("mock"), "Copilot workspace must not contain mocked workflows.");
