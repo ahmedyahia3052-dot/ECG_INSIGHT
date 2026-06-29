@@ -46,6 +46,7 @@ const NAV_ITEMS: NavItem[] = [
   { group: "CLINICAL", href: "/upload-ecg", icon: "upload-cloud", title: "Upload ECG" },
   { group: "CLINICAL", href: "/patients", icon: "users", title: "Patients" },
   { group: "CLINICAL", href: "/reports", icon: "file-text", title: "Reports" },
+  { group: "WORKSPACE", href: "/copilot", icon: "message-square", title: "AI Copilot" },
   { group: "WORKSPACE", href: "/analytics", icon: "bar-chart-2", title: "Analytics" },
   { group: "WORKSPACE", href: "/team-management", icon: "briefcase", minRole: "admin", title: "Organizations" },
   { group: "WORKSPACE", href: "/team-management", icon: "user-plus", minRole: "admin", title: "Employees" },
@@ -62,6 +63,7 @@ const PAGE_TITLES: Record<string, { subtitle: string; title: string }> = {
   "/analytics": { subtitle: "Enterprise BI, trends, workload, and quality signals.", title: "Analytics" },
   "/admin-dashboard": { subtitle: "Administrative overview, users, subscriptions, and platform health.", title: "Admin Dashboard" },
   "/billing-subscription": { subtitle: "Subscription plan, quota, billing, and license status.", title: "Billing & Subscription" },
+  "/copilot": { subtitle: "Enterprise medical AI chat workspace with real conversation persistence.", title: "AI Clinical Copilot" },
   "/support": { subtitle: "Contact support and submit operational requests.", title: "Support" },
   "/dashboard": { subtitle: "Executive medical command center for ECG operations.", title: "Dashboard" },
   "/ecg-analysis": { subtitle: "Review cases, AI findings, validation, and report generation.", title: "ECG Analysis" },
@@ -501,7 +503,7 @@ export function EnterpriseShell({ children }: PropsWithChildren) {
           </Animated.View>
         </View>
       ) : null}
-      <MedicalAICopilot />
+      {pathname === "/copilot" ? null : <MedicalAICopilot />}
     </View>
   );
 }

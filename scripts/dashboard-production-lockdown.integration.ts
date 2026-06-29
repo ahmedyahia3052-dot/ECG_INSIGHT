@@ -57,7 +57,7 @@ assert((enterpriseShell.match(/accessibilityLabel=\"Notifications\"/g) ?? []).le
 for (const marker of ["CLINICAL", "WORKSPACE", "DEVELOPER", "/support", "refetchInterval: 15_000", "notificationSearch", "Open Notification History", "PremiumNotificationCard", "RefreshControl", "PanResponder", "hapticReadyInteraction", "notificationDrawerMobile"]) {
   assert(enterpriseShell.includes(marker), `Enterprise shell is missing production dashboard marker: ${marker}`);
 }
-for (const forbidden of ["AI Clinical Copilot", "\"ai\"] as const", "/(tabs)", "@/components/bolt", "@/components/dashboard"]) {
+for (const forbidden of ["\"ai\"] as const", "/(tabs)", "@/components/bolt", "@/components/dashboard"]) {
   assert(!enterpriseShell.includes(forbidden), `Enterprise shell must not contain legacy/conflicting marker: ${forbidden}`);
 }
 
