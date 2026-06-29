@@ -1,7 +1,7 @@
 import React, { createContext, useCallback, useContext, useEffect } from "react";
 import { create } from "zustand";
 import { type ManagedUser } from "@/data/mockData";
-import { apiRequest, ApiError, setApiAccessToken, setApiTokenRefreshHandler } from "@/services/api";
+import { apiRequest, ApiError, clearAuthState, setApiAccessToken, setApiAuthFailureHandler, setApiTokenRefreshHandler } from "@/services/api";
 
 export type UserRole = "super_admin" | "admin" | "corporate_client" | "doctor" | "student" | "user";
 
@@ -213,6 +213,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     user,
   } = useAuthStore();
 
+  const resetAuthState = useCallback(() => {
+    clearAuthState();
+    setState({
+      accessToken: null,
+      isImpersonating: false,
+      isLoading: false,
+      managedUsers: [],
+      originalAccessToken: null,
+      originalUser: null,
+      user: null,
+    });
+  }, [setState]);
+
   const fetchManagedUsers = useCallback(
     async (token?: string | null) => {
       const currentToken = token ?? useAuthStore.getState().accessToken;
@@ -228,10 +241,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setApiTokenRefreshHandler((nextAccessToken) => {
       setState({ accessToken: nextAccessToken });
     });
+    setApiAuthFailureHandler(() => {
+      resetAuthState();
+      if (typeof window !== "undefined" && !window.location.pathname.endsWith("/login")) {
+        window.location.assign("/login");
+      }
+    });
     return () => {
+      setApiAuthFailureHandler(null);
       setApiTokenRefreshHandler(null);
     };
-  }, [accessToken, setState]);
+  }, [accessToken, resetAuthState, setState]);
 
   useEffect(() => {
     (async () => {
@@ -249,10 +269,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           await fetchManagedUsers(refreshed.accessToken);
         }
       } catch {
-        setState({ accessToken: null, isLoading: false, user: null });
+        resetAuthState();
       }
     })();
-  }, [fetchManagedUsers, setState]);
+  }, [fetchManagedUsers, resetAuthState, setState]);
 
   const login = useCallback(
     async (email: string, password: string, remember = false) => {
@@ -399,16 +419,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const logout = useCallback(async () => {
     await apiRequest<void>("/auth/logout", { method: "POST", accessToken }).catch(() => {});
-    setState({
-      accessToken: null,
-      isImpersonating: false,
-      managedUsers: [],
-      originalAccessToken: null,
-      originalUser: null,
-      user: null,
-    });
-    setApiAccessToken(null);
-  }, [accessToken, setState]);
+    resetAuthState();
+  }, [accessToken, resetAuthState]);
 
   const forgotPassword = useCallback(
     async (email: string): Promise<boolean> => {

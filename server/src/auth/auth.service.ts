@@ -13,6 +13,7 @@ import { signAccessToken, signRefreshToken, verifyRefreshToken } from "../utils/
 import { fromApiRole, serializeUser } from "../utils/users";
 
 const REFRESH_COOKIE = "ecg_refresh_token";
+const CSRF_COOKIE = "ecg_csrf_token";
 const NORMAL_SESSION_SECONDS = 60 * 60 * 24;
 const REMEMBER_SESSION_SECONDS = 60 * 60 * 24 * 30;
 const TOKEN_VERSION = 1;
@@ -129,12 +130,13 @@ export async function setupOwnerPassword(body: { email: string; newPassword: str
 
 export function clearRefreshCookie(res: Response) {
   res.clearCookie(REFRESH_COOKIE, cookieOptions());
+  res.clearCookie(CSRF_COOKIE, csrfCookieOptions());
 }
 
-function cookieOptions(maxAgeSeconds?: number) {
+function cookieOptions(maxAgeSeconds?: number, httpOnly = true) {
   return {
     domain: env.COOKIE_DOMAIN,
-    httpOnly: true,
+    httpOnly,
     maxAge: maxAgeSeconds ? maxAgeSeconds * 1000 : undefined,
     path: "/",
     sameSite: isProduction ? ("none" as const) : ("lax" as const),
@@ -142,8 +144,13 @@ function cookieOptions(maxAgeSeconds?: number) {
   };
 }
 
+function csrfCookieOptions(maxAgeSeconds?: number) {
+  return cookieOptions(maxAgeSeconds, false);
+}
+
 function setRefreshCookie(res: Response, token: string, maxAgeSeconds: number) {
   res.cookie(REFRESH_COOKIE, token, cookieOptions(maxAgeSeconds));
+  res.cookie(CSRF_COOKIE, createOpaqueToken(32), csrfCookieOptions(maxAgeSeconds));
 }
 
 function sessionMeta(req: Request) {
@@ -398,7 +405,10 @@ export async function loginUser(
     throw error;
   }
   if (!user.isActive) {
-    throw new AppError(403, "User account is deactivated.", "USER_INACTIVE");
+    throw new AppError(403, "Your account is inactive.", "USER_INACTIVE");
+  }
+  if (!user.emailVerified) {
+    throw new AppError(403, "Email verification is required before login.", "USER_UNVERIFIED");
   }
   if (user.forcePasswordReset) {
     throw new AppError(403, "Password reset is required before login.", "PASSWORD_RESET_REQUIRED");
@@ -531,10 +541,17 @@ export async function resendVerificationEmail(emailInput: string) {
 export async function refreshSession(req: Request, res: Response) {
   const refreshToken = req.cookies?.[REFRESH_COOKIE];
   if (!refreshToken || typeof refreshToken !== "string") {
+    clearRefreshCookie(res);
     throw new AppError(401, "Refresh token is missing.", "REFRESH_MISSING");
   }
 
-  const claims = verifyRefreshToken(refreshToken);
+  let claims: ReturnType<typeof verifyRefreshToken>;
+  try {
+    claims = verifyRefreshToken(refreshToken);
+  } catch {
+    clearRefreshCookie(res);
+    throw new AppError(401, "Refresh session is invalid.", "REFRESH_INVALID");
+  }
   const session = await prisma.session.findUnique({
     where: { id: claims.sessionId },
     include: { user: { include: { organization: true, subscription: true } } },
@@ -556,7 +573,7 @@ export async function refreshSession(req: Request, res: Response) {
 
   if (!session.user.isActive) {
     clearRefreshCookie(res);
-    throw new AppError(403, "User account is deactivated.", "USER_INACTIVE");
+    throw new AppError(403, "Your account is inactive.", "USER_INACTIVE");
   }
 
   const expiresInSeconds = session.rememberMe ? REMEMBER_SESSION_SECONDS : NORMAL_SESSION_SECONDS;

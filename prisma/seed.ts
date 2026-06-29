@@ -19,6 +19,7 @@ const users: Array<{
   avatarInitials: string;
   specialization?: string;
   institution?: string;
+  protectedOwner?: boolean;
   username?: string;
 }> = [
   {
@@ -29,6 +30,15 @@ const users: Array<{
     role: "OWNER",
     tier: "LIFETIME",
     username: "AhmedYahiaFahmy",
+  },
+  {
+    avatarInitials: "AY",
+    email: "ahmedyehia3020@gmail.com",
+    institution: "ECG Insight Developer Recovery",
+    name: "Developer Super Admin",
+    protectedOwner: true,
+    role: "SUPER_ADMIN",
+    tier: "LIFETIME",
   },
   {
     avatarInitials: "SA",
@@ -137,13 +147,13 @@ async function main() {
         forcePasswordReset: false,
         institution: user.institution,
         isActive: true,
-        isLifetime: user.role === "OWNER",
-        lifetimeGrantedAt: user.role === "OWNER" ? seededAt : undefined,
-        lifetimeGrantedBy: user.role === "OWNER" ? "seed" : undefined,
+        isLifetime: user.role === "OWNER" || user.protectedOwner === true,
+        lifetimeGrantedAt: user.role === "OWNER" || user.protectedOwner === true ? seededAt : undefined,
+        lifetimeGrantedBy: user.role === "OWNER" || user.protectedOwner === true ? "seed" : undefined,
         name: user.name,
         ownerPasswordSetupRequired: false,
         passwordHash: user.role === "OWNER" ? ownerPasswordHash : passwordHash,
-        protectedOwner: user.role === "OWNER",
+        protectedOwner: user.role === "OWNER" || user.protectedOwner === true,
         role: user.role,
         specialization: user.specialization,
         username: user.username,
@@ -161,13 +171,13 @@ async function main() {
         forcePasswordReset: user.role === "OWNER" ? false : undefined,
         institution: user.institution,
         isActive: true,
-        isLifetime: user.role === "OWNER" ? true : undefined,
-        lifetimeGrantedAt: user.role === "OWNER" ? seededAt : undefined,
-        lifetimeGrantedBy: user.role === "OWNER" ? "seed" : undefined,
+        isLifetime: user.role === "OWNER" || user.protectedOwner === true ? true : undefined,
+        lifetimeGrantedAt: user.role === "OWNER" || user.protectedOwner === true ? seededAt : undefined,
+        lifetimeGrantedBy: user.role === "OWNER" || user.protectedOwner === true ? "seed" : undefined,
         name: user.name,
         ownerPasswordSetupRequired: user.role === "OWNER" ? false : undefined,
         passwordHash: user.role === "OWNER" ? ownerPasswordHash : undefined,
-        protectedOwner: user.role === "OWNER" ? true : undefined,
+        protectedOwner: user.role === "OWNER" || user.protectedOwner === true ? true : undefined,
         role: user.role,
         specialization: user.specialization,
         username: user.username,

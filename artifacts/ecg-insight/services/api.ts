@@ -16,6 +16,7 @@ type RetryableAxiosRequestConfig = AxiosRequestConfig & {
 
 let activeAccessToken: string | null = null;
 let onTokenRefresh: ((accessToken: string) => void) | null = null;
+let onAuthFailure: (() => void) | null = null;
 let refreshPromise: Promise<string> | null = null;
 
 export function apiFileUrl(path: string): string {
@@ -48,8 +49,38 @@ export function setApiTokenRefreshHandler(handler: ((accessToken: string) => voi
   onTokenRefresh = handler;
 }
 
+export function setApiAuthFailureHandler(handler: (() => void) | null) {
+  onAuthFailure = handler;
+}
+
 function isAuthEndpoint(url?: string) {
   return !!url && /^\/?auth\/(login|register|phone|oauth|refresh)/.test(url.replace(API_URL, "").replace(/^\/+/, ""));
+}
+
+function csrfTokenFromCookie() {
+  if (typeof document === "undefined") return null;
+  const cookie = document.cookie
+    .split("; ")
+    .find((entry) => entry.startsWith("ecg_csrf_token="));
+  return cookie ? decodeURIComponent(cookie.slice("ecg_csrf_token=".length)) : null;
+}
+
+export function clearAuthState() {
+  setApiAccessToken(null);
+  refreshPromise = null;
+  if (typeof window === "undefined") return;
+  for (const storage of [window.localStorage, window.sessionStorage]) {
+    for (const key of Object.keys(storage)) {
+      if (key.startsWith("ecg-insight:auth") || key.includes("accessToken") || key.includes("refreshToken")) {
+        storage.removeItem(key);
+      }
+    }
+  }
+}
+
+export function logoutAndRedirect() {
+  clearAuthState();
+  onAuthFailure?.();
 }
 
 function shouldRefresh(error: AxiosError) {
@@ -80,6 +111,10 @@ apiClient.interceptors.request.use((config) => {
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
+  const csrfToken = csrfTokenFromCookie();
+  if (csrfToken && !config.headers["x-csrf-token"]) {
+    config.headers["x-csrf-token"] = csrfToken;
+  }
   return config;
 });
 
@@ -98,6 +133,7 @@ apiClient.interceptors.response.use(
       };
       return apiClient.request(config);
     } catch (refreshError) {
+      logoutAndRedirect();
       throw normalizeApiError(refreshError);
     }
   },
@@ -120,10 +156,22 @@ function apiErrorMessage(error: AxiosError) {
   const payloadObject =
     payload && typeof payload === "object" ? (payload as { code?: string; message?: string }) : null;
 
+  const status = error.response.status;
+  const code = payloadObject?.code;
+  const message =
+    code === "INVALID_CREDENTIALS" ? "Invalid email or password." :
+    code === "USER_INACTIVE" ? "Your account is inactive." :
+    status === 401 ? "Session expired." :
+    status === 403 ? "Invalid credentials." :
+    status === 423 ? "Account locked." :
+    status === 429 ? "Too many attempts." :
+    status >= 500 ? "Unexpected server error." :
+    payloadObject?.message ?? "Request failed.";
+
   return {
     code: payloadObject?.code,
-    message: payloadObject?.message ?? "Request failed.",
-    status: error.response.status,
+    message,
+    status,
   };
 }
 

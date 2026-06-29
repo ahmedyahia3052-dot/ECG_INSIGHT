@@ -61,6 +61,7 @@ function validSignature(req: Request) {
 function validCsrf(req: Request) {
   if (!mutatingMethods.has(req.method)) return true;
   if (!req.cookies?.ecg_refresh_token) return true;
+  if (/^\/api\/auth\/(login|register|phone\/request-otp|phone\/verify|oauth\/login|refresh|logout)$/i.test(req.path)) return true;
   const csrfCookie = req.cookies?.ecg_csrf_token;
   const csrfHeader = req.get("x-csrf-token");
   if (!csrfCookie || !csrfHeader || String(csrfCookie).length !== csrfHeader.length) return false;
