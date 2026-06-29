@@ -21,76 +21,33 @@ assert(!enterpriseShell.includes("<MedicalAICopilot"), "Floating Copilot widget 
 assert(!dashboard.includes("MedicalAICopilot"), "Dashboard must not embed the Copilot widget.");
 assert(dashboard.includes("Open AI Copilot"), "Dashboard must expose a clean route button for Copilot.");
 
-for (const chip of [
-  "Interpret ECG",
-  "Generate Impression",
-  "Patient Summary",
-  "Differential Diagnosis",
-  "Occupational Fitness",
-  "Follow-up Plan",
-  "Generate Report",
-]) {
-  assert(workspace.includes(chip), `Top action bar chip is missing: ${chip}`);
-}
-
 for (const marker of [
-  "Current Patient",
-  "Demographics",
-  "Active ECG",
-  "ECG Metadata",
-  "Uploaded Files",
-  "Labs",
-  "Echo Reports",
-  "Clinical History",
-  "Search Conversations",
-  "Pinned Conversations",
-  "Favorites",
-  "Recent Conversations",
-  "Archived Conversations",
-  "accessibilityRole=\"button\"",
-  "scrollToEnd",
-  "messageList",
-  "chatPanel",
+  "New Chat",
+  "ConversationList",
+  "lastMessagePreview",
+  "Start a clinical conversation",
+  "MessageCard",
   "composer",
-  "contextPanel",
-  "sidebar",
-  "mobileSidebarOpen",
-  "Shift+Enter",
-  "toggleVoiceInput",
-  "SpeechRecognition",
-  "openFilePicker",
-  "uploadComposerFile",
-  "AttachmentChip",
-  "attachmentPanel",
-  "attachmentIds",
-  "Upload failed.",
-  "Unsupported format.",
-  "File too large.",
-  "Microphone permission denied.",
-  "Voice input is not supported by this browser.",
-  "uploadingFiles",
-  "Export PDF",
-  "Export TXT",
-  "Share",
-  "shareConversation",
-  "exportConversation",
-  "downloadCopilotExport",
-  "downloadBlob",
+  "streamCopilotMessage",
+  "selectedConversation?.title",
+  "New Clinical Conversation",
 ]) {
-  assert(workspace.includes(marker), `Enterprise workspace marker missing: ${marker}`);
+  assert(workspace.includes(marker), `Simplified Copilot workspace marker missing: ${marker}`);
 }
 
-assert(!workspace.includes("quickGrid"), "Legacy quick action grid must be removed.");
-assert(!workspace.includes("conversationStrip"), "Legacy conversation strip must be removed.");
-assert(!workspace.includes("sidebarScroll"), "Nested sidebar scrolling must be removed.");
-
-for (const marker of ["copilotExportTxtUrl", "copilotExportUrl", "downloadCopilotExport", "streamCopilotMessage", "getCopilotConversation", "listCopilotConversations", "updateCopilotConversation", "deleteCopilotConversation", "uploadCopilotAttachment"]) {
-  assert(copilotService.includes(marker), `Copilot service missing real workflow marker: ${marker}`);
+for (const removed of ["Search Conversations", "Pinned Conversations", "Favorites", "Archived Conversations", "Rename", "Pin", "Favorite", "Archive", "Duplicate"]) {
+  assert(!workspace.includes(removed), `Simplified Copilot workspace still contains removed management UI: ${removed}`);
 }
 
-for (const marker of ["retrieveClinicalContext", "Previous ECGs", "Documents:", "DISCLAIMER", "Confidence Score", "citations", "responseTimeMs", "copilotUsageEvent", "/chat/stream", "/attachments", "CopilotAttachment"]) {
-  assert(copilotRoutes.includes(marker), `Copilot backend missing real context/safety/observability marker: ${marker}`);
+for (const marker of ["retrieveClinicalContext", "Previous ECGs", "Documents:", "DISCLAIMER", "Confidence Score", "citations", "responseTimeMs", "copilotUsageEvent", "/chat/stream", "/attachments", "automaticConversationTitle"]) {
+  assert(copilotRoutes.includes(marker), `Copilot backend missing real chat/context marker: ${marker}`);
 }
-assert(!copilotRoutes.includes("setTimeout(resolve"), "Copilot streaming must not use fake token delays.");
+for (const removed of ["/rename", "/pin", "/favorite", "/archive", "/duplicate"]) {
+  assert(!copilotRoutes.includes(removed), `Copilot backend still contains removed management route: ${removed}`);
+}
+
+for (const marker of ["streamCopilotMessage", "getCopilotConversation", "listCopilotConversations", "lastMessagePreview"]) {
+  assert(copilotService.includes(marker), `Copilot service missing simplified workflow marker: ${marker}`);
+}
 
 console.log("AI Clinical Copilot final closure integration checks passed.");

@@ -47,34 +47,42 @@ function sseEvents(payload: string) {
     .filter((event): event is { data: Record<string, unknown>; event: string } => Boolean(event));
 }
 
-async function main() {
-  const prefix = `copilot-enterprise-${Date.now()}`;
-  await cleanup("copilot-enterprise-");
+function assertAutoTitle(title: string, expectedPrefix: string) {
+  assert(title.length <= 60, `Auto title exceeds 60 characters: ${title}`);
+  assert(title.split(/\s+/).filter(Boolean).length <= 6, `Auto title exceeds 6 words: ${title}`);
+  assert(title.startsWith(expectedPrefix), `Unexpected auto title: ${title}`);
+}
 
-  const user = await prisma.user.create({
-    data: {
-      avatarInitials: "CW",
-      email: `${prefix}@ecg.test`,
-      emailVerified: true,
-      isActive: true,
-      name: "Copilot Workspace Doctor",
-      passwordHash: await hashPassword("StrongPass123!"),
-      role: "DOCTOR",
-      subscription: { create: { status: "ACTIVE", tier: "PROFESSIONAL" } },
-    },
-  });
-  const otherUser = await prisma.user.create({
-    data: {
-      avatarInitials: "OU",
-      email: `${prefix}+other@ecg.test`,
-      emailVerified: true,
-      isActive: true,
-      name: "Other Copilot Doctor",
-      passwordHash: await hashPassword("StrongPass123!"),
-      role: "DOCTOR",
-      subscription: { create: { status: "ACTIVE", tier: "PROFESSIONAL" } },
-    },
-  });
+async function main() {
+  const prefix = `copilot-simple-${Date.now()}`;
+  await cleanup("copilot-simple-");
+
+  const [user, otherUser] = await Promise.all([
+    prisma.user.create({
+      data: {
+        avatarInitials: "CW",
+        email: `${prefix}@ecg.test`,
+        emailVerified: true,
+        isActive: true,
+        name: "Copilot Workspace Doctor",
+        passwordHash: await hashPassword("StrongPass123!"),
+        role: "DOCTOR",
+        subscription: { create: { status: "ACTIVE", tier: "PROFESSIONAL" } },
+      },
+    }),
+    prisma.user.create({
+      data: {
+        avatarInitials: "OU",
+        email: `${prefix}+other@ecg.test`,
+        emailVerified: true,
+        isActive: true,
+        name: "Other Copilot Doctor",
+        passwordHash: await hashPassword("StrongPass123!"),
+        role: "DOCTOR",
+        subscription: { create: { status: "ACTIVE", tier: "PROFESSIONAL" } },
+      },
+    }),
+  ]);
 
   const server = createServer(createApp());
   await new Promise<void>((resolve) => server.listen(0, resolve));
@@ -96,21 +104,6 @@ async function main() {
     return { body: body as T, response, status: response.status };
   }
 
-  async function uploadAttachment(kind: "ecg" | "echo" | "file" | "labs", fileName: string, mimeType: string, token: string, conversationId: string) {
-    const formData = new FormData();
-    formData.append("kind", kind);
-    formData.append("contextType", "global");
-    formData.append("conversationId", conversationId);
-    formData.append("file", new Blob([`clinical fixture for ${kind}`], { type: mimeType }), fileName);
-    const response = await fetch(`${baseUrl}/copilot/attachments`, {
-      body: formData,
-      headers: { authorization: `Bearer ${token}` },
-      method: "POST",
-    });
-    const body = await response.json() as { attachment: { id: string; kind: string; originalName: string; sizeBytes: number } };
-    return { body, status: response.status };
-  }
-
   try {
     const login = await request<{ accessToken: string }>("/auth/login", {
       body: { email: user.email, password: "StrongPass123!", rememberMe: true },
@@ -118,148 +111,74 @@ async function main() {
     });
     assert(login.status === 200 && Boolean(login.body.accessToken), "Doctor login must issue an access token.");
     const token = login.body.accessToken;
+
     const otherLogin = await request<{ accessToken: string }>("/auth/login", {
       body: { email: otherUser.email, password: "StrongPass123!", rememberMe: true },
       method: "POST",
     });
     assert(otherLogin.status === 200 && Boolean(otherLogin.body.accessToken), "Second doctor login must issue an access token.");
-    const otherToken = otherLogin.body.accessToken;
 
-    const created = await request<{ conversation: { id: string; title: string } }>("/copilot/conversations", {
-      body: { contextType: "global", tag: "ECG Interpretation", title: "Enterprise workspace chat" },
+    const emptyConversation = await request<{ conversation: { id: string; title: string } }>("/copilot/conversations", {
+      body: { contextType: "global", tag: "ECG Interpretation" },
       method: "POST",
       token,
     });
-    assert(created.status === 201, "Create chat must succeed.");
-    const conversationId = created.body.conversation.id;
+    assert(emptyConversation.status === 201, "New Chat placeholder conversation must be creatable.");
+    assert(emptyConversation.body.conversation.title === "New Clinical Conversation", "Empty new chat must use default title.");
 
-    const renamed = await request<{ conversation: { title: string }; success: boolean }>(`/copilot/conversations/${conversationId}/rename`, {
-      body: { title: "Renamed pinned favorite chat" },
-      method: "PATCH",
-      token,
-    });
-    assert(renamed.status === 200 && renamed.body.success, "PATCH /api/copilot/conversations/:id/rename must return 200 and success=true.");
-    assert(renamed.body.conversation.title === "Renamed pinned favorite chat", "Rename did not persist.");
-
-    const forbiddenRename = await request<{ code: string }>(`/copilot/conversations/${conversationId}/rename`, {
-      body: { title: "Unauthorized rename" },
-      method: "PATCH",
-      token: otherToken,
-    });
-    assert(forbiddenRename.status === 403, "Conversation actions must return 403 when another user owns the conversation.");
-
-    const missingRename = await request<{ code: string }>("/copilot/conversations/missing-conversation-id/rename", {
-      body: { title: "Missing rename" },
-      method: "PATCH",
-      token,
-    });
-    assert(missingRename.status === 404, "Missing conversation actions must return 404.");
-
-    const pinned = await request<{ conversation: { isPinned: boolean }; success: boolean }>(`/copilot/conversations/${conversationId}/pin`, {
-      body: { isPinned: true },
-      method: "PATCH",
-      token,
-    });
-    assert(pinned.status === 200 && pinned.body.success && pinned.body.conversation.isPinned, "PATCH pin must persist isPinned on.");
-
-    const favorited = await request<{ conversation: { isFavorite: boolean }; success: boolean }>(`/copilot/conversations/${conversationId}/favorite`, {
-      body: { isFavorite: true },
-      method: "PATCH",
-      token,
-    });
-    assert(favorited.status === 200 && favorited.body.success && favorited.body.conversation.isFavorite, "PATCH favorite must persist isFavorite on.");
-
-    const patchUnpinned = await request<{ conversation: { isPinned: boolean }; success: boolean }>(`/copilot/conversations/${conversationId}/pin`, {
-      body: { isPinned: false },
-      method: "PATCH",
-      token,
-    });
-    assert(patchUnpinned.status === 200 && patchUnpinned.body.success && !patchUnpinned.body.conversation.isPinned, "PATCH pin must persist explicit isPinned=false.");
-
-    const patchPinned = await request<{ conversation: { isPinned: boolean }; success: boolean }>(`/copilot/conversations/${conversationId}/pin`, {
-      body: { isPinned: true },
-      method: "PATCH",
-      token,
-    });
-    assert(patchPinned.status === 200 && patchPinned.body.success && patchPinned.body.conversation.isPinned, "PATCH pin must persist explicit isPinned=true.");
-
-    const patchUnfavorited = await request<{ conversation: { isFavorite: boolean }; success: boolean }>(`/copilot/conversations/${conversationId}/favorite`, {
-      body: { isFavorite: false },
-      method: "PATCH",
-      token,
-    });
-    assert(patchUnfavorited.status === 200 && patchUnfavorited.body.success && !patchUnfavorited.body.conversation.isFavorite, "PATCH favorite must persist explicit isFavorite=false.");
-
-    const patchFavorited = await request<{ conversation: { isFavorite: boolean }; success: boolean }>(`/copilot/conversations/${conversationId}/favorite`, {
-      body: { isFavorite: true },
-      method: "PATCH",
-      token,
-    });
-    assert(patchFavorited.status === 200 && patchFavorited.body.success && patchFavorited.body.conversation.isFavorite, "PATCH favorite must persist explicit isFavorite=true.");
-
-    const listed = await request<{ conversations: Array<{ id: string; isFavorite: boolean; isPinned: boolean; title: string }> }>("/copilot/conversations?q=Renamed", { token });
-    assert(listed.status === 200 && listed.body.conversations.some((item) => item.id === conversationId && item.isPinned && item.isFavorite), "Search/list must restore persisted conversation state.");
-
-    const ecgAttachment = await uploadAttachment("ecg", "ECG_001.png", "image/png", token, conversationId);
-    const echoAttachment = await uploadAttachment("echo", "Echo_Report.pdf", "application/pdf", token, conversationId);
-    const labsAttachment = await uploadAttachment("labs", "Labs_May2026.csv", "text/csv", token, conversationId);
-    const genericOne = await uploadAttachment("file", "Notes.txt", "text/plain", token, conversationId);
-    const genericTwo = await uploadAttachment("file", "Referral.pdf", "application/pdf", token, conversationId);
-    for (const upload of [ecgAttachment, echoAttachment, labsAttachment, genericOne, genericTwo]) {
-      assert(upload.status === 201 && Boolean(upload.body.attachment.id), `Attachment upload failed for ${upload.body?.attachment?.originalName ?? "unknown file"}.`);
-    }
-    const attachmentIds = [ecgAttachment, echoAttachment, labsAttachment, genericOne, genericTwo].map((upload) => upload.body.attachment.id);
-
-    const stream = await fetch(`${baseUrl}/copilot/chat/stream`, {
-      body: JSON.stringify({ attachmentIds, contextType: "global", conversationId, question: "Interpret this ECG and provide follow-up recommendations.", tag: "ECG Interpretation" }),
+    const firstQuestion = "Interpret this ECG showing irregular rhythm and AF";
+    const firstStream = await fetch(`${baseUrl}/copilot/chat/stream`, {
+      body: JSON.stringify({ contextType: "global", question: firstQuestion, tag: "ECG Interpretation" }),
       headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
       method: "POST",
     });
-    const streamText = await stream.text();
-    assert(stream.status === 201, "Streaming response must succeed.");
-    const events = sseEvents(streamText);
-    assert(events.some((event) => event.event === "token"), "Streaming response must emit token events.");
-    assert(events.some((event) => event.event === "done"), "Streaming response must emit done event.");
+    const firstEvents = sseEvents(await firstStream.text());
+    assert(firstStream.status === 201, "First message must create and stream a new conversation.");
+    assert(firstEvents.some((event) => event.event === "token"), "First stream must emit token events.");
+    const firstConversation = firstEvents.find((event) => event.event === "conversation")?.data.conversation as { id: string; title: string } | undefined;
+    assert(firstConversation?.id, "First stream must return the created conversation.");
+    assertAutoTitle(firstConversation.title, "Interpret this ECG");
 
-    const restored = await request<{ conversation: { id: string; lastOpenedAt?: string }; messages: Array<{ attachments?: Array<{ id: string; kind: string; originalName: string }>; content: string; role: string }> }>(`/copilot/conversations/${conversationId}`, { token });
-    assert(restored.status === 200 && restored.body.conversation.id === conversationId, "Deep-linked conversation restore must succeed.");
-    assert(Boolean(restored.body.conversation.lastOpenedAt), "Restore must update lastOpenedAt for refresh/back-forward persistence.");
-    assert(restored.body.messages.some((message) => message.role === "user") && restored.body.messages.some((message) => message.role === "assistant"), "Message persistence must include user and assistant messages.");
-    const restoredUserMessage = restored.body.messages.find((message) => message.role === "user" && message.attachments?.length);
-    assert(restoredUserMessage?.attachments?.length === 5, "Refresh persistence must restore all Copilot message attachments.");
-    assert(restoredUserMessage.attachments.some((attachment) => attachment.kind === "ecg" && attachment.originalName === "ECG_001.png"), "ECG attachment must persist in conversation history.");
-    assert(restoredUserMessage.attachments.some((attachment) => attachment.kind === "echo"), "Echo attachment badge must persist in conversation history.");
-    assert(restoredUserMessage.attachments.some((attachment) => attachment.kind === "labs"), "Labs attachment chip must persist in conversation history.");
-    assert(restoredUserMessage.attachments.filter((attachment) => attachment.kind === "file").length === 2, "Multiple generic file attachments must persist.");
+    const secondQuestion = "Summarize occupational fitness after abnormal ECG";
+    const secondStream = await fetch(`${baseUrl}/copilot/chat/stream`, {
+      body: JSON.stringify({ contextType: "global", question: secondQuestion, tag: "Occupational Fitness" }),
+      headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
+      method: "POST",
+    });
+    const secondEvents = sseEvents(await secondStream.text());
+    const secondConversation = secondEvents.find((event) => event.event === "conversation")?.data.conversation as { id: string; title: string } | undefined;
+    assert(secondStream.status === 201 && secondConversation?.id, "Second chat must create a separate conversation.");
+    assertAutoTitle(secondConversation.title, "Summarize occupational");
 
-    const archived = await request<{ conversation: { archivedAt?: string }; success: boolean }>(`/copilot/conversations/${conversationId}/archive`, { method: "PATCH", token });
-    assert(archived.status === 200 && archived.body.success && Boolean(archived.body.conversation.archivedAt), "PATCH archive must persist archivedAt.");
+    const continued = await fetch(`${baseUrl}/copilot/chat/stream`, {
+      body: JSON.stringify({ contextType: "global", conversationId: firstConversation.id, question: "Continue with key anticoagulation considerations.", tag: "Follow-up" }),
+      headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
+      method: "POST",
+    });
+    const continuedEvents = sseEvents(await continued.text());
+    assert(continued.status === 201, "Sending another message to an existing chat must succeed.");
+    assert(continuedEvents.some((event) => event.event === "done"), "Continuation stream must finish before restore assertions.");
 
-    const restoredArchive = await request<{ conversation: { archivedAt?: string }; success: boolean }>(`/copilot/conversations/${conversationId}/archive`, { method: "PATCH", token });
-    assert(restoredArchive.status === 200 && restoredArchive.body.success && !restoredArchive.body.conversation.archivedAt, "PATCH archive must toggle archivedAt off.");
+    const restoredFirst = await request<{ conversation: { id: string; title: string }; messages: Array<{ content: string; role: string }> }>(`/copilot/conversations/${firstConversation.id}`, { token });
+    assert(restoredFirst.status === 200 && restoredFirst.body.conversation.id === firstConversation.id, "Refresh/deep-link restore must return the first conversation.");
+    assert(restoredFirst.body.conversation.title === firstConversation.title, "Existing chat title must remain stable after later messages.");
+    assert(restoredFirst.body.messages.filter((message) => message.role === "user").length === 2, "First conversation history must restore all user messages.");
+    assert(restoredFirst.body.messages.some((message) => message.content.includes("anticoagulation")), "First conversation must restore later history.");
 
-    const repinned = await request<{ conversation: { isPinned: boolean }; success: boolean }>(`/copilot/conversations/${conversationId}/pin`, { body: { isPinned: true }, method: "PATCH", token });
-    assert(repinned.status === 200 && repinned.body.success && repinned.body.conversation.isPinned, "PATCH pin must persist isPinned on after archive clears state.");
-    const unpinned = await request<{ conversation: { isPinned: boolean }; success: boolean }>(`/copilot/conversations/${conversationId}/pin`, { body: { isPinned: false }, method: "PATCH", token });
-    assert(unpinned.status === 200 && unpinned.body.success && !unpinned.body.conversation.isPinned, "PATCH pin must persist isPinned off.");
+    const restoredSecond = await request<{ conversation: { id: string; title: string }; messages: Array<{ content: string; role: string }> }>(`/copilot/conversations/${secondConversation.id}`, { token });
+    assert(restoredSecond.status === 200 && restoredSecond.body.conversation.id === secondConversation.id, "Switching to second chat must restore its history.");
+    assert(restoredSecond.body.messages.some((message) => message.content === secondQuestion), "Second conversation history must be isolated.");
 
-    const refavorited = await request<{ conversation: { isFavorite: boolean }; success: boolean }>(`/copilot/conversations/${conversationId}/favorite`, { body: { isFavorite: true }, method: "PATCH", token });
-    assert(refavorited.status === 200 && refavorited.body.success && refavorited.body.conversation.isFavorite, "PATCH favorite must persist isFavorite on after archive clears state.");
-    const unfavorited = await request<{ conversation: { isFavorite: boolean }; success: boolean }>(`/copilot/conversations/${conversationId}/favorite`, { body: { isFavorite: false }, method: "PATCH", token });
-    assert(unfavorited.status === 200 && unfavorited.body.success && !unfavorited.body.conversation.isFavorite, "PATCH favorite must persist isFavorite off.");
+    const forbiddenSwitch = await request<{ code: string }>(`/copilot/conversations/${firstConversation.id}`, { token: otherLogin.body.accessToken });
+    assert(forbiddenSwitch.status === 404, "Other doctors must not be able to restore another doctor's chat.");
 
-    const duplicated = await request<{ conversation: { id: string } }>(`/copilot/conversations/${conversationId}/duplicate`, { method: "POST", token });
-    assert(duplicated.status === 201 && duplicated.body.conversation.id !== conversationId, "Duplicate chat must create a new persisted conversation.");
-
-    const deleted = await request<void>(`/copilot/conversations/${conversationId}`, { method: "DELETE", token });
-    assert(deleted.status === 204, "Delete chat must succeed.");
-    const missing = await request<{ code: string }>(`/copilot/conversations/${conversationId}`, { token });
-    assert(missing.status === 404, "Soft-deleted chat must no longer restore by deep link.");
-    const softDeleted = await prisma.copilotConversation.findUnique({ where: { id: conversationId } });
-    assert(Boolean(softDeleted?.deletedAt), "Delete must be soft-delete and preserve the conversation row.");
+    const listed = await request<{ conversations: Array<{ id: string; lastMessagePreview?: string; title: string; updatedAt: string }> }>("/copilot/conversations", { token });
+    assert(listed.status === 200, "Conversation list must load.");
+    assert(listed.body.conversations.some((conversation) => conversation.id === firstConversation.id && Boolean(conversation.lastMessagePreview)), "Conversation list must include a latest message preview.");
+    assert(listed.body.conversations.some((conversation) => conversation.id === secondConversation.id && conversation.title === secondConversation.title), "Conversation list must include second chat for switching.");
   } finally {
     await new Promise<void>((resolve) => server.close(() => resolve()));
-    await cleanup("copilot-enterprise-");
+    await cleanup("copilot-simple-");
     await prisma.$disconnect();
   }
 }

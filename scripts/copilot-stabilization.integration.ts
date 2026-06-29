@@ -16,6 +16,7 @@ const conversationRoute = read("artifacts/ecg-insight/app/(protected)/copilot/[c
 const service = read("artifacts/ecg-insight/services/copilot.ts");
 const routes = read("server/src/modules/copilot/copilot.routes.ts");
 const schema = read("prisma/schema.prisma");
+const conversationModel = schema.split("model CopilotConversation {")[1]?.split("model CopilotMessage {")[0] ?? "";
 
 for (const marker of [
   "routeConversationId",
@@ -23,110 +24,50 @@ for (const marker of [
   "router.push(`/copilot/${conversationId}`",
   "router.replace(\"/copilot\"",
   "selectedQuery.isError",
-  "Rename",
-  "Rename Conversation",
-  "renameModalOpen",
-  "renameCopilotConversation",
-  "openRenameDialog",
-  "showActionError",
-  "Rename failed.",
-  "Conversation renamed.",
-  "Pin",
-  "Unpin",
-  "pinCopilotConversation",
-  "Pin failed.",
-  "Conversation pinned.",
-  "Favorite",
-  "Unfavorite",
-  "favoriteCopilotConversation",
-  "Favorite failed.",
-  "Conversation added to favorites.",
-  "Archive",
-  "Restore",
-  "Delete",
-  "Duplicate",
-  "groupedConversations.pinned",
-  "groupedConversations.favorites",
-  "groupedConversations.archived",
-  "mobileSidebarOpen",
-  "contextOpen",
-  "Regenerate",
-  "Continue",
-  "Copy answer",
-  "applyConversationPatch",
-  "setQueriesData",
-  "ConversationAction",
-  "actionNotice",
-  "toggleVoiceInput",
-  "stopVoiceInput",
-  "isRecording",
-  "openFilePicker",
-  "uploadComposerFile",
-  "AttachmentChip",
-  "setAttachments",
-  "attachmentIds",
-  "Voice input is not supported by this browser.",
-  "Microphone permission denied.",
-  "uploadingFiles",
-  "shareConversation",
-  "exportConversation",
-  "Export PDF",
-  "Export TXT",
-  "Share",
-  "downloadCopilotExport",
-  "downloadBlob",
-  "Unsupported format.",
-  "File too large.",
-  "📌",
-  "★",
+  "New Clinical Conversation",
+  "ConversationList",
+  "lastMessagePreview",
+  "startNewChat",
+  "messages.map",
+  "scrollToEnd",
+  "WORKSPACE_STATE_KEY",
 ]) {
-  assert(workspace.includes(marker), `Workspace stabilization marker missing: ${marker}`);
+  assert(workspace.includes(marker), `Workspace simplified-chat marker missing: ${marker}`);
+}
+
+for (const removed of ["Rename", "Pin", "Favorite", "Archive", "Duplicate", "renameCopilotConversation", "pinCopilotConversation", "favoriteCopilotConversation", "archiveCopilotConversation", "duplicateCopilotConversation", "ConversationAction"]) {
+  assert(!workspace.includes(removed), `Workspace still contains removed management marker: ${removed}`);
 }
 
 assert(conversationRoute.includes("useLocalSearchParams") && conversationRoute.includes("conversationId") && conversationRoute.includes("CopilotWorkspaceScreen"), "Dynamic /copilot/:conversationId route must restore workspace state.");
 
-for (const marker of ["CopilotAttachment", "isPinned", "isFavorite", "archivedAt", "deletedAt", "lastOpenedAt", "@@index([isPinned])", "@@index([isFavorite])", "@@index([archivedAt])", "@@index([deletedAt])", "@@index([lastOpenedAt])"]) {
-  assert(schema.includes(marker), `Prisma schema missing copilot persistence marker: ${marker}`);
+for (const marker of ["id", "title", "createdAt", "updatedAt", "messages", "@@index([updatedAt])"]) {
+  assert(conversationModel.includes(marker), `CopilotConversation simplified model missing marker: ${marker}`);
+}
+for (const removed of ["favorite", "isPinned", "isFavorite", "archivedAt", "deletedAt", "lastOpenedAt"]) {
+  assert(!conversationModel.includes(removed), `CopilotConversation still contains removed management field: ${removed}`);
 }
 
 for (const marker of [
-  "isPinned: z.boolean()",
-  "isFavorite: z.boolean()",
-  "archivedAt: z.coerce.date().nullable()",
-  "lastOpenedAt",
-  "messages: { some:",
-  "prisma.patient.findMany",
-  "prisma.eCGCase.findMany",
-  "copilotRouter.post(\"/conversations/:conversationId/restore\"",
-  "copilotRouter.patch(\"/conversations/:conversationId/rename\"",
-  "copilotRouter.patch(\"/conversations/:conversationId/pin\"",
-  "copilotRouter.patch(\"/conversations/:conversationId/favorite\"",
-  "copilotRouter.patch(\"/conversations/:conversationId/archive\"",
-  "registeredCopilotRoutes",
-  "mutableConversationForUser",
-  "renameConversationSchema",
-  "pinConversationSchema",
-  "favoriteConversationSchema",
-  "uploadAttachmentSchema",
-  "copilotRouter.post(\"/attachments\"",
-  "copilotAttachment",
-  "duplicate",
-  "archivedAt: new Date()",
-  "deletedAt: new Date()",
-  "archivedAt: null",
-  "writeSse(res, \"token\"",
+  "automaticConversationTitle",
+  "New Clinical Conversation",
+  "lastMessagePreview",
+  "prisma.copilotConversation.findMany",
+  "orderBy: { updatedAt: \"desc\" }",
+  "copilotRouter.post(\"/chat/stream\"",
+  "copilotRouter.get(\"/conversations/:conversationId\"",
 ]) {
-  assert(routes.includes(marker), `Copilot API stabilization marker missing: ${marker}`);
+  assert(routes.includes(marker), `Copilot backend simplified-chat marker missing: ${marker}`);
+}
+for (const removed of ["renameConversationSchema", "pinConversationSchema", "favoriteConversationSchema", "mutableConversationForUser", "/rename", "/pin", "/favorite", "/archive", "/duplicate"]) {
+  assert(!routes.includes(removed), `Copilot backend still contains removed management code: ${removed}`);
 }
 
-for (const marker of ["isPinned", "isFavorite", "archivedAt", "deletedAt", "lastOpenedAt", "restoreCopilotConversation", "renameConversation", "deleteConversation", "renameCopilotConversation", "pinCopilotConversation", "favoriteCopilotConversation", "archiveCopilotConversation", "uploadCopilotAttachment", "streamCopilotMessage"]) {
-  assert(service.includes(marker), `Copilot service stabilization marker missing: ${marker}`);
+for (const marker of ["listCopilotConversations", "getCopilotConversation", "streamCopilotMessage", "CopilotConversation", "lastMessagePreview"]) {
+  assert(service.includes(marker), `Copilot service simplified-chat marker missing: ${marker}`);
 }
-assert(!service.includes("togglePin") && !service.includes("toggleFavorite") && !service.includes("toggleArchive"), "Copilot service must not keep deprecated POST toggle helpers.");
-
-assert(!workspace.includes("onPress={() => {}}"), "Workspace must not contain dead actions.");
-assert(!workspace.includes("title.replace(\" copy\""), "Rename action must not fake-copy titles.");
-assert(!routes.includes("[Archived]"), "Archive system must not rely on title prefixes.");
-assert(!routes.includes("setTimeout(resolve"), "Streaming must not rely on fake token delays.");
+for (const removed of ["renameConversation", "pinCopilotConversation", "favoriteCopilotConversation", "archiveCopilotConversation", "duplicateCopilotConversation", "deleteCopilotConversation", "updateCopilotConversation"]) {
+  assert(!service.includes(removed), `Copilot service still contains removed management helper: ${removed}`);
+}
 
 console.log("AI Clinical Copilot stabilization integration checks passed.");

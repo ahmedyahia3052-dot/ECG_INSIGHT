@@ -1,25 +1,16 @@
 import { Feather } from "@expo/vector-icons";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "expo-router";
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, useWindowDimensions, View } from "react-native";
+import React, { useCallback, useEffect, useRef, useState } from "react";
+import { Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, useWindowDimensions, View } from "react-native";
 
 import { Badge, Card, EmptyState, medicalTheme, PrimaryButton } from "@/components/enterprise/EnterpriseUI";
 import { useAuth } from "@/context/AuthContext";
 import { listCases, listPatients } from "@/services/clinical";
-import { ApiError } from "@/services/api";
 import {
-  archiveCopilotConversation,
-  createCopilotConversation,
-  deleteCopilotConversation,
   downloadCopilotExport,
-  duplicateCopilotConversation,
-  favoriteCopilotConversation,
   getCopilotConversation,
   listCopilotConversations,
-  pinCopilotConversation,
-  renameCopilotConversation,
-  restoreCopilotConversation,
   streamCopilotMessage,
   uploadCopilotAttachment,
   type CopilotAttachment,
@@ -90,16 +81,12 @@ export function CopilotWorkspaceScreen({ routeConversationId }: { routeConversat
   const { width } = useWindowDimensions();
   const { authToken, user } = useAuth();
   const token = authToken?.token;
-  const [conversationSearch, setConversationSearch] = useState("");
   const [contextOpen, setContextOpen] = useState(false);
   const [actionNotice, setActionNotice] = useState<{ tone: "error" | "success"; text: string } | undefined>();
   const [attachments, setAttachments] = useState<CopilotAttachment[]>([]);
   const [draft, setDraft] = useState("");
   const [isRecording, setIsRecording] = useState(false);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
-  const [renameModalOpen, setRenameModalOpen] = useState(false);
-  const [renameTitle, setRenameTitle] = useState("");
-  const [renameTarget, setRenameTarget] = useState<CopilotConversation | undefined>();
   const [selectedId, setSelectedId] = useState<string | undefined>();
   const [streamingMessage, setStreamingMessage] = useState("");
   const [status, setStatus] = useState("");
@@ -110,8 +97,8 @@ export function CopilotWorkspaceScreen({ routeConversationId }: { routeConversat
 
   const conversationsQuery = useQuery({
     enabled: !!token,
-    queryFn: () => listCopilotConversations(token!, conversationSearch),
-    queryKey: ["copilot-workspace-conversations", token, conversationSearch],
+    queryFn: () => listCopilotConversations(token!),
+    queryKey: ["copilot-workspace-conversations", token],
     retry: false,
   });
   const selectedQuery = useQuery({
@@ -139,48 +126,16 @@ export function CopilotWorkspaceScreen({ routeConversationId }: { routeConversat
   const currentCase = casesQuery.data?.cases[0];
   const currentPatient = patientsQuery.data?.patients[0] ?? currentCase?.patient;
   const characterCount = draft.length;
-
-  const groupedConversations = useMemo(() => ({
-    archived: conversations.filter((item) => !!item.archivedAt),
-    favorites: conversations.filter((item) => item.isFavorite && !item.archivedAt),
-    pinned: conversations.filter((item) => item.isPinned && !item.archivedAt),
-    recent: conversations.filter((item) => !item.isPinned && !item.isFavorite && !item.archivedAt),
-  }), [conversations]);
+  const chatTitle = selectedConversation?.title ?? "New Clinical Conversation";
 
   const invalidate = useCallback(() => {
     void queryClient.invalidateQueries({ queryKey: ["copilot-workspace-conversations", token] });
     if (selectedId) void queryClient.invalidateQueries({ queryKey: ["copilot-workspace-conversation", token, selectedId] });
   }, [queryClient, selectedId, token]);
 
-  const applyConversationPatch = useCallback((conversationId: string, patch: Partial<CopilotConversation>) => {
-    queryClient.setQueriesData<{ conversations: CopilotConversation[] }>({ queryKey: ["copilot-workspace-conversations", token] }, (current) => {
-      if (!current) return current;
-      return {
-        conversations: current.conversations.map((conversation) => conversation.id === conversationId ? { ...conversation, ...patch } : conversation),
-      };
-    });
-    queryClient.setQueryData<{ conversation: CopilotConversation; messages: CopilotMessage[] }>(["copilot-workspace-conversation", token, conversationId], (current) => {
-      if (!current) return current;
-      return { ...current, conversation: { ...current.conversation, ...patch } };
-    });
-  }, [queryClient, token]);
-
-  const commitConversation = useCallback((conversation: CopilotConversation) => {
-    applyConversationPatch(conversation.id, conversation);
-    if (conversation.id === selectedId) setRenameTitle(conversation.title);
-  }, [applyConversationPatch, selectedId]);
-
   const showActionNotice = useCallback((text: string, tone: "error" | "success" = "success") => {
     setActionNotice({ text, tone });
   }, []);
-
-  const showActionError = useCallback((fallback: string, error: unknown) => {
-    if (error instanceof ApiError) {
-      showActionNotice(error.message || fallback, "error");
-      return;
-    }
-    showActionNotice(fallback, "error");
-  }, [showActionNotice]);
 
   const stopVoiceInput = useCallback(() => {
     recognitionRef.current?.stop();
@@ -291,115 +246,6 @@ export function CopilotWorkspaceScreen({ routeConversationId }: { routeConversat
     router.push(`/copilot/${conversationId}` as never);
   }, [router]);
 
-  const createMutation = useMutation({
-    mutationFn: () => createCopilotConversation(token!, {
-      caseId: currentCase?.id,
-      contextType: currentCase ? "case" : currentPatient ? "patient" : "global",
-      patientId: currentPatient?.id,
-      tag: "ECG Interpretation",
-      title: "New clinical copilot conversation",
-    }),
-    onSuccess: (payload) => {
-      setSelectedId(payload.conversation.id);
-      setRenameTitle(payload.conversation.title);
-      setMobileSidebarOpen(false);
-      router.push(`/copilot/${payload.conversation.id}` as never);
-      invalidate();
-    },
-  });
-
-  const renameMutation = useMutation({
-    mutationFn: ({ conversationId, title }: { conversationId: string; title: string }) => renameCopilotConversation(token!, conversationId, title),
-    onMutate: ({ conversationId, title }) => {
-      applyConversationPatch(conversationId, { title });
-      if (conversationId === selectedId) setRenameTitle(title);
-    },
-    onSuccess: (payload) => {
-      commitConversation(payload.conversation);
-      setRenameModalOpen(false);
-      setRenameTarget(undefined);
-      showActionNotice("Conversation renamed.");
-      invalidate();
-    },
-    onError: (error) => {
-      showActionError("Rename failed.", error);
-      invalidate();
-    },
-  });
-
-  const pinMutation = useMutation({
-    mutationFn: ({ conversationId, isPinned }: { conversationId: string; isPinned: boolean }) => pinCopilotConversation(token!, conversationId, isPinned),
-    onMutate: ({ conversationId, isPinned }) => {
-      applyConversationPatch(conversationId, { isPinned });
-    },
-    onSuccess: (payload) => {
-      commitConversation(payload.conversation);
-      showActionNotice(payload.conversation.isPinned ? "Conversation pinned." : "Conversation unpinned.");
-      invalidate();
-    },
-    onError: (error) => {
-      showActionError("Pin failed.", error);
-      invalidate();
-    },
-  });
-
-  const favoriteMutation = useMutation({
-    mutationFn: ({ conversationId, isFavorite }: { conversationId: string; isFavorite: boolean }) => favoriteCopilotConversation(token!, conversationId, isFavorite),
-    onMutate: ({ conversationId, isFavorite }) => {
-      applyConversationPatch(conversationId, { favorite: isFavorite, isFavorite });
-    },
-    onSuccess: (payload) => {
-      commitConversation(payload.conversation);
-      showActionNotice(payload.conversation.isFavorite ? "Conversation added to favorites." : "Conversation removed from favorites.");
-      invalidate();
-    },
-    onError: (error) => {
-      showActionError("Favorite failed.", error);
-      invalidate();
-    },
-  });
-
-  const deleteMutation = useMutation({
-    mutationFn: (conversationId: string) => deleteCopilotConversation(token!, conversationId),
-    onSuccess: (_payload, conversationId) => {
-      if (conversationId === selectedId) {
-        setSelectedId(undefined);
-        setRenameTitle("");
-        router.replace("/copilot" as never);
-      }
-      invalidate();
-    },
-  });
-
-  const archiveMutation = useMutation({
-    mutationFn: (conversationId: string) => archiveCopilotConversation(token!, conversationId),
-    onSuccess: (payload) => {
-      if (payload.conversation.id === selectedId) {
-        setSelectedId(undefined);
-        setRenameTitle("");
-        router.replace("/copilot" as never);
-      }
-      invalidate();
-    },
-  });
-
-  const restoreMutation = useMutation({
-    mutationFn: (conversationId: string) => restoreCopilotConversation(token!, conversationId),
-    onSuccess: (payload) => {
-      navigateConversation(payload.conversation.id);
-      invalidate();
-    },
-  });
-
-  const duplicateMutation = useMutation({
-    mutationFn: (conversationId: string) => duplicateCopilotConversation(token!, conversationId),
-    onSuccess: (payload) => {
-      setRenameTitle(payload.conversation.title);
-      navigateConversation(payload.conversation.id);
-      invalidate();
-    },
-  });
-
   const sendMutation = useMutation({
     mutationFn: async (input: { attachmentIds: string[]; prompt: string; tag: CopilotTag }) => {
       const controller = new AbortController();
@@ -422,7 +268,6 @@ export function CopilotWorkspaceScreen({ routeConversationId }: { routeConversat
         if (event.conversation) {
           finalConversation = event.conversation;
           setSelectedId(event.conversation.id);
-          setRenameTitle(event.conversation.title);
           router.replace(`/copilot/${event.conversation.id}` as never);
         }
       }, controller.signal);
@@ -477,10 +322,6 @@ export function CopilotWorkspaceScreen({ routeConversationId }: { routeConversat
   }, [routeConversationId, router, selectedQuery.isError]);
 
   useEffect(() => {
-    if (selectedConversation) setRenameTitle(selectedConversation.title);
-  }, [selectedConversation]);
-
-  useEffect(() => {
     if (typeof window !== "undefined" && selectedId && !streamingMessage) {
       const savedScroll = Number(window.localStorage.getItem(`${WORKSPACE_STATE_KEY}:scroll:${selectedId}`));
       if (Number.isFinite(savedScroll) && savedScroll > 0) {
@@ -497,39 +338,14 @@ export function CopilotWorkspaceScreen({ routeConversationId }: { routeConversat
     sendMutation.mutate({ attachmentIds: attachments.map((attachment) => attachment.id), prompt: trimmed, tag });
   }
 
-  function saveRename() {
-    const target = renameTarget ?? selectedConversation;
-    if (!target || !token) {
-      showActionNotice("Unable to rename conversation.", "error");
-      return;
-    }
-    renameMutation.mutate({ conversationId: target.id, title: renameTitle.trim() || "Clinical copilot conversation" });
-  }
-
-  function openRenameDialog(conversation?: CopilotConversation) {
-    if (!conversation) {
-      showActionNotice("Select a conversation before renaming.", "error");
-      return;
-    }
-    setRenameTarget(conversation);
-    setRenameTitle(conversation.title);
-    setRenameModalOpen(true);
-  }
-
-  function togglePin(conversation: CopilotConversation) {
-    if (!token) {
-      showActionNotice("Unable to pin conversation.", "error");
-      return;
-    }
-    pinMutation.mutate({ conversationId: conversation.id, isPinned: !conversation.isPinned });
-  }
-
-  function toggleFavorite(conversation: CopilotConversation) {
-    if (!token) {
-      showActionNotice("Unable to favorite conversation.", "error");
-      return;
-    }
-    favoriteMutation.mutate({ conversationId: conversation.id, isFavorite: !conversation.isFavorite });
+  function startNewChat() {
+    setSelectedId(undefined);
+    setAttachments([]);
+    setDraft("");
+    setStatus("");
+    setStreamingMessage("");
+    setMobileSidebarOpen(false);
+    router.replace("/copilot" as never);
   }
 
   function regenerateLastAnswer() {
@@ -597,19 +413,9 @@ export function CopilotWorkspaceScreen({ routeConversationId }: { routeConversat
               </Pressable>
             ) : null}
           </View>
-          <PrimaryButton icon="plus" label="New Chat" onPress={() => createMutation.mutate()} />
-          <TextInput
-            onChangeText={setConversationSearch}
-            placeholder="Search Conversations..."
-            placeholderTextColor={medicalTheme.muted}
-            style={styles.searchInput}
-            value={conversationSearch}
-          />
+          <PrimaryButton icon="plus" label="New Chat" onPress={startNewChat} />
           <ScrollView contentContainerStyle={styles.sidebarList} showsVerticalScrollIndicator={false}>
-            <ConversationGroup conversations={groupedConversations.pinned} icon="map-pin" onArchive={(id) => archiveMutation.mutate(id)} onDelete={(id) => deleteMutation.mutate(id)} onDuplicate={(id) => duplicateMutation.mutate(id)} onFavorite={toggleFavorite} onPin={togglePin} onRename={openRenameDialog} onRestore={(id) => restoreMutation.mutate(id)} onSelect={navigateConversation} selectedId={selectedId} title="Pinned Conversations" />
-            <ConversationGroup conversations={groupedConversations.favorites} icon="star" onArchive={(id) => archiveMutation.mutate(id)} onDelete={(id) => deleteMutation.mutate(id)} onDuplicate={(id) => duplicateMutation.mutate(id)} onFavorite={toggleFavorite} onPin={togglePin} onRename={openRenameDialog} onRestore={(id) => restoreMutation.mutate(id)} onSelect={navigateConversation} selectedId={selectedId} title="Favorites" />
-            <ConversationGroup conversations={groupedConversations.recent} icon="clock" onArchive={(id) => archiveMutation.mutate(id)} onDelete={(id) => deleteMutation.mutate(id)} onDuplicate={(id) => duplicateMutation.mutate(id)} onFavorite={toggleFavorite} onPin={togglePin} onRename={openRenameDialog} onRestore={(id) => restoreMutation.mutate(id)} onSelect={navigateConversation} selectedId={selectedId} title="Recent Conversations" />
-            <ConversationGroup conversations={groupedConversations.archived} icon="archive" onArchive={(id) => archiveMutation.mutate(id)} onDelete={(id) => deleteMutation.mutate(id)} onDuplicate={(id) => duplicateMutation.mutate(id)} onFavorite={toggleFavorite} onPin={togglePin} onRename={openRenameDialog} onRestore={(id) => restoreMutation.mutate(id)} onSelect={navigateConversation} selectedId={selectedId} title="Archived Conversations" />
+            <ConversationList conversations={conversations} onSelect={navigateConversation} selectedId={selectedId} />
           </ScrollView>
         </Card>
       ) : null}
@@ -667,23 +473,13 @@ export function CopilotWorkspaceScreen({ routeConversationId }: { routeConversat
                 <Feather name="cpu" size={20} color={medicalTheme.primary} />
               </View>
               <View style={styles.chatHeaderMain}>
-                <TextInput
-                  editable={false}
-                  onChangeText={setRenameTitle}
-                  placeholder="Untitled clinical conversation"
-                  placeholderTextColor={medicalTheme.muted}
-                  style={styles.titleInput}
-                  value={renameTitle}
-                />
+                <Text style={styles.titleInput}>{chatTitle}</Text>
                 <Text style={styles.chatMeta}>
                   {selectedConversation?.tag ?? "Free medical conversation"} • {messages.length} persisted messages • Deep link ready
                 </Text>
               </View>
             </View>
             <View style={styles.chatTools}>
-              <HeaderTool disabled={!selectedConversation} icon="edit-2" label="Rename" onPress={() => openRenameDialog(selectedConversation)} />
-              <HeaderTool disabled={!selectedConversation || pinMutation.isPending} icon="map-pin" label={selectedConversation?.isPinned ? "📌 Pinned" : "Pin"} onPress={() => selectedConversation && togglePin(selectedConversation)} />
-              <HeaderTool disabled={!selectedConversation || favoriteMutation.isPending} icon="star" label={selectedConversation?.isFavorite ? "★ Favorite" : "Favorite"} onPress={() => selectedConversation && toggleFavorite(selectedConversation)} />
               <HeaderTool disabled={!selectedId} icon="share-2" label="Share" onPress={shareConversation} />
               <HeaderTool disabled={!selectedId} icon="download" label="Export PDF" onPress={() => exportConversation("pdf")} />
               <HeaderTool disabled={!selectedId} icon="file" label="Export TXT" onPress={() => exportConversation("txt")} />
@@ -782,81 +578,31 @@ export function CopilotWorkspaceScreen({ routeConversationId }: { routeConversat
         </Card>
       ) : null}
 
-      <Modal animationType="fade" transparent visible={renameModalOpen} onRequestClose={() => setRenameModalOpen(false)}>
-        <View style={styles.modalBackdrop}>
-          <View style={styles.renameDialog}>
-            <Text style={styles.renameTitle}>Rename Conversation</Text>
-            <Text style={styles.renameSubtitle}>Update the title for this persisted PostgreSQL-backed conversation.</Text>
-            <TextInput
-              autoFocus
-              onChangeText={setRenameTitle}
-              onSubmitEditing={saveRename}
-              placeholder="Conversation title"
-              placeholderTextColor={medicalTheme.muted}
-              style={styles.renameInput}
-              value={renameTitle}
-            />
-            <View style={styles.renameActions}>
-              <PrimaryButton label="Cancel" onPress={() => { setRenameModalOpen(false); setRenameTarget(undefined); }} variant="outline" />
-              <PrimaryButton disabled={renameMutation.isPending || !renameTitle.trim()} icon="save" label={renameMutation.isPending ? "Saving..." : "Save"} onPress={saveRename} />
-            </View>
-          </View>
-        </View>
-      </Modal>
     </View>
   );
 }
 
-function ConversationGroup({
+function ConversationList({
   conversations,
-  icon,
-  onArchive,
-  onDelete,
-  onDuplicate,
-  onFavorite,
-  onPin,
-  onRename,
-  onRestore,
   onSelect,
   selectedId,
-  title,
 }: {
   conversations: CopilotConversation[];
-  icon: keyof typeof Feather.glyphMap;
-  onArchive: (id: string) => void;
-  onDelete: (id: string) => void;
-  onDuplicate: (id: string) => void;
-  onFavorite: (conversation: CopilotConversation) => void;
-  onPin: (conversation: CopilotConversation) => void;
-  onRename: (conversation: CopilotConversation) => void;
-  onRestore: (id: string) => void;
   onSelect: (id: string) => void;
   selectedId?: string;
-  title: string;
 }) {
   return (
     <View style={styles.group}>
       <View style={styles.groupHeader}>
-        <Feather name={icon} size={13} color={medicalTheme.primary} />
-        <Text style={styles.groupTitle}>{title}</Text>
+        <Feather name="message-square" size={13} color={medicalTheme.primary} />
+        <Text style={styles.groupTitle}>Conversations</Text>
       </View>
-      {conversations.length ? conversations.slice(0, 14).map((conversation) => (
-        <View key={conversation.id} style={[styles.conversationItem, selectedId === conversation.id && styles.conversationItemActive]}>
-          <Pressable accessibilityRole="button" onPress={() => onSelect(conversation.id)} style={styles.conversationSelect}>
-            <Text numberOfLines={1} style={styles.conversationTitle}>
-              {conversation.isPinned ? "📌 " : ""}{conversation.isFavorite ? "★ " : ""}{conversation.title.replace("[Archived] ", "")}
-            </Text>
-            <Text style={styles.conversationMeta}>{conversation.tag} • {new Date(conversation.updatedAt).toLocaleDateString()}</Text>
-          </Pressable>
-          <View style={styles.conversationMenu}>
-            <ConversationAction icon="edit-2" label="Rename" onPress={() => onRename(conversation)} />
-            <ConversationAction active={conversation.isPinned} activeText="📌 Pinned" icon="map-pin" label={conversation.isPinned ? "Unpin" : "Pin"} onPress={() => onPin(conversation)} />
-            <ConversationAction active={conversation.isFavorite} activeText="★ Favorite" icon="star" label={conversation.isFavorite ? "Unfavorite" : "Favorite"} onPress={() => onFavorite(conversation)} />
-            {conversation.archivedAt ? <MiniAction icon="corner-up-left" label="Restore" onPress={() => onRestore(conversation.id)} /> : <MiniAction icon="archive" label="Archive" onPress={() => onArchive(conversation.id)} />}
-            <MiniAction icon="copy" label="Duplicate" onPress={() => onDuplicate(conversation.id)} />
-            <MiniAction icon="trash-2" label="Delete" onPress={() => onDelete(conversation.id)} tone="danger" />
-          </View>
-        </View>
+      {conversations.length ? conversations.slice(0, 50).map((conversation) => (
+        <Pressable accessibilityRole="button" key={conversation.id} onPress={() => onSelect(conversation.id)} style={[styles.conversationItem, selectedId === conversation.id && styles.conversationItemActive]}>
+          <Text numberOfLines={1} style={styles.conversationTitle}>{conversation.title}</Text>
+          <Text numberOfLines={2} style={styles.conversationPreview}>{conversation.lastMessagePreview ?? "No messages yet."}</Text>
+          <Text style={styles.conversationMeta}>{new Date(conversation.updatedAt).toLocaleString([], { dateStyle: "medium", timeStyle: "short" })}</Text>
+        </Pressable>
       )) : <Text style={styles.emptyText}>No conversations yet.</Text>}
     </View>
   );
@@ -950,15 +696,6 @@ function MiniAction({ icon, label, onPress, tone }: { icon: keyof typeof Feather
   return (
     <Pressable accessibilityLabel={label} accessibilityRole="button" onPress={onPress} style={styles.miniAction}>
       <Feather name={icon} size={12} color={tone === "danger" ? medicalTheme.critical : medicalTheme.muted} />
-    </Pressable>
-  );
-}
-
-function ConversationAction({ active, activeText, icon, label, onPress }: { active?: boolean; activeText?: string; icon: keyof typeof Feather.glyphMap; label: string; onPress: () => void }) {
-  return (
-    <Pressable accessibilityLabel={label} accessibilityRole="button" onPress={onPress} style={[styles.conversationAction, active && styles.conversationActionActive]}>
-      <Feather name={icon} size={12} color={active ? medicalTheme.primary : medicalTheme.text} />
-      <Text style={[styles.conversationActionText, active && styles.conversationActionTextActive]}>{active && activeText ? activeText : label}</Text>
     </Pressable>
   );
 }
@@ -1070,13 +807,8 @@ const styles = StyleSheet.create({
   contextValue: { color: medicalTheme.text, fontSize: 13, fontWeight: "800", lineHeight: 18 },
   conversationItem: { backgroundColor: "rgba(15,33,53,0.64)", borderColor: "transparent", borderRadius: 16, borderWidth: 1, gap: 8, padding: 10 },
   conversationItemActive: { borderColor: medicalTheme.primary, shadowColor: medicalTheme.primary, shadowOpacity: 0.24, shadowRadius: 16 },
-  conversationAction: { alignItems: "center", backgroundColor: "rgba(2,6,23,0.34)", borderColor: glassBorder, borderRadius: 999, borderWidth: 1, flexDirection: "row", gap: 5, minHeight: 28, paddingHorizontal: 8, paddingVertical: 5 },
-  conversationActionActive: { backgroundColor: "rgba(20,221,230,0.12)", borderColor: "rgba(20,221,230,0.45)" },
-  conversationActionText: { color: medicalTheme.text, fontSize: 10, fontWeight: "900" },
-  conversationActionTextActive: { color: medicalTheme.primary },
-  conversationMenu: { flexDirection: "row", flexWrap: "wrap", gap: 4 },
   conversationMeta: { color: medicalTheme.muted, fontSize: 10, fontWeight: "800" },
-  conversationSelect: { gap: 4 },
+  conversationPreview: { color: medicalTheme.muted, fontSize: 11, fontWeight: "700", lineHeight: 16 },
   conversationTitle: { color: medicalTheme.text, fontSize: 12, fontWeight: "900" },
   counter: { color: medicalTheme.muted, fontSize: 11, fontWeight: "800", textAlign: "right" },
   disabled: { opacity: 0.45 },
@@ -1108,14 +840,7 @@ const styles = StyleSheet.create({
   messageTop: { alignItems: "center", flexDirection: "row", gap: 8, justifyContent: "space-between" },
   messages: { flex: 1, minHeight: 0 },
   miniAction: { alignItems: "center", backgroundColor: "rgba(2,6,23,0.34)", borderRadius: 999, height: 24, justifyContent: "center", width: 24 },
-  modalBackdrop: { alignItems: "center", backgroundColor: "rgba(2,6,23,0.72)", flex: 1, justifyContent: "center", padding: 20 },
-  renameActions: { alignItems: "center", flexDirection: "row", flexWrap: "wrap", gap: 10, justifyContent: "flex-end" },
-  renameDialog: { backgroundColor: "rgba(12,26,45,0.98)", borderColor: glassBorder, borderRadius: 24, borderWidth: 1, gap: 14, maxWidth: 520, padding: 18, shadowColor: medicalTheme.primary, shadowOpacity: 0.24, shadowRadius: 28, width: "100%" },
-  renameInput: { backgroundColor: "rgba(2,6,23,0.42)", borderColor: glassBorder, borderRadius: 14, borderWidth: 1, color: medicalTheme.text, fontSize: 16, fontWeight: "800", minHeight: 48, paddingHorizontal: 12 },
-  renameSubtitle: { color: medicalTheme.muted, fontSize: 13, fontWeight: "800", lineHeight: 19 },
-  renameTitle: { color: medicalTheme.text, fontSize: 20, fontWeight: "900" },
   richText: { gap: 2 },
-  searchInput: { backgroundColor: "rgba(2,6,23,0.42)", borderColor: glassBorder, borderRadius: 14, borderWidth: 1, color: medicalTheme.text, minHeight: 42, paddingHorizontal: 12 },
   shell: { backgroundColor: "#020617", flex: 1, flexDirection: "row", gap: 14, minHeight: Platform.OS === "web" ? "calc(100vh - 130px)" as unknown as number : 760, overflow: "hidden", padding: 2 },
   sidebar: { backgroundColor: "rgba(15,23,42,0.88)", borderColor: glassBorder, flexBasis: 320, gap: 12, padding: 14, width: 320 },
   sidebarEyebrow: { color: medicalTheme.primary, fontSize: 11, fontWeight: "900", letterSpacing: 1, textTransform: "uppercase" },

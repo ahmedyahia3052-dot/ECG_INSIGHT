@@ -2421,12 +2421,6 @@ model CopilotConversation {
   userId      String
   title       String
   tag         String   @default("ECG Interpretation")
-  favorite    Boolean  @default(false)
-  isPinned   Boolean  @default(false)
-  isFavorite Boolean  @default(false)
-  archivedAt DateTime?
-  deletedAt  DateTime?
-  lastOpenedAt DateTime?
   patientId   String?
   caseId      String?
   contextType String?
@@ -2439,12 +2433,6 @@ model CopilotConversation {
   @@index([patientId])
   @@index([caseId])
   @@index([tag])
-  @@index([favorite])
-  @@index([isPinned])
-  @@index([isFavorite])
-  @@index([archivedAt])
-  @@index([deletedAt])
-  @@index([lastOpenedAt])
   @@index([updatedAt])
 }
 
@@ -2527,6 +2515,27 @@ model ECGKnowledgeEntry {
 
   @@index([category])
   @@index([topic])
+}
+
+model MedicalKnowledgeDocument {
+  id         String   @id @default(cuid())
+  domain     String
+  title      String
+  content    String
+  sourceName String
+  sourceUrl  String?
+  references String[]
+  tags       String[]
+  searchText String
+  embedding  Json
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([domain, title])
+  @@index([domain])
+  @@index([title])
+  @@index([sourceName])
+  @@index([updatedAt])
 }
 
 model PatientTrend {

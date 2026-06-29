@@ -3,16 +3,11 @@ import { API_URL, apiRequest } from "./api";
 export type CopilotTag = "Clinical Summary" | "Differential Diagnosis" | "ECG Interpretation" | "Follow-up" | "Occupational Fitness";
 
 export interface CopilotConversation {
-  archivedAt?: string;
   caseId?: string;
   contextType?: string;
   createdAt: string;
-  deletedAt?: string;
-  favorite: boolean;
   id: string;
-  isFavorite: boolean;
-  isPinned: boolean;
-  lastOpenedAt?: string;
+  lastMessagePreview?: string;
   patientId?: string;
   tag: CopilotTag;
   title: string;
@@ -79,75 +74,8 @@ export async function getCopilotConversation(accessToken: string, conversationId
   return apiRequest<{ conversation: CopilotConversation; messages: CopilotMessage[] }>(`/copilot/conversations/${conversationId}`, { accessToken });
 }
 
-export async function createCopilotConversation(accessToken: string, input: Partial<CopilotConversation>) {
-  return apiRequest<{ conversation: CopilotConversation }>("/copilot/conversations", {
-    accessToken,
-    body: JSON.stringify(input),
-    method: "POST",
-  });
-}
-
-export async function updateCopilotConversation(accessToken: string, conversationId: string, input: Partial<CopilotConversation>) {
-  return apiRequest<{ conversation: CopilotConversation }>(`/copilot/conversations/${conversationId}`, {
-    accessToken,
-    body: JSON.stringify(input),
-    method: "PATCH",
-  });
-}
-
-export async function renameCopilotConversation(accessToken: string, conversationId: string, title: string) {
-  return renameConversation(accessToken, conversationId, title);
-}
-
-export async function renameConversation(accessToken: string, conversationId: string, title: string) {
-  return apiRequest<{ conversation: CopilotConversation }>(`/copilot/conversations/${conversationId}/rename`, {
-    accessToken,
-    body: JSON.stringify({ title }),
-    method: "PATCH",
-  });
-}
-
-export async function pinCopilotConversation(accessToken: string, conversationId: string, isPinned: boolean) {
-  return apiRequest<{ conversation: CopilotConversation; success: boolean }>(`/copilot/conversations/${conversationId}/pin`, {
-    accessToken,
-    body: JSON.stringify({ isPinned }),
-    method: "PATCH",
-  });
-}
-
-export async function favoriteCopilotConversation(accessToken: string, conversationId: string, isFavorite: boolean) {
-  return apiRequest<{ conversation: CopilotConversation; success: boolean }>(`/copilot/conversations/${conversationId}/favorite`, {
-    accessToken,
-    body: JSON.stringify({ isFavorite }),
-    method: "PATCH",
-  });
-}
-
-export async function deleteCopilotConversation(accessToken: string, conversationId: string) {
-  return deleteConversation(accessToken, conversationId);
-}
-
-export async function deleteConversation(accessToken: string, conversationId: string) {
-  return apiRequest<void>(`/copilot/conversations/${conversationId}`, { accessToken, method: "DELETE" });
-}
-
 export async function deleteCopilotMessage(accessToken: string, conversationId: string, messageId: string) {
   return apiRequest<void>(`/copilot/conversations/${conversationId}/messages/${messageId}`, { accessToken, method: "DELETE" });
-}
-
-export async function duplicateCopilotConversation(accessToken: string, conversationId: string) {
-  return apiRequest<{ conversation: CopilotConversation }>(`/copilot/conversations/${conversationId}/duplicate`, { accessToken, method: "POST" });
-}
-
-export async function archiveCopilotConversation(accessToken: string, conversationId: string) {
-  return apiRequest<{ conversation: CopilotConversation; success: boolean }>(`/copilot/conversations/${conversationId}/archive`, {
-    accessToken,
-    method: "PATCH",
-  });
-}
-
-export async function restoreCopilotConversation(accessToken: string, conversationId: string) {
-  return apiRequest<{ conversation: CopilotConversation }>(`/copilot/conversations/${conversationId}/restore`, { accessToken, method: "POST" });
 }
 
 export async function sendCopilotMessage(accessToken: string, input: CopilotChatInput) {

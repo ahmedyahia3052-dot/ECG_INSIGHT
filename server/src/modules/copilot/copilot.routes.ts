@@ -9,22 +9,20 @@ import { prisma } from "../../config/prisma";
 import { requireAuth, requireRole } from "../../middleware/auth";
 import { AppError } from "../../middleware/error";
 import { assertResourceAccess, canAccessCase, canAccessPatient } from "../../utils/resource-access";
+import { semanticSearchKnowledge } from "./medical-knowledge";
 
 export const copilotRouter = Router();
 export const registeredCopilotRoutes = [
   "GET /api/copilot/conversations",
   "GET /api/copilot/conversations/:conversationId",
-  "PATCH /api/copilot/conversations/:conversationId/rename",
-  "PATCH /api/copilot/conversations/:conversationId/pin",
-  "PATCH /api/copilot/conversations/:conversationId/favorite",
-  "PATCH /api/copilot/conversations/:conversationId/archive",
-  "DELETE /api/copilot/conversations/:conversationId",
+  "POST /api/copilot/chat/stream",
+  "POST /api/copilot/chat",
 ] as const;
 
 copilotRouter.use(requireAuth);
 
 const OWNER_EMAIL = "ahmedyahia3052@gmail.com";
-const DISCLAIMER = "AI assistance only. Final diagnosis and clinical decisions remain the responsibility of the physician.";
+const DISCLAIMER = "AI assistance only. Clinical decisions remain the responsibility of the physician.";
 const tags = ["ECG Interpretation", "Clinical Summary", "Occupational Fitness", "Differential Diagnosis", "Follow-up"] as const;
 const attachmentRoot = path.resolve(process.cwd(), "uploads", "copilot");
 fs.mkdirSync(attachmentRoot, { recursive: true });
@@ -68,6 +66,9 @@ type KnowledgeHit = {
   content: string;
   id: string;
   references: string[];
+  relevanceScore: number;
+  sourceName: string;
+  sourceUrl?: string;
   tags: string[];
   topic: string;
 };
@@ -80,32 +81,8 @@ const contextSchema = z.object({
 });
 
 const createConversationSchema = contextSchema.extend({
-  isFavorite: z.boolean().default(false),
-  isPinned: z.boolean().default(false),
   tag: z.enum(tags).default("ECG Interpretation"),
-  title: z.string().trim().min(1).max(160).default("New clinical conversation"),
-});
-
-const updateConversationSchema = z.object({
-  archivedAt: z.coerce.date().nullable().optional(),
-  favorite: z.boolean().optional(),
-  isFavorite: z.boolean().optional(),
-  isPinned: z.boolean().optional(),
-  lastOpenedAt: z.coerce.date().nullable().optional(),
-  tag: z.enum(tags).optional(),
-  title: z.string().trim().min(1).max(160).optional(),
-});
-
-const renameConversationSchema = z.object({
-  title: z.string().trim().min(1).max(160),
-});
-
-const pinConversationSchema = z.object({
-  isPinned: z.boolean(),
-});
-
-const favoriteConversationSchema = z.object({
-  isFavorite: z.boolean(),
+  title: z.string().trim().min(1).max(60).default("New Clinical Conversation"),
 });
 
 const attachmentKinds = ["ecg", "echo", "labs", "file"] as const;
@@ -206,32 +183,23 @@ async function settings() {
 }
 
 function serializeConversation(conversation: {
-  archivedAt: Date | null;
   caseId: string | null;
   contextType: string | null;
   createdAt: Date;
-  deletedAt?: Date | null;
-  favorite: boolean;
   id: string;
-  isFavorite: boolean;
-  isPinned: boolean;
-  lastOpenedAt: Date | null;
+  messages?: Array<{ content: string; createdAt: Date }>;
   patientId: string | null;
   tag: string;
   title: string;
   updatedAt: Date;
 }) {
+  const preview = conversation.messages?.[0]?.content;
   return {
-    archivedAt: conversation.archivedAt?.toISOString() ?? undefined,
     caseId: conversation.caseId ?? undefined,
     contextType: conversation.contextType ?? undefined,
     createdAt: conversation.createdAt.toISOString(),
-    deletedAt: conversation.deletedAt?.toISOString() ?? undefined,
-    favorite: conversation.isFavorite || conversation.favorite,
     id: conversation.id,
-    isFavorite: conversation.isFavorite || conversation.favorite,
-    isPinned: conversation.isPinned,
-    lastOpenedAt: conversation.lastOpenedAt?.toISOString() ?? undefined,
+    lastMessagePreview: preview ? preview.replace(/\s+/g, " ").slice(0, 96) : undefined,
     patientId: conversation.patientId ?? undefined,
     tag: conversation.tag,
     title: conversation.title,
@@ -424,6 +392,7 @@ async function retrieveKnowledge(question: string, context: ClinicalContext): Pr
     ...context.criticalAlerts,
   ].filter(Boolean).join(" ").toLowerCase();
   const terms = clinicalTerms(haystack);
+  const enterpriseHits = await semanticSearchKnowledge(question, { contextTerms: terms, take: 8 });
   const hits = await prisma.eCGKnowledgeEntry.findMany({
     orderBy: { updatedAt: "desc" },
     take: 8,
@@ -437,17 +406,31 @@ async function retrieveKnowledge(question: string, context: ClinicalContext): Pr
       ],
     },
   });
-  const fallback = hits.length ? [] : await prisma.eCGKnowledgeEntry.findMany({ orderBy: { topic: "asc" }, take: 6 });
-  const selected = (hits.length ? hits : fallback).map((entry) => ({
+  const legacySelected: KnowledgeHit[] = hits.map((entry) => ({
     category: entry.category,
     content: entry.content,
     id: entry.id,
     references: entry.references,
+    relevanceScore: 0.45,
+    sourceName: "ECG Knowledge Base",
+    sourceUrl: undefined,
     tags: entry.tags,
     topic: entry.topic,
   }));
-  const sources = selected.map((entry) => ({ id: entry.id, label: entry.topic, source: "ECG Knowledge Base", tags: entry.tags, type: "knowledge" }));
-  return { hits: selected, sources, tags: Array.from(new Set(selected.flatMap((entry) => entry.tags))).slice(0, 12) };
+  const enterpriseSelected: KnowledgeHit[] = enterpriseHits.map((entry) => ({
+    category: String(entry.domain),
+    content: entry.content,
+    id: entry.id,
+    references: entry.references,
+    relevanceScore: entry.relevanceScore,
+    sourceName: entry.sourceName,
+    sourceUrl: entry.sourceUrl,
+    tags: entry.tags,
+    topic: entry.title,
+  }));
+  const selected = enterpriseSelected.concat(legacySelected).sort((left, right) => right.relevanceScore - left.relevanceScore).slice(0, 10);
+  const sources = selected.map((entry) => ({ id: entry.id, label: entry.topic, source: entry.sourceName, tags: entry.tags, type: "knowledge" }));
+  return { hits: selected, sources, tags: Array.from(new Set(selected.flatMap((entry) => entry.tags))).slice(0, 16) };
 }
 
 function buildPrompt(question: string, context: ClinicalContext, knowledge: KnowledgeHit[]) {
@@ -458,7 +441,7 @@ function buildPrompt(question: string, context: ClinicalContext, knowledge: Know
     `Current ECG: ${context.currentCase ? `${context.currentCase.rhythm ?? "rhythm pending"}, HR ${context.currentCase.heartRate ?? "n/a"}, ${context.currentCase.intervals}, axis ${context.currentCase.axis ?? "n/a"}, diagnosis ${context.currentCase.diagnosis ?? "pending"}, doctor ${context.currentCase.doctorDiagnosis ?? "pending"}, severity ${context.currentCase.severity}.` : "No current ECG case open."}`,
     `Previous ECGs: ${context.previousEcgs.slice(0, 5).join(" | ") || "none retrieved"}.`,
     `Documents: ${context.documents.slice(0, 5).join(" | ") || "none retrieved"}.`,
-    `Knowledge: ${knowledge.map((entry) => `${entry.topic}: ${entry.content}`).join(" | ") || "general safety knowledge"}.`,
+    `Retrieved Medical Knowledge: ${knowledge.map((entry) => `${entry.topic} [${entry.sourceName}, relevance ${Math.round(entry.relevanceScore * 100)}%]: ${entry.content} References: ${entry.references.join("; ")}`).join(" | ") || "general safety knowledge"}.`,
   ].join("\n");
 }
 
@@ -475,12 +458,33 @@ function generateClinicalResponse(input: { context: ClinicalContext; knowledge: 
   const occupational = occupationalOpinion(risk, input.context, input.question);
   const recommendations = recommendationsFor(risk, input.context, input.knowledge);
   const followUp = followUpFor(risk, input.context);
+  const warnings = medicalGuardrails(input.question, risk, input.knowledge);
+  const keyPoints = [
+    `Retrieved ${input.knowledge.length} enterprise medical knowledge references across ${Array.from(new Set(input.knowledge.map((entry) => entry.category))).join(", ") || "general medicine"}.`,
+    `Highest relevance: ${input.knowledge[0] ? `${input.knowledge[0].topic} (${Math.round(input.knowledge[0].relevanceScore * 100)}%)` : "no knowledge document retrieved"}.`,
+    `Risk tier: ${risk.level}.`,
+  ];
+  const references = input.knowledge.flatMap((entry) => entry.references.map((reference) => `${entry.sourceName}: ${reference}`));
+  const citations = input.context.sources.concat(input.knowledge.map((entry) => ({ id: entry.id, label: entry.topic, source: entry.sourceName, tags: entry.tags, type: "knowledge" }))).slice(0, 12);
 
   return {
     confidence,
-    content: `${DISCLAIMER}\n\n## Clinical Summary\n${patientSummary}\n\n## ECG Interpretation\n${ecgInterpretation}\n\n## Differential Diagnosis\n${differential.map((item, index) => `${index + 1}. ${item}`).join("\n")}\n\n## Risk Stratification\n${risk.level}: ${risk.reason}\n\n## Occupational Fitness Opinion\n${occupational}\n\n## Recommendations\n${recommendations.map((item) => `- ${item}`).join("\n")}\n\n## Follow-up Plan\n${followUp.map((item) => `- ${item}`).join("\n")}\n\n## Confidence Score\n${Math.round(confidence * 100)}%\n\n## Sources Used\n${input.context.sources.concat(input.knowledge.map((entry) => ({ id: entry.id, label: entry.topic, source: "ECG Knowledge Base", tags: entry.tags, type: "knowledge" }))).slice(0, 10).map((source) => `- ${source.source}: ${source.label}`).join("\n") || "- ECG Knowledge Base"}\n\n## Knowledge Tags\n${Array.from(new Set(input.knowledge.flatMap((entry) => entry.tags))).slice(0, 10).join(", ") || "general-ecg"}`,
+    content: `${DISCLAIMER}\n\n## Clinical Summary\n${patientSummary}\n\n## Detailed Explanation\n${ecgInterpretation}\n\nDifferential diagnosis:\n${differential.map((item, index) => `${index + 1}. ${item}`).join("\n")}\n\nRisk stratification: ${risk.level}: ${risk.reason}\n\nOccupational fitness opinion: ${occupational}\n\nRecommendations:\n${recommendations.map((item) => `- ${item}`).join("\n")}\n\nFollow-up plan:\n${followUp.map((item) => `- ${item}`).join("\n")}\n\n## Key Points\n${keyPoints.map((item) => `- ${item}`).join("\n")}\n\n## Warnings\n${warnings.map((item) => `- ${item}`).join("\n")}\n\n## References\n${Array.from(new Set(references)).slice(0, 10).map((item) => `- ${item}`).join("\n") || "- Internal ECG Insight medical knowledge base"}\n\n## Citations\n${citations.map((source) => `- [${source.type}:${source.id}] ${source.source}: ${source.label}`).join("\n") || "- ECG Insight Knowledge Engine"}\n\n## Confidence Score\n${Math.round(confidence * 100)}%\n\n## Knowledge Tags\n${Array.from(new Set(input.knowledge.flatMap((entry) => entry.tags))).slice(0, 12).join(", ") || "general-ecg"}`,
     prompt: input.prompt,
   };
+}
+
+function medicalGuardrails(question: string, risk: { level: string }, knowledge: KnowledgeHit[]) {
+  const text = `${question} ${knowledge.flatMap((entry) => entry.tags).join(" ")}`.toLowerCase();
+  const warnings = new Set<string>([DISCLAIMER]);
+  if (risk.level === "HIGH") warnings.add("High-risk features require urgent clinician review or emergency escalation according to local protocol.");
+  if (/dose|dosage|start|stop|increase|decrease|prescribe|medication|drug|anticoagulation|beta blocker|digoxin|statin/.test(text)) {
+    warnings.add("Do not start, stop, or change medications based only on AI output; confirm indications, contraindications, renal function, interactions, allergies, and local formulary guidance.");
+  }
+  if (/chest pain|stemi|syncope|stroke|sepsis|shock|dyspnea|pulmonary embolism|wide-complex|ventricular/.test(text)) {
+    warnings.add("Potential emergency symptoms or ECG patterns should be assessed immediately by a qualified clinician.");
+  }
+  return Array.from(warnings);
 }
 
 function dedupeCitations(citations: Citation[]) {
@@ -546,6 +550,7 @@ function confidenceScore(context: ClinicalContext, knowledge: KnowledgeHit[]) {
   if (context.reports.length) score += 0.05;
   if (context.documents.length) score += 0.04;
   if (knowledge.length >= 3) score += 0.07;
+  if (knowledge[0]?.relevanceScore && knowledge[0].relevanceScore > 0.35) score += 0.05;
   return Math.min(score, 0.94);
 }
 
@@ -595,16 +600,18 @@ function classifyQuestion(question: string) {
   return "ECG Interpretation";
 }
 
-async function conversationForUser(conversationId: string, userId: string) {
-  const conversation = await prisma.copilotConversation.findFirst({ where: { deletedAt: null, id: conversationId, userId } });
-  if (!conversation) throw new AppError(404, "Copilot conversation not found.", "COPILOT_CONVERSATION_NOT_FOUND");
-  return conversation;
+function automaticConversationTitle(question: string) {
+  const normalized = question
+    .replace(/[^\w\s-]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (!normalized) return "New Clinical Conversation";
+  return normalized.split(" ").slice(0, 6).join(" ").slice(0, 60);
 }
 
-async function mutableConversationForUser(conversationId: string, userId: string) {
-  const conversation = await prisma.copilotConversation.findFirst({ where: { deletedAt: null, id: conversationId } });
+async function conversationForUser(conversationId: string, userId: string) {
+  const conversation = await prisma.copilotConversation.findFirst({ where: { id: conversationId, userId } });
   if (!conversation) throw new AppError(404, "Copilot conversation not found.", "COPILOT_CONVERSATION_NOT_FOUND");
-  if (conversation.userId !== userId) throw new AppError(403, "You do not have access to this Copilot conversation.", "COPILOT_CONVERSATION_FORBIDDEN");
   return conversation;
 }
 
@@ -612,6 +619,7 @@ async function executeCopilotChat(input: ChatInput, userId: string, started = Da
   const currentSettings = await settings();
   if (!currentSettings.enabled) throw new AppError(503, "Medical AI Copilot is disabled by the developer owner.", "COPILOT_DISABLED");
   const tag = input.tag ?? classifyQuestion(input.question);
+  const generatedTitle = automaticConversationTitle(input.question);
   const conversation = input.conversationId
     ? await conversationForUser(input.conversationId, userId)
     : await prisma.copilotConversation.create({
@@ -620,10 +628,13 @@ async function executeCopilotChat(input: ChatInput, userId: string, started = Da
           contextType: input.contextType,
           patientId: input.patientId,
           tag,
-          title: input.question.slice(0, 80),
+          title: generatedTitle,
           userId,
         },
       });
+  const existingUserMessages = input.conversationId
+    ? await prisma.copilotMessage.count({ where: { conversationId: conversation.id, role: "user" } })
+    : 0;
   const userMessage = await prisma.copilotMessage.create({
     data: { content: input.question, conversationId: conversation.id, role: "user" },
     include: { attachments: true },
@@ -667,7 +678,11 @@ async function executeCopilotChat(input: ChatInput, userId: string, started = Da
     data: { conversationId: conversation.id, question: `${input.question} | diagnoses:${knowledge.hits.map((hit) => hit.topic).slice(0, 4).join(",")}`, responseTimeMs, tag, userId },
   });
   const updatedConversation = await prisma.copilotConversation.update({
-    data: { lastOpenedAt: new Date(), tag, updatedAt: new Date() },
+    data: {
+      tag,
+      title: existingUserMessages === 0 && conversation.title === "New Clinical Conversation" ? generatedTitle : conversation.title,
+      updatedAt: new Date(),
+    },
     where: { id: conversation.id },
   });
   return { assistant, conversation: updatedConversation, result, responseTimeMs, userMessage };
@@ -814,10 +829,10 @@ copilotRouter.get("/conversations", async (req, res, next) => {
     const patientIds = matchingPatients.map((patient) => patient.id);
     const caseIds = matchingCases.map((ecgCase) => ecgCase.id);
     const conversations = await prisma.copilotConversation.findMany({
-      orderBy: [{ isPinned: "desc" }, { lastOpenedAt: "desc" }, { updatedAt: "desc" }],
+      include: { messages: { orderBy: { createdAt: "desc" }, take: 1 } },
+      orderBy: { updatedAt: "desc" },
       take: 50,
       where: {
-        deletedAt: null,
         userId: req.auth!.id,
         ...(q
           ? {
@@ -851,122 +866,15 @@ copilotRouter.post("/conversations", async (req, res, next) => {
   }
 });
 
-copilotRouter.post("/conversations/:conversationId/duplicate", async (req, res, next) => {
-  try {
-    const current = await conversationForUser(String(req.params.conversationId), req.auth!.id);
-    const messages = await prisma.copilotMessage.findMany({ orderBy: { createdAt: "asc" }, where: { conversationId: current.id } });
-    const duplicated = await prisma.copilotConversation.create({
-      data: {
-        archivedAt: null,
-        caseId: current.caseId,
-        contextType: current.contextType,
-        favorite: false,
-        isFavorite: false,
-        isPinned: false,
-        lastOpenedAt: new Date(),
-        patientId: current.patientId,
-        tag: current.tag,
-        title: `${current.title} copy`.slice(0, 160),
-        userId: req.auth!.id,
-        messages: {
-          create: messages.map((message) => ({
-            citations: message.citations as Prisma.InputJsonValue | undefined,
-            confidence: message.confidence,
-            content: message.content,
-            responseTimeMs: message.responseTimeMs,
-            role: message.role,
-          })),
-        },
-      },
-    });
-    res.status(201).json({ conversation: serializeConversation(duplicated) });
-  } catch (error) {
-    next(error);
-  }
-});
-
-copilotRouter.patch("/conversations/:conversationId/archive", async (req, res, next) => {
-  try {
-    const current = await mutableConversationForUser(String(req.params.conversationId), req.auth!.id);
-    const archivedAt = current.archivedAt ? null : new Date();
-    const conversation = await prisma.copilotConversation.update({
-      data: archivedAt ? { archivedAt, favorite: false, isFavorite: false, isPinned: false } : { archivedAt: null, lastOpenedAt: new Date() },
-      where: { id: current.id },
-    });
-    res.json({ conversation: serializeConversation(conversation), success: true });
-  } catch (error) {
-    next(error);
-  }
-});
-
-copilotRouter.post("/conversations/:conversationId/restore", async (req, res, next) => {
-  try {
-    const current = await mutableConversationForUser(String(req.params.conversationId), req.auth!.id);
-    const conversation = await prisma.copilotConversation.update({
-      data: { archivedAt: null, lastOpenedAt: new Date() },
-      where: { id: current.id },
-    });
-    res.json({ conversation: serializeConversation(conversation) });
-  } catch (error) {
-    next(error);
-  }
-});
-
 copilotRouter.get("/conversations/:conversationId", async (req, res, next) => {
   try {
-    const current = await conversationForUser(String(req.params.conversationId), req.auth!.id);
-    const conversation = await prisma.copilotConversation.update({
-      data: { lastOpenedAt: new Date() },
-      where: { id: current.id },
-    });
+    const conversation = await conversationForUser(String(req.params.conversationId), req.auth!.id);
     const messages = await prisma.copilotMessage.findMany({
       include: { attachments: { orderBy: { createdAt: "asc" } } },
       orderBy: { createdAt: "asc" },
       where: { conversationId: conversation.id },
     });
     res.json({ conversation: serializeConversation(conversation), messages: messages.map(serializeMessage) });
-  } catch (error) {
-    next(error);
-  }
-});
-
-copilotRouter.patch("/conversations/:conversationId/rename", async (req, res, next) => {
-  try {
-    const current = await mutableConversationForUser(String(req.params.conversationId), req.auth!.id);
-    const body = renameConversationSchema.parse(req.body);
-    const conversation = await prisma.copilotConversation.update({
-      data: { title: body.title },
-      where: { id: current.id },
-    });
-    res.json({ conversation: serializeConversation(conversation), success: true });
-  } catch (error) {
-    next(error);
-  }
-});
-
-copilotRouter.patch("/conversations/:conversationId/pin", async (req, res, next) => {
-  try {
-    const current = await mutableConversationForUser(String(req.params.conversationId), req.auth!.id);
-    const body = pinConversationSchema.parse(req.body);
-    const conversation = await prisma.copilotConversation.update({
-      data: { isPinned: body.isPinned },
-      where: { id: current.id },
-    });
-    res.json({ conversation: serializeConversation(conversation), success: true });
-  } catch (error) {
-    next(error);
-  }
-});
-
-copilotRouter.patch("/conversations/:conversationId/favorite", async (req, res, next) => {
-  try {
-    const current = await mutableConversationForUser(String(req.params.conversationId), req.auth!.id);
-    const body = favoriteConversationSchema.parse(req.body);
-    const conversation = await prisma.copilotConversation.update({
-      data: { favorite: body.isFavorite, isFavorite: body.isFavorite },
-      where: { id: current.id },
-    });
-    res.json({ conversation: serializeConversation(conversation), success: true });
   } catch (error) {
     next(error);
   }
@@ -989,33 +897,6 @@ copilotRouter.delete("/conversations/:conversationId/messages/:messageId", async
         message: "Copilot message deleted by conversation owner.",
       },
     }).catch(() => undefined);
-    res.status(204).send();
-  } catch (error) {
-    next(error);
-  }
-});
-
-copilotRouter.patch("/conversations/:conversationId", async (req, res, next) => {
-  try {
-    const current = await mutableConversationForUser(String(req.params.conversationId), req.auth!.id);
-    const body = updateConversationSchema.parse(req.body);
-    const conversation = await prisma.copilotConversation.update({
-      data: { ...body, favorite: body.isFavorite ?? body.favorite },
-      where: { id: current.id },
-    });
-    res.json({ conversation: serializeConversation(conversation) });
-  } catch (error) {
-    next(error);
-  }
-});
-
-copilotRouter.delete("/conversations/:conversationId", async (req, res, next) => {
-  try {
-    const current = await mutableConversationForUser(String(req.params.conversationId), req.auth!.id);
-    await prisma.copilotConversation.update({
-      data: { archivedAt: new Date(), deletedAt: new Date(), favorite: false, isFavorite: false, isPinned: false },
-      where: { id: current.id },
-    });
     res.status(204).send();
   } catch (error) {
     next(error);

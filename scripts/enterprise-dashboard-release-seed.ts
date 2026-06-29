@@ -277,7 +277,6 @@ async function main() {
     return {
       caseId: ecgCase.id,
       contextType: "case",
-      favorite: index % 8 === 0,
       id: `release-copilot-conversation-${padded(index + 1, 4)}`,
       patientId: ecgCase.patientId,
       tag: pick(["ECG Interpretation", "Clinical Summary", "Occupational Fitness", "Differential Diagnosis", "Follow-up"], index),
