@@ -64,8 +64,14 @@ for (const marker of [
   "AttachmentChip",
   "setAttachments",
   "attachmentIds",
-  "Voice input is not supported in this browser.",
-  "Microphone denied.",
+  "Voice input is not supported by this browser.",
+  "Microphone permission denied.",
+  "uploadingFiles",
+  "shareConversation",
+  "exportConversation",
+  "Export PDF",
+  "Export TXT",
+  "Share",
   "Unsupported format.",
   "File too large.",
   "📌",
@@ -76,7 +82,7 @@ for (const marker of [
 
 assert(conversationRoute.includes("useLocalSearchParams") && conversationRoute.includes("conversationId") && conversationRoute.includes("CopilotWorkspaceScreen"), "Dynamic /copilot/:conversationId route must restore workspace state.");
 
-for (const marker of ["CopilotAttachment", "isPinned", "isFavorite", "archivedAt", "lastOpenedAt", "@@index([isPinned])", "@@index([isFavorite])", "@@index([archivedAt])", "@@index([lastOpenedAt])"]) {
+for (const marker of ["CopilotAttachment", "isPinned", "isFavorite", "archivedAt", "deletedAt", "lastOpenedAt", "@@index([isPinned])", "@@index([isFavorite])", "@@index([archivedAt])", "@@index([deletedAt])", "@@index([lastOpenedAt])"]) {
   assert(schema.includes(marker), `Prisma schema missing copilot persistence marker: ${marker}`);
 }
 
@@ -90,8 +96,11 @@ for (const marker of [
   "prisma.eCGCase.findMany",
   "copilotRouter.post(\"/conversations/:conversationId/restore\"",
   "copilotRouter.patch(\"/conversations/:conversationId/rename\"",
+  "copilotRouter.post(\"/conversations/:conversationId/pin\"",
   "copilotRouter.patch(\"/conversations/:conversationId/pin\"",
+  "copilotRouter.post(\"/conversations/:conversationId/favorite\"",
   "copilotRouter.patch(\"/conversations/:conversationId/favorite\"",
+  "mutableConversationForUser",
   "renameConversationSchema",
   "pinConversationSchema",
   "favoriteConversationSchema",
@@ -100,18 +109,20 @@ for (const marker of [
   "copilotAttachment",
   "duplicate",
   "archivedAt: new Date()",
+  "deletedAt: new Date()",
   "archivedAt: null",
   "writeSse(res, \"token\"",
 ]) {
   assert(routes.includes(marker), `Copilot API stabilization marker missing: ${marker}`);
 }
 
-for (const marker of ["isPinned", "isFavorite", "archivedAt", "lastOpenedAt", "restoreCopilotConversation", "renameCopilotConversation", "pinCopilotConversation", "favoriteCopilotConversation", "uploadCopilotAttachment", "streamCopilotMessage"]) {
+for (const marker of ["isPinned", "isFavorite", "archivedAt", "deletedAt", "lastOpenedAt", "restoreCopilotConversation", "renameConversation", "togglePin", "toggleFavorite", "toggleArchive", "deleteConversation", "renameCopilotConversation", "pinCopilotConversation", "favoriteCopilotConversation", "uploadCopilotAttachment", "streamCopilotMessage"]) {
   assert(service.includes(marker), `Copilot service stabilization marker missing: ${marker}`);
 }
 
 assert(!workspace.includes("onPress={() => {}}"), "Workspace must not contain dead actions.");
 assert(!workspace.includes("title.replace(\" copy\""), "Rename action must not fake-copy titles.");
 assert(!routes.includes("[Archived]"), "Archive system must not rely on title prefixes.");
+assert(!routes.includes("setTimeout(resolve"), "Streaming must not rely on fake token delays.");
 
 console.log("AI Clinical Copilot stabilization integration checks passed.");

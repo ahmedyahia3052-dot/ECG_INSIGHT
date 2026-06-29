@@ -2425,6 +2425,7 @@ model CopilotConversation {
   isPinned   Boolean  @default(false)
   isFavorite Boolean  @default(false)
   archivedAt DateTime?
+  deletedAt  DateTime?
   lastOpenedAt DateTime?
   patientId   String?
   caseId      String?
@@ -2442,6 +2443,7 @@ model CopilotConversation {
   @@index([isPinned])
   @@index([isFavorite])
   @@index([archivedAt])
+  @@index([deletedAt])
   @@index([lastOpenedAt])
   @@index([updatedAt])
 }

@@ -63,6 +63,18 @@ async function main() {
       subscription: { create: { status: "ACTIVE", tier: "PROFESSIONAL" } },
     },
   });
+  const otherUser = await prisma.user.create({
+    data: {
+      avatarInitials: "OU",
+      email: `${prefix}+other@ecg.test`,
+      emailVerified: true,
+      isActive: true,
+      name: "Other Copilot Doctor",
+      passwordHash: await hashPassword("StrongPass123!"),
+      role: "DOCTOR",
+      subscription: { create: { status: "ACTIVE", tier: "PROFESSIONAL" } },
+    },
+  });
 
   const server = createServer(createApp());
   await new Promise<void>((resolve) => server.listen(0, resolve));
@@ -106,6 +118,12 @@ async function main() {
     });
     assert(login.status === 200 && Boolean(login.body.accessToken), "Doctor login must issue an access token.");
     const token = login.body.accessToken;
+    const otherLogin = await request<{ accessToken: string }>("/auth/login", {
+      body: { email: otherUser.email, password: "StrongPass123!", rememberMe: true },
+      method: "POST",
+    });
+    assert(otherLogin.status === 200 && Boolean(otherLogin.body.accessToken), "Second doctor login must issue an access token.");
+    const otherToken = otherLogin.body.accessToken;
 
     const created = await request<{ conversation: { id: string; title: string } }>("/copilot/conversations", {
       body: { contextType: "global", tag: "ECG Interpretation", title: "Enterprise workspace chat" },
@@ -115,14 +133,33 @@ async function main() {
     assert(created.status === 201, "Create chat must succeed.");
     const conversationId = created.body.conversation.id;
 
-    const renamed = await request<{ conversation: { isFavorite: boolean; isPinned: boolean; title: string } }>(`/copilot/conversations/${conversationId}`, {
-      body: { isFavorite: true, isPinned: true, title: "Renamed pinned favorite chat" },
+    const renamed = await request<{ conversation: { title: string } }>(`/copilot/conversations/${conversationId}/rename`, {
+      body: { title: "Renamed pinned favorite chat" },
       method: "PATCH",
       token,
     });
-    assert(renamed.status === 200, "Rename/pin/favorite must persist.");
+    assert(renamed.status === 200, "Rename endpoint must persist.");
     assert(renamed.body.conversation.title === "Renamed pinned favorite chat", "Rename did not persist.");
-    assert(renamed.body.conversation.isPinned && renamed.body.conversation.isFavorite, "Pin/favorite did not persist.");
+
+    const forbiddenRename = await request<{ code: string }>(`/copilot/conversations/${conversationId}/rename`, {
+      body: { title: "Unauthorized rename" },
+      method: "PATCH",
+      token: otherToken,
+    });
+    assert(forbiddenRename.status === 403, "Conversation actions must return 403 when another user owns the conversation.");
+
+    const missingRename = await request<{ code: string }>("/copilot/conversations/missing-conversation-id/rename", {
+      body: { title: "Missing rename" },
+      method: "PATCH",
+      token,
+    });
+    assert(missingRename.status === 404, "Missing conversation actions must return 404.");
+
+    const pinned = await request<{ conversation: { isPinned: boolean } }>(`/copilot/conversations/${conversationId}/pin`, { method: "POST", token });
+    assert(pinned.status === 200 && pinned.body.conversation.isPinned, "POST pin must toggle isPinned on.");
+
+    const favorited = await request<{ conversation: { isFavorite: boolean } }>(`/copilot/conversations/${conversationId}/favorite`, { method: "POST", token });
+    assert(favorited.status === 200 && favorited.body.conversation.isFavorite, "POST favorite must toggle isFavorite on.");
 
     const listed = await request<{ conversations: Array<{ id: string; isFavorite: boolean; isPinned: boolean; title: string }> }>("/copilot/conversations?q=Renamed", { token });
     assert(listed.status === 200 && listed.body.conversations.some((item) => item.id === conversationId && item.isPinned && item.isFavorite), "Search/list must restore persisted conversation state.");
@@ -162,8 +199,18 @@ async function main() {
     const archived = await request<{ conversation: { archivedAt?: string } }>(`/copilot/conversations/${conversationId}/archive`, { method: "POST", token });
     assert(archived.status === 200 && Boolean(archived.body.conversation.archivedAt), "Archive chat must persist.");
 
-    const restoredArchive = await request<{ conversation: { archivedAt?: string } }>(`/copilot/conversations/${conversationId}/restore`, { method: "POST", token });
-    assert(restoredArchive.status === 200 && !restoredArchive.body.conversation.archivedAt, "Restore archived chat must persist.");
+    const restoredArchive = await request<{ conversation: { archivedAt?: string } }>(`/copilot/conversations/${conversationId}/archive`, { method: "POST", token });
+    assert(restoredArchive.status === 200 && !restoredArchive.body.conversation.archivedAt, "Archive endpoint must toggle archived state off.");
+
+    const repinned = await request<{ conversation: { isPinned: boolean } }>(`/copilot/conversations/${conversationId}/pin`, { method: "POST", token });
+    assert(repinned.status === 200 && repinned.body.conversation.isPinned, "POST pin must toggle isPinned on after archive clears state.");
+    const unpinned = await request<{ conversation: { isPinned: boolean } }>(`/copilot/conversations/${conversationId}/pin`, { method: "POST", token });
+    assert(unpinned.status === 200 && !unpinned.body.conversation.isPinned, "POST pin must toggle isPinned off.");
+
+    const refavorited = await request<{ conversation: { isFavorite: boolean } }>(`/copilot/conversations/${conversationId}/favorite`, { method: "POST", token });
+    assert(refavorited.status === 200 && refavorited.body.conversation.isFavorite, "POST favorite must toggle isFavorite on after archive clears state.");
+    const unfavorited = await request<{ conversation: { isFavorite: boolean } }>(`/copilot/conversations/${conversationId}/favorite`, { method: "POST", token });
+    assert(unfavorited.status === 200 && !unfavorited.body.conversation.isFavorite, "POST favorite must toggle isFavorite off.");
 
     const duplicated = await request<{ conversation: { id: string } }>(`/copilot/conversations/${conversationId}/duplicate`, { method: "POST", token });
     assert(duplicated.status === 201 && duplicated.body.conversation.id !== conversationId, "Duplicate chat must create a new persisted conversation.");
@@ -171,7 +218,9 @@ async function main() {
     const deleted = await request<void>(`/copilot/conversations/${conversationId}`, { method: "DELETE", token });
     assert(deleted.status === 204, "Delete chat must succeed.");
     const missing = await request<{ code: string }>(`/copilot/conversations/${conversationId}`, { token });
-    assert(missing.status === 404, "Deleted chat must no longer restore by deep link.");
+    assert(missing.status === 404, "Soft-deleted chat must no longer restore by deep link.");
+    const softDeleted = await prisma.copilotConversation.findUnique({ where: { id: conversationId } });
+    assert(Boolean(softDeleted?.deletedAt), "Delete must be soft-delete and preserve the conversation row.");
   } finally {
     await new Promise<void>((resolve) => server.close(() => resolve()));
     await cleanup("copilot-enterprise-");

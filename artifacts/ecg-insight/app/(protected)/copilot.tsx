@@ -9,6 +9,8 @@ import { useAuth } from "@/context/AuthContext";
 import { listCases, listPatients } from "@/services/clinical";
 import {
   archiveCopilotConversation,
+  copilotExportTxtUrl,
+  copilotExportUrl,
   createCopilotConversation,
   deleteCopilotConversation,
   duplicateCopilotConversation,
@@ -73,6 +75,8 @@ const EMPTY_MESSAGES = [
   "Use the action bar above to inject a clinical workflow prompt into this persistent conversation.",
 ];
 
+const WORKSPACE_STATE_KEY = "ecg-insight:copilot-workspace-state";
+
 export default function CopilotRoute() {
   return <CopilotWorkspaceScreen />;
 }
@@ -99,6 +103,7 @@ export function CopilotWorkspaceScreen({ routeConversationId }: { routeConversat
   const [selectedId, setSelectedId] = useState<string | undefined>();
   const [streamingMessage, setStreamingMessage] = useState("");
   const [status, setStatus] = useState("");
+  const [uploadingFiles, setUploadingFiles] = useState<string[]>([]);
 
   const isMobile = width < 760;
   const isTablet = width >= 760 && width < 1120;
@@ -203,11 +208,14 @@ export function CopilotWorkspaceScreen({ routeConversationId }: { routeConversat
     if (currentCase?.id) formData.append("caseId", currentCase.id);
     if (selectedId) formData.append("conversationId", selectedId);
     try {
+      setUploadingFiles((current) => current.concat(file.name));
       const payload = await uploadCopilotAttachment(token, formData);
       setAttachments((current) => kind === "ecg" ? current.filter((item) => item.kind !== "ecg").concat(payload.attachment) : current.concat(payload.attachment));
       showActionNotice(`${payload.attachment.originalName} uploaded.`);
     } catch {
       showActionNotice("Upload failed.", "error");
+    } finally {
+      setUploadingFiles((current) => current.filter((item) => item !== file.name));
     }
   }, [attachments, currentCase, currentPatient, selectedId, showActionNotice, token]);
 
@@ -234,13 +242,13 @@ export function CopilotWorkspaceScreen({ routeConversationId }: { routeConversat
       return;
     }
     if (Platform.OS !== "web" || typeof window === "undefined") {
-      showActionNotice("Voice input is not supported in this browser.", "error");
+      showActionNotice("Voice input is not supported by this browser.", "error");
       return;
     }
     const speechWindow = window as SpeechWindow;
     const Recognition = speechWindow.SpeechRecognition ?? speechWindow.webkitSpeechRecognition;
     if (!Recognition) {
-      showActionNotice("Voice input is not supported in this browser.", "error");
+      showActionNotice("Voice input is not supported by this browser.", "error");
       return;
     }
     try {
@@ -257,7 +265,7 @@ export function CopilotWorkspaceScreen({ routeConversationId }: { routeConversat
       };
       recognition.onerror = (event) => {
         stopVoiceInput();
-        showActionNotice(event.error === "not-allowed" ? "Microphone denied." : "Upload failed.", "error");
+        showActionNotice(event.error === "not-allowed" ? "Microphone denied. Microphone permission denied." : "Voice input failed.", "error");
       };
       recognition.onend = () => setIsRecording(false);
       recognitionRef.current = recognition;
@@ -265,7 +273,7 @@ export function CopilotWorkspaceScreen({ routeConversationId }: { routeConversat
       setIsRecording(true);
       showActionNotice("Voice recording started.");
     } catch {
-      showActionNotice("Microphone denied.", "error");
+      showActionNotice("Microphone denied. Microphone permission denied.", "error");
     }
   }, [isRecording, showActionNotice, stopVoiceInput]);
 
@@ -432,6 +440,24 @@ export function CopilotWorkspaceScreen({ routeConversationId }: { routeConversat
   }, [routeConversationId, selectedId]);
 
   useEffect(() => {
+    if (routeConversationId || selectedId || typeof window === "undefined") return;
+    const rawState = window.localStorage.getItem(WORKSPACE_STATE_KEY);
+    if (!rawState) return;
+    try {
+      const saved = JSON.parse(rawState) as { contextOpen?: boolean; selectedId?: string };
+      if (saved.contextOpen !== undefined) setContextOpen(saved.contextOpen);
+      if (saved.selectedId) router.replace(`/copilot/${saved.selectedId}` as never);
+    } catch {
+      window.localStorage.removeItem(WORKSPACE_STATE_KEY);
+    }
+  }, [routeConversationId, router, selectedId]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    window.localStorage.setItem(WORKSPACE_STATE_KEY, JSON.stringify({ contextOpen, selectedId }));
+  }, [contextOpen, selectedId]);
+
+  useEffect(() => {
     if (!routeConversationId && selectedId) setSelectedId(undefined);
   }, [routeConversationId, selectedId]);
 
@@ -447,8 +473,15 @@ export function CopilotWorkspaceScreen({ routeConversationId }: { routeConversat
   }, [selectedConversation]);
 
   useEffect(() => {
+    if (typeof window !== "undefined" && selectedId && !streamingMessage) {
+      const savedScroll = Number(window.localStorage.getItem(`${WORKSPACE_STATE_KEY}:scroll:${selectedId}`));
+      if (Number.isFinite(savedScroll) && savedScroll > 0) {
+        scrollRef.current?.scrollTo({ animated: false, y: savedScroll });
+        return;
+      }
+    }
     scrollRef.current?.scrollToEnd({ animated: true });
-  }, [messages.length, streamingMessage]);
+  }, [messages.length, selectedId, streamingMessage]);
 
   function sendPrompt(prompt: string, tag: CopilotTag) {
     const trimmed = prompt.trim() || (attachments.length ? "Review the attached clinical files and summarize the relevant ECG, echo, labs, and document findings." : "");
@@ -498,6 +531,35 @@ export function CopilotWorkspaceScreen({ routeConversationId }: { routeConversat
 
   function continueGeneration() {
     sendPrompt("Continue the previous clinical answer with the same structure, context, citations, and safety caveats.", selectedConversation?.tag ?? "Clinical Summary");
+  }
+
+  function exportConversation(format: "pdf" | "txt") {
+    if (!selectedId || !token || typeof window === "undefined") {
+      showActionNotice("Select a conversation before exporting.", "error");
+      return;
+    }
+    const baseUrl = format === "pdf" ? copilotExportUrl(selectedId) : copilotExportTxtUrl(selectedId);
+    const separator = baseUrl.includes("?") ? "&" : "?";
+    window.open(`${baseUrl}${separator}token=${encodeURIComponent(token)}`, "_blank", "noopener,noreferrer");
+    showActionNotice(format === "pdf" ? "PDF export opened." : "TXT export opened.");
+  }
+
+  function shareConversation() {
+    if (!selectedId || !token || typeof window === "undefined") {
+      showActionNotice("Select a conversation before sharing.", "error");
+      return;
+    }
+    const url = `${copilotExportUrl(selectedId)}?token=${encodeURIComponent(token)}`;
+    const webNavigator = navigator as Navigator & { share?: (data: { title: string; url: string }) => Promise<void> };
+    if (webNavigator.share) {
+      void webNavigator.share({ title: "ECG Insight AI Copilot conversation", url }).then(() => showActionNotice("Share sheet opened.")).catch(() => showActionNotice("Share cancelled.", "error"));
+      return;
+    }
+    if ("clipboard" in navigator) {
+      void navigator.clipboard.writeText(url).then(() => showActionNotice("Share link copied."));
+      return;
+    }
+    showActionNotice("Share is not supported by this browser.", "error");
   }
 
   const sidebarVisible = !isMobile || mobileSidebarOpen;
@@ -605,12 +667,25 @@ export function CopilotWorkspaceScreen({ routeConversationId }: { routeConversat
               <HeaderTool disabled={!selectedConversation} icon="edit-2" label="Rename" onPress={() => openRenameDialog(selectedConversation)} />
               <HeaderTool disabled={!selectedConversation || pinMutation.isPending} icon="map-pin" label={selectedConversation?.isPinned ? "📌 Pinned" : "Pin"} onPress={() => selectedConversation && togglePin(selectedConversation)} />
               <HeaderTool disabled={!selectedConversation || favoriteMutation.isPending} icon="star" label={selectedConversation?.isFavorite ? "★ Favorite" : "Favorite"} onPress={() => selectedConversation && toggleFavorite(selectedConversation)} />
+              <HeaderTool disabled={!selectedId} icon="share-2" label="Share" onPress={shareConversation} />
+              <HeaderTool disabled={!selectedId} icon="download" label="Export PDF" onPress={() => exportConversation("pdf")} />
+              <HeaderTool disabled={!selectedId} icon="file" label="Export TXT" onPress={() => exportConversation("txt")} />
               <HeaderTool disabled={!messages.length || sendMutation.isPending} icon="refresh-cw" label="Regenerate" onPress={regenerateLastAnswer} />
               <HeaderTool disabled={!selectedId || sendMutation.isPending} icon="fast-forward" label="Continue" onPress={continueGeneration} />
             </View>
           </View>
 
-          <ScrollView contentContainerStyle={styles.messageList} ref={scrollRef} style={styles.messages}>
+          <ScrollView
+            contentContainerStyle={styles.messageList}
+            onScroll={({ nativeEvent }) => {
+              if (typeof window !== "undefined") {
+                window.localStorage.setItem(`${WORKSPACE_STATE_KEY}:scroll:${selectedId ?? "new"}`, String(nativeEvent.contentOffset.y));
+              }
+            }}
+            ref={scrollRef}
+            scrollEventThrottle={400}
+            style={styles.messages}
+          >
             {!messages.length && !streamingMessage ? (
               <View style={styles.emptyChat}>
                 <Text style={styles.emptyTitle}>Start a clinical conversation</Text>
@@ -640,6 +715,12 @@ export function CopilotWorkspaceScreen({ routeConversationId }: { routeConversat
                     onRemove={() => setAttachments((current) => current.filter((item) => item.id !== attachment.id))}
                   />
                 ))}
+              </View>
+            ) : null}
+            {uploadingFiles.length ? (
+              <View style={styles.uploadProgress}>
+                <Feather name="loader" size={13} color={medicalTheme.primary} />
+                <Text style={styles.uploadProgressText}>Uploading {uploadingFiles.join(", ")}...</Text>
               </View>
             ) : null}
             <View style={styles.inputRow}>
@@ -1014,6 +1095,8 @@ const styles = StyleSheet.create({
   topBar: { alignItems: "center", flexDirection: "row", flexWrap: "wrap", gap: 12, justifyContent: "space-between" },
   topButtons: { alignItems: "center", flexDirection: "row", gap: 8 },
   topTitleBlock: { alignItems: "center", flexDirection: "row", gap: 10 },
+  uploadProgress: { alignItems: "center", backgroundColor: "rgba(20,221,230,0.08)", borderColor: glassBorder, borderRadius: 999, borderWidth: 1, flexDirection: "row", gap: 8, paddingHorizontal: 10, paddingVertical: 7 },
+  uploadProgressText: { color: medicalTheme.text, fontSize: 11, fontWeight: "900" },
   userMessage: { alignSelf: "flex-end", backgroundColor: "rgba(14,51,69,0.98)", borderColor: "#1F7085" },
   workspaceTitle: { color: medicalTheme.text, fontSize: 26, fontWeight: "900", letterSpacing: -0.7 },
 });

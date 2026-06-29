@@ -201,6 +201,7 @@ function serializeConversation(conversation: {
   caseId: string | null;
   contextType: string | null;
   createdAt: Date;
+  deletedAt?: Date | null;
   favorite: boolean;
   id: string;
   isFavorite: boolean;
@@ -216,6 +217,7 @@ function serializeConversation(conversation: {
     caseId: conversation.caseId ?? undefined,
     contextType: conversation.contextType ?? undefined,
     createdAt: conversation.createdAt.toISOString(),
+    deletedAt: conversation.deletedAt?.toISOString() ?? undefined,
     favorite: conversation.isFavorite || conversation.favorite,
     id: conversation.id,
     isFavorite: conversation.isFavorite || conversation.favorite,
@@ -585,8 +587,15 @@ function classifyQuestion(question: string) {
 }
 
 async function conversationForUser(conversationId: string, userId: string) {
-  const conversation = await prisma.copilotConversation.findFirst({ where: { id: conversationId, userId } });
+  const conversation = await prisma.copilotConversation.findFirst({ where: { deletedAt: null, id: conversationId, userId } });
   if (!conversation) throw new AppError(404, "Copilot conversation not found.", "COPILOT_CONVERSATION_NOT_FOUND");
+  return conversation;
+}
+
+async function mutableConversationForUser(conversationId: string, userId: string) {
+  const conversation = await prisma.copilotConversation.findFirst({ where: { deletedAt: null, id: conversationId } });
+  if (!conversation) throw new AppError(404, "Copilot conversation not found.", "COPILOT_CONVERSATION_NOT_FOUND");
+  if (conversation.userId !== userId) throw new AppError(403, "You do not have access to this Copilot conversation.", "COPILOT_CONVERSATION_FORBIDDEN");
   return conversation;
 }
 
@@ -677,7 +686,6 @@ async function streamAssistantContent(content: string, res: { write: (chunk: str
   for (const chunk of chunks) {
     if (cancelled()) return;
     writeSse(res, "token", { token: chunk });
-    await new Promise((resolve) => setTimeout(resolve, 8));
   }
 }
 
@@ -800,6 +808,7 @@ copilotRouter.get("/conversations", async (req, res, next) => {
       orderBy: [{ isPinned: "desc" }, { lastOpenedAt: "desc" }, { updatedAt: "desc" }],
       take: 50,
       where: {
+        deletedAt: null,
         userId: req.auth!.id,
         ...(q
           ? {
@@ -869,9 +878,10 @@ copilotRouter.post("/conversations/:conversationId/duplicate", async (req, res, 
 
 copilotRouter.post("/conversations/:conversationId/archive", async (req, res, next) => {
   try {
-    const current = await conversationForUser(String(req.params.conversationId), req.auth!.id);
+    const current = await mutableConversationForUser(String(req.params.conversationId), req.auth!.id);
+    const archivedAt = current.archivedAt ? null : new Date();
     const conversation = await prisma.copilotConversation.update({
-      data: { archivedAt: new Date(), favorite: false, isFavorite: false, isPinned: false },
+      data: archivedAt ? { archivedAt, favorite: false, isFavorite: false, isPinned: false } : { archivedAt: null, lastOpenedAt: new Date() },
       where: { id: current.id },
     });
     res.json({ conversation: serializeConversation(conversation) });
@@ -882,7 +892,7 @@ copilotRouter.post("/conversations/:conversationId/archive", async (req, res, ne
 
 copilotRouter.post("/conversations/:conversationId/restore", async (req, res, next) => {
   try {
-    const current = await conversationForUser(String(req.params.conversationId), req.auth!.id);
+    const current = await mutableConversationForUser(String(req.params.conversationId), req.auth!.id);
     const conversation = await prisma.copilotConversation.update({
       data: { archivedAt: null, lastOpenedAt: new Date() },
       where: { id: current.id },
@@ -913,7 +923,7 @@ copilotRouter.get("/conversations/:conversationId", async (req, res, next) => {
 
 copilotRouter.patch("/conversations/:conversationId/rename", async (req, res, next) => {
   try {
-    const current = await conversationForUser(String(req.params.conversationId), req.auth!.id);
+    const current = await mutableConversationForUser(String(req.params.conversationId), req.auth!.id);
     const body = renameConversationSchema.parse(req.body);
     const conversation = await prisma.copilotConversation.update({
       data: { title: body.title },
@@ -925,9 +935,22 @@ copilotRouter.patch("/conversations/:conversationId/rename", async (req, res, ne
   }
 });
 
+copilotRouter.post("/conversations/:conversationId/pin", async (req, res, next) => {
+  try {
+    const current = await mutableConversationForUser(String(req.params.conversationId), req.auth!.id);
+    const conversation = await prisma.copilotConversation.update({
+      data: { isPinned: !current.isPinned },
+      where: { id: current.id },
+    });
+    res.json({ conversation: serializeConversation(conversation) });
+  } catch (error) {
+    next(error);
+  }
+});
+
 copilotRouter.patch("/conversations/:conversationId/pin", async (req, res, next) => {
   try {
-    const current = await conversationForUser(String(req.params.conversationId), req.auth!.id);
+    const current = await mutableConversationForUser(String(req.params.conversationId), req.auth!.id);
     const body = pinConversationSchema.parse(req.body);
     const conversation = await prisma.copilotConversation.update({
       data: { isPinned: body.isPinned },
@@ -939,9 +962,23 @@ copilotRouter.patch("/conversations/:conversationId/pin", async (req, res, next)
   }
 });
 
+copilotRouter.post("/conversations/:conversationId/favorite", async (req, res, next) => {
+  try {
+    const current = await mutableConversationForUser(String(req.params.conversationId), req.auth!.id);
+    const isFavorite = !(current.isFavorite || current.favorite);
+    const conversation = await prisma.copilotConversation.update({
+      data: { favorite: isFavorite, isFavorite },
+      where: { id: current.id },
+    });
+    res.json({ conversation: serializeConversation(conversation) });
+  } catch (error) {
+    next(error);
+  }
+});
+
 copilotRouter.patch("/conversations/:conversationId/favorite", async (req, res, next) => {
   try {
-    const current = await conversationForUser(String(req.params.conversationId), req.auth!.id);
+    const current = await mutableConversationForUser(String(req.params.conversationId), req.auth!.id);
     const body = favoriteConversationSchema.parse(req.body);
     const conversation = await prisma.copilotConversation.update({
       data: { favorite: body.isFavorite, isFavorite: body.isFavorite },
@@ -978,7 +1015,7 @@ copilotRouter.delete("/conversations/:conversationId/messages/:messageId", async
 
 copilotRouter.patch("/conversations/:conversationId", async (req, res, next) => {
   try {
-    const current = await conversationForUser(String(req.params.conversationId), req.auth!.id);
+    const current = await mutableConversationForUser(String(req.params.conversationId), req.auth!.id);
     const body = updateConversationSchema.parse(req.body);
     const conversation = await prisma.copilotConversation.update({
       data: { ...body, favorite: body.isFavorite ?? body.favorite },
@@ -992,8 +1029,11 @@ copilotRouter.patch("/conversations/:conversationId", async (req, res, next) => 
 
 copilotRouter.delete("/conversations/:conversationId", async (req, res, next) => {
   try {
-    const current = await conversationForUser(String(req.params.conversationId), req.auth!.id);
-    await prisma.copilotConversation.delete({ where: { id: current.id } });
+    const current = await mutableConversationForUser(String(req.params.conversationId), req.auth!.id);
+    await prisma.copilotConversation.update({
+      data: { archivedAt: new Date(), deletedAt: new Date(), favorite: false, isFavorite: false, isPinned: false },
+      where: { id: current.id },
+    });
     res.status(204).send();
   } catch (error) {
     next(error);

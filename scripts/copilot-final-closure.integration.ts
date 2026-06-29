@@ -66,7 +66,14 @@ for (const marker of [
   "Upload failed.",
   "Unsupported format.",
   "File too large.",
-  "Microphone denied.",
+  "Microphone permission denied.",
+  "Voice input is not supported by this browser.",
+  "uploadingFiles",
+  "Export PDF",
+  "Export TXT",
+  "Share",
+  "shareConversation",
+  "exportConversation",
 ]) {
   assert(workspace.includes(marker), `Enterprise workspace marker missing: ${marker}`);
 }
@@ -75,12 +82,13 @@ assert(!workspace.includes("quickGrid"), "Legacy quick action grid must be remov
 assert(!workspace.includes("conversationStrip"), "Legacy conversation strip must be removed.");
 assert(!workspace.includes("sidebarScroll"), "Nested sidebar scrolling must be removed.");
 
-for (const marker of ["streamCopilotMessage", "getCopilotConversation", "listCopilotConversations", "updateCopilotConversation", "deleteCopilotConversation", "uploadCopilotAttachment"]) {
+for (const marker of ["copilotExportTxtUrl", "copilotExportUrl", "streamCopilotMessage", "getCopilotConversation", "listCopilotConversations", "updateCopilotConversation", "deleteCopilotConversation", "uploadCopilotAttachment"]) {
   assert(copilotService.includes(marker), `Copilot service missing real workflow marker: ${marker}`);
 }
 
 for (const marker of ["retrieveClinicalContext", "Previous ECGs", "Documents:", "DISCLAIMER", "Confidence Score", "citations", "responseTimeMs", "copilotUsageEvent", "/chat/stream", "/attachments", "CopilotAttachment"]) {
   assert(copilotRoutes.includes(marker), `Copilot backend missing real context/safety/observability marker: ${marker}`);
 }
+assert(!copilotRoutes.includes("setTimeout(resolve"), "Copilot streaming must not use fake token delays.");
 
 console.log("AI Clinical Copilot final closure integration checks passed.");

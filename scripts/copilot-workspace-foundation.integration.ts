@@ -50,8 +50,18 @@ for (const marker of [
   "uploadComposerFile",
   "AttachmentChip",
   "attachmentIds",
-  "Voice input is not supported in this browser.",
-  "Microphone denied.",
+  "Voice input is not supported by this browser.",
+  "Microphone permission denied.",
+  "uploadingFiles",
+  "Uploading",
+  "shareConversation",
+  "exportConversation",
+  "Export PDF",
+  "Export TXT",
+  "Share",
+  "WORKSPACE_STATE_KEY",
+  "localStorage.setItem",
+  "localStorage.getItem",
   "Unsupported format.",
   "File too large.",
   "Drag & drop",
@@ -72,13 +82,15 @@ assert(dashboard.includes('label="Open AI Copilot"') && dashboard.includes('rout
 assert(enterpriseShell.includes('href: "/copilot"'), "Enterprise navigation must expose /copilot.");
 assert(!enterpriseShell.includes("<MedicalAICopilot"), "Enterprise shell must not mount the retired floating Copilot widget.");
 
-for (const marker of ["CopilotAttachment", "CopilotConversation", "CopilotMessage", "@@index([userId])", "@@index([conversationId])", "@@index([messageId])", "@@index([isPinned])", "@@index([isFavorite])", "@@index([archivedAt])"]) {
+for (const marker of ["CopilotAttachment", "CopilotConversation", "CopilotMessage", "@@index([userId])", "@@index([conversationId])", "@@index([messageId])", "@@index([isPinned])", "@@index([isFavorite])", "@@index([archivedAt])", "@@index([deletedAt])"]) {
   assert(prismaSchema.includes(marker), `Prisma copilot persistence model is missing marker: ${marker}`);
 }
 
 for (const marker of [
   'copilotRouter.get("/conversations"',
   'copilotRouter.post("/conversations"',
+  'copilotRouter.post("/conversations/:conversationId/pin"',
+  'copilotRouter.post("/conversations/:conversationId/favorite"',
   'copilotRouter.patch("/conversations/:conversationId"',
   'copilotRouter.delete("/conversations/:conversationId"',
   'copilotRouter.post("/chat/stream"',
@@ -92,7 +104,7 @@ for (const marker of [
   assert(copilotRoutes.includes(marker), `Copilot API is missing real CRUD/chat marker: ${marker}`);
 }
 
-for (const marker of ["createCopilotConversation", "renameCopilotConversation", "pinCopilotConversation", "favoriteCopilotConversation", "deleteCopilotConversation", "streamCopilotMessage", "uploadCopilotAttachment", "credentials: \"include\"", "X-CSRF-Token"]) {
+for (const marker of ["copilotExportTxtUrl", "copilotExportUrl", "createCopilotConversation", "renameConversation", "togglePin", "toggleFavorite", "toggleArchive", "deleteConversation", "renameCopilotConversation", "pinCopilotConversation", "favoriteCopilotConversation", "deleteCopilotConversation", "streamCopilotMessage", "uploadCopilotAttachment", "credentials: \"include\"", "X-CSRF-Token"]) {
   assert(copilotService.includes(marker), `Copilot frontend service is missing marker: ${marker}`);
 }
 

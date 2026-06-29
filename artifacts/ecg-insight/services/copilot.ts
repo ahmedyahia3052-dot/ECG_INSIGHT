@@ -7,6 +7,7 @@ export interface CopilotConversation {
   caseId?: string;
   contextType?: string;
   createdAt: string;
+  deletedAt?: string;
   favorite: boolean;
   id: string;
   isFavorite: boolean;
@@ -95,6 +96,10 @@ export async function updateCopilotConversation(accessToken: string, conversatio
 }
 
 export async function renameCopilotConversation(accessToken: string, conversationId: string, title: string) {
+  return renameConversation(accessToken, conversationId, title);
+}
+
+export async function renameConversation(accessToken: string, conversationId: string, title: string) {
   return apiRequest<{ conversation: CopilotConversation }>(`/copilot/conversations/${conversationId}/rename`, {
     accessToken,
     body: JSON.stringify({ title }),
@@ -103,22 +108,32 @@ export async function renameCopilotConversation(accessToken: string, conversatio
 }
 
 export async function pinCopilotConversation(accessToken: string, conversationId: string, isPinned: boolean) {
+  return togglePin(accessToken, conversationId, isPinned);
+}
+
+export async function togglePin(accessToken: string, conversationId: string, _isPinned?: boolean) {
   return apiRequest<{ conversation: CopilotConversation }>(`/copilot/conversations/${conversationId}/pin`, {
     accessToken,
-    body: JSON.stringify({ isPinned }),
-    method: "PATCH",
+    method: "POST",
   });
 }
 
 export async function favoriteCopilotConversation(accessToken: string, conversationId: string, isFavorite: boolean) {
+  return toggleFavorite(accessToken, conversationId, isFavorite);
+}
+
+export async function toggleFavorite(accessToken: string, conversationId: string, _isFavorite?: boolean) {
   return apiRequest<{ conversation: CopilotConversation }>(`/copilot/conversations/${conversationId}/favorite`, {
     accessToken,
-    body: JSON.stringify({ isFavorite }),
-    method: "PATCH",
+    method: "POST",
   });
 }
 
 export async function deleteCopilotConversation(accessToken: string, conversationId: string) {
+  return deleteConversation(accessToken, conversationId);
+}
+
+export async function deleteConversation(accessToken: string, conversationId: string) {
   return apiRequest<void>(`/copilot/conversations/${conversationId}`, { accessToken, method: "DELETE" });
 }
 
@@ -131,6 +146,10 @@ export async function duplicateCopilotConversation(accessToken: string, conversa
 }
 
 export async function archiveCopilotConversation(accessToken: string, conversationId: string) {
+  return toggleArchive(accessToken, conversationId);
+}
+
+export async function toggleArchive(accessToken: string, conversationId: string) {
   return apiRequest<{ conversation: CopilotConversation }>(`/copilot/conversations/${conversationId}/archive`, { accessToken, method: "POST" });
 }
 
