@@ -31,6 +31,12 @@ for (const marker of [
   "streamCopilotMessage",
   "selectedConversation?.title",
   "New Clinical Conversation",
+  "Voice",
+  "Camera",
+  "Upload Files",
+  "Upload Image",
+  "capture",
+  "analysisSummary",
 ]) {
   assert(workspace.includes(marker), `Simplified Copilot workspace marker missing: ${marker}`);
 }
@@ -39,7 +45,7 @@ for (const removed of ["Search Conversations", "Pinned Conversations", "Favorite
   assert(!workspace.includes(removed), `Simplified Copilot workspace still contains removed management UI: ${removed}`);
 }
 
-for (const marker of ["retrieveClinicalContext", "Previous ECGs", "Documents:", "DISCLAIMER", "Confidence Score", "citations", "responseTimeMs", "copilotUsageEvent", "/chat/stream", "/attachments", "automaticConversationTitle"]) {
+for (const marker of ["retrieveClinicalContext", "Previous ECGs", "Documents:", "DISCLAIMER", "Confidence Score", "citations", "responseTimeMs", "copilotUsageEvent", "/chat/stream", "/attachments", "automaticConversationTitle", "analyzeUploadedAttachment", "detectAttachmentDocumentType", "readBestEffortOcrText"]) {
   assert(copilotRoutes.includes(marker), `Copilot backend missing real chat/context marker: ${marker}`);
 }
 for (const removed of ["/rename", "/pin", "/favorite", "/archive", "/duplicate"]) {

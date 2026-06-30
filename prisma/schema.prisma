@@ -2466,6 +2466,13 @@ model CopilotAttachment {
   mimeType       String
   sizeBytes      Int
   storagePath    String
+  documentType   String?
+  extractedText  String?
+  analysisSummary String?
+  medicalAnalysis Json?
+  confidence     Float?
+  warnings       String[]
+  recommendations String[]
   createdAt      DateTime @default(now())
   conversation   CopilotConversation? @relation(fields: [conversationId], references: [id], onDelete: Cascade)
   message        CopilotMessage?      @relation(fields: [messageId], references: [id], onDelete: SetNull)
@@ -2476,6 +2483,7 @@ model CopilotAttachment {
   @@index([patientId])
   @@index([caseId])
   @@index([kind])
+  @@index([documentType])
   @@index([createdAt])
 }
 

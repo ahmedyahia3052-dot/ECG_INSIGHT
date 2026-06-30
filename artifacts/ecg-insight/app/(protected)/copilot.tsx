@@ -27,7 +27,7 @@ type WorkspacePrompt = {
   tag: CopilotTag;
 };
 
-type AttachmentKind = "ecg" | "echo" | "file" | "labs";
+type AttachmentKind = "camera" | "file" | "image";
 type SpeechRecognitionLike = {
   continuous: boolean;
   interimResults: boolean;
@@ -44,11 +44,10 @@ type SpeechWindow = Window & {
   webkitSpeechRecognition?: new () => SpeechRecognitionLike;
 };
 
-const ATTACHMENT_RULES: Record<AttachmentKind, { accept: string; extensions: string[]; maxBytes: number; multiple: boolean }> = {
-  ecg: { accept: ".jpg,.jpeg,.png,.pdf,image/jpeg,image/png,application/pdf", extensions: [".jpg", ".jpeg", ".png", ".pdf"], maxBytes: 25 * 1024 * 1024, multiple: false },
-  echo: { accept: ".jpg,.jpeg,.png,.pdf,image/jpeg,image/png,application/pdf", extensions: [".jpg", ".jpeg", ".png", ".pdf"], maxBytes: 25 * 1024 * 1024, multiple: false },
-  labs: { accept: ".csv,.jpg,.jpeg,.png,.pdf,text/csv,image/jpeg,image/png,application/pdf", extensions: [".csv", ".jpg", ".jpeg", ".png", ".pdf"], maxBytes: 20 * 1024 * 1024, multiple: false },
-  file: { accept: ".pdf,.docx,.txt,.csv,.jpg,.jpeg,.png,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain,text/csv,image/jpeg,image/png", extensions: [".csv", ".docx", ".jpg", ".jpeg", ".pdf", ".png", ".txt"], maxBytes: 20 * 1024 * 1024, multiple: true },
+const ATTACHMENT_RULES: Record<AttachmentKind, { accept: string; capture?: "environment"; extensions: string[]; maxBytes: number; multiple: boolean }> = {
+  camera: { accept: "image/*", capture: "environment", extensions: [".jpg", ".jpeg", ".png", ".webp"], maxBytes: 25 * 1024 * 1024, multiple: false },
+  file: { accept: ".pdf,.docx,.txt,.csv,.jpg,.jpeg,.png,.webp,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain,text/csv,image/jpeg,image/png,image/webp", extensions: [".csv", ".docx", ".jpg", ".jpeg", ".pdf", ".png", ".txt", ".webp"], maxBytes: 25 * 1024 * 1024, multiple: true },
+  image: { accept: "image/*,.jpg,.jpeg,.png,.webp", extensions: [".jpg", ".jpeg", ".png", ".webp"], maxBytes: 25 * 1024 * 1024, multiple: true },
 };
 
 const ACTIONS: WorkspacePrompt[] = [
@@ -158,11 +157,6 @@ export function CopilotWorkspaceScreen({ routeConversationId }: { routeConversat
       showActionNotice("File too large.", "error");
       return;
     }
-    if (kind === "ecg" && attachments.some((item) => item.kind === "ecg")) {
-      const replace = typeof window !== "undefined" ? window.confirm("An ECG is already attached. Replace it?") : false;
-      if (!replace) return;
-      setAttachments((current) => current.filter((item) => item.kind !== "ecg"));
-    }
     const formData = new FormData();
     formData.append("file", file);
     formData.append("kind", kind);
@@ -173,8 +167,8 @@ export function CopilotWorkspaceScreen({ routeConversationId }: { routeConversat
     try {
       setUploadingFiles((current) => current.concat(file.name));
       const payload = await uploadCopilotAttachment(token, formData);
-      setAttachments((current) => kind === "ecg" ? current.filter((item) => item.kind !== "ecg").concat(payload.attachment) : current.concat(payload.attachment));
-      showActionNotice(`${payload.attachment.originalName} uploaded.`);
+      setAttachments((current) => current.concat(payload.attachment));
+      showActionNotice(`${payload.attachment.originalName} analyzed as ${payload.attachment.documentType ?? "clinical document"}.`);
     } catch {
       showActionNotice("Upload failed.", "error");
     } finally {
@@ -191,6 +185,7 @@ export function CopilotWorkspaceScreen({ routeConversationId }: { routeConversat
     input.type = "file";
     input.accept = ATTACHMENT_RULES[kind].accept;
     input.multiple = ATTACHMENT_RULES[kind].multiple;
+    if (ATTACHMENT_RULES[kind].capture) input.setAttribute("capture", ATTACHMENT_RULES[kind].capture);
     input.onchange = () => {
       const files = Array.from(input.files ?? []);
       if (!files.length) return;
@@ -333,7 +328,7 @@ export function CopilotWorkspaceScreen({ routeConversationId }: { routeConversat
   }, [messages.length, selectedId, streamingMessage]);
 
   function sendPrompt(prompt: string, tag: CopilotTag) {
-    const trimmed = prompt.trim() || (attachments.length ? "Review the attached clinical files and summarize the relevant ECG, echo, labs, and document findings." : "");
+    const trimmed = prompt.trim() || (attachments.length ? "Review the attached medical files, perform OCR-informed analysis, identify document or image type, explain findings, cite trusted medical knowledge, provide warnings, and suggest next steps." : "");
     if (!trimmed || !token || sendMutation.isPending) return;
     sendMutation.mutate({ attachmentIds: attachments.map((attachment) => attachment.id), prompt: trimmed, tag });
   }
@@ -513,10 +508,9 @@ export function CopilotWorkspaceScreen({ routeConversationId }: { routeConversat
           <View style={styles.composer}>
             <View style={styles.attachmentRow}>
               <ComposerTool active={isRecording} icon="mic" label={isRecording ? "Stop Voice" : "Voice"} onPress={toggleVoiceInput} />
-              <ComposerTool icon="activity" label="Upload ECG" onPress={() => openFilePicker("ecg")} />
-              <ComposerTool icon="heart" label="Upload Echo" onPress={() => openFilePicker("echo")} />
-              <ComposerTool icon="clipboard" label="Upload Labs" onPress={() => openFilePicker("labs")} />
-              <ComposerTool icon="paperclip" label="Attach Files" onPress={() => openFilePicker("file")} />
+              <ComposerTool icon="camera" label="Camera" onPress={() => openFilePicker("camera")} />
+              <ComposerTool icon="paperclip" label="Upload Files" onPress={() => openFilePicker("file")} />
+              <ComposerTool icon="image" label="Upload Image" onPress={() => openFilePicker("image")} />
             </View>
             {attachments.length ? (
               <View style={styles.attachmentPanel}>
@@ -701,12 +695,20 @@ function MiniAction({ icon, label, onPress, tone }: { icon: keyof typeof Feather
 }
 
 function AttachmentChip({ attachment, onRemove }: { attachment: CopilotAttachment; onRemove?: () => void }) {
+  const findings = attachment.medicalAnalysis?.findings ?? [];
   return (
     <View style={styles.attachmentChip}>
-      <Feather name={attachment.kind === "ecg" ? "activity" : attachment.kind === "echo" ? "heart" : attachment.kind === "labs" ? "clipboard" : "paperclip"} size={13} color={medicalTheme.primary} />
+      <Feather name={attachment.kind === "camera" ? "camera" : attachment.kind === "image" ? "image" : attachment.kind === "ecg" ? "activity" : attachment.kind === "echo" ? "heart" : attachment.kind === "labs" ? "clipboard" : "paperclip"} size={13} color={medicalTheme.primary} />
       <View style={styles.attachmentChipText}>
         <Text numberOfLines={1} style={styles.attachmentName}>{attachment.originalName}</Text>
-        <Text style={styles.attachmentMeta}>{attachment.kind.toUpperCase()} • {formatFileSize(attachment.sizeBytes)}</Text>
+        <Text style={styles.attachmentMeta}>
+          {(attachment.documentType ?? attachment.kind).replace(/_/g, " ")} • {formatFileSize(attachment.sizeBytes)}
+          {attachment.confidence !== undefined ? ` • ${Math.round(attachment.confidence * 100)}% confidence` : ""}
+        </Text>
+        {attachment.analysisSummary ? <Text numberOfLines={2} style={styles.attachmentSummary}>{attachment.analysisSummary}</Text> : null}
+        {findings.length ? <Text numberOfLines={2} style={styles.attachmentSummary}>Findings: {findings.join("; ")}</Text> : null}
+        {attachment.warnings?.length ? <Text numberOfLines={2} style={styles.attachmentWarning}>Warnings: {attachment.warnings.join("; ")}</Text> : null}
+        {attachment.recommendations?.length ? <Text numberOfLines={2} style={styles.attachmentSummary}>Next steps: {attachment.recommendations.join("; ")}</Text> : null}
       </View>
       {onRemove ? (
         <Pressable accessibilityLabel={`Remove ${attachment.originalName}`} accessibilityRole="button" onPress={onRemove} style={styles.attachmentRemove}>
@@ -776,6 +778,8 @@ const styles = StyleSheet.create({
   attachmentPanel: { borderColor: "rgba(148,163,184,0.16)", borderRadius: 16, borderWidth: 1, flexDirection: "row", flexWrap: "wrap", gap: 8, padding: 8 },
   attachmentRemove: { alignItems: "center", backgroundColor: "rgba(239,68,68,0.18)", borderRadius: 999, height: 22, justifyContent: "center", width: 22 },
   attachmentRow: { alignItems: "center", flexDirection: "row", flexWrap: "wrap", gap: 8 },
+  attachmentSummary: { color: medicalTheme.muted, fontSize: 10, fontWeight: "700", lineHeight: 14, marginTop: 3 },
+  attachmentWarning: { color: medicalTheme.warning, fontSize: 10, fontWeight: "800", lineHeight: 14, marginTop: 3 },
   avatarGlow: { alignItems: "center", backgroundColor: "rgba(20,221,230,0.12)", borderColor: "rgba(20,221,230,0.35)", borderRadius: 16, borderWidth: 1, height: 44, justifyContent: "center", shadowColor: medicalTheme.primary, shadowOpacity: 0.3, shadowRadius: 18, width: 44 },
   chatHeader: { alignItems: "center", borderBottomColor: glassBorder, borderBottomWidth: 1, flexDirection: "row", flexWrap: "wrap", gap: 12, justifyContent: "space-between", paddingBottom: 12 },
   chatHeaderMain: { flex: 1, minWidth: 0 },

@@ -23,18 +23,32 @@ export interface CopilotCitation {
 }
 
 export interface CopilotAttachment {
+  analysisSummary?: string;
   caseId?: string;
+  confidence?: number;
   conversationId?: string;
   createdAt: string;
+  documentType?: string;
   downloadUrl: string;
+  extractedText?: string;
   id: string;
-  kind: "ecg" | "echo" | "file" | "labs";
+  kind: "camera" | "ecg" | "echo" | "file" | "image" | "labs";
+  medicalAnalysis?: {
+    documentType?: string;
+    findings?: string[];
+    hasReadableText?: boolean;
+    mimeType?: string;
+    originalName?: string;
+    sizeBytes?: number;
+  };
   messageId?: string;
   mimeType: string;
   originalName: string;
   patientId?: string;
+  recommendations?: string[];
   sizeBytes: number;
   storedName: string;
+  warnings?: string[];
 }
 
 export interface CopilotMessage {

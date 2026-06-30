@@ -104,6 +104,32 @@ async function main() {
     return { body: body as T, response, status: response.status };
   }
 
+  async function uploadAttachment(kind: "camera" | "file" | "image", fileName: string, mimeType: string, content: string, token: string) {
+    const formData = new FormData();
+    formData.append("kind", kind);
+    formData.append("contextType", "global");
+    formData.append("file", new Blob([content], { type: mimeType }), fileName);
+    const response = await fetch(`${baseUrl}/copilot/attachments`, {
+      body: formData,
+      headers: { authorization: `Bearer ${token}` },
+      method: "POST",
+    });
+    const body = await response.json() as {
+      attachment: {
+        analysisSummary?: string;
+        confidence?: number;
+        documentType?: string;
+        extractedText?: string;
+        id: string;
+        kind: string;
+        medicalAnalysis?: { findings?: string[] };
+        recommendations?: string[];
+        warnings?: string[];
+      };
+    };
+    return { body, status: response.status };
+  }
+
   try {
     const login = await request<{ accessToken: string }>("/auth/login", {
       body: { email: user.email, password: "StrongPass123!", rememberMe: true },
@@ -126,9 +152,27 @@ async function main() {
     assert(emptyConversation.status === 201, "New Chat placeholder conversation must be creatable.");
     assert(emptyConversation.body.conversation.title === "New Clinical Conversation", "Empty new chat must use default title.");
 
+    const cameraCapture = await uploadAttachment("camera", "skin-rash-camera.jpg", "image/jpeg", "skin rash lesion medication image from mobile camera", token);
+    const medicalImage = await uploadAttachment("image", "chest-xray-image.png", "image/png", "chest x-ray opacity radiograph follow up", token);
+    const clinicalFile = await uploadAttachment("file", "lab-report.txt", "text/plain", "Troponin: 0.42 Creatinine: 1.4 Potassium: 5.7 ECG irregular rhythm", token);
+    for (const upload of [cameraCapture, medicalImage, clinicalFile]) {
+      assert(upload.status === 201 && Boolean(upload.body.attachment.id), "Medical attachment upload must persist.");
+      assert(Boolean(upload.body.attachment.documentType), "Upload must detect document type.");
+      assert(Boolean(upload.body.attachment.analysisSummary), "Upload must generate medical analysis summary.");
+      assert((upload.body.attachment.confidence ?? 0) >= 0.55, "Upload must include analysis confidence.");
+      assert((upload.body.attachment.warnings?.length ?? 0) > 0, "Upload must include safety warnings.");
+      assert((upload.body.attachment.recommendations?.length ?? 0) > 0, "Upload must include next-step recommendations.");
+    }
+    assert(clinicalFile.body.attachment.extractedText?.includes("Troponin"), "Text clinical files must persist OCR extracted text.");
+
     const firstQuestion = "Interpret this ECG showing irregular rhythm and AF";
     const firstStream = await fetch(`${baseUrl}/copilot/chat/stream`, {
-      body: JSON.stringify({ contextType: "global", question: firstQuestion, tag: "ECG Interpretation" }),
+      body: JSON.stringify({
+        attachmentIds: [cameraCapture.body.attachment.id, medicalImage.body.attachment.id, clinicalFile.body.attachment.id],
+        contextType: "global",
+        question: firstQuestion,
+        tag: "ECG Interpretation",
+      }),
       headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
       method: "POST",
     });
@@ -159,11 +203,15 @@ async function main() {
     assert(continued.status === 201, "Sending another message to an existing chat must succeed.");
     assert(continuedEvents.some((event) => event.event === "done"), "Continuation stream must finish before restore assertions.");
 
-    const restoredFirst = await request<{ conversation: { id: string; title: string }; messages: Array<{ content: string; role: string }> }>(`/copilot/conversations/${firstConversation.id}`, { token });
+    const restoredFirst = await request<{ conversation: { id: string; title: string }; messages: Array<{ attachments?: Array<{ analysisSummary?: string; documentType?: string; extractedText?: string; kind: string; warnings?: string[] }>; content: string; role: string }> }>(`/copilot/conversations/${firstConversation.id}`, { token });
     assert(restoredFirst.status === 200 && restoredFirst.body.conversation.id === firstConversation.id, "Refresh/deep-link restore must return the first conversation.");
     assert(restoredFirst.body.conversation.title === firstConversation.title, "Existing chat title must remain stable after later messages.");
     assert(restoredFirst.body.messages.filter((message) => message.role === "user").length === 2, "First conversation history must restore all user messages.");
     assert(restoredFirst.body.messages.some((message) => message.content.includes("anticoagulation")), "First conversation must restore later history.");
+    const restoredAttachments = restoredFirst.body.messages.flatMap((message) => message.attachments ?? []);
+    assert(restoredAttachments.some((attachment) => attachment.kind === "camera" && attachment.documentType), "Camera capture must restore with document type.");
+    assert(restoredAttachments.some((attachment) => attachment.kind === "image" && attachment.analysisSummary), "Medical image upload must restore analysis summary.");
+    assert(restoredAttachments.some((attachment) => attachment.kind === "file" && attachment.extractedText?.includes("Troponin")), "Clinical file upload must restore OCR text.");
 
     const restoredSecond = await request<{ conversation: { id: string; title: string }; messages: Array<{ content: string; role: string }> }>(`/copilot/conversations/${secondConversation.id}`, { token });
     assert(restoredSecond.status === 200 && restoredSecond.body.conversation.id === secondConversation.id, "Switching to second chat must restore its history.");

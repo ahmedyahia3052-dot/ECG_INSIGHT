@@ -83,12 +83,12 @@ async function main() {
     return { token: body.accessToken, user: body.user };
   }
 
-  const admin = await login(superUser.email);
   const doctor = await login(doctorUser.email);
 
   let response = await request("/super-admin/dashboard", { token: doctor.token });
   assert(response.status === 403, "Non-super-admin should not access dashboard.");
 
+  let admin = await login(superUser.email);
   response = await request("/super-admin/dashboard", { token: admin.token });
   assert(response.status === 200, "Super admin dashboard should be accessible.");
   assert((response.body as { dashboard: { totalUsers: number } }).dashboard.totalUsers >= 2, "Dashboard total users missing.");
@@ -97,6 +97,7 @@ async function main() {
   assert(response.status === 200, "Public plan list should load.");
   assert(!(response.body as { plans: Array<{ code: string }> }).plans.some((plan) => plan.code === "lifetime"), "Lifetime must be hidden from public plans.");
 
+  admin = await login(superUser.email);
   response = await request("/subscriptions/plans", { token: admin.token });
   assert(response.status === 200, "Super admin plan list should load.");
   assert((response.body as { plans: Array<{ code: string }> }).plans.some((plan) => plan.code === "lifetime"), "Super admin should be able to inspect internal lifetime plan.");

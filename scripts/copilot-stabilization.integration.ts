@@ -31,6 +31,12 @@ for (const marker of [
   "messages.map",
   "scrollToEnd",
   "WORKSPACE_STATE_KEY",
+  "Voice",
+  "Camera",
+  "Upload Files",
+  "Upload Image",
+  "environment",
+  "analysisSummary",
 ]) {
   assert(workspace.includes(marker), `Workspace simplified-chat marker missing: ${marker}`);
 }
@@ -56,6 +62,10 @@ for (const marker of [
   "orderBy: { updatedAt: \"desc\" }",
   "copilotRouter.post(\"/chat/stream\"",
   "copilotRouter.get(\"/conversations/:conversationId\"",
+  "analyzeUploadedAttachment",
+  "detectAttachmentDocumentType",
+  "readBestEffortOcrText",
+  "medicalAnalysis",
 ]) {
   assert(routes.includes(marker), `Copilot backend simplified-chat marker missing: ${marker}`);
 }

@@ -28,7 +28,7 @@ const attachmentRoot = path.resolve(process.cwd(), "uploads", "copilot");
 fs.mkdirSync(attachmentRoot, { recursive: true });
 
 type Citation = { id: string; label: string; source: string; tags?: string[]; type: string };
-type AttachmentKind = "ecg" | "echo" | "labs" | "file";
+type AttachmentKind = "camera" | "ecg" | "echo" | "file" | "image" | "labs";
 
 type ClinicalContext = {
   criticalAlerts: string[];
@@ -85,7 +85,7 @@ const createConversationSchema = contextSchema.extend({
   title: z.string().trim().min(1).max(60).default("New Clinical Conversation"),
 });
 
-const attachmentKinds = ["ecg", "echo", "labs", "file"] as const;
+const attachmentKinds = ["camera", "ecg", "echo", "labs", "file", "image"] as const;
 const attachmentSchema = z.object({
   attachmentIds: z.array(z.string().trim().min(1)).max(12).default([]),
 });
@@ -109,6 +109,11 @@ const settingsSchema = z.object({
 });
 
 const attachmentRules: Record<AttachmentKind, { extensions: Set<string>; maxBytes: number; mime: Set<string> }> = {
+  camera: {
+    extensions: new Set([".jpg", ".jpeg", ".png", ".webp"]),
+    maxBytes: 25 * 1024 * 1024,
+    mime: new Set(["image/jpeg", "image/jpg", "image/png", "image/webp"]),
+  },
   ecg: {
     extensions: new Set([".jpg", ".jpeg", ".png", ".pdf"]),
     maxBytes: 25 * 1024 * 1024,
@@ -125,9 +130,14 @@ const attachmentRules: Record<AttachmentKind, { extensions: Set<string>; maxByte
     mime: new Set(["application/pdf", "image/jpeg", "image/jpg", "image/png", "text/csv", "application/vnd.ms-excel"]),
   },
   file: {
-    extensions: new Set([".csv", ".docx", ".jpg", ".jpeg", ".pdf", ".png", ".txt"]),
+    extensions: new Set([".csv", ".docx", ".jpg", ".jpeg", ".pdf", ".png", ".txt", ".webp"]),
     maxBytes: 20 * 1024 * 1024,
-    mime: new Set(["application/pdf", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "image/jpeg", "image/jpg", "image/png", "text/csv", "text/plain"]),
+    mime: new Set(["application/pdf", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "image/jpeg", "image/jpg", "image/png", "image/webp", "text/csv", "text/plain"]),
+  },
+  image: {
+    extensions: new Set([".jpg", ".jpeg", ".png", ".webp"]),
+    maxBytes: 25 * 1024 * 1024,
+    mime: new Set(["image/jpeg", "image/jpg", "image/png", "image/webp"]),
   },
 };
 
@@ -137,6 +147,112 @@ function safeAttachmentName(originalName: string) {
     throw new AppError(400, "Unsupported format.", "UNSUPPORTED_FORMAT");
   }
   return `${Date.now()}-${randomUUID()}${ext}`;
+}
+
+function readBestEffortOcrText(filePath: string) {
+  const buffer = fs.readFileSync(filePath);
+  const printable = buffer
+    .toString("latin1")
+    .replace(/[^\x20-\x7E\r\n]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  return printable.length > 40 ? printable.slice(0, 12000) : "";
+}
+
+function detectAttachmentDocumentType(input: { kind: AttachmentKind; mimeType: string; originalName: string; text: string }) {
+  const haystack = `${input.kind} ${input.mimeType} ${input.originalName} ${input.text}`.toLowerCase();
+  if (/ecg|ekg|qrs|qtc|pr interval|st elevation|st depression|rhythm/.test(haystack)) return "ECG";
+  if (/echo|echocardiography|ejection fraction|\bef\b|valvular|ventricle/.test(haystack)) return "ECHO_REPORT";
+  if (/troponin|hba1c|creatinine|hemoglobin|lipid|laboratory|lab|cbc|potassium|sodium/.test(haystack)) return "LAB_REPORT";
+  if (/x[\s-]?ray|radiograph|chest xray|cxr/.test(haystack)) return "XRAY";
+  if (/\bct\b|computed tomography/.test(haystack)) return "CT_REPORT";
+  if (/\bmri\b|magnetic resonance/.test(haystack)) return "MRI_REPORT";
+  if (/medication|tablet|capsule|dose|prescription|drug|pharmacy/.test(haystack)) return "MEDICATION_IMAGE";
+  if (/skin|rash|lesion|wound|dermatology|mole/.test(haystack)) return "SKIN_IMAGE";
+  if (input.mimeType.startsWith("image/")) return input.kind === "camera" ? "CAMERA_IMAGE" : "MEDICAL_IMAGE";
+  if (input.mimeType === "application/pdf") return "CLINICAL_PDF";
+  return "CLINICAL_DOCUMENT";
+}
+
+function analyzeAttachment(input: { documentType: string; kind: AttachmentKind; mimeType: string; originalName: string; sizeBytes: number; text: string }) {
+  const text = `${input.originalName} ${input.text}`.toLowerCase();
+  const findings = new Set<string>();
+  const warnings = new Set<string>([DISCLAIMER]);
+  const recommendations = new Set<string>(["Physician review and correlation with the full clinical record are required."]);
+
+  if (/st elevation|stemi|acute mi/.test(text)) {
+    findings.add("Possible acute ischemic ECG language detected.");
+    warnings.add("Possible STEMI or acute coronary syndrome language requires urgent clinician review.");
+    recommendations.add("Compare with prior ECGs and activate local emergency pathway if clinically consistent.");
+  }
+  if (/atrial fibrillation|\baf\b|irregular/.test(text)) {
+    findings.add("Atrial fibrillation or irregular rhythm language detected.");
+    recommendations.add("Assess hemodynamic stability, stroke risk, bleeding risk, and reversible triggers.");
+  }
+  if (/troponin|creatinine|hba1c|potassium|hemoglobin/.test(text)) {
+    findings.add("Laboratory markers were detected.");
+    recommendations.add("Trend abnormal labs and correlate with symptoms, medications, renal function, and ECG findings.");
+  }
+  if (/ejection fraction|\bef\b|valvular|hypokinesia/.test(text)) {
+    findings.add("Echo/cardiac function findings were detected.");
+    recommendations.add("Correlate with symptoms, ECG, prior echo, and cardiology plan.");
+  }
+  if (/x[\s-]?ray|ct|mri|radiograph|opacity|fracture|infiltrate/.test(text)) {
+    findings.add("Radiology report language was detected.");
+    recommendations.add("Review the original imaging report and urgent findings with the responsible clinician.");
+  }
+  if (/medication|dose|tablet|capsule|prescription/.test(text)) {
+    findings.add("Medication-related content was detected.");
+    warnings.add("Do not start, stop, or adjust medications from AI output alone.");
+    recommendations.add("Verify drug name, dose, allergies, renal function, interactions, and prescribing indication.");
+  }
+  if (/skin|rash|lesion|wound|mole/.test(text)) {
+    findings.add("Skin/dermatology image context was detected.");
+    recommendations.add("Assess lesion evolution, infection signs, systemic symptoms, and need for in-person examination.");
+  }
+  if (!findings.size && input.mimeType.startsWith("image/")) {
+    findings.add(`${input.documentType.replace(/_/g, " ")} uploaded for medical image review.`);
+    recommendations.add("Use the image as context for a physician-led interpretation; verify quality, laterality, labels, and patient identity.");
+  }
+  if (!findings.size) {
+    findings.add(`${input.documentType.replace(/_/g, " ")} uploaded and indexed for clinical chat context.`);
+  }
+
+  const hasReadableText = input.text.length > 40;
+  const confidence = Math.min(0.92, Math.max(0.55, 0.58 + (hasReadableText ? 0.16 : 0) + (findings.size * 0.04)));
+  return {
+    analysisSummary: `${input.documentType.replace(/_/g, " ")} analyzed: ${Array.from(findings).join(" ")}`,
+    confidence,
+    medicalAnalysis: {
+      documentType: input.documentType,
+      findings: Array.from(findings),
+      hasReadableText,
+      mimeType: input.mimeType,
+      originalName: input.originalName,
+      sizeBytes: input.sizeBytes,
+    } as Prisma.InputJsonObject,
+    recommendations: Array.from(recommendations),
+    warnings: Array.from(warnings),
+  };
+}
+
+function analyzeUploadedAttachment(file: Express.Multer.File, kind: AttachmentKind) {
+  const extractedText = readBestEffortOcrText(file.path);
+  const documentType = detectAttachmentDocumentType({
+    kind,
+    mimeType: file.mimetype,
+    originalName: file.originalname,
+    text: extractedText,
+  });
+  const analysis = analyzeAttachment({
+    documentType,
+    kind,
+    mimeType: file.mimetype,
+    originalName: file.originalname,
+    sizeBytes: file.size,
+    text: extractedText,
+  });
+  return { documentType, extractedText, ...analysis };
 }
 
 const attachmentStorage = multer.diskStorage({
@@ -208,31 +324,45 @@ function serializeConversation(conversation: {
 }
 
 function serializeAttachment(attachment: {
+  analysisSummary?: string | null;
   caseId: string | null;
+  confidence?: number | null;
   conversationId: string | null;
   createdAt: Date;
+  documentType?: string | null;
+  extractedText?: string | null;
   id: string;
   kind: string;
+  medicalAnalysis?: Prisma.JsonValue | null;
   messageId: string | null;
   mimeType: string;
   originalName: string;
   patientId: string | null;
+  recommendations?: string[];
   sizeBytes: number;
   storedName: string;
+  warnings?: string[];
 }) {
   return {
+    analysisSummary: attachment.analysisSummary ?? undefined,
     caseId: attachment.caseId ?? undefined,
+    confidence: attachment.confidence ?? undefined,
     conversationId: attachment.conversationId ?? undefined,
     createdAt: attachment.createdAt.toISOString(),
+    documentType: attachment.documentType ?? undefined,
     downloadUrl: `/api/copilot/attachments/${attachment.id}/download`,
+    extractedText: attachment.extractedText ?? undefined,
     id: attachment.id,
     kind: attachment.kind,
+    medicalAnalysis: attachment.medicalAnalysis ?? undefined,
     messageId: attachment.messageId ?? undefined,
     mimeType: attachment.mimeType,
     originalName: attachment.originalName,
     patientId: attachment.patientId ?? undefined,
+    recommendations: attachment.recommendations ?? [],
     sizeBytes: attachment.sizeBytes,
     storedName: attachment.storedName,
+    warnings: attachment.warnings ?? [],
   };
 }
 
@@ -658,7 +788,16 @@ async function executeCopilotChat(input: ChatInput, userId: string, started = Da
   const clinicalContext = await retrieveClinicalContext({ caseId: input.caseId ?? conversation.caseId ?? undefined, patientId: input.patientId ?? conversation.patientId ?? undefined });
   const knowledge = await retrieveKnowledge(input.question, clinicalContext);
   const attachmentContext = userMessage.attachments.length
-    ? `\nAttachments: ${userMessage.attachments.map((attachment) => `${attachment.kind.toUpperCase()} ${attachment.originalName} (${attachment.mimeType}, ${attachment.sizeBytes} bytes)`).join(" | ")}`
+    ? `\nAttachments:\n${userMessage.attachments.map((attachment) => [
+        `${attachment.kind.toUpperCase()} ${attachment.originalName}`,
+        `Type: ${attachment.documentType ?? "CLINICAL_DOCUMENT"}`,
+        `MIME: ${attachment.mimeType}; size ${attachment.sizeBytes} bytes`,
+        attachment.analysisSummary ? `Analysis: ${attachment.analysisSummary}` : undefined,
+        attachment.extractedText ? `OCR text: ${attachment.extractedText.slice(0, 1200)}` : "OCR text: no embedded text extracted; use image/document metadata and clinician review.",
+        attachment.recommendations.length ? `Suggested next steps: ${attachment.recommendations.join("; ")}` : undefined,
+        attachment.warnings.length ? `Warnings: ${attachment.warnings.join("; ")}` : undefined,
+        attachment.confidence ? `Attachment analysis confidence: ${Math.round(attachment.confidence * 100)}%` : undefined,
+      ].filter(Boolean).join(" | ")).join("\n")}`
     : "";
   const enrichedQuestion = `${input.question}${attachmentContext}`;
   const prompt = buildPrompt(enrichedQuestion, clinicalContext, knowledge.hits);
@@ -749,18 +888,26 @@ copilotRouter.post("/attachments", requireRole("DOCTOR"), uploadAttachment.singl
     if (body.patientId) assertResourceAccess(await canAccessPatient(body.patientId, req.auth!));
     if (body.caseId) assertResourceAccess(await canAccessCase(body.caseId, req.auth!));
     if (body.conversationId) await conversationForUser(body.conversationId, req.auth!.id);
+    const analysis = analyzeUploadedAttachment(req.file, body.kind);
     const attachment = await prisma.copilotAttachment.create({
       data: {
+        analysisSummary: analysis.analysisSummary,
         caseId: body.caseId,
+        confidence: analysis.confidence,
         conversationId: body.conversationId,
+        documentType: analysis.documentType,
+        extractedText: analysis.extractedText,
         kind: body.kind,
+        medicalAnalysis: analysis.medicalAnalysis,
         mimeType: req.file.mimetype,
         originalName: req.file.originalname,
         patientId: body.patientId,
+        recommendations: analysis.recommendations,
         sizeBytes: req.file.size,
         storagePath: req.file.path,
         storedName: req.file.filename,
         userId: req.auth!.id,
+        warnings: analysis.warnings,
       },
     });
     await prisma.auditLog.create({
@@ -770,8 +917,8 @@ copilotRouter.post("/attachments", requireRole("DOCTOR"), uploadAttachment.singl
         caseId: body.caseId,
         entityId: attachment.id,
         entityType: "CopilotAttachment",
-        message: `Copilot ${body.kind} attachment uploaded: ${attachment.originalName}.`,
-        metadata: { kind: body.kind, mimeType: attachment.mimeType, sizeBytes: attachment.sizeBytes },
+        message: `Copilot ${body.kind} attachment uploaded and analyzed: ${attachment.originalName}.`,
+        metadata: { documentType: attachment.documentType, kind: body.kind, mimeType: attachment.mimeType, sizeBytes: attachment.sizeBytes },
         patientId: body.patientId,
       },
     }).catch(() => undefined);
