@@ -6,6 +6,7 @@ import { Badge, Card, EmptyState, Field, formatDate, medicalTheme, PageSection, 
 import { useAuth } from "@/context/AuthContext";
 import { apiRequest } from "@/services/api";
 import { grantOwnerLicense, listLicenses, updateOwnerLicense, type LicenseRecord, type SubscriptionPlanCode } from "@/services/subscriptions";
+import { safeArray } from "@/utils/collections";
 
 type UserOption = { email: string; id: string; name: string; username?: string };
 type LicenseAction = "extend" | "resume" | "revoke" | "suspend";
@@ -57,11 +58,11 @@ export default function OwnerLicensesScreen() {
     },
   });
 
-  const licenses = licensesQuery.data?.licenses ?? [];
+  const licenses = safeArray(licensesQuery.data?.licenses);
   const filteredLicenses = useMemo(() => {
     const needle = query.trim().toLowerCase();
     if (!needle) return licenses;
-    return licenses.filter((license) => [license.userName, license.email, license.username, license.status, license.subscriptionType].filter(Boolean).join(" ").toLowerCase().includes(needle));
+    return safeArray(licenses).filter((license) => [license.userName, license.email, license.username, license.status, license.subscriptionType].filter(Boolean).join(" ").toLowerCase().includes(needle));
   }, [licenses, query]);
 
   if (!isOwner) {
@@ -77,9 +78,9 @@ export default function OwnerLicensesScreen() {
 
       <View style={styles.stats}>
         <StatCard icon="award" label="Total Licenses" value={String(licenses.length)} />
-        <StatCard icon="check-circle" label="Active Licenses" tone="success" value={String(licenses.filter((item) => item.status === "ACTIVE").length)} />
-        <StatCard icon="refresh-cw" label="Lifetime Licenses" value={String(licenses.filter((item) => item.subscriptionType.toLowerCase().includes("lifetime")).length)} />
-        <StatCard icon="alert-circle" label="Expired Licenses" tone="warning" value={String(licenses.filter((item) => item.status === "EXPIRED").length)} />
+        <StatCard icon="check-circle" label="Active Licenses" tone="success" value={String(safeArray(licenses).filter((item) => item.status === "ACTIVE").length)} />
+        <StatCard icon="refresh-cw" label="Lifetime Licenses" value={String(safeArray(licenses).filter((item) => item.subscriptionType.toLowerCase().includes("lifetime")).length)} />
+        <StatCard icon="alert-circle" label="Expired Licenses" tone="warning" value={String(safeArray(licenses).filter((item) => item.status === "EXPIRED").length)} />
       </View>
 
       <Card style={styles.form}>
@@ -100,7 +101,7 @@ export default function OwnerLicensesScreen() {
 
       <Card style={styles.form}>
         <SectionHeader title="Users" subtitle="Select a user to grant access." />
-        {(usersQuery.data?.users ?? []).filter((item) => !query || [item.name, item.email, item.username].filter(Boolean).join(" ").toLowerCase().includes(query.toLowerCase())).slice(0, 10).map((item) => (
+        {safeArray(usersQuery.data?.users).filter((item) => !query || [item.name, item.email, item.username].filter(Boolean).join(" ").toLowerCase().includes(query.toLowerCase())).slice(0, 10).map((item) => (
           <View key={item.id} style={styles.row}>
             <View style={styles.rowMain}>
               <Text style={styles.rowTitle}>{item.name}</Text>

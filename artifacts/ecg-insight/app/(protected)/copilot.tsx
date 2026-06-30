@@ -19,6 +19,7 @@ import {
   type CopilotMessage,
   type CopilotTag,
 } from "@/services/copilot";
+import { safeArray } from "@/utils/collections";
 
 type AttachmentKind = "ecg" | "file" | "image";
 type SpeechRecognitionLike = {
@@ -60,10 +61,6 @@ const EMPTY_MESSAGES = [
 ];
 
 const WORKSPACE_STATE_KEY = "ecg-insight:copilot-workspace-state";
-
-function safeArray<T>(value: T[] | null | undefined): T[] {
-  return Array.isArray(value) ? value : [];
-}
 
 function safeString(value: unknown, fallback = "") {
   return typeof value === "string" ? value : fallback;
@@ -199,7 +196,7 @@ export function CopilotWorkspaceScreen({ routeConversationId }: { routeConversat
     } catch (error) {
       showActionNotice(error instanceof Error ? error.message : "Upload failed.", "error");
     } finally {
-      setUploadingFiles((current) => current.filter((item) => item !== file.name));
+      setUploadingFiles((current) => safeArray(current).filter((item) => item !== file.name));
     }
   }, [attachments, currentCase, currentPatient, selectedId, showActionNotice, token]);
 
@@ -446,7 +443,7 @@ export function CopilotWorkspaceScreen({ routeConversationId }: { routeConversat
   function sendPrompt(prompt: string, tag: CopilotTag) {
     const trimmed = safeString(prompt).trim() || (attachments.length ? "Review the attached medical files, perform OCR-informed analysis, identify document or image type, explain findings, cite trusted medical knowledge, provide warnings, and suggest next steps." : "");
     if (!trimmed || !token || sendMutation.isPending) return;
-    sendMutation.mutate({ attachmentIds: attachments.map((attachment) => attachment?.id).filter(Boolean), prompt: trimmed, tag });
+    sendMutation.mutate({ attachmentIds: safeArray(attachments).map((attachment) => attachment?.id).filter(Boolean) as string[], prompt: trimmed, tag });
   }
 
   function startNewChat() {
@@ -651,7 +648,7 @@ export function CopilotWorkspaceScreen({ routeConversationId }: { routeConversat
                         delete next[attachmentId];
                         return next;
                       });
-                      setAttachments((current) => current.filter((item) => item?.id !== attachmentId));
+                      setAttachments((current) => safeArray(current).filter((item) => item?.id !== attachmentId));
                     }}
                     previewUrl={attachment?.id ? attachmentPreviews[attachment.id] : undefined}
                   />

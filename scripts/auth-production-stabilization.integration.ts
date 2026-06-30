@@ -73,7 +73,10 @@ async function main() {
   ]) {
     assert(registerSource.includes(`"${option}"`), `Registration dropdown must render option: ${option}`);
   }
-  assert(registerSource.includes("const filtered = normalizedQuery ? options.filter") && registerSource.includes(": options"), "Dropdowns must render all options before search filtering.");
+  assert(
+    registerSource.includes("const filtered = normalizedQuery ? safeArray(options).filter") && registerSource.includes(": safeArray(options)"),
+    "Dropdowns must render all options before search filtering.",
+  );
 
   const server = createServer(createApp());
   await new Promise<void>((resolve) => server.listen(0, resolve));

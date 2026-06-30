@@ -1,5 +1,7 @@
 import { create } from "zustand";
 
+import { safeArray } from "@/utils/collections";
+
 type NotificationFilter = "all" | "critical" | "license" | "system" | "unread";
 
 type AssistantSize = {
@@ -92,7 +94,7 @@ export const useDashboardStore = create<DashboardState>((set) => ({
   rememberSearch: (query) => set((state) => {
     const normalized = query.trim();
     if (!normalized) return state;
-    const recentSearches = [normalized, ...state.recentSearches.filter((item) => item.toLowerCase() !== normalized.toLowerCase())].slice(0, 6);
+    const recentSearches = [normalized, ...safeArray(state.recentSearches).filter((item) => item.toLowerCase() !== normalized.toLowerCase())].slice(0, 6);
     if (typeof window !== "undefined") window.localStorage.setItem("ecg-insight:recent-searches", JSON.stringify(recentSearches));
     return { recentSearches };
   }),

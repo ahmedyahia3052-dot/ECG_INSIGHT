@@ -6,6 +6,7 @@ import { Platform, StyleSheet, Text, View } from "react-native";
 import { Badge, Card, EmptyState, Field, medicalTheme, PageSection, patientDisplayName, PrimaryButton, SectionHeader } from "@/components/enterprise/EnterpriseUI";
 import { useAuth } from "@/context/AuthContext";
 import { archivePatient, listPatients, type ApiPatient } from "@/services/clinical";
+import { safeArray } from "@/utils/collections";
 
 export default function PatientsIndexScreen() {
   const router = useRouter();
@@ -38,10 +39,10 @@ export default function PatientsIndexScreen() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["enterprise-patients", token] }),
   });
 
-  const patients = patientsQuery.data?.patients ?? [];
+  const patients = safeArray(patientsQuery.data?.patients);
   const totalPages = patientsQuery.data?.totalPages ?? 1;
-  const highRiskCount = useMemo(() => patients.filter((patient) => patient.hypertension || patient.diabetes || patient.smokingStatus === "current").length, [patients]);
-  const lastEcgPatients = useMemo(() => patients.filter((patient) => patient.status === "active").length, [patients]);
+  const highRiskCount = useMemo(() => safeArray(patients).filter((patient) => patient.hypertension || patient.diabetes || patient.smokingStatus === "current").length, [patients]);
+  const lastEcgPatients = useMemo(() => safeArray(patients).filter((patient) => patient.status === "active").length, [patients]);
 
   return (
     <PageSection>

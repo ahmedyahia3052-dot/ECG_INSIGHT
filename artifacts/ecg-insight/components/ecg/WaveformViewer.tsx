@@ -3,6 +3,7 @@ import { Image, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import Svg, { Circle, Line, Path, Rect, Text as SvgText } from "react-native-svg";
 import { useColors } from "@/hooks/useColors";
 import type { DigitalEcg, DigitalEcgLead, ProcessedWaveform } from "@/services/ecgProcessing";
+import { safeArray } from "@/utils/collections";
 
 interface Props {
   digitalEcg?: DigitalEcg | null;
@@ -35,7 +36,7 @@ function pathForLead(lead: DigitalEcgLead, width: number, height: number, zoom: 
   const samples = lead.samples.slice(start, start + visibleSamples);
   if (samples.length < 2) return "";
   const step = Math.max(1, Math.ceil(samples.length / 260));
-  const reduced = samples.filter((_sample, index) => index % step === 0);
+  const reduced = safeArray(samples).filter((_sample, index) => index % step === 0);
   return reduced
     .map((sample, index) => {
       const x = (index / Math.max(reduced.length - 1, 1)) * width;
@@ -106,7 +107,7 @@ export function WaveformViewer({ digitalEcg, waveform }: Props) {
           {displayLeads.map((lead, index) => {
             const yOffset = index * leadHeight;
             const pathData = pathForLead(lead, width - 44, leadHeight, zoom, pan);
-            const leadAnnotations = annotationsVisible ? ecg?.annotations.filter((annotation) => annotation.lead === lead.lead).slice(0, 8) ?? [] : [];
+            const leadAnnotations = annotationsVisible ? safeArray(ecg?.annotations).filter((annotation) => annotation.lead === lead.lead).slice(0, 8) : [];
             return (
               <React.Fragment key={lead.lead}>
                 <SvgText x={4} y={yOffset + 20} fill="#334155" fontSize={11} fontWeight="700">{lead.lead}</SvgText>

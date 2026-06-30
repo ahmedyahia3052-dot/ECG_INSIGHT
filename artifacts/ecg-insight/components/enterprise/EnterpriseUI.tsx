@@ -26,6 +26,7 @@ import { useDashboardStore } from "@/context/DashboardStore";
 import { deleteNotification, listNotifications, markAllNotificationsRead, markNotificationRead, type NotificationRecord } from "@/services/collaboration";
 import { globalSearch, type GlobalSearchResult } from "@/services/search";
 import { medicalTheme } from "@/theme/medicalTheme";
+import { safeArray } from "@/utils/collections";
 
 export { medicalTheme };
 
@@ -166,12 +167,12 @@ export function EnterpriseShell({ children }: PropsWithChildren) {
     queryKey: ["global-search", authToken?.token, debouncedSearch.trim()],
     retry: false,
   });
-  const notifications = notificationQuery.data?.notifications ?? [];
-  const unreadCount = notifications.filter((item) => !item.read).length;
-  const criticalCount = notifications.filter((item) => isCriticalNotification(item)).length;
-  const filteredNotifications = useMemo(() => notifications.filter((item) => notificationMatchesFilter(item, notificationFilter)), [notificationFilter, notifications]);
-  const searchResults = searchQuery.data?.results ?? [];
-  const showSearchPanel = searchFocused && (searchText.trim().length > 0 || recentSearches.length > 0);
+  const notifications = safeArray(notificationQuery.data?.notifications);
+  const unreadCount = safeArray(notifications).filter((item) => !item.read).length;
+  const criticalCount = safeArray(notifications).filter((item) => isCriticalNotification(item)).length;
+  const filteredNotifications = useMemo(() => safeArray(notifications).filter((item) => notificationMatchesFilter(item, notificationFilter)), [notificationFilter, notifications]);
+  const searchResults = safeArray(searchQuery.data?.results);
+  const showSearchPanel = searchFocused && (searchText.trim().length > 0 || safeArray(recentSearches).length > 0);
   const invalidateNotifications = () => {
     void queryClient.invalidateQueries({ queryKey: ["enterprise-shell-notifications"] });
     void queryClient.invalidateQueries({ queryKey: ["enterprise-notifications", authToken?.token] });

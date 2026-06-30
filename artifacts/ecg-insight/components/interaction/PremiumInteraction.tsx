@@ -20,6 +20,7 @@ import { PanGestureHandler, State, type PanGestureHandlerStateChangeEvent } from
 import Svg, { Polyline } from "react-native-svg";
 import { useColors } from "@/hooks/useColors";
 import { useVisualExperience } from "@/context/VisualExperienceContext";
+import { safeArray } from "@/utils/collections";
 
 export const animationPresets = {
   cardReveal: { duration: 280, easing: Easing.out(Easing.cubic), translateY: 14 },
@@ -172,7 +173,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
   const [toasts, setToasts] = useState<ToastItem[]>([]);
 
   const dismiss = useCallback((id: string) => {
-    setToasts((items) => items.filter((item) => item.id !== id));
+    setToasts((items) => safeArray(items).filter((item) => item.id !== id));
   }, []);
 
   const showToast = useCallback((toast: ToastInput) => {

@@ -7,6 +7,7 @@ import { z } from "zod";
 import { AuthCard, AuthMessage, AuthPrimaryButton, AuthTextField, AuthToggle, premiumAuthTheme, PremiumAuthShell } from "@/components/auth/PremiumAuth";
 import { useAuth } from "@/context/AuthContext";
 import { assertOAuthProviderReady, listOAuthProviders, oauthStartUrl, type OAuthProvider, type OAuthProviderStatus } from "@/services/oauth";
+import { safeArray } from "@/utils/collections";
 
 const loginSchema = z.object({
   email: z.string().trim().min(1, "Email is required.").email("Enter a valid email address."),
@@ -30,8 +31,7 @@ export default function LoginScreen() {
     () => (user as { organizations?: unknown[] } | null)?.organizations ?? [],
     [user],
   );
-  const providers = oauthProviders ?? [];
-  const configuredProviders = (providers ?? []).filter((provider) => provider?.configured);
+  const configuredProviders = safeArray(oauthProviders).filter((provider) => provider?.configured);
 
   useEffect(() => {
     console.log("LoginScreen state", {

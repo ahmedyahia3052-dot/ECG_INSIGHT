@@ -6,6 +6,7 @@ import { Platform, StyleSheet, Text, View } from "react-native";
 import { Badge, Card, EmptyState, Field, formatDate, medicalTheme, PageSection, PrimaryButton, SectionHeader } from "@/components/enterprise/EnterpriseUI";
 import { useAuth } from "@/context/AuthContext";
 import { createReport, deleteReport, downloadReportPdf, finalizeReport, listReports, signReport, type ClinicalReport, type ReportsResponse } from "@/services/reports";
+import { safeArray } from "@/utils/collections";
 
 type ReportStatus = "all" | ClinicalReport["status"];
 const statuses: ReportStatus[] = ["all", "draft", "under_review", "finalized", "signed", "archived"];
@@ -51,8 +52,8 @@ export default function ReportsIndexScreen() {
     onSuccess: (payload) => {
       queryClient.setQueryData<ReportsResponse>(reportsQueryKey, (current) => current ? {
         ...current,
-        reports: [payload.report, ...current.reports.filter((report) => report.id !== payload.report.id)],
-        total: current.total + (current.reports.some((report) => report.id === payload.report.id) ? 0 : 1),
+        reports: [payload.report, ...safeArray(current.reports).filter((report) => report.id !== payload.report.id)],
+        total: current.total + (safeArray(current.reports).some((report) => report.id === payload.report.id) ? 0 : 1),
       } : current);
       setCaseId("");
       setPatientId("");

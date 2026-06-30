@@ -7,6 +7,7 @@ import { useAuth } from "@/context/AuthContext";
 import { getAIStatistics } from "@/services/ai";
 import { listCases, listPatients } from "@/services/clinical";
 import { listReports } from "@/services/reports";
+import { safeArray } from "@/utils/collections";
 
 export default function AnalyticsScreen() {
   const { authToken } = useAuth();
@@ -16,9 +17,9 @@ export default function AnalyticsScreen() {
   const reportsQuery = useQuery({ enabled: !!token, queryFn: () => listReports(token!, new URLSearchParams({ pageSize: "100" })), queryKey: ["enterprise-analytics-reports", token], retry: false });
   const aiQuery = useQuery({ enabled: !!token, queryFn: () => getAIStatistics(token!), queryKey: ["enterprise-analytics-ai", token], retry: false });
 
-  const cases = casesQuery.data?.cases ?? [];
-  const reports = reportsQuery.data?.reports ?? [];
-  const patients = patientsQuery.data?.patients ?? [];
+  const cases = safeArray(casesQuery.data?.cases);
+  const reports = safeArray(reportsQuery.data?.reports);
+  const patients = safeArray(patientsQuery.data?.patients);
   const critical = cases.filter((item) => item.priority === "critical").length;
   const signedReports = reports.filter((item) => item.status === "signed").length;
   const diagnosisDistribution = Object.values(aiQuery.data?.statistics.diagnosisDistribution ?? {});

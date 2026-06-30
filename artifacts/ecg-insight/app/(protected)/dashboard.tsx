@@ -10,6 +10,7 @@ import { listNotifications } from "@/services/collaboration";
 import { listCases, listPatients } from "@/services/clinical";
 import { listReports } from "@/services/reports";
 import { getMySubscription } from "@/services/subscriptions";
+import { safeArray } from "@/utils/collections";
 
 function greeting() {
   const hour = new Date().getHours();
@@ -61,10 +62,10 @@ export default function DashboardScreen() {
     retry: false,
   });
 
-  const cases = casesQuery.data?.cases ?? [];
-  const patients = patientsQuery.data?.patients ?? [];
-  const reports = reportsQuery.data?.reports ?? [];
-  const notifications = notificationsQuery.data?.notifications ?? [];
+  const cases = safeArray(casesQuery.data?.cases);
+  const patients = safeArray(patientsQuery.data?.patients);
+  const reports = safeArray(reportsQuery.data?.reports);
+  const notifications = safeArray(notificationsQuery.data?.notifications);
   const criticalCases = cases.filter((item) => item.priority === "critical").length;
   const abnormalCases = cases.filter((item) => item.finalDiagnosis || item.priority === "high").length;
   const pendingReports = reports.filter((item) => item.status === "draft" || item.status === "under_review").length;

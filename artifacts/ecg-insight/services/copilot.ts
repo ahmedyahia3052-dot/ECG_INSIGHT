@@ -1,3 +1,5 @@
+import { safeArray } from "@/utils/collections";
+
 import { API_URL, apiRequest } from "./api";
 
 export type CopilotTag = "Clinical Summary" | "Differential Diagnosis" | "ECG Interpretation" | "Follow-up" | "Occupational Fitness";
@@ -79,13 +81,26 @@ export interface CopilotSettings {
   provider: string;
 }
 
+function normalizeCopilotMessage(message: CopilotMessage): CopilotMessage {
+  return {
+    ...message,
+    attachments: safeArray(message.attachments),
+    citations: safeArray(message.citations),
+  };
+}
+
 export async function listCopilotConversations(accessToken: string, q = "") {
   const suffix = q ? `?q=${encodeURIComponent(q)}` : "";
-  return apiRequest<{ conversations: CopilotConversation[] }>(`/copilot/conversations${suffix}`, { accessToken });
+  const payload = await apiRequest<{ conversations?: CopilotConversation[] }>(`/copilot/conversations${suffix}`, { accessToken });
+  return { conversations: safeArray(payload.conversations) };
 }
 
 export async function getCopilotConversation(accessToken: string, conversationId: string) {
-  return apiRequest<{ conversation: CopilotConversation; messages: CopilotMessage[] }>(`/copilot/conversations/${conversationId}`, { accessToken });
+  const payload = await apiRequest<{ conversation: CopilotConversation; messages?: CopilotMessage[] }>(`/copilot/conversations/${conversationId}`, { accessToken });
+  return {
+    conversation: payload.conversation,
+    messages: safeArray(payload.messages).map(normalizeCopilotMessage),
+  };
 }
 
 export async function deleteCopilotMessage(accessToken: string, conversationId: string, messageId: string) {

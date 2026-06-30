@@ -6,6 +6,7 @@ import { StyleSheet, Text, View } from "react-native";
 import { Badge, Card, EmptyState, Field, formatDate, medicalTheme, PageSection, PrimaryButton, SectionHeader } from "@/components/enterprise/EnterpriseUI";
 import { useAuth } from "@/context/AuthContext";
 import { deleteNotification, listAlerts, listNotifications, markAllNotificationsRead, markNotificationRead, type NotificationRecord } from "@/services/collaboration";
+import { safeArray } from "@/utils/collections";
 
 type NotificationFilter = "all" | "critical" | "license" | "system" | "unread";
 
@@ -35,10 +36,10 @@ export default function NotificationsScreen() {
   const readAllMutation = useMutation({ mutationFn: () => markAllNotificationsRead(token!), onSuccess: invalidate });
   const deleteMutation = useMutation({ mutationFn: (id: string) => deleteNotification(token!, id), onSuccess: invalidate });
 
-  const notifications = notificationsQuery.data?.notifications ?? [];
-  const filteredNotifications = notifications.filter((item) => notificationMatchesFilter(item, filter));
-  const unreadCount = notifications.filter((item) => !item.read).length;
-  const criticalCount = notifications.filter(isCriticalNotification).length + (alertsQuery.data?.alerts.length ?? 0);
+  const notifications = safeArray(notificationsQuery.data?.notifications);
+  const filteredNotifications = safeArray(notifications).filter((item) => notificationMatchesFilter(item, filter));
+  const unreadCount = safeArray(notifications).filter((item) => !item.read).length;
+  const criticalCount = safeArray(notifications).filter(isCriticalNotification).length + safeArray(alertsQuery.data?.alerts).length;
 
   return (
     <PageSection>

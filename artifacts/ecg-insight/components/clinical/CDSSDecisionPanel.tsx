@@ -4,6 +4,7 @@ import { StyleSheet, Text, View } from "react-native";
 
 import { Badge, Card, EmptyState, formatDate, medicalTheme, PrimaryButton, SectionHeader } from "@/components/enterprise/EnterpriseUI";
 import { evaluateCDSS, listCDSSRuns, type CDSSFinding } from "@/services/clinicalIntelligence";
+import { safeArray } from "@/utils/collections";
 
 type Props = {
   accessToken: string;
@@ -25,11 +26,11 @@ export function CDSSDecisionPanel({ accessToken, caseId }: Props) {
   });
 
   const latest = runsQuery.data?.runs[0];
-  const findings = latest?.findings ?? [];
-  const redFlags = findings.filter((finding) => finding.findingType === "RED_FLAG");
-  const recommendations = findings.filter((finding) => finding.findingType === "RECOMMENDATION");
-  const occupational = findings.find((finding) => finding.findingType === "OCCUPATIONAL_DECISION");
-  const trends = findings.filter((finding) => finding.findingType === "TREND");
+  const findings = safeArray(latest?.findings);
+  const redFlags = safeArray(findings).filter((finding) => finding.findingType === "RED_FLAG");
+  const recommendations = safeArray(findings).filter((finding) => finding.findingType === "RECOMMENDATION");
+  const occupational = safeArray(findings).find((finding) => finding.findingType === "OCCUPATIONAL_DECISION");
+  const trends = safeArray(findings).filter((finding) => finding.findingType === "TREND");
 
   return (
     <Card style={styles.panel}>

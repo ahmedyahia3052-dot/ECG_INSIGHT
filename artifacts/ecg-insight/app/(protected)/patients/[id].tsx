@@ -9,6 +9,7 @@ import { getPatient } from "@/services/clinical";
 import { API_URL } from "@/services/api";
 import { deleteClinicalDocument, uploadClinicalDocument } from "@/services/documents";
 import { downloadReportPdf, generateReport } from "@/services/reports";
+import { safeArray } from "@/utils/collections";
 
 type PatientTab = "ai" | "documents" | "ecg" | "history" | "overview" | "reports" | "timeline";
 
@@ -41,13 +42,13 @@ export default function PatientProfileScreen() {
 
   const patient = patientQuery.data?.patient;
   const related = patientQuery.data?.related;
-  const cases = related?.cases ?? [];
-  const reports = related?.reports ?? [];
-  const documents = related?.documents ?? [];
-  const timeline = related?.timeline ?? [];
-  const criticalCases = cases.filter((item) => item.priority === "critical" || item.aiSeverity === "critical").length;
-  const abnormalCases = cases.filter((item) => item.finalDiagnosis || (item.aiSeverity && item.aiSeverity !== "normal")).length;
-  const pendingReviews = cases.filter((item) => item.status !== "finalized").length;
+  const cases = safeArray(related?.cases);
+  const reports = safeArray(related?.reports);
+  const documents = safeArray(related?.documents);
+  const timeline = safeArray(related?.timeline);
+  const criticalCases = safeArray(cases).filter((item) => item.priority === "critical" || item.aiSeverity === "critical").length;
+  const abnormalCases = safeArray(cases).filter((item) => item.finalDiagnosis || (item.aiSeverity && item.aiSeverity !== "normal")).length;
+  const pendingReviews = safeArray(cases).filter((item) => item.status !== "finalized").length;
   const lastReportDate = reports[0] ? formatDate(reports[0].reportingDate) : "None";
   const highRisk = criticalCases > 0 || patient?.hypertension || patient?.diabetes || patient?.ischemicHeartDisease;
   const createdToast = created === "1";

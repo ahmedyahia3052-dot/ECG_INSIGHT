@@ -10,6 +10,7 @@ import { analyzeCaseWithRealAI, type AIAnalysisResult } from "@/services/ai";
 import { createCase, createPatient, listPatients } from "@/services/clinical";
 import { uploadClinicalEcgFile } from "@/services/ecgFiles";
 import type { ClinicalReport } from "@/services/reports";
+import { safeArray } from "@/utils/collections";
 
 type SelectedAsset = {
   file?: Blob;
@@ -167,7 +168,7 @@ export default function UploadEcgScreen() {
   };
 
   const removeAsset = (name: string) => {
-    setAssets((current) => current.filter((item) => item.name !== name));
+    setAssets((current) => safeArray(current).filter((item) => item.name !== name));
   };
 
   return (

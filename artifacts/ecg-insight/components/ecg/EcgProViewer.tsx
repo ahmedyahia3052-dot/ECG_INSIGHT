@@ -9,6 +9,7 @@ import { API_URL } from "@/services/api";
 import type { AIAnalysisResult, AIExplainability } from "@/services/ai";
 import type { ApiECGCase } from "@/services/clinical";
 import type { DigitalEcg, DigitalEcgLead } from "@/services/ecgProcessing";
+import { safeArray } from "@/utils/collections";
 
 type GridColor = "gray" | "red";
 type PaperSpeed = 25 | 50;
@@ -70,9 +71,9 @@ export function EcgProViewer({
   const pdfUrl = absoluteUrl(ecgCase.pdfPath ?? ecgCase.files.find((file) => file.mimeType.includes("pdf"))?.downloadUrl);
   const leadData = useMemo(() => normalizedLeads(digitalEcg), [digitalEcg]);
   const criticalAlert = criticalTerms.find((term) => `${analysis?.diagnosis ?? ""} ${ecgCase.aiDiagnosis ?? ""} ${ecgCase.doctorDiagnosis ?? ""}`.toUpperCase().includes(term));
-  const aiFindings = explainability?.leadHighlights ?? [];
+  const aiFindings = safeArray(explainability?.leadHighlights);
   const annotations = useMemo(() => buildAnnotations(aiFindings, analysis, ecgCase), [aiFindings, analysis, ecgCase]);
-  const visibleAnnotations = selectedLead === "ALL" ? annotations : annotations.filter((annotation) => annotation.lead === selectedLead);
+  const visibleAnnotations = selectedLead === "ALL" ? annotations : safeArray(annotations).filter((annotation) => annotation.lead === selectedLead);
 
   return (
     <View style={[styles.workstation, mobileMode && styles.mobileWorkstation, fullscreen && styles.fullscreen]}>
@@ -165,7 +166,7 @@ export function EcgProViewer({
             setSelectedLead(lead);
           }} />
           <CaliperPanel calipers={calipers} onChange={setCalipers} />
-          {focusedLead ? <LeadFocus annotations={annotations.filter((item) => item.lead === focusedLead)} lead={focusedLead} leadData={leadData.find((item) => item.lead === focusedLead)} onClose={() => setFocusedLead(null)} /> : null}
+          {focusedLead ? <LeadFocus annotations={safeArray(annotations).filter((item) => item.lead === focusedLead)} lead={focusedLead} leadData={leadData.find((item) => item.lead === focusedLead)} onClose={() => setFocusedLead(null)} /> : null}
         </View>
       ) : null}
 
@@ -227,7 +228,7 @@ function LeadNavigator({ onSelect, selectedLead }: { onSelect: (lead: string) =>
 
 function WaveformGrid({ annotations, focusedLead, leadData, onFocusLead }: { annotations: EcgAnnotation[]; focusedLead: string | null; leadData: DigitalEcgLead[]; onFocusLead: (lead: string) => void }) {
   if (!leadData.length) return <EmptyState title="Digitized waveform unavailable" message="Run ECG digitization to render 12-lead waveforms." />;
-  const display = focusedLead ? leadData.filter((lead) => lead.lead === focusedLead) : leadData;
+  const display = focusedLead ? safeArray(leadData).filter((lead) => lead.lead === focusedLead) : safeArray(leadData);
   const leadHeight = focusedLead ? 170 : 64;
   const width = 980;
   return (
@@ -243,7 +244,7 @@ function WaveformGrid({ annotations, focusedLead, leadData, onFocusLead }: { ann
               <React.Fragment key={lead.lead}>
                 <SvgText x={12} y={yOffset + 24} fill="#0F172A" fontSize={14} fontWeight="700" onPress={() => onFocusLead(lead.lead)}>{lead.lead}</SvgText>
                 <Path d={pathForLead(lead, width - 70, leadHeight - 8)} fill="none" stroke="#C1121F" strokeLinecap="round" strokeWidth={focusedLead ? 2.3 : 1.6} transform={`translate(50 ${yOffset + 4})`} />
-                {annotations.filter((annotation) => annotation.lead === lead.lead).slice(0, 3).map((annotation, annotationIndex) => (
+                {safeArray(annotations).filter((annotation) => annotation.lead === lead.lead).slice(0, 3).map((annotation, annotationIndex) => (
                   <React.Fragment key={`${lead.lead}-${annotation.finding}-${annotationIndex}`}>
                     <Rect x={annotation.region.x * 7 + 60} y={yOffset + annotation.region.y * 0.55 + 8} width={Math.max(56, annotation.region.width * 4)} height={focusedLead ? 28 : 18} fill={annotationColor(annotation, 0.16)} stroke={annotationColor(annotation)} strokeWidth={1.2} rx={6} />
                     <SvgText x={annotation.region.x * 7 + 64} y={yOffset + annotation.region.y * 0.55 + 22} fill="#0F172A" fontSize={focusedLead ? 11 : 8} fontWeight="700">{annotation.finding}</SvgText>
@@ -262,7 +263,7 @@ function WaveformGrid({ annotations, focusedLead, leadData, onFocusLead }: { ann
 }
 
 function AnnotationLayer({ annotations, heatmap, selectedLead }: { annotations: EcgAnnotation[]; heatmap: AIExplainability["heatmap"]["points"]; selectedLead: string }) {
-  const points = selectedLead === "ALL" ? heatmap : heatmap.filter((point) => point.lead === selectedLead);
+  const points = selectedLead === "ALL" ? safeArray(heatmap) : safeArray(heatmap).filter((point) => point.lead === selectedLead);
   return (
     <Svg pointerEvents="none" style={StyleSheet.absoluteFill} viewBox="0 0 1000 560" preserveAspectRatio="none">
       {points.slice(0, 80).map((point, index) => (
@@ -370,7 +371,7 @@ function pathForLead(lead: DigitalEcgLead, width: number, height: number) {
   const samples = lead.samples.slice(0, Math.min(lead.samples.length, 1400));
   if (samples.length < 2) return "";
   const step = Math.max(1, Math.ceil(samples.length / 480));
-  const reduced = samples.filter((_sample, index) => index % step === 0);
+  const reduced = safeArray(samples).filter((_sample, index) => index % step === 0);
   return reduced.map((sample, index) => {
     const x = (index / Math.max(reduced.length - 1, 1)) * width;
     const y = height / 2 - sample * (height * 0.28);
@@ -382,7 +383,7 @@ function pathForMonitorLead(lead: DigitalEcgLead, width: number, height: number,
   const samples = lead.samples.slice(0, Math.min(lead.samples.length, 1600));
   if (samples.length < 2) return "";
   const step = Math.max(1, Math.ceil(samples.length / 520));
-  const reduced = samples.filter((_sample, index) => index % step === 0);
+  const reduced = safeArray(samples).filter((_sample, index) => index % step === 0);
   return reduced.map((sample, index) => {
     const x = (index / Math.max(reduced.length - 1, 1)) * width;
     const y = height / 2 - sample * (height * 0.28) * gainScale;
