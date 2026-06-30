@@ -28,12 +28,12 @@ test.describe("Copilot collection guard regression", () => {
     await page.getByRole("button", { name: "New Chat" }).click();
     await expectHealthyCopilot();
 
-    const composer = page.getByPlaceholder(/Ask about ECG interpretation/i);
+    const composer = page.getByPlaceholder(/Message the assistant|Ask about ECG/i);
     await composer.fill("hi");
     const streamResponse = page.waitForResponse((item) => item.url().includes("/copilot/chat/stream") && item.status() === 201, { timeout: 45_000 });
     await page.getByRole("button", { name: "Send" }).click();
     await streamResponse;
-    await expect(page.getByText("AI Clinical Copilot").first()).toBeVisible({ timeout: 45_000 });
+    await expect(page.getByText("Assistant").first()).toBeVisible({ timeout: 45_000 });
     await expect(page).toHaveURL(/\/copilot\/[^/]+$/);
     await expectHealthyCopilot();
 
@@ -59,16 +59,16 @@ test.describe("Copilot collection guard regression", () => {
     const secondStream = page.waitForResponse((item) => item.url().includes("/copilot/chat/stream") && item.status() === 201, { timeout: 45_000 });
     await page.getByRole("button", { name: "Send" }).click();
     await secondStream;
-    await expect(page.getByText("AI Clinical Copilot").first()).toBeVisible({ timeout: 45_000 });
+    await expect(page.getByText("Assistant").first()).toBeVisible({ timeout: 45_000 });
     const secondConversationUrl = page.url();
     await expectHealthyCopilot();
 
     await page.goto(firstConversationUrl);
-    await expect(page.getByText("AI Clinical Copilot").first()).toBeVisible({ timeout: 45_000 });
+    await expect(page.getByText("Assistant").first()).toBeVisible({ timeout: 45_000 });
     await expectHealthyCopilot();
 
     await page.goto(secondConversationUrl);
-    await expect(page.getByText("AI Clinical Copilot").first()).toBeVisible({ timeout: 45_000 });
+    await expect(page.getByText("Assistant").first()).toBeVisible({ timeout: 45_000 });
     await expectHealthyCopilot();
 
     expect(pageErrors.filter((message) => /reading 'filter'|\.filter is not a function/i.test(message))).toEqual([]);

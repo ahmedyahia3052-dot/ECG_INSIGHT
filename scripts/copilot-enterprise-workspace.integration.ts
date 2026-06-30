@@ -158,12 +158,11 @@ async function main() {
     for (const upload of [ecgUpload, medicalImage, clinicalFile]) {
       assert(upload.status === 201 && Boolean(upload.body.attachment.id), "Medical attachment upload must persist.");
       assert(Boolean(upload.body.attachment.documentType), "Upload must detect document type.");
-      assert(Boolean(upload.body.attachment.analysisSummary), "Upload must generate medical analysis summary.");
-      assert((upload.body.attachment.confidence ?? 0) >= 0.55, "Upload must include analysis confidence.");
-      assert((upload.body.attachment.warnings?.length ?? 0) > 0, "Upload must include safety warnings.");
-      assert((upload.body.attachment.recommendations?.length ?? 0) > 0, "Upload must include next-step recommendations.");
+      assert(Boolean(upload.body.attachment.originalName), "Upload must return the original filename.");
+      assert((upload.body.attachment.sizeBytes ?? 0) > 0, "Upload must return file size.");
+      assert(!("analysisSummary" in upload.body.attachment), "Upload API must not expose internal analysis metadata.");
+      assert(!("confidence" in upload.body.attachment), "Upload API must not expose confidence metadata.");
     }
-    assert(clinicalFile.body.attachment.extractedText?.includes("Troponin"), "Text clinical files must persist OCR extracted text.");
 
     const firstQuestion = "Interpret this ECG showing irregular rhythm and AF";
     const firstStream = await fetch(`${baseUrl}/copilot/chat/stream`, {
@@ -203,15 +202,15 @@ async function main() {
     assert(continued.status === 201, "Sending another message to an existing chat must succeed.");
     assert(continuedEvents.some((event) => event.event === "done"), "Continuation stream must finish before restore assertions.");
 
-    const restoredFirst = await request<{ conversation: { id: string; title: string }; messages: Array<{ attachments?: Array<{ analysisSummary?: string; documentType?: string; extractedText?: string; kind: string; warnings?: string[] }>; content: string; role: string }> }>(`/copilot/conversations/${firstConversation.id}`, { token });
+    const restoredFirst = await request<{ conversation: { id: string; title: string }; messages: Array<{ attachments?: Array<{ documentType?: string; kind: string; originalName?: string }>; content: string; role: string }> }>(`/copilot/conversations/${firstConversation.id}`, { token });
     assert(restoredFirst.status === 200 && restoredFirst.body.conversation.id === firstConversation.id, "Refresh/deep-link restore must return the first conversation.");
     assert(restoredFirst.body.conversation.title === firstConversation.title, "Existing chat title must remain stable after later messages.");
     assert(restoredFirst.body.messages.filter((message) => message.role === "user").length === 2, "First conversation history must restore all user messages.");
     assert(restoredFirst.body.messages.some((message) => message.content.includes("anticoagulation")), "First conversation must restore later history.");
     const restoredAttachments = restoredFirst.body.messages.flatMap((message) => message.attachments ?? []);
     assert(restoredAttachments.some((attachment) => attachment.kind === "ecg" && attachment.documentType), "ECG upload must restore with document type.");
-    assert(restoredAttachments.some((attachment) => attachment.kind === "image" && attachment.analysisSummary), "Medical image upload must restore analysis summary.");
-    assert(restoredAttachments.some((attachment) => attachment.kind === "file" && attachment.extractedText?.includes("Troponin")), "Clinical file upload must restore OCR text.");
+    assert(restoredAttachments.some((attachment) => attachment.kind === "image" && attachment.originalName), "Medical image upload must restore attachment metadata.");
+    assert(restoredAttachments.some((attachment) => attachment.kind === "file" && attachment.originalName), "Clinical file upload must restore attachment metadata.");
 
     const restoredSecond = await request<{ conversation: { id: string; title: string }; messages: Array<{ content: string; role: string }> }>(`/copilot/conversations/${secondConversation.id}`, { token });
     assert(restoredSecond.status === 200 && restoredSecond.body.conversation.id === secondConversation.id, "Switching to second chat must restore its history.");

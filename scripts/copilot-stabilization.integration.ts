@@ -36,7 +36,7 @@ for (const marker of [
   "Upload Files",
   "Upload Image",
   "attachmentPreviews",
-  "analysisSummary",
+  "sanitizeAssistantContent",
 ]) {
   assert(workspace.includes(marker), `Workspace simplified-chat marker missing: ${marker}`);
 }

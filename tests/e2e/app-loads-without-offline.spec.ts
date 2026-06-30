@@ -16,10 +16,16 @@ test.describe("Application loads without offline mode", () => {
     await expect(page.getByText(/Dashboard|Clinical Copilot|ECG Insight/i).first()).toBeVisible({ timeout: 30_000 });
     await expect(page).not.toHaveURL(/offline\.html/);
 
-    const offlinePage = await page.request.get("/offline.html");
-    expect(offlinePage.status()).toBeGreaterThanOrEqual(404);
+    const serviceWorkerCount = await page.evaluate(async () => {
+      if (!("serviceWorker" in navigator)) return 0;
+      return (await navigator.serviceWorker.getRegistrations()).length;
+    });
+    expect(serviceWorkerCount).toBe(0);
 
-    const serviceWorker = await page.request.get("/sw.js");
-    expect(serviceWorker.status()).toBeGreaterThanOrEqual(404);
+    const offlineBody = await (await page.request.get("/offline.html")).text();
+    expect(offlineBody).not.toMatch(/offline mode|You are offline|ecg-insight-pwa/i);
+
+    const serviceWorkerBody = await (await page.request.get("/sw.js")).text();
+    expect(serviceWorkerBody).not.toMatch(/addEventListener\s*\(\s*['"]install['"]|ecg-insight-pwa/i);
   });
 });

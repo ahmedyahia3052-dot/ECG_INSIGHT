@@ -60,14 +60,14 @@ test.describe("Copilot runtime hardening", () => {
     await page.getByRole("button", { name: "New Chat" }).click();
     await expectNoErrorBoundary();
 
-    const composer = page.getByPlaceholder(/Ask about ECG interpretation/i);
+    const composer = page.getByPlaceholder(/Message the assistant|Ask about ECG/i);
     async function sendAndWaitForAssistant(prompt: string, expectedText?: RegExp | string) {
       await composer.fill(prompt);
       const response = page.waitForResponse((item) => item.url().includes("/copilot/chat/stream") && item.status() === 201, { timeout: 45_000 });
       await page.getByRole("button", { name: "Send" }).click();
       await response;
       await expect(page.getByText("Ready").first()).toBeVisible({ timeout: 45_000 });
-      await expect(page.getByText("AI Clinical Copilot").first()).toBeVisible({ timeout: 45_000 });
+      await expect(page.getByText("Assistant").first()).toBeVisible({ timeout: 45_000 });
       if (expectedText) await expect(page.getByText(expectedText).first()).toBeVisible({ timeout: 45_000 });
       await expect(page).toHaveURL(/\/copilot\/[^/]+$/);
       await expectNoErrorBoundary();
@@ -75,9 +75,9 @@ test.describe("Copilot runtime hardening", () => {
 
     await sendAndWaitForAssistant("hi", /Hello Dr/i);
     await page.getByRole("button", { name: "New Chat" }).click();
-    await sendAndWaitForAssistant("What is hypertension?", /Short Answer|hypertension/i);
+    await sendAndWaitForAssistant("What is hypertension?", /hypertension/i);
     await page.getByRole("button", { name: "New Chat" }).click();
-    await sendAndWaitForAssistant("I have chest pain and sweating", /Urgent Triage|emergency assessment/i);
+    await sendAndWaitForAssistant("I have chest pain and sweating", /urgent|emergency|immediate/i);
     await page.getByRole("button", { name: "New Chat" }).click();
 
     await page.getByRole("button", { name: "Voice" }).last().click();
@@ -101,8 +101,9 @@ test.describe("Copilot runtime hardening", () => {
     await expect(page.getByText("runtime-image.png").last()).toBeVisible({ timeout: 30_000 });
     await expectNoErrorBoundary();
 
-    await sendAndWaitForAssistant("Runtime smoke test: summarize uploaded ECG, image, and labs with citations.", /Uploaded Document Review|Document Type|OCR Confidence/i);
-    await sendAndWaitForAssistant("Using the files I uploaded earlier, what should I re-check?", /Uploaded Document Review|previously uploaded|runtime-labs\.txt/i);
+    await sendAndWaitForAssistant("Runtime smoke test: summarize uploaded ECG, image, and labs.", /reviewed the material|runtime-labs\.txt/i);
+    await sendAndWaitForAssistant("Using the files I uploaded earlier, what should I re-check?", /reviewed|runtime-labs\.txt|correlate/i);
+    await sendAndWaitForAssistant("show sources");
 
     await page.getByRole("button", { name: "Play answer" }).first().click();
     await expect(page.getByText(/Speaking|Voice paused/).first()).toBeVisible({ timeout: 10_000 });
@@ -118,14 +119,14 @@ test.describe("Copilot runtime hardening", () => {
     const conversationUrl = page.url();
     await page.reload();
     await expect(page.getByText("Clinical Copilot Workspace")).toBeVisible({ timeout: 30_000 });
-    await expect(page.getByText("AI Clinical Copilot").first()).toBeVisible({ timeout: 45_000 });
+    await expect(page.getByText("Assistant").first()).toBeVisible({ timeout: 45_000 });
     await expectNoErrorBoundary();
 
     await page.getByRole("button", { name: "New Chat" }).click();
     await expect(page).toHaveURL(/\/copilot$/);
     await page.goto(conversationUrl);
     await expect(page).toHaveURL(/\/copilot\/[^/]+$/);
-    await expect(page.getByText("AI Clinical Copilot").first()).toBeVisible({ timeout: 45_000 });
+    await expect(page.getByText("Assistant").first()).toBeVisible({ timeout: 45_000 });
     await expect(page.getByRole("button", { name: "Export PDF" })).toBeEnabled({ timeout: 30_000 });
     await expectNoErrorBoundary();
 

@@ -54,9 +54,15 @@ async function main() {
   assert(meanTopScore > 0.18, `Mean retrieval quality score too low: ${meanTopScore.toFixed(3)}.`);
 
   const routeSource = await import("node:fs").then((fs) => fs.readFileSync("server/src/modules/copilot/copilot.routes.ts", "utf8"));
-  for (const marker of ["classifyMedicalIntent", "uploaded_document_review", "emergency_symptom_triage", "Uploaded Document Review", "OCR Confidence", "Warnings", "References", "Citations", "AI assistance only. Clinical decisions remain the responsibility of the physician.", "medicalGuardrails", "semanticSearchKnowledge"]) {
+  const intentSource = await import("node:fs").then((fs) => fs.readFileSync("server/src/modules/copilot/intent-manager.ts", "utf8"));
+  const engineSource = await import("node:fs").then((fs) => fs.readFileSync("server/src/modules/copilot/conversational-engine.ts", "utf8"));
+  for (const marker of ["classifyMedicalIntent", "composeConversationalResponse", "semanticSearchKnowledge", "LEGAL_DISCLAIMER", "shouldRetrieveClinicalContext"]) {
     assert(routeSource.includes(marker), `Copilot RAG answer/guardrail marker missing: ${marker}`);
   }
+  for (const marker of ["greetingResponse", "shouldRetrieveKnowledge", "conversationTopic", "upload_analysis", "emergency_triage"]) {
+    assert(intentSource.includes(marker), `Copilot intent manager marker missing: ${marker}`);
+  }
+  assert(engineSource.includes("composeConversationalResponse"), "Copilot conversational engine marker missing.");
 
   console.log(`Enterprise medical knowledge RAG quality passed: ${questions.length} questions, domain ${Math.round(domainAccuracy * 100)}%, citation ${Math.round(citationAccuracy * 100)}%, mean score ${meanTopScore.toFixed(3)}.`);
 }

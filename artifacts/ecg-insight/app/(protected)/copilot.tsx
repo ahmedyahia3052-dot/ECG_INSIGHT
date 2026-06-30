@@ -1,12 +1,11 @@
 import { Feather } from "@expo/vector-icons";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { Image, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, useWindowDimensions, View } from "react-native";
 
 import { Badge, Card, EmptyState, medicalTheme, PrimaryButton } from "@/components/enterprise/EnterpriseUI";
 import { useAuth } from "@/context/AuthContext";
-import { listCases, listPatients } from "@/services/clinical";
 import {
   downloadCopilotExport,
   getCopilotConversation,
@@ -14,7 +13,6 @@ import {
   streamCopilotMessage,
   uploadCopilotAttachment,
   type CopilotAttachment,
-  type CopilotCitation,
   type CopilotConversation,
   type CopilotMessage,
   type CopilotTag,
@@ -56,11 +54,25 @@ const ATTACHMENT_RULES: Record<AttachmentKind, { accept: string; extensions: str
 };
 
 const EMPTY_MESSAGES = [
-  "Ask naturally about symptoms, ECGs, medications, medical reports, occupational fitness, or follow-up.",
-  "Upload ECGs, labs, radiology reports, echo reports, or medical photos and continue the conversation in plain language.",
+  "Start a natural conversation — say hello, ask a cardiology question, or upload an ECG when you're ready.",
 ];
 
 const WORKSPACE_STATE_KEY = "ecg-insight:copilot-workspace-state";
+
+function sanitizeAssistantContent(content: string) {
+  return content
+    .replace(/^##+\s.+$/gm, "")
+    .replace(/^References:[\s\S]*$/im, "")
+    .replace(/\nConfidence Score:\s*\d+%/gi, "")
+    .replace(/\nCitations:\s*.+$/gim, "")
+    .replace(/Risk tier:\s*(HIGH|MODERATE|LOW)/gi, "")
+    .replace(/Knowledge Base|Retrieved Medical Knowledge|Conversation memory:|Previously uploaded files:/gi, "")
+    .replace(/Continuing from our earlier discussion about .+?\./gi, "")
+    .replace(/I am using the earlier messages in this conversation for context\./gi, "")
+    .replace(/AI assistance only\. Clinical decisions remain the responsibility of the physician\./gi, "")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
 
 function safeString(value: unknown, fallback = "") {
   return typeof value === "string" ? value : fallback;
@@ -85,6 +97,7 @@ export default function CopilotRoute() {
 export function CopilotWorkspaceScreen({ routeConversationId }: { routeConversationId?: string }) {
   const queryClient = useQueryClient();
   const router = useRouter();
+  const { caseId: scopedCaseId, patientId: scopedPatientId } = useLocalSearchParams<{ caseId?: string; patientId?: string }>();
   const attachmentPreviewsRef = useRef<Record<string, string>>({});
   const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
   const scrollRef = useRef<ScrollView>(null);
@@ -92,7 +105,7 @@ export function CopilotWorkspaceScreen({ routeConversationId }: { routeConversat
   const { width } = useWindowDimensions();
   const { authToken, user } = useAuth();
   const token = authToken?.token;
-  const [contextOpen, setContextOpen] = useState(false);
+  const [voiceMode, setVoiceMode] = useState(false);
   const [actionNotice, setActionNotice] = useState<{ tone: "error" | "success"; text: string } | undefined>();
   const [attachments, setAttachments] = useState<CopilotAttachment[]>([]);
   const [attachmentPreviews, setAttachmentPreviews] = useState<Record<string, string>>({});
@@ -108,7 +121,6 @@ export function CopilotWorkspaceScreen({ routeConversationId }: { routeConversat
   const [uploadingFiles, setUploadingFiles] = useState<string[]>([]);
 
   const isMobile = width < 760;
-  const isTablet = width >= 760 && width < 1120;
 
   const conversationsQuery = useQuery({
     enabled: !!token,
@@ -122,24 +134,12 @@ export function CopilotWorkspaceScreen({ routeConversationId }: { routeConversat
     queryKey: ["copilot-workspace-conversation", token, selectedId],
     retry: false,
   });
-  const casesQuery = useQuery({
-    enabled: !!token,
-    queryFn: () => listCases(token!, new URLSearchParams({ pageSize: "1" })),
-    queryKey: ["copilot-workspace-context-case", token],
-    retry: false,
-  });
-  const patientsQuery = useQuery({
-    enabled: !!token,
-    queryFn: () => listPatients(token!, new URLSearchParams({ pageSize: "1" })),
-    queryKey: ["copilot-workspace-context-patient", token],
-    retry: false,
-  });
 
   const conversations = safeArray(conversationsQuery.data?.conversations);
   const messages = safeArray(selectedQuery.data?.messages);
   const selectedConversation = conversations.find((item) => item.id === selectedId) ?? selectedQuery.data?.conversation;
-  const currentCase = safeArray(casesQuery.data?.cases)[0];
-  const currentPatient = safeArray(patientsQuery.data?.patients)[0] ?? currentCase?.patient;
+  const explicitCaseId = typeof scopedCaseId === "string" && scopedCaseId.trim() ? scopedCaseId : undefined;
+  const explicitPatientId = typeof scopedPatientId === "string" && scopedPatientId.trim() ? scopedPatientId : undefined;
   const characterCount = draft.length;
   const chatTitle = selectedConversation?.title ?? "New Clinical Conversation";
 
@@ -176,9 +176,9 @@ export function CopilotWorkspaceScreen({ routeConversationId }: { routeConversat
     const formData = new FormData();
     formData.append("file", file);
     formData.append("kind", kind);
-    formData.append("contextType", currentCase ? "case" : currentPatient ? "patient" : "global");
-    if (currentPatient?.id) formData.append("patientId", currentPatient.id);
-    if (currentCase?.id) formData.append("caseId", currentCase.id);
+    formData.append("contextType", explicitCaseId ? "case" : explicitPatientId ? "patient" : "global");
+    if (explicitPatientId) formData.append("patientId", explicitPatientId);
+    if (explicitCaseId) formData.append("caseId", explicitCaseId);
     if (selectedId) formData.append("conversationId", selectedId);
     try {
       setUploadingFiles((current) => current.concat(file.name));
@@ -192,13 +192,13 @@ export function CopilotWorkspaceScreen({ routeConversationId }: { routeConversat
         setAttachmentPreviews((current) => ({ ...current, [payload.attachment.id]: previewUrl }));
       }
       setAttachments((current) => current.concat(payload.attachment));
-      showActionNotice(`${payload.attachment.originalName} analyzed as ${payload.attachment.documentType ?? "clinical document"}.`);
+      showActionNotice(`${payload.attachment.originalName} attached.`);
     } catch (error) {
       showActionNotice(error instanceof Error ? error.message : "Upload failed.", "error");
     } finally {
       setUploadingFiles((current) => safeArray(current).filter((item) => item !== file.name));
     }
-  }, [attachments, currentCase, currentPatient, selectedId, showActionNotice, token]);
+  }, [explicitCaseId, explicitPatientId, selectedId, showActionNotice, token]);
 
   const openFilePicker = useCallback((kind: AttachmentKind) => {
     if (Platform.OS !== "web" || typeof document === "undefined") {
@@ -342,16 +342,16 @@ export function CopilotWorkspaceScreen({ routeConversationId }: { routeConversat
     mutationFn: async (input: { attachmentIds: string[]; prompt: string; tag: CopilotTag }) => {
       const controller = new AbortController();
       streamAbort.current = controller;
-      setStatus("Loading clinical context...");
+      setStatus("Thinking...");
       setStreamingMessage("");
       let finalConversation: CopilotConversation | undefined;
       await streamCopilotMessage(token!, {
-        caseId: currentCase?.id,
+        caseId: explicitCaseId,
         attachmentIds: input.attachmentIds,
         contextPath: "/copilot",
-        contextType: currentCase ? "case" : currentPatient ? "patient" : "global",
+        contextType: explicitCaseId ? "case" : explicitPatientId ? "patient" : "global",
         conversationId: selectedId,
-        patientId: currentPatient?.id,
+        patientId: explicitPatientId,
         question: input.prompt,
         tag: input.tag,
       }, (event) => {
@@ -393,8 +393,7 @@ export function CopilotWorkspaceScreen({ routeConversationId }: { routeConversat
     const rawState = window.localStorage.getItem(WORKSPACE_STATE_KEY);
     if (!rawState) return;
     try {
-      const saved = JSON.parse(rawState) as { contextOpen?: unknown; selectedId?: unknown };
-      if (typeof saved.contextOpen === "boolean") setContextOpen(saved.contextOpen);
+      const saved = JSON.parse(rawState) as { selectedId?: unknown };
       if (typeof saved.selectedId === "string" && saved.selectedId.trim()) router.replace(`/copilot/${saved.selectedId}` as never);
     } catch {
       window.localStorage.removeItem(WORKSPACE_STATE_KEY);
@@ -404,11 +403,11 @@ export function CopilotWorkspaceScreen({ routeConversationId }: { routeConversat
   useEffect(() => {
     if (typeof window === "undefined") return;
     try {
-      window.localStorage.setItem(WORKSPACE_STATE_KEY, JSON.stringify({ contextOpen, selectedId }));
+      window.localStorage.setItem(WORKSPACE_STATE_KEY, JSON.stringify({ selectedId }));
     } catch {
       window.localStorage.removeItem(WORKSPACE_STATE_KEY);
     }
-  }, [contextOpen, selectedId]);
+  }, [selectedId]);
 
   useEffect(() => {
     attachmentPreviewsRef.current = attachmentPreviews;
@@ -464,7 +463,7 @@ export function CopilotWorkspaceScreen({ routeConversationId }: { routeConversat
   }
 
   function continueGeneration() {
-    sendPrompt("Continue the previous clinical answer with the same structure, context, citations, and safety caveats.", selectedConversation?.tag ?? "Clinical Summary");
+    sendPrompt("Continue the previous answer with the same clinical topic.", selectedConversation?.tag ?? "Clinical Summary");
   }
 
   async function exportConversation(format: "pdf" | "txt") {
@@ -512,7 +511,6 @@ export function CopilotWorkspaceScreen({ routeConversationId }: { routeConversat
   }
 
   const sidebarVisible = !isMobile || mobileSidebarOpen;
-  const contextVisible = contextOpen && !isMobile;
   const speechControl: SpeechControl = {
     muted: speechMuted,
     onMuteToggle: toggleSpeechMute,
@@ -560,10 +558,10 @@ export function CopilotWorkspaceScreen({ routeConversationId }: { routeConversat
             </View>
           </View>
           <View style={styles.topButtons}>
-            <Badge label={sendMutation.isPending ? "Streaming" : "Ready"} tone={sendMutation.isPending ? "warning" : "success"} />
-            <Pressable accessibilityRole="button" onPress={() => setContextOpen((current) => !current)} style={styles.contextToggle}>
-              <Feather name="sidebar" size={16} color={medicalTheme.primary} />
-              <Text style={styles.contextToggleText}>{contextOpen ? "Hide Context" : "Context"}</Text>
+            <Badge label={sendMutation.isPending ? "Streaming" : voiceMode ? "Voice mode" : "Ready"} tone={sendMutation.isPending ? "warning" : "success"} />
+            <Pressable accessibilityRole="button" onPress={() => setVoiceMode((current) => !current)} style={styles.contextToggle}>
+              <Feather name={voiceMode ? "headphones" : "mic"} size={16} color={medicalTheme.primary} />
+              <Text style={styles.contextToggleText}>{voiceMode ? "Voice mode on" : "Voice mode"}</Text>
             </Pressable>
           </View>
         </View>
@@ -586,7 +584,7 @@ export function CopilotWorkspaceScreen({ routeConversationId }: { routeConversat
               <View style={styles.chatHeaderMain}>
                 <Text style={styles.titleInput}>{chatTitle}</Text>
                 <Text style={styles.chatMeta}>
-                  {selectedConversation?.tag ?? "Free medical conversation"} • {messages.length} persisted messages • Deep link ready
+                  {selectedConversation?.tag ?? "Free medical conversation"} • {messages.length} messages
                 </Text>
               </View>
             </View>
@@ -670,7 +668,7 @@ export function CopilotWorkspaceScreen({ routeConversationId }: { routeConversat
                   const event = nativeEvent as unknown as { key?: string; shiftKey?: boolean };
                   if (event.key === "Enter" && !event.shiftKey) sendPrompt(draft, "Clinical Summary");
                 }}
-                placeholder="Ask about ECG interpretation, rhythm, risk, occupational fitness, follow-up, reports, or clinical reasoning..."
+                placeholder="Message the assistant..."
                 placeholderTextColor={medicalTheme.muted}
                 style={styles.composerInput}
                 value={draft}
@@ -682,28 +680,6 @@ export function CopilotWorkspaceScreen({ routeConversationId }: { routeConversat
           </View>
         </Card>
       </View>
-
-      {contextVisible ? (
-        <Card style={[styles.contextPanel, isTablet && styles.contextPanelTablet]}>
-          <View style={styles.contextHeader}>
-            <Text style={styles.contextTitle}>Clinical Context</Text>
-            <Pressable accessibilityRole="button" onPress={() => setContextOpen(false)} style={styles.iconButton}>
-              <Feather name="chevron-right" size={18} color={medicalTheme.text} />
-            </Pressable>
-          </View>
-          <ScrollView contentContainerStyle={styles.contextBody} showsVerticalScrollIndicator={false}>
-            <ContextLine icon="user" label="Current Patient" value={currentPatient ? `${currentPatient.firstName} ${currentPatient.lastName}` : "No patient selected"} />
-            <ContextLine icon="hash" label="Demographics" value={currentPatient ? `${currentPatient.age} years • ${currentPatient.gender} • MRN ${currentPatient.medicalRecordNumber}` : "No demographics loaded"} />
-            <ContextLine icon="activity" label="Active ECG" value={currentCase?.caseNumber ?? currentCase?.caseId ?? "No active ECG"} />
-            <ContextLine icon="clock" label="ECG Metadata" value={currentCase ? `${currentCase.ecgType ?? "12-lead ECG"} • ${currentCase.status} • ${currentCase.priority}` : "No ECG metadata"} />
-            <ContextLine icon="upload-cloud" label="Uploaded Files" value={`${currentCase?.reportCount ?? 0} reports or files linked to current context`} />
-            <ContextLine icon="thermometer" label="Labs" value="Available through uploaded files, documents, and clinical notes context." />
-            <ContextLine icon="heart" label="Echo Reports" value="Available when attached to the patient or case record." />
-            <ContextLine icon="file-text" label="Clinical History" value={currentCase?.clinicalNotes ?? currentPatient?.medicalHistory ?? "No clinical history recorded"} />
-          </ScrollView>
-        </Card>
-      ) : null}
-
     </View>
   );
 }
@@ -742,15 +718,14 @@ function ConversationList({
 function MessageCard({ message, onNotice, speechControl }: { message: CopilotMessage; onNotice: (text: string, tone?: "error" | "success") => void; speechControl: SpeechControl }) {
   const assistant = message?.role === "assistant";
   const attachments = safeArray(message?.attachments);
-  const citations = safeArray(message?.citations);
-  const confidence = typeof message?.confidence === "number" && Number.isFinite(message.confidence) ? message.confidence : undefined;
-  const content = safeString(message?.content);
+  const rawContent = safeString(message?.content);
+  const content = assistant ? sanitizeAssistantContent(rawContent) : rawContent;
   const messageId = safeString(message?.id, "assistant-message");
   const isSpeaking = assistant && speechControl.speakingMessageId === messageId;
   return (
     <View style={[styles.message, assistant ? styles.assistantMessage : styles.userMessage]}>
       <View style={styles.messageTop}>
-        <Text style={styles.messageRole}>{assistant ? "AI Clinical Copilot" : "You"}</Text>
+        <Text style={styles.messageRole}>{assistant ? "Assistant" : "You"}</Text>
         <Text style={styles.messageTime}>{safeTime(message?.createdAt)}</Text>
       </View>
       <RichMedicalText content={content} />
@@ -759,7 +734,6 @@ function MessageCard({ message, onNotice, speechControl }: { message: CopilotMes
           {attachments.map((attachment, index) => <AttachmentChip attachment={attachment} key={attachment?.id ?? `message-attachment-${index}`} />)}
         </View>
       ) : null}
-      {citations.length ? <CitationList citations={citations} /> : null}
       {assistant ? (
         <View style={styles.answerTools}>
           <MiniAction icon="copy" label="Copy answer" onPress={() => copyText(content, onNotice)} />
@@ -769,7 +743,6 @@ function MessageCard({ message, onNotice, speechControl }: { message: CopilotMes
           <MiniAction icon="square" label="Stop voice" onPress={speechControl.onStop} />
           <MiniAction active={speechControl.muted} icon={speechControl.muted ? "volume-x" : "volume-1"} label={speechControl.muted ? "Unmute voice" : "Mute voice"} onPress={speechControl.onMuteToggle} />
           {isSpeaking ? <Text style={styles.speakingState}>{speechControl.paused ? "Voice paused" : "Speaking..."}</Text> : null}
-          {confidence !== undefined ? <Text style={styles.confidence}>Confidence {Math.round(confidence * 100)}%</Text> : null}
         </View>
       ) : null}
     </View>
@@ -799,34 +772,6 @@ function RichMedicalText({ content }: { content: string }) {
   );
 }
 
-function CitationList({ citations }: { citations: CopilotCitation[] }) {
-  const safeCitations = safeArray(citations);
-  return (
-    <View style={styles.citations}>
-      {safeCitations.map((citation, index) => (
-        <View key={safeString(citation?.id, `citation-${index}`)} style={styles.citation}>
-          <Feather name="link" size={12} color={medicalTheme.primary} />
-          <Text style={styles.citationText}>{safeString(citation?.label, "Clinical source")} • {safeString(citation?.source, "ECG Insight")}</Text>
-        </View>
-      ))}
-    </View>
-  );
-}
-
-function ContextLine({ icon, label, value }: { icon: keyof typeof Feather.glyphMap; label: string; value: string }) {
-  return (
-    <View style={styles.contextLine}>
-      <View style={styles.contextIcon}>
-        <Feather name={icon} size={14} color={medicalTheme.primary} />
-      </View>
-      <View style={styles.contextText}>
-        <Text style={styles.contextLabel}>{label}</Text>
-        <Text style={styles.contextValue}>{value}</Text>
-      </View>
-    </View>
-  );
-}
-
 function HeaderTool({ disabled, icon, label, onPress }: { disabled?: boolean; icon: keyof typeof Feather.glyphMap; label: string; onPress: () => void }) {
   return (
     <Pressable accessibilityRole="button" disabled={disabled} onPress={onPress} style={[styles.headerTool, disabled && styles.disabled]}>
@@ -845,27 +790,15 @@ function MiniAction({ active, disabled, icon, label, onPress, tone }: { active?:
 }
 
 function AttachmentChip({ attachment, onRemove, previewUrl }: { attachment: CopilotAttachment; onRemove?: () => void; previewUrl?: string }) {
-  const findings = safeArray(attachment?.medicalAnalysis?.findings);
-  const warnings = safeArray(attachment?.warnings);
-  const recommendations = safeArray(attachment?.recommendations);
-  const originalName = safeString(attachment?.originalName, "Uploaded medical file");
+  const originalName = safeString(attachment?.originalName, "Uploaded file");
   const attachmentKind = safeString(attachment?.kind, "file");
-  const documentType = safeString(attachment?.documentType, attachmentKind).replace(/_/g, " ");
-  const confidence = typeof attachment?.confidence === "number" && Number.isFinite(attachment.confidence) ? attachment.confidence : undefined;
   return (
     <View style={styles.attachmentChip}>
       {previewUrl ? <Image accessibilityLabel={`${originalName} preview`} source={{ uri: previewUrl }} style={styles.attachmentPreview} /> : null}
       <Feather name={attachmentKind === "camera" ? "camera" : attachmentKind === "image" ? "image" : attachmentKind === "ecg" ? "activity" : attachmentKind === "echo" ? "heart" : attachmentKind === "labs" ? "clipboard" : "paperclip"} size={13} color={medicalTheme.primary} />
       <View style={styles.attachmentChipText}>
         <Text numberOfLines={1} style={styles.attachmentName}>{originalName}</Text>
-        <Text style={styles.attachmentMeta}>
-          {documentType} • {formatFileSize(attachment?.sizeBytes)}
-          {confidence !== undefined ? ` • ${Math.round(confidence * 100)}% confidence` : ""}
-        </Text>
-        {safeString(attachment?.analysisSummary) ? <Text numberOfLines={2} style={styles.attachmentSummary}>{safeString(attachment?.analysisSummary)}</Text> : null}
-        {findings.length ? <Text numberOfLines={2} style={styles.attachmentSummary}>Findings: {findings.join("; ")}</Text> : null}
-        {warnings.length ? <Text numberOfLines={2} style={styles.attachmentWarning}>Warnings: {warnings.join("; ")}</Text> : null}
-        {recommendations.length ? <Text numberOfLines={2} style={styles.attachmentSummary}>Next steps: {recommendations.join("; ")}</Text> : null}
+        <Text style={styles.attachmentMeta}>{formatFileSize(attachment?.sizeBytes)}</Text>
       </View>
       {onRemove ? (
         <Pressable accessibilityLabel={`Remove ${originalName}`} accessibilityRole="button" onPress={onRemove} style={styles.attachmentRemove}>
@@ -980,6 +913,7 @@ const styles = StyleSheet.create({
   conversationPreview: { color: medicalTheme.muted, fontSize: 11, fontWeight: "700", lineHeight: 16 },
   conversationTitle: { color: medicalTheme.text, fontSize: 12, fontWeight: "900" },
   counter: { color: medicalTheme.muted, fontSize: 11, fontWeight: "800", textAlign: "right" },
+  legalFooter: { color: medicalTheme.muted, fontSize: 10, fontWeight: "600", lineHeight: 14, marginTop: 6, textAlign: "center" },
   disabled: { opacity: 0.45 },
   dropHint: { color: medicalTheme.muted, fontSize: 11, fontWeight: "800" },
   emptyChat: { alignItems: "center", gap: 8, justifyContent: "center", minHeight: 320, padding: 28 },

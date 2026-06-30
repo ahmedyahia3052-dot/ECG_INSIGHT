@@ -45,6 +45,9 @@ const enterpriseSeed = read("scripts/enterprise-dashboard-release-seed.ts");
 const analyticsPage = read("artifacts/ecg-insight/app/(protected)/analytics.tsx");
 const patientProfilePage = read("artifacts/ecg-insight/app/(protected)/patients/[id].tsx");
 const copilotRoutes = read("server/src/modules/copilot/copilot.routes.ts");
+const copilotIntentManager = read("server/src/modules/copilot/intent-manager.ts");
+const copilotConversationalEngine = read("server/src/modules/copilot/conversational-engine.ts");
+const copilotSystemPrompt = read("server/src/modules/copilot/conversation-system-prompt.ts");
 const notificationCenterService = read("server/src/notifications/notification-center.service.ts");
 const casesRoutes = read("server/src/cases/cases.routes.ts");
 const aiService = read("server/src/ai/ai.service.ts");
@@ -63,8 +66,11 @@ for (const forbidden of ["\"ai\"] as const", "/(tabs)", "@/components/bolt", "@/
   assert(!enterpriseShell.includes(forbidden), `Enterprise shell must not contain legacy/conflicting marker: ${forbidden}`);
 }
 
-for (const marker of ["Clinical Copilot Workspace", "streamCopilotMessage", "listCopilotConversations", "getCopilotConversation", "ConversationList", "lastMessagePreview", "startNewChat", "Regenerate", "Continue", "RichMedicalText", "CitationList", "ContextLine"]) {
+for (const marker of ["Clinical Copilot Workspace", "streamCopilotMessage", "listCopilotConversations", "getCopilotConversation", "ConversationList", "lastMessagePreview", "startNewChat", "Regenerate", "Continue", "RichMedicalText", "sanitizeAssistantContent", "voiceMode"]) {
   assert(copilotWorkspace.includes(marker), `Full-page Copilot workspace is missing production marker: ${marker}`);
+}
+for (const removedAutoContext of ["ContextLine", "listPatients", "Patient Profile", "Knowledge Tags", "Medical History"]) {
+  assert(!copilotWorkspace.includes(removedAutoContext), `Copilot workspace must not auto-display clinical context marker: ${removedAutoContext}`);
 }
 for (const marker of ["sidebar", "groupTitle", "chatPanel", "messages", "messageList", "composer", "scrollToEnd", "Voice", "Upload ECG", "Upload Files", "Upload Image", "overflow: \"hidden\"", "mobileSidebarOpen"]) {
   assert(copilotWorkspace.includes(marker), `Final enterprise copilot UI is missing anti-clipping/layout marker: ${marker}`);
@@ -99,8 +105,17 @@ for (const forbidden of ["Normal: 8", "Abnormal: 3", "Math.random", "onPress={()
 assert(analyticsPage.includes("No analytics yet") && analyticsPage.includes("diagnosisDistribution ?? {}"), "Analytics charts must use real empty states instead of fake fallback values.");
 assert(patientProfilePage.includes("onOpen={(item)") && patientProfilePage.includes("metadata.caseId") && patientProfilePage.includes("metadata.reportId"), "Patient timeline actions must resolve to real routes or tabs.");
 
-for (const marker of ["retrieveClinicalContext", "Patient Profile", "Previous ECG", "Cardiovascular Document", "shouldRetrieveKnowledge", "retrieveConversationMemory", "DISCLAIMER", "citations", "automaticConversationTitle", "lastMessagePreview", "analyzeUploadedAttachment", "detectAttachmentDocumentType", "readBestEffortOcrText", "/chat/stream", "writeSse", "streamAssistantContent", "export.txt", "auditCopilotError", "copilotUsageEvent"]) {
+for (const marker of ["retrieveClinicalContext", "shouldRetrieveClinicalContext", "shouldRetrieveKnowledge", "retrieveConversationMemory", "classifyMedicalIntent", "composeConversationalResponse", "./intent-manager", "LEGAL_DISCLAIMER", "automaticConversationTitle", "lastMessagePreview", "analyzeUploadedAttachment", "detectAttachmentDocumentType", "readBestEffortOcrText", "/chat/stream", "writeSse", "streamAssistantContent", "export.txt", "auditCopilotError", "copilotUsageEvent"]) {
   assert(copilotRoutes.includes(marker), `Copilot backend is missing context/RAG/persistence marker: ${marker}`);
+}
+for (const marker of ["classifyMedicalIntent", "shouldRetrieveClinicalContext", "shouldRetrieveKnowledge", "greetingResponse", "isFastPathIntent", "conversationTopic"]) {
+  assert(copilotIntentManager.includes(marker), `Copilot intent manager is missing marker: ${marker}`);
+}
+for (const marker of ["composeConversationalResponse", "buildInternalClinicalBrief", "conversationTopic"]) {
+  assert(copilotConversationalEngine.includes(marker), `Copilot conversational engine is missing marker: ${marker}`);
+}
+for (const marker of ["CONVERSATION_SYSTEM_PROMPT", "Senior Clinical Cardiology Assistant", "Never reveal"]) {
+  assert(copilotSystemPrompt.includes(marker), `Copilot conversation system prompt is missing marker: ${marker}`);
 }
 for (const marker of ["createUnifiedNotification", "unreadNotificationCount", "processScheduledNotifications", "emitRealtime", "REPORT_GENERATION", "read: false"]) {
   assert(notificationCenterService.includes(marker), `Notification center backend is missing persistence/realtime marker: ${marker}`);
