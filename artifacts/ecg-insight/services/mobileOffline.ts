@@ -3,7 +3,6 @@ import { API_ROOT_URL, API_URL } from "./api";
 import { createCase, createPatient } from "./clinical";
 import { uploadClinicalEcgFile } from "./ecgFiles";
 import type { EcgAcquisitionAsset } from "./ecgImageProcessor";
-import { safeArray } from "@/utils/collections";
 
 const DB_NAME = "ecg-insight-mobile-v30";
 const DB_VERSION = 1;
@@ -168,7 +167,7 @@ export async function removeOfflineRuntime() {
   }
   if (typeof caches !== "undefined") {
     const keys = await caches.keys();
-    await Promise.all(safeArray(keys).filter((key) => key.startsWith("ecg-insight-pwa-")).map((key) => caches.delete(key)));
+    await Promise.all(keys.filter((key) => key.startsWith("ecg-insight-pwa-")).map((key) => caches.delete(key)));
   }
 }
 
@@ -219,7 +218,7 @@ export async function listOfflineUploads() {
 export async function processPendingActions(accessToken: string) {
   const actions = await listPendingActions();
   const completed: PendingAction[] = [];
-  for (const action of safeArray(actions).filter((item) => item.status !== "synced")) {
+  for (const action of actions.filter((item) => item.status !== "synced")) {
     const next: PendingAction = { ...action, attempts: action.attempts + 1, status: "syncing", updatedAt: new Date().toISOString() };
     await putRecord(ACTION_STORE, next);
     try {
@@ -254,7 +253,7 @@ export async function processPendingActions(accessToken: string) {
 export async function processOfflineUploads(accessToken: string) {
   const uploads = await listOfflineUploads();
   const completed: OfflineEcgUpload[] = [];
-  for (const upload of safeArray(uploads).filter((item) => item.status !== "synced")) {
+  for (const upload of uploads.filter((item) => item.status !== "synced")) {
     const next: OfflineEcgUpload = { ...upload, attempts: upload.attempts + 1, status: "syncing", updatedAt: new Date().toISOString() };
     await putRecord(UPLOAD_STORE, next);
     try {
@@ -310,7 +309,7 @@ export async function mobileSyncSnapshot(): Promise<MobileSyncSnapshot> {
     backendReachable: backend.ok,
     lastHealthCheckAt: backend.timestamp,
     lastSyncAt: meta.find((item) => item.id === "lastSyncAt")?.value,
-    pendingActions: safeArray(actions).filter((item) => item.status !== "synced").length,
-    pendingUploads: safeArray(uploads).filter((item) => item.status !== "synced").length,
+    pendingActions: actions.filter((item) => item.status !== "synced").length,
+    pendingUploads: uploads.filter((item) => item.status !== "synced").length,
   };
 }
