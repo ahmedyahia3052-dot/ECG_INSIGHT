@@ -130,9 +130,9 @@ const attachmentRules: Record<AttachmentKind, { extensions: Set<string>; maxByte
     mime: new Set(["application/pdf", "image/jpeg", "image/jpg", "image/png", "text/csv", "application/vnd.ms-excel"]),
   },
   file: {
-    extensions: new Set([".csv", ".docx", ".jpg", ".jpeg", ".pdf", ".png", ".txt", ".webp"]),
+    extensions: new Set([".docx", ".jpg", ".jpeg", ".pdf", ".png", ".txt"]),
     maxBytes: 20 * 1024 * 1024,
-    mime: new Set(["application/pdf", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "image/jpeg", "image/jpg", "image/png", "image/webp", "text/csv", "text/plain"]),
+    mime: new Set(["application/pdf", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "image/jpeg", "image/jpg", "image/png", "text/plain"]),
   },
   image: {
     extensions: new Set([".jpg", ".jpeg", ".png", ".webp"]),
@@ -161,6 +161,7 @@ function readBestEffortOcrText(filePath: string) {
 
 function detectAttachmentDocumentType(input: { kind: AttachmentKind; mimeType: string; originalName: string; text: string }) {
   const haystack = `${input.kind} ${input.mimeType} ${input.originalName} ${input.text}`.toLowerCase();
+  if (input.kind === "ecg") return input.mimeType === "application/pdf" ? "ECG_PDF" : "ECG_IMAGE";
   if (/ecg|ekg|qrs|qtc|pr interval|st elevation|st depression|rhythm/.test(haystack)) return "ECG";
   if (/echo|echocardiography|ejection fraction|\bef\b|valvular|ventricle/.test(haystack)) return "ECHO_REPORT";
   if (/troponin|hba1c|creatinine|hemoglobin|lipid|laboratory|lab|cbc|potassium|sodium/.test(haystack)) return "LAB_REPORT";

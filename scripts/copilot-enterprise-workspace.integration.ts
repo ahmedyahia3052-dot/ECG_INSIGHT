@@ -104,7 +104,7 @@ async function main() {
     return { body: body as T, response, status: response.status };
   }
 
-  async function uploadAttachment(kind: "camera" | "file" | "image", fileName: string, mimeType: string, content: string, token: string) {
+  async function uploadAttachment(kind: "ecg" | "file" | "image", fileName: string, mimeType: string, content: string, token: string) {
     const formData = new FormData();
     formData.append("kind", kind);
     formData.append("contextType", "global");
@@ -152,10 +152,10 @@ async function main() {
     assert(emptyConversation.status === 201, "New Chat placeholder conversation must be creatable.");
     assert(emptyConversation.body.conversation.title === "New Clinical Conversation", "Empty new chat must use default title.");
 
-    const cameraCapture = await uploadAttachment("camera", "skin-rash-camera.jpg", "image/jpeg", "skin rash lesion medication image from mobile camera", token);
+    const ecgUpload = await uploadAttachment("ecg", "resting-ecg-upload.pdf", "application/pdf", "ECG rhythm strip PR interval QRS QTc ST depression", token);
     const medicalImage = await uploadAttachment("image", "chest-xray-image.png", "image/png", "chest x-ray opacity radiograph follow up", token);
     const clinicalFile = await uploadAttachment("file", "lab-report.txt", "text/plain", "Troponin: 0.42 Creatinine: 1.4 Potassium: 5.7 ECG irregular rhythm", token);
-    for (const upload of [cameraCapture, medicalImage, clinicalFile]) {
+    for (const upload of [ecgUpload, medicalImage, clinicalFile]) {
       assert(upload.status === 201 && Boolean(upload.body.attachment.id), "Medical attachment upload must persist.");
       assert(Boolean(upload.body.attachment.documentType), "Upload must detect document type.");
       assert(Boolean(upload.body.attachment.analysisSummary), "Upload must generate medical analysis summary.");
@@ -168,7 +168,7 @@ async function main() {
     const firstQuestion = "Interpret this ECG showing irregular rhythm and AF";
     const firstStream = await fetch(`${baseUrl}/copilot/chat/stream`, {
       body: JSON.stringify({
-        attachmentIds: [cameraCapture.body.attachment.id, medicalImage.body.attachment.id, clinicalFile.body.attachment.id],
+        attachmentIds: [ecgUpload.body.attachment.id, medicalImage.body.attachment.id, clinicalFile.body.attachment.id],
         contextType: "global",
         question: firstQuestion,
         tag: "ECG Interpretation",
@@ -209,7 +209,7 @@ async function main() {
     assert(restoredFirst.body.messages.filter((message) => message.role === "user").length === 2, "First conversation history must restore all user messages.");
     assert(restoredFirst.body.messages.some((message) => message.content.includes("anticoagulation")), "First conversation must restore later history.");
     const restoredAttachments = restoredFirst.body.messages.flatMap((message) => message.attachments ?? []);
-    assert(restoredAttachments.some((attachment) => attachment.kind === "camera" && attachment.documentType), "Camera capture must restore with document type.");
+    assert(restoredAttachments.some((attachment) => attachment.kind === "ecg" && attachment.documentType), "ECG upload must restore with document type.");
     assert(restoredAttachments.some((attachment) => attachment.kind === "image" && attachment.analysisSummary), "Medical image upload must restore analysis summary.");
     assert(restoredAttachments.some((attachment) => attachment.kind === "file" && attachment.extractedText?.includes("Troponin")), "Clinical file upload must restore OCR text.");
 

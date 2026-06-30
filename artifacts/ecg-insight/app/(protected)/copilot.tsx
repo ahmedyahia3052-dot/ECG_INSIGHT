@@ -2,7 +2,7 @@ import { Feather } from "@expo/vector-icons";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "expo-router";
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import { Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, useWindowDimensions, View } from "react-native";
+import { Image, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, useWindowDimensions, View } from "react-native";
 
 import { Badge, Card, EmptyState, medicalTheme, PrimaryButton } from "@/components/enterprise/EnterpriseUI";
 import { useAuth } from "@/context/AuthContext";
@@ -21,13 +21,14 @@ import {
 } from "@/services/copilot";
 
 type WorkspacePrompt = {
+  autoExportPdf?: boolean;
   icon: keyof typeof Feather.glyphMap;
   label: string;
   prompt: string;
   tag: CopilotTag;
 };
 
-type AttachmentKind = "camera" | "file" | "image";
+type AttachmentKind = "ecg" | "file" | "image";
 type SpeechRecognitionLike = {
   continuous: boolean;
   interimResults: boolean;
@@ -44,9 +45,9 @@ type SpeechWindow = Window & {
   webkitSpeechRecognition?: new () => SpeechRecognitionLike;
 };
 
-const ATTACHMENT_RULES: Record<AttachmentKind, { accept: string; capture?: "environment"; extensions: string[]; maxBytes: number; multiple: boolean }> = {
-  camera: { accept: "image/*", capture: "environment", extensions: [".jpg", ".jpeg", ".png", ".webp"], maxBytes: 25 * 1024 * 1024, multiple: false },
-  file: { accept: ".pdf,.docx,.txt,.csv,.jpg,.jpeg,.png,.webp,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain,text/csv,image/jpeg,image/png,image/webp", extensions: [".csv", ".docx", ".jpg", ".jpeg", ".pdf", ".png", ".txt", ".webp"], maxBytes: 25 * 1024 * 1024, multiple: true },
+const ATTACHMENT_RULES: Record<AttachmentKind, { accept: string; extensions: string[]; maxBytes: number; multiple: boolean }> = {
+  ecg: { accept: ".jpg,.jpeg,.png,.pdf,application/pdf,image/jpeg,image/png", extensions: [".jpg", ".jpeg", ".pdf", ".png"], maxBytes: 25 * 1024 * 1024, multiple: true },
+  file: { accept: ".pdf,.docx,.txt,.jpg,.jpeg,.png,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain,image/jpeg,image/png", extensions: [".docx", ".jpg", ".jpeg", ".pdf", ".png", ".txt"], maxBytes: 25 * 1024 * 1024, multiple: true },
   image: { accept: "image/*,.jpg,.jpeg,.png,.webp", extensions: [".jpg", ".jpeg", ".png", ".webp"], maxBytes: 25 * 1024 * 1024, multiple: true },
 };
 
@@ -57,7 +58,7 @@ const ACTIONS: WorkspacePrompt[] = [
   { icon: "git-branch", label: "Differential Diagnosis", prompt: "Provide a ranked differential diagnosis with ECG evidence, patient-context support, and recommended next discriminating tests.", tag: "Differential Diagnosis" },
   { icon: "briefcase", label: "Occupational Fitness", prompt: "Assess occupational fitness, restrictions, risk tier, return-to-work considerations, and follow-up requirements from the active ECG and patient context.", tag: "Occupational Fitness" },
   { icon: "calendar", label: "Follow-up Plan", prompt: "Create a follow-up plan with escalation thresholds, referral timing, repeat ECG guidance, and patient safety instructions.", tag: "Follow-up" },
-  { icon: "file-text", label: "Generate Report", prompt: "Draft a structured medical ECG report including interpretation, impression, differential, recommendations, occupational considerations, and physician sign-off disclaimer.", tag: "Clinical Summary" },
+  { autoExportPdf: true, icon: "file-text", label: "Generate Report", prompt: "Draft a complete structured medical ECG report including interpretation, clinical impression, differential diagnosis, recommendations, occupational considerations, follow-up plan, references, citations, and physician sign-off disclaimer. Format it as a physician-ready report for PDF export.", tag: "Clinical Summary" },
 ];
 
 const EMPTY_MESSAGES = [
@@ -74,7 +75,9 @@ export default function CopilotRoute() {
 export function CopilotWorkspaceScreen({ routeConversationId }: { routeConversationId?: string }) {
   const queryClient = useQueryClient();
   const router = useRouter();
+  const attachmentPreviewsRef = useRef<Record<string, string>>({});
   const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
+  const reportExportPendingRef = useRef(false);
   const scrollRef = useRef<ScrollView>(null);
   const streamAbort = useRef<AbortController | null>(null);
   const { width } = useWindowDimensions();
@@ -83,6 +86,7 @@ export function CopilotWorkspaceScreen({ routeConversationId }: { routeConversat
   const [contextOpen, setContextOpen] = useState(false);
   const [actionNotice, setActionNotice] = useState<{ tone: "error" | "success"; text: string } | undefined>();
   const [attachments, setAttachments] = useState<CopilotAttachment[]>([]);
+  const [attachmentPreviews, setAttachmentPreviews] = useState<Record<string, string>>({});
   const [draft, setDraft] = useState("");
   const [isRecording, setIsRecording] = useState(false);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
@@ -167,10 +171,14 @@ export function CopilotWorkspaceScreen({ routeConversationId }: { routeConversat
     try {
       setUploadingFiles((current) => current.concat(file.name));
       const payload = await uploadCopilotAttachment(token, formData);
+      if (file.type.startsWith("image/")) {
+        const previewUrl = URL.createObjectURL(file);
+        setAttachmentPreviews((current) => ({ ...current, [payload.attachment.id]: previewUrl }));
+      }
       setAttachments((current) => current.concat(payload.attachment));
       showActionNotice(`${payload.attachment.originalName} analyzed as ${payload.attachment.documentType ?? "clinical document"}.`);
-    } catch {
-      showActionNotice("Upload failed.", "error");
+    } catch (error) {
+      showActionNotice(error instanceof Error ? error.message : "Upload failed.", "error");
     } finally {
       setUploadingFiles((current) => current.filter((item) => item !== file.name));
     }
@@ -185,7 +193,6 @@ export function CopilotWorkspaceScreen({ routeConversationId }: { routeConversat
     input.type = "file";
     input.accept = ATTACHMENT_RULES[kind].accept;
     input.multiple = ATTACHMENT_RULES[kind].multiple;
-    if (ATTACHMENT_RULES[kind].capture) input.setAttribute("capture", ATTACHMENT_RULES[kind].capture);
     input.onchange = () => {
       const files = Array.from(input.files ?? []);
       if (!files.length) return;
@@ -268,8 +275,19 @@ export function CopilotWorkspaceScreen({ routeConversationId }: { routeConversat
       }, controller.signal);
       return finalConversation;
     },
-    onSuccess: () => {
+    onSuccess: (finalConversation) => {
+      if (reportExportPendingRef.current && finalConversation?.id && token) {
+        reportExportPendingRef.current = false;
+        void downloadCopilotExport(token, finalConversation.id, "pdf")
+          .then((blob) => {
+            downloadBlob(blob, `${finalConversation.title || "generated-medical-report"}.pdf`);
+            showActionNotice("Medical report generated and PDF export downloaded.");
+          })
+          .catch(() => showActionNotice("Report generated, but PDF export failed.", "error"));
+      }
+      Object.values(attachmentPreviews).forEach((previewUrl) => URL.revokeObjectURL(previewUrl));
       setAttachments([]);
+      setAttachmentPreviews({});
       setDraft("");
       setStatus("");
       setStreamingMessage("");
@@ -306,6 +324,14 @@ export function CopilotWorkspaceScreen({ routeConversationId }: { routeConversat
   }, [contextOpen, selectedId]);
 
   useEffect(() => {
+    attachmentPreviewsRef.current = attachmentPreviews;
+  }, [attachmentPreviews]);
+
+  useEffect(() => () => {
+    Object.values(attachmentPreviewsRef.current).forEach((previewUrl) => URL.revokeObjectURL(previewUrl));
+  }, []);
+
+  useEffect(() => {
     if (!routeConversationId && selectedId) setSelectedId(undefined);
   }, [routeConversationId, selectedId]);
 
@@ -327,15 +353,18 @@ export function CopilotWorkspaceScreen({ routeConversationId }: { routeConversat
     scrollRef.current?.scrollToEnd({ animated: true });
   }, [messages.length, selectedId, streamingMessage]);
 
-  function sendPrompt(prompt: string, tag: CopilotTag) {
+  function sendPrompt(prompt: string, tag: CopilotTag, options: { autoExportPdf?: boolean } = {}) {
     const trimmed = prompt.trim() || (attachments.length ? "Review the attached medical files, perform OCR-informed analysis, identify document or image type, explain findings, cite trusted medical knowledge, provide warnings, and suggest next steps." : "");
     if (!trimmed || !token || sendMutation.isPending) return;
+    reportExportPendingRef.current = Boolean(options.autoExportPdf);
     sendMutation.mutate({ attachmentIds: attachments.map((attachment) => attachment.id), prompt: trimmed, tag });
   }
 
   function startNewChat() {
     setSelectedId(undefined);
     setAttachments([]);
+    Object.values(attachmentPreviews).forEach((previewUrl) => URL.revokeObjectURL(previewUrl));
+    setAttachmentPreviews({});
     setDraft("");
     setStatus("");
     setStreamingMessage("");
@@ -371,22 +400,28 @@ export function CopilotWorkspaceScreen({ routeConversationId }: { routeConversat
       showActionNotice("Select a conversation before sharing.", "error");
       return;
     }
+    const deepLink = `${window.location.origin}/copilot/${selectedId}`;
+    const text = [selectedConversation?.title ?? "ECG Insight AI Copilot conversation", deepLink, ...messages.map((message) => `${message.role.toUpperCase()}: ${message.content}`)].join("\n\n");
+    const webNavigator = navigator as Navigator & {
+      clipboard?: { writeText: (text: string) => Promise<void> };
+      share?: (data: { text: string; title: string; url: string }) => Promise<void>;
+    };
     try {
-      const blob = await downloadCopilotExport(token, selectedId, "pdf");
-      const file = new File([blob], `${safeFileName(selectedConversation?.title ?? "copilot-conversation")}.pdf`, { type: "application/pdf" });
-      const webNavigator = navigator as Navigator & {
-        canShare?: (data: { files: File[] }) => boolean;
-        share?: (data: { files: File[]; title: string }) => Promise<void>;
-      };
-      if (webNavigator.share && (!webNavigator.canShare || webNavigator.canShare({ files: [file] }))) {
-        await webNavigator.share({ files: [file], title: "ECG Insight AI Copilot conversation" });
+      if (webNavigator.share) {
+        await webNavigator.share({ text, title: "ECG Insight AI Copilot conversation", url: deepLink });
         showActionNotice("Share sheet opened.");
         return;
       }
-      downloadBlob(blob, file.name);
-      showActionNotice("Share sheet unavailable. PDF export downloaded.");
     } catch {
-      showActionNotice("Share failed.", "error");
+      // Fall through to clipboard/download sharing when native share is unavailable or cancelled.
+    }
+    try {
+      if (!webNavigator.clipboard) throw new Error("Clipboard unavailable.");
+      await webNavigator.clipboard.writeText(text);
+      showActionNotice("Conversation deep link and text copied.");
+    } catch {
+      downloadBlob(new Blob([text], { type: "text/plain;charset=utf-8" }), `${selectedConversation?.title ?? "copilot-conversation"}-share.txt`);
+      showActionNotice("Clipboard unavailable. Conversation text downloaded.");
     }
   }
 
@@ -443,7 +478,7 @@ export function CopilotWorkspaceScreen({ routeConversationId }: { routeConversat
               accessibilityRole="button"
               disabled={sendMutation.isPending}
               key={action.label}
-              onPress={() => sendPrompt(action.prompt, action.tag)}
+              onPress={() => sendPrompt(action.prompt, action.tag, { autoExportPdf: action.autoExportPdf })}
               style={[styles.actionPill, sendMutation.isPending && styles.disabled]}
             >
               <Feather name={action.icon} size={14} color={medicalTheme.primary} />
@@ -500,15 +535,15 @@ export function CopilotWorkspaceScreen({ routeConversationId }: { routeConversat
                 {EMPTY_MESSAGES.map((message) => <Text key={message} style={styles.emptyMessage}>{message}</Text>)}
               </View>
             ) : null}
-            {messages.map((message) => <MessageCard key={message.id} message={message} />)}
+            {messages.map((message) => <MessageCard key={message.id} message={message} onNotice={showActionNotice} />)}
             {status && !streamingMessage ? <Text style={styles.statusText}>{status}</Text> : null}
-            {streamingMessage ? <MessageCard message={{ attachments: [], citations: [], content: streamingMessage, createdAt: new Date().toISOString(), id: "streaming", role: "assistant" }} /> : null}
+            {streamingMessage ? <MessageCard message={{ attachments: [], citations: [], content: streamingMessage, createdAt: new Date().toISOString(), id: "streaming", role: "assistant" }} onNotice={showActionNotice} /> : null}
           </ScrollView>
 
           <View style={styles.composer}>
             <View style={styles.attachmentRow}>
               <ComposerTool active={isRecording} icon="mic" label={isRecording ? "Stop Voice" : "Voice"} onPress={toggleVoiceInput} />
-              <ComposerTool icon="camera" label="Camera" onPress={() => openFilePicker("camera")} />
+              <ComposerTool icon="activity" label="Upload ECG" onPress={() => openFilePicker("ecg")} />
               <ComposerTool icon="paperclip" label="Upload Files" onPress={() => openFilePicker("file")} />
               <ComposerTool icon="image" label="Upload Image" onPress={() => openFilePicker("image")} />
             </View>
@@ -518,7 +553,17 @@ export function CopilotWorkspaceScreen({ routeConversationId }: { routeConversat
                   <AttachmentChip
                     attachment={attachment}
                     key={attachment.id}
-                    onRemove={() => setAttachments((current) => current.filter((item) => item.id !== attachment.id))}
+                    onRemove={() => {
+                      const previewUrl = attachmentPreviews[attachment.id];
+                      if (previewUrl) URL.revokeObjectURL(previewUrl);
+                      setAttachmentPreviews((current) => {
+                        const next = { ...current };
+                        delete next[attachment.id];
+                        return next;
+                      });
+                      setAttachments((current) => current.filter((item) => item.id !== attachment.id));
+                    }}
+                    previewUrl={attachmentPreviews[attachment.id]}
                   />
                 ))}
               </View>
@@ -602,7 +647,7 @@ function ConversationList({
   );
 }
 
-function MessageCard({ message }: { message: CopilotMessage }) {
+function MessageCard({ message, onNotice }: { message: CopilotMessage; onNotice: (text: string, tone?: "error" | "success") => void }) {
   const assistant = message.role === "assistant";
   return (
     <View style={[styles.message, assistant ? styles.assistantMessage : styles.userMessage]}>
@@ -619,7 +664,7 @@ function MessageCard({ message }: { message: CopilotMessage }) {
       {message.citations?.length ? <CitationList citations={message.citations} /> : null}
       {assistant ? (
         <View style={styles.answerTools}>
-          <MiniAction icon="copy" label="Copy answer" onPress={() => copyText(message.content)} />
+          <MiniAction icon="copy" label="Copy answer" onPress={() => copyText(message.content, onNotice)} />
           {message.confidence !== undefined ? <Text style={styles.confidence}>Confidence {Math.round(message.confidence * 100)}%</Text> : null}
         </View>
       ) : null}
@@ -694,10 +739,11 @@ function MiniAction({ icon, label, onPress, tone }: { icon: keyof typeof Feather
   );
 }
 
-function AttachmentChip({ attachment, onRemove }: { attachment: CopilotAttachment; onRemove?: () => void }) {
+function AttachmentChip({ attachment, onRemove, previewUrl }: { attachment: CopilotAttachment; onRemove?: () => void; previewUrl?: string }) {
   const findings = attachment.medicalAnalysis?.findings ?? [];
   return (
     <View style={styles.attachmentChip}>
+      {previewUrl ? <Image accessibilityLabel={`${attachment.originalName} preview`} source={{ uri: previewUrl }} style={styles.attachmentPreview} /> : null}
       <Feather name={attachment.kind === "camera" ? "camera" : attachment.kind === "image" ? "image" : attachment.kind === "ecg" ? "activity" : attachment.kind === "echo" ? "heart" : attachment.kind === "labs" ? "clipboard" : "paperclip"} size={13} color={medicalTheme.primary} />
       <View style={styles.attachmentChipText}>
         <Text numberOfLines={1} style={styles.attachmentName}>{attachment.originalName}</Text>
@@ -734,10 +780,14 @@ function formatFileSize(sizeBytes: number) {
   return `${(sizeBytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-function copyText(content: string) {
+function copyText(content: string, onNotice?: (text: string, tone?: "error" | "success") => void) {
   if (typeof navigator !== "undefined" && "clipboard" in navigator) {
-    void navigator.clipboard.writeText(content);
+    void navigator.clipboard.writeText(content)
+      .then(() => onNotice?.("Answer copied."))
+      .catch(() => onNotice?.("Copy failed.", "error"));
+    return;
   }
+  onNotice?.("Copy is not available in this browser.", "error");
 }
 
 function downloadBlob(blob: Blob, filename: string) {
@@ -776,6 +826,7 @@ const styles = StyleSheet.create({
   attachmentMeta: { color: medicalTheme.muted, fontSize: 10, fontWeight: "800" },
   attachmentName: { color: medicalTheme.text, fontSize: 12, fontWeight: "900" },
   attachmentPanel: { borderColor: "rgba(148,163,184,0.16)", borderRadius: 16, borderWidth: 1, flexDirection: "row", flexWrap: "wrap", gap: 8, padding: 8 },
+  attachmentPreview: { backgroundColor: "rgba(2,6,23,0.72)", borderColor: glassBorder, borderRadius: 10, borderWidth: 1, height: 42, width: 42 },
   attachmentRemove: { alignItems: "center", backgroundColor: "rgba(239,68,68,0.18)", borderRadius: 999, height: 22, justifyContent: "center", width: 22 },
   attachmentRow: { alignItems: "center", flexDirection: "row", flexWrap: "wrap", gap: 8 },
   attachmentSummary: { color: medicalTheme.muted, fontSize: 10, fontWeight: "700", lineHeight: 14, marginTop: 3 },

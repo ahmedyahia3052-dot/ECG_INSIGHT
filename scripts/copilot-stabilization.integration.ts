@@ -32,10 +32,11 @@ for (const marker of [
   "scrollToEnd",
   "WORKSPACE_STATE_KEY",
   "Voice",
-  "Camera",
+  "Upload ECG",
   "Upload Files",
   "Upload Image",
-  "environment",
+  "attachmentPreviews",
+  "autoExportPdf",
   "analysisSummary",
 ]) {
   assert(workspace.includes(marker), `Workspace simplified-chat marker missing: ${marker}`);

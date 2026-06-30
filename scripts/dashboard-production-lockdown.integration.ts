@@ -66,7 +66,7 @@ for (const forbidden of ["\"ai\"] as const", "/(tabs)", "@/components/bolt", "@/
 for (const marker of ["Clinical Copilot Workspace", "ACTIONS", "streamCopilotMessage", "listCopilotConversations", "getCopilotConversation", "ConversationList", "lastMessagePreview", "startNewChat", "Regenerate", "Continue", "RichMedicalText", "CitationList", "ContextLine"]) {
   assert(copilotWorkspace.includes(marker), `Full-page Copilot workspace is missing production marker: ${marker}`);
 }
-for (const marker of ["sidebar", "groupTitle", "chatPanel", "messages", "messageList", "composer", "actionBar", "scrollToEnd", "Voice", "Camera", "Upload Files", "Upload Image", "overflow: \"hidden\"", "mobileSidebarOpen"]) {
+for (const marker of ["sidebar", "groupTitle", "chatPanel", "messages", "messageList", "composer", "actionBar", "scrollToEnd", "Voice", "Upload ECG", "Upload Files", "Upload Image", "overflow: \"hidden\"", "mobileSidebarOpen"]) {
   assert(copilotWorkspace.includes(marker), `Final enterprise copilot UI is missing anti-clipping/layout marker: ${marker}`);
 }
 assert(!copilotWorkspace.includes("onPress={() => {}}"), "Copilot workspace must not contain dead button handlers.");

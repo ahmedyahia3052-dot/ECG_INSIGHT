@@ -42,8 +42,8 @@ export async function uiLogin(page: Page, role: keyof typeof users = "doctor") {
     }
   }
   await expect(page.getByText("Welcome back")).toBeVisible();
-  await page.getByPlaceholder("doctor@hospital.com").fill(users[role].email);
-  await page.getByPlaceholder("Password").fill(users[role].password);
+  await page.getByPlaceholder(/doctor@hospital\.com|name@organization\.com/i).fill(users[role].email);
+  await page.getByPlaceholder(/password/i).fill(users[role].password);
   await page.getByRole("button", { name: /sign in/i }).click();
   await expect(page.getByText(/Enterprise Clinical Command Center|Good Morning|Good Afternoon|Good Evening/).first()).toBeVisible({ timeout: 30_000 });
 }

@@ -32,10 +32,12 @@ for (const marker of [
   "selectedConversation?.title",
   "New Clinical Conversation",
   "Voice",
-  "Camera",
+  "Upload ECG",
   "Upload Files",
   "Upload Image",
-  "capture",
+  "attachmentPreviews",
+  "autoExportPdf",
+  "shareConversation",
   "analysisSummary",
 ]) {
   assert(workspace.includes(marker), `Simplified Copilot workspace marker missing: ${marker}`);

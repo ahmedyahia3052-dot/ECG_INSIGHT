@@ -28,27 +28,102 @@ test.describe("owner controls, copilot, ECG viewer, search, notifications, and e
     await expect(page.getByText(target.email)).toBeVisible();
   });
 
-  test("Medical AI Copilot opens, answers, manages conversation, and exports PDF @smoke", async ({ page, request }) => {
-    await apiLogin(request, "doctor");
-    await uiLogin(page, "owner");
-    await navigate(page, "/dashboard", /Enterprise Clinical Command Center|Dashboard/);
-    await page.getByLabel("Open Medical AI Copilot").click();
-    await expect(page.getByText("Medical AI Copilot")).toBeVisible();
-    const enableButton = page.getByRole("button", { name: "Enable Copilot" });
-    if (await enableButton.isVisible().catch(() => false)) {
-      await enableButton.click();
+  test("AI Clinical Copilot workspace activates every visible action @smoke", async ({ page }) => {
+    const consoleErrors: string[] = [];
+    const failedRequests: string[] = [];
+    page.on("console", (message) => {
+      if (message.type() === "error") consoleErrors.push(message.text());
+    });
+    page.on("requestfailed", (requestFailure) => failedRequests.push(requestFailure.url()));
+    await page.addInitScript(() => {
+      window.localStorage.clear();
+      window.sessionStorage.clear();
+      class MockSpeechRecognition {
+        continuous = false;
+        interimResults = false;
+        lang = "en-US";
+        onend: (() => void) | null = null;
+        onerror: ((event: { error?: string }) => void) | null = null;
+        onresult: ((event: { results: ArrayLike<{ 0: { transcript: string }; isFinal: boolean }> }) => void) | null = null;
+        start() {
+          setTimeout(() => {
+            this.onresult?.({ results: [{ 0: { transcript: "mock voice transcript" }, isFinal: true }] });
+            this.onend?.();
+          }, 50);
+        }
+        stop() {
+          this.onend?.();
+        }
+      }
+      Object.assign(window, { SpeechRecognition: MockSpeechRecognition, webkitSpeechRecognition: MockSpeechRecognition });
+    });
+
+    const loginResponse = await page.request.post(`${API_URL}/auth/login`, {
+      data: { email: "doctor@ecginsight.com", password: "password", rememberMe: true },
+    });
+    if (!loginResponse.ok()) throw new Error(`Browser-context doctor login should succeed: ${await loginResponse.text()}`);
+    const loginPayload = await loginResponse.json();
+    await page.route("**/api/auth/refresh", async (route) => {
+      await route.fulfill({ contentType: "application/json", json: loginPayload, status: 200 });
+    });
+    await page.goto("/copilot");
+    await expectPageReady(page, "Clinical Copilot Workspace");
+    async function clickStreamingButton(name: string) {
+      const streamResponse = page.waitForResponse((response) => response.url().includes("/copilot/chat/stream") && response.status() === 201, { timeout: 45_000 });
+      await page.getByRole("button", { name }).click();
+      await streamResponse;
+      await expect(page.getByText("Ready").first()).toBeVisible({ timeout: 45_000 });
     }
-    await page.getByPlaceholder("Ask the Medical AI Copilot...").fill("Explain atrial fibrillation and occupational fitness risk.");
-    await page.getByRole("button", { name: "Send" }).click();
-    const exportButton = page.getByRole("button", { name: "Export Conversation PDF" });
-    await expect(page.getByText(/Current Context|Medical AI Copilot/).first()).toBeVisible({ timeout: 45_000 });
-    if (await exportButton.isVisible().catch(() => false)) {
-      await page.getByRole("button", { name: "Favorite" }).click();
-      await page.getByRole("button", { name: "Rename" }).click();
-      const download = page.waitForEvent("download", { timeout: 20_000 }).catch(() => null);
-      await exportButton.click();
-      await download;
+
+    const composer = page.getByPlaceholder(/Ask about ECG interpretation/i);
+    await page.getByRole("button", { name: "Voice" }).last().click();
+    await expect(composer).toHaveValue(/mock voice transcript/i);
+
+    const ecgChooser = page.waitForEvent("filechooser");
+    await page.getByRole("button", { name: "Upload ECG" }).last().click();
+    await (await ecgChooser).setFiles({ buffer: Buffer.from("ECG rhythm strip PR interval QRS QTc ST depression"), mimeType: "application/pdf", name: "qa-resting-ecg.pdf" });
+    await expect(page.getByText("qa-resting-ecg.pdf")).toBeVisible({ timeout: 30_000 });
+
+    const imageChooser = page.waitForEvent("filechooser");
+    await page.getByRole("button", { name: "Upload Image" }).last().click();
+    await (await imageChooser).setFiles({ buffer: Buffer.from("89504e470d0a1a0a0000000d49484452", "hex"), mimeType: "image/png", name: "qa-medical-image.png" });
+    await expect(page.getByText("qa-medical-image.png")).toBeVisible({ timeout: 30_000 });
+
+    const fileChooser = page.waitForEvent("filechooser");
+    await page.getByRole("button", { name: "Upload Files" }).last().click();
+    await (await fileChooser).setFiles({ buffer: Buffer.from("Troponin 0.42 potassium 5.7 ECG irregular rhythm"), mimeType: "text/plain", name: "qa-labs.txt" });
+    await expect(page.getByText("qa-labs.txt")).toBeVisible({ timeout: 30_000 });
+
+    await clickStreamingButton("Send");
+    await expect(page.getByText(/Clinical Summary|AI Clinical Copilot/).first()).toBeVisible({ timeout: 45_000 });
+
+    for (const action of ["Interpret ECG", "Generate Impression", "Patient Summary", "Differential Diagnosis", "Occupational Fitness", "Follow-up Plan"]) {
+      await clickStreamingButton(action);
+      await expect(page.getByText("AI Clinical Copilot").first()).toBeVisible({ timeout: 45_000 });
     }
+
+    const reportDownload = page.waitForEvent("download", { timeout: 45_000 }).catch(() => null);
+    await clickStreamingButton("Generate Report");
+    await reportDownload;
+
+    const pdfDownload = page.waitForEvent("download", { timeout: 30_000 }).catch(() => null);
+    await page.getByRole("button", { name: "Export PDF" }).click();
+    await pdfDownload;
+
+    const txtDownload = page.waitForEvent("download", { timeout: 30_000 }).catch(() => null);
+    await page.getByRole("button", { name: "Export TXT" }).click();
+    await txtDownload;
+
+    await page.getByRole("button", { name: "Share" }).click();
+    await expect(page.getByText(/Share sheet opened|Conversation deep link and text copied|Conversation text downloaded/)).toBeVisible({ timeout: 20_000 });
+
+    await clickStreamingButton("Regenerate");
+    await expect(page.getByText("AI Clinical Copilot").first()).toBeVisible({ timeout: 45_000 });
+    await clickStreamingButton("Continue");
+    await expect(page.getByText("AI Clinical Copilot").first()).toBeVisible({ timeout: 45_000 });
+
+    expect(consoleErrors).toEqual([]);
+    expect(failedRequests).toEqual([]);
   });
 
   test("ECG Pro Viewer exposes viewer controls, annotations, AI explainability, and report actions", async ({ page, request }) => {
