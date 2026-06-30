@@ -78,11 +78,11 @@ export function ErrorFallback({ error, resetError }: ErrorFallbackProps) {
 
       <View style={styles.content}>
         <Text style={[styles.title, { color: colors.foreground }]}>
-          Something went wrong
+          Workspace recovery needed
         </Text>
 
         <Text style={[styles.message, { color: colors.mutedForeground }]}>
-          The workspace recovered from a runtime issue. Use Retry or return to the dashboard.
+          The workspace caught a recoverable issue. Retry the screen or return to the dashboard.
         </Text>
 
         <Text style={[styles.errorId, { color: colors.mutedForeground }]}>

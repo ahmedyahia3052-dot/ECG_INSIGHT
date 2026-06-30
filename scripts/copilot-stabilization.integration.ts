@@ -36,13 +36,12 @@ for (const marker of [
   "Upload Files",
   "Upload Image",
   "attachmentPreviews",
-  "autoExportPdf",
   "analysisSummary",
 ]) {
   assert(workspace.includes(marker), `Workspace simplified-chat marker missing: ${marker}`);
 }
 
-for (const removed of ["Rename", "Pin", "Favorite", "Archive", "Duplicate", "renameCopilotConversation", "pinCopilotConversation", "favoriteCopilotConversation", "archiveCopilotConversation", "duplicateCopilotConversation", "ConversationAction"]) {
+for (const removed of ["Rename", "Pin", "Favorite", "Archive", "Duplicate", "renameCopilotConversation", "pinCopilotConversation", "favoriteCopilotConversation", "archiveCopilotConversation", "duplicateCopilotConversation", "ConversationAction", "Interpret ECG", "Generate Impression", "Patient Summary", "Differential Diagnosis", "Follow-up Plan", "Generate Report", "autoExportPdf"]) {
   assert(!workspace.includes(removed), `Workspace still contains removed management marker: ${removed}`);
 }
 
@@ -67,6 +66,8 @@ for (const marker of [
   "detectAttachmentDocumentType",
   "readBestEffortOcrText",
   "medicalAnalysis",
+  "retrieveConversationMemory",
+  "shouldRetrieveKnowledge",
 ]) {
   assert(routes.includes(marker), `Copilot backend simplified-chat marker missing: ${marker}`);
 }

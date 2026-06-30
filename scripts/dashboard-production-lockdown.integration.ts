@@ -63,11 +63,14 @@ for (const forbidden of ["\"ai\"] as const", "/(tabs)", "@/components/bolt", "@/
   assert(!enterpriseShell.includes(forbidden), `Enterprise shell must not contain legacy/conflicting marker: ${forbidden}`);
 }
 
-for (const marker of ["Clinical Copilot Workspace", "ACTIONS", "streamCopilotMessage", "listCopilotConversations", "getCopilotConversation", "ConversationList", "lastMessagePreview", "startNewChat", "Regenerate", "Continue", "RichMedicalText", "CitationList", "ContextLine"]) {
+for (const marker of ["Clinical Copilot Workspace", "streamCopilotMessage", "listCopilotConversations", "getCopilotConversation", "ConversationList", "lastMessagePreview", "startNewChat", "Regenerate", "Continue", "RichMedicalText", "CitationList", "ContextLine"]) {
   assert(copilotWorkspace.includes(marker), `Full-page Copilot workspace is missing production marker: ${marker}`);
 }
-for (const marker of ["sidebar", "groupTitle", "chatPanel", "messages", "messageList", "composer", "actionBar", "scrollToEnd", "Voice", "Upload ECG", "Upload Files", "Upload Image", "overflow: \"hidden\"", "mobileSidebarOpen"]) {
+for (const marker of ["sidebar", "groupTitle", "chatPanel", "messages", "messageList", "composer", "scrollToEnd", "Voice", "Upload ECG", "Upload Files", "Upload Image", "overflow: \"hidden\"", "mobileSidebarOpen"]) {
   assert(copilotWorkspace.includes(marker), `Final enterprise copilot UI is missing anti-clipping/layout marker: ${marker}`);
+}
+for (const removed of ["Interpret ECG", "Generate Impression", "Patient Summary", "Differential Diagnosis", "Follow-up Plan", "Generate Report", "autoExportPdf"]) {
+  assert(!copilotWorkspace.includes(removed), `Conversational Copilot must not expose workflow generator marker: ${removed}`);
 }
 assert(!copilotWorkspace.includes("onPress={() => {}}"), "Copilot workspace must not contain dead button handlers.");
 for (const marker of ["streamCopilotMessage", "/copilot/chat/stream", "parseSseEvent", "lastMessagePreview", "copilotExportTxtUrl"]) {
@@ -96,7 +99,7 @@ for (const forbidden of ["Normal: 8", "Abnormal: 3", "Math.random", "onPress={()
 assert(analyticsPage.includes("No analytics yet") && analyticsPage.includes("diagnosisDistribution ?? {}"), "Analytics charts must use real empty states instead of fake fallback values.");
 assert(patientProfilePage.includes("onOpen={(item)") && patientProfilePage.includes("metadata.caseId") && patientProfilePage.includes("metadata.reportId"), "Patient timeline actions must resolve to real routes or tabs.");
 
-for (const marker of ["retrieveClinicalContext", "Patient Profile", "Previous ECG", "Cardiovascular Document", "retrieveKnowledge", "ECG Knowledge Base", "DISCLAIMER", "citations", "automaticConversationTitle", "lastMessagePreview", "analyzeUploadedAttachment", "detectAttachmentDocumentType", "readBestEffortOcrText", "/chat/stream", "writeSse", "streamAssistantContent", "export.txt", "auditCopilotError", "copilotUsageEvent"]) {
+for (const marker of ["retrieveClinicalContext", "Patient Profile", "Previous ECG", "Cardiovascular Document", "shouldRetrieveKnowledge", "retrieveConversationMemory", "DISCLAIMER", "citations", "automaticConversationTitle", "lastMessagePreview", "analyzeUploadedAttachment", "detectAttachmentDocumentType", "readBestEffortOcrText", "/chat/stream", "writeSse", "streamAssistantContent", "export.txt", "auditCopilotError", "copilotUsageEvent"]) {
   assert(copilotRoutes.includes(marker), `Copilot backend is missing context/RAG/persistence marker: ${marker}`);
 }
 for (const marker of ["createUnifiedNotification", "unreadNotificationCount", "processScheduledNotifications", "emitRealtime", "REPORT_GENERATION", "read: false"]) {

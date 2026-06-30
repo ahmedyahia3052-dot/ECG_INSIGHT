@@ -95,16 +95,15 @@ test.describe("owner controls, copilot, ECG viewer, search, notifications, and e
     await expect(page.getByText("qa-labs.txt")).toBeVisible({ timeout: 30_000 });
 
     await clickStreamingButton("Send");
-    await expect(page.getByText(/Clinical Summary|AI Clinical Copilot/).first()).toBeVisible({ timeout: 45_000 });
+    await expect(page.getByText(/Uploaded Document Review|AI Clinical Copilot/).first()).toBeVisible({ timeout: 45_000 });
 
-    for (const action of ["Interpret ECG", "Generate Impression", "Patient Summary", "Differential Diagnosis", "Occupational Fitness", "Follow-up Plan"]) {
-      await clickStreamingButton(action);
-      await expect(page.getByText("AI Clinical Copilot").first()).toBeVisible({ timeout: 45_000 });
-    }
+    await composer.fill("What causes AF and how should I think about risk?");
+    await clickStreamingButton("Send");
+    await expect(page.getByText(/Short Answer|Atrial Fibrillation|AI Clinical Copilot/).first()).toBeVisible({ timeout: 45_000 });
 
-    const reportDownload = page.waitForEvent("download", { timeout: 45_000 }).catch(() => null);
-    await clickStreamingButton("Generate Report");
-    await reportDownload;
+    await composer.fill("Using the files I uploaded earlier, what should I re-check?");
+    await clickStreamingButton("Send");
+    await expect(page.getByText(/Uploaded Document Review|previously uploaded|AI Clinical Copilot/).first()).toBeVisible({ timeout: 45_000 });
 
     const pdfDownload = page.waitForEvent("download", { timeout: 30_000 }).catch(() => null);
     await page.getByRole("button", { name: "Export PDF" }).click();

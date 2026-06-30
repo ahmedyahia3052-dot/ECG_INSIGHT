@@ -20,14 +20,6 @@ import {
   type CopilotTag,
 } from "@/services/copilot";
 
-type WorkspacePrompt = {
-  autoExportPdf?: boolean;
-  icon: keyof typeof Feather.glyphMap;
-  label: string;
-  prompt: string;
-  tag: CopilotTag;
-};
-
 type AttachmentKind = "ecg" | "file" | "image";
 type SpeechRecognitionLike = {
   continuous: boolean;
@@ -62,19 +54,9 @@ const ATTACHMENT_RULES: Record<AttachmentKind, { accept: string; extensions: str
   image: { accept: "image/*,.jpg,.jpeg,.png,.webp", extensions: [".jpg", ".jpeg", ".png", ".webp"], maxBytes: 25 * 1024 * 1024, multiple: true },
 };
 
-const ACTIONS: WorkspacePrompt[] = [
-  { icon: "activity", label: "Interpret ECG", prompt: "Interpret the active ECG using all available patient, case, file, note, report, and knowledge retrieval context. Include rhythm, intervals, morphology, red flags, and confidence.", tag: "ECG Interpretation" },
-  { icon: "edit-3", label: "Generate Impression", prompt: "Generate a concise physician-ready ECG impression with clinical caveats, confidence, and urgent action criteria.", tag: "ECG Interpretation" },
-  { icon: "user", label: "Patient Summary", prompt: "Summarize the current patient context, demographics, ECG history, uploaded documents, reports, labs, and clinically relevant risk factors.", tag: "Clinical Summary" },
-  { icon: "git-branch", label: "Differential Diagnosis", prompt: "Provide a ranked differential diagnosis with ECG evidence, patient-context support, and recommended next discriminating tests.", tag: "Differential Diagnosis" },
-  { icon: "briefcase", label: "Occupational Fitness", prompt: "Assess occupational fitness, restrictions, risk tier, return-to-work considerations, and follow-up requirements from the active ECG and patient context.", tag: "Occupational Fitness" },
-  { icon: "calendar", label: "Follow-up Plan", prompt: "Create a follow-up plan with escalation thresholds, referral timing, repeat ECG guidance, and patient safety instructions.", tag: "Follow-up" },
-  { autoExportPdf: true, icon: "file-text", label: "Generate Report", prompt: "Draft a complete structured medical ECG report including interpretation, clinical impression, differential diagnosis, recommendations, occupational considerations, follow-up plan, references, citations, and physician sign-off disclaimer. Format it as a physician-ready report for PDF export.", tag: "Clinical Summary" },
-];
-
 const EMPTY_MESSAGES = [
-  "Ask anything about ECG interpretation, clinical reasoning, occupational fitness, reports, or follow-up.",
-  "Use the action bar above to inject a clinical workflow prompt into this persistent conversation.",
+  "Ask naturally about symptoms, ECGs, medications, medical reports, occupational fitness, or follow-up.",
+  "Upload ECGs, labs, radiology reports, echo reports, or medical photos and continue the conversation in plain language.",
 ];
 
 const WORKSPACE_STATE_KEY = "ecg-insight:copilot-workspace-state";
@@ -108,7 +90,6 @@ export function CopilotWorkspaceScreen({ routeConversationId }: { routeConversat
   const router = useRouter();
   const attachmentPreviewsRef = useRef<Record<string, string>>({});
   const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
-  const reportExportPendingRef = useRef(false);
   const scrollRef = useRef<ScrollView>(null);
   const streamAbort = useRef<AbortController | null>(null);
   const { width } = useWindowDimensions();
@@ -387,16 +368,9 @@ export function CopilotWorkspaceScreen({ routeConversationId }: { routeConversat
       }, controller.signal);
       return finalConversation;
     },
-    onSuccess: (finalConversation) => {
-      if (reportExportPendingRef.current && finalConversation?.id && token) {
-        reportExportPendingRef.current = false;
-        void downloadCopilotExport(token, finalConversation.id, "pdf")
-          .then((blob) => {
-            downloadBlob(blob, `${finalConversation.title || "generated-medical-report"}.pdf`);
-            showActionNotice("Medical report generated and PDF export downloaded.");
-          })
-          .catch(() => showActionNotice("Report generated, but PDF export failed.", "error"));
-      }
+    retry: 1,
+    retryDelay: 1200,
+    onSuccess: () => {
       Object.values(attachmentPreviews).forEach((previewUrl) => URL.revokeObjectURL(previewUrl));
       setAttachments([]);
       setAttachmentPreviews({});
@@ -407,7 +381,7 @@ export function CopilotWorkspaceScreen({ routeConversationId }: { routeConversat
       invalidate();
     },
     onError: () => {
-      setStatus("Generation stopped. Your persisted conversation is still available.");
+      setStatus("Connection interrupted. Your conversation is saved; please retry when ready.");
       setStreamingMessage("");
       streamAbort.current = null;
     },
@@ -469,10 +443,9 @@ export function CopilotWorkspaceScreen({ routeConversationId }: { routeConversat
     scrollRef.current?.scrollToEnd({ animated: true });
   }, [messages.length, selectedId, streamingMessage]);
 
-  function sendPrompt(prompt: string, tag: CopilotTag, options: { autoExportPdf?: boolean } = {}) {
+  function sendPrompt(prompt: string, tag: CopilotTag) {
     const trimmed = safeString(prompt).trim() || (attachments.length ? "Review the attached medical files, perform OCR-informed analysis, identify document or image type, explain findings, cite trusted medical knowledge, provide warnings, and suggest next steps." : "");
     if (!trimmed || !token || sendMutation.isPending) return;
-    reportExportPendingRef.current = Boolean(options.autoExportPdf);
     sendMutation.mutate({ attachmentIds: attachments.map((attachment) => attachment?.id).filter(Boolean), prompt: trimmed, tag });
   }
 
@@ -596,21 +569,6 @@ export function CopilotWorkspaceScreen({ routeConversationId }: { routeConversat
               <Text style={styles.contextToggleText}>{contextOpen ? "Hide Context" : "Context"}</Text>
             </Pressable>
           </View>
-        </View>
-
-        <View style={styles.actionBar}>
-          {ACTIONS.map((action) => (
-            <Pressable
-              accessibilityRole="button"
-              disabled={sendMutation.isPending}
-              key={action.label}
-              onPress={() => sendPrompt(action.prompt, action.tag, { autoExportPdf: action.autoExportPdf })}
-              style={[styles.actionPill, sendMutation.isPending && styles.disabled]}
-            >
-              <Feather name={action.icon} size={14} color={medicalTheme.primary} />
-              <Text style={styles.actionText}>{action.label}</Text>
-            </Pressable>
-          ))}
         </View>
 
         {actionNotice ? (

@@ -52,6 +52,9 @@ test.describe("Copilot runtime hardening", () => {
 
     await page.goto("/copilot");
     await expect(page.getByText("Clinical Copilot Workspace")).toBeVisible({ timeout: 30_000 });
+    for (const retiredWorkflow of ["Interpret ECG", "Generate Impression", "Patient Summary", "Differential Diagnosis", "Follow-up Plan", "Generate Report"]) {
+      await expect(page.getByRole("button", { name: retiredWorkflow })).toHaveCount(0);
+    }
     await expectNoErrorBoundary();
 
     await page.getByRole("button", { name: "New Chat" }).click();
@@ -99,6 +102,7 @@ test.describe("Copilot runtime hardening", () => {
     await expectNoErrorBoundary();
 
     await sendAndWaitForAssistant("Runtime smoke test: summarize uploaded ECG, image, and labs with citations.", /Uploaded Document Review|Document Type|OCR Confidence/i);
+    await sendAndWaitForAssistant("Using the files I uploaded earlier, what should I re-check?", /Uploaded Document Review|previously uploaded|runtime-labs\.txt/i);
 
     await page.getByRole("button", { name: "Play answer" }).first().click();
     await expect(page.getByText(/Speaking|Voice paused/).first()).toBeVisible({ timeout: 10_000 });

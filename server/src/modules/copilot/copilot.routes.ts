@@ -109,6 +109,12 @@ type AttachmentInsight = {
   warnings: string[];
 };
 
+type ConversationMemory = {
+  attachments: AttachmentInsight[];
+  summary: string;
+  turns: Array<{ content: string; role: string }>;
+};
+
 const contextSchema = z.object({
   caseId: z.string().optional(),
   contextPath: z.string().optional(),
@@ -621,6 +627,7 @@ function classifyMedicalIntent(question: string, attachments: AttachmentForAnaly
   if (/medication|medicine|drug|dose|dosage|tablet|capsule|prescription|side effect|interaction|contraindication|start|stop|increase|decrease|beta blocker|statin|anticoag/.test(text)) return "medication_question";
   if (/occupational|fitness|fit for work|work restriction|return to work|offshore|driver|safety-sensitive|duty/.test(text)) return "occupational_fitness";
   if (/follow.?up|next step|monitor|repeat|when should|refer|appointment|plan/.test(text)) return "follow_up_advice";
+  if (/what causes|causes of|why does|what is|explain|how does/.test(text)) return "general_medical_question";
   if (/\becg\b|\bekg\b|qrs|qtc|st elevation|st depression|rhythm|atrial fibrillation|brady|tachy|interval|axis/.test(text)) return "ecg_interpretation";
   return "general_medical_question";
 }
@@ -655,6 +662,38 @@ function attachmentInsights(attachments: AttachmentForAnalysis[]): AttachmentIns
   });
 }
 
+function shouldRetrieveKnowledge(input: { attachments: AttachmentForAnalysis[]; intent: MedicalIntent; question: string }) {
+  if (input.intent === "greeting" || input.intent === "casual_conversation") return false;
+  if (input.intent === "uploaded_document_review") return /ecg|echo|lab|radiology|xray|ct|mri|medication|prescription|diagnosis|interpret|risk|warning/i.test(`${input.question} ${input.attachments.map((attachment) => `${attachment.documentType ?? ""} ${attachment.analysisSummary ?? ""}`).join(" ")}`);
+  return true;
+}
+
+async function retrieveConversationMemory(conversationId: string): Promise<ConversationMemory> {
+  const recent = await prisma.copilotMessage.findMany({
+    include: { attachments: { orderBy: { createdAt: "asc" } } },
+    orderBy: { createdAt: "desc" },
+    take: 12,
+    where: { conversationId },
+  });
+  const ordered = recent.reverse();
+  const turns = ordered.map((message) => ({
+    content: message.content.replace(/\s+/g, " ").slice(0, 360),
+    role: message.role,
+  }));
+  const attachments = attachmentInsights(ordered.flatMap((message) => message.attachments));
+  const summary = turns.length
+    ? turns.map((turn) => `${turn.role}: ${turn.content}`).join(" | ")
+    : "No previous conversation turns.";
+  return { attachments, summary, turns };
+}
+
+function memoryContext(memory: ConversationMemory) {
+  const attachmentSummary = memory.attachments.length
+    ? memory.attachments.map((attachment) => `${attachment.name}: ${attachment.documentType}; ${attachment.findings.join("; ") || attachment.interpretation}`).join(" | ")
+    : "No previous uploaded file findings.";
+  return `Conversation memory: ${memory.summary}\nPreviously uploaded files: ${attachmentSummary}`;
+}
+
 function clinicianFirstName(name?: string | null) {
   const normalized = name?.replace(/^dr\.?\s+/i, "").trim();
   return normalized?.split(/\s+/)[0] || "Doctor";
@@ -669,7 +708,7 @@ function citationObjects(context: ClinicalContext, knowledge: KnowledgeHit[]) {
   return context.sources.concat(knowledge.map((entry) => ({ id: entry.id, label: entry.topic, source: entry.sourceName, tags: entry.tags, type: "knowledge" }))).slice(0, 12);
 }
 
-function generateClinicalResponse(input: { attachments: AttachmentForAnalysis[]; clinicianName?: string | null; context: ClinicalContext; intent: MedicalIntent; knowledge: KnowledgeHit[]; prompt: string; question: string }) {
+function generateClinicalResponse(input: { attachments: AttachmentForAnalysis[]; clinicianName?: string | null; context: ClinicalContext; intent: MedicalIntent; knowledge: KnowledgeHit[]; memory: ConversationMemory; prompt: string; question: string }) {
   const risk = riskStratification(input.context, input.question);
   const confidence = confidenceScore(input.context, input.knowledge);
   const references = referencesFromKnowledge(input.knowledge);
@@ -677,6 +716,7 @@ function generateClinicalResponse(input: { attachments: AttachmentForAnalysis[];
   const warnings = medicalGuardrails(input.question, risk, input.knowledge);
   const clinician = clinicianFirstName(input.clinicianName);
   const insights = attachmentInsights(input.attachments);
+  const rememberedFiles = input.memory.attachments.filter((attachment) => !insights.some((current) => current.name === attachment.name));
   const firstKnowledge = input.knowledge[0];
   let content: string;
 
@@ -703,8 +743,8 @@ function generateClinicalResponse(input: { attachments: AttachmentForAnalysis[];
   } else if (input.intent === "uploaded_document_review") {
     content = [
       "## Uploaded Document Review",
-      insights.length
-        ? insights.map((item, index) => [
+      insights.concat(rememberedFiles).length
+        ? insights.concat(rememberedFiles).map((item, index) => [
             `### ${index + 1}. ${item.name}`,
             `Document Type: ${item.documentType}`,
             `OCR Confidence: ${Math.round(item.confidence * 100)}%`,
@@ -718,8 +758,8 @@ function generateClinicalResponse(input: { attachments: AttachmentForAnalysis[];
       "",
       "## Answer",
       insights.some((item) => item.interpretation.length > 0)
-        ? "I used the extracted attachment content above as the primary context. I will not infer visual diagnoses that were not extracted from the document or metadata."
-        : "No readable medical content was extracted, so I cannot provide a document-specific diagnosis.",
+        ? "I used the extracted attachment content and remembered file context above as the primary evidence. I will not infer visual diagnoses that were not extracted from the document or metadata."
+        : rememberedFiles.length ? "I used previously uploaded file findings from this conversation as context." : "No readable medical content was extracted, so I cannot provide a document-specific diagnosis.",
       "",
       `References: ${references.join(" | ") || "ECG Insight trusted medical knowledge base"}`,
       DISCLAIMER,
@@ -777,9 +817,11 @@ function generateClinicalResponse(input: { attachments: AttachmentForAnalysis[];
     const explanation = firstKnowledge
       ? `${firstKnowledge.topic}: ${firstKnowledge.content}`
       : "This is a general medical question. Please provide patient age, symptoms, relevant history, medications, and any test results for a more specific answer.";
+    const memoryHint = input.memory.turns.length > 1 ? `I am also considering the prior conversation context: ${input.memory.summary.slice(0, 260)}.` : "";
     content = [
       "## Short Answer",
       explanation,
+      memoryHint,
       "",
       "I can go deeper if you want mechanisms, diagnosis, treatment options, or red flags.",
       references.length ? `References: ${references.join(" | ")}` : "References: ECG Insight trusted medical knowledge base",
@@ -996,12 +1038,15 @@ async function executeCopilotChat(input: ChatInput, userId: string, started = Da
         attachment.confidence ? `Attachment analysis confidence: ${Math.round(attachment.confidence * 100)}%` : undefined,
       ].filter(Boolean).join(" | ")).join("\n")}`
     : "";
-  const enrichedQuestion = `${input.question}${attachmentContext}`;
   const intent = classifyMedicalIntent(input.question, userMessage.attachments);
   const tag = tagForIntent(intent, input.tag);
-  const knowledge = await retrieveKnowledge(enrichedQuestion, clinicalContext);
+  const memory = await retrieveConversationMemory(conversation.id);
+  const enrichedQuestion = `${input.question}${attachmentContext}\n${memoryContext(memory)}`;
+  const knowledge = shouldRetrieveKnowledge({ attachments: userMessage.attachments, intent, question: input.question })
+    ? await retrieveKnowledge(enrichedQuestion, clinicalContext)
+    : { hits: [], sources: [], tags: [] };
   const prompt = buildPrompt(enrichedQuestion, clinicalContext, knowledge.hits);
-  const result = generateClinicalResponse({ attachments: userMessage.attachments, clinicianName: requestingUser?.name, context: clinicalContext, intent, knowledge: knowledge.hits, prompt, question: enrichedQuestion });
+  const result = generateClinicalResponse({ attachments: userMessage.attachments, clinicianName: requestingUser?.name, context: clinicalContext, intent, knowledge: knowledge.hits, memory, prompt, question: enrichedQuestion });
   const responseTimeMs = Date.now() - started;
   const assistant = await prisma.copilotMessage.create({
     data: {
