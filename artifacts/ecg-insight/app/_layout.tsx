@@ -14,6 +14,7 @@ import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
 import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { ToastProvider } from "@/components/interaction/PremiumInteraction";
 import { MobileSyncStatus } from "@/components/mobile/MobileSyncStatus";
 import { AuthProvider, useAuth } from "@/context/AuthContext";
 import { ApiError } from "@/services/api";
@@ -118,8 +119,10 @@ export default function RootLayout() {
         <QueryClientProvider client={queryClient}>
           <GestureHandlerRootView style={{ flex: 1 }}>
             <AuthProvider>
-              <RootLayoutNav />
-              <AuthenticatedChrome />
+              <ToastProvider>
+                <RootLayoutNav />
+                <AuthenticatedChrome />
+              </ToastProvider>
             </AuthProvider>
           </GestureHandlerRootView>
         </QueryClientProvider>

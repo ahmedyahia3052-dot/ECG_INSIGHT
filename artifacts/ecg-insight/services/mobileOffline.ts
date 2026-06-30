@@ -3,6 +3,7 @@ import { API_ROOT_URL, API_URL } from "./api";
 import { createCase, createPatient } from "./clinical";
 import { uploadClinicalEcgFile } from "./ecgFiles";
 import type { EcgAcquisitionAsset } from "./ecgImageProcessor";
+import { safeArray } from "@/utils/collections";
 
 const DB_NAME = "ecg-insight-mobile-v30";
 const DB_VERSION = 1;
@@ -45,16 +46,12 @@ export interface OfflineEcgUpload {
 
 export interface MobileSyncSnapshot {
   apiUrl: string;
-  backendReachable: boolean;
   backendHealthStatus: string;
-  browserOnline: boolean;
-  isOnline: boolean;
+  backendReachable: boolean;
   lastHealthCheckAt: string;
   lastSyncAt?: string;
-  offlineReason: string;
   pendingActions: number;
   pendingUploads: number;
-  serviceWorkerReady: boolean;
 }
 
 type StoreName = typeof ACTION_STORE | typeof META_STORE | typeof PATIENT_STORE | typeof UPLOAD_STORE;
@@ -78,7 +75,7 @@ function openDatabase() {
   if (!isWebIndexedDbAvailable()) return Promise.resolve(null);
   return new Promise<IDBDatabase>((resolve, reject) => {
     const request = indexedDB.open(DB_NAME, DB_VERSION);
-    request.onerror = () => reject(request.error ?? new Error("Unable to open ECG Insight offline database."));
+    request.onerror = () => reject(request.error ?? new Error("Unable to open ECG Insight sync database."));
     request.onupgradeneeded = () => {
       const db = request.result;
       for (const store of [ACTION_STORE, UPLOAD_STORE, PATIENT_STORE, META_STORE]) {
@@ -95,7 +92,7 @@ async function withStore<T>(storeName: StoreName, mode: IDBTransactionMode, call
   return new Promise<T>((resolve, reject) => {
     const transaction = db.transaction(storeName, mode);
     const request = callback(transaction.objectStore(storeName));
-    request.onerror = () => reject(request.error ?? new Error("Offline database operation failed."));
+    request.onerror = () => reject(request.error ?? new Error("Sync database operation failed."));
     request.onsuccess = () => resolve(request.result);
     transaction.oncomplete = () => db.close();
   });
@@ -118,10 +115,6 @@ async function deleteRecord(storeName: StoreName, id: string) {
   if (result === null) memoryStores.get(storeName)?.delete(id);
 }
 
-export function networkIsOnline() {
-  return typeof navigator === "undefined" ? true : navigator.onLine !== false;
-}
-
 type BackendHealthResult = {
   message: string;
   ok: boolean;
@@ -129,7 +122,7 @@ type BackendHealthResult = {
   timestamp: string;
 };
 
-async function backendHealthCheck(): Promise<BackendHealthResult> {
+export async function backendHealthCheck(): Promise<BackendHealthResult> {
   const timestamp = new Date().toISOString();
   if (typeof fetch === "undefined") return { message: "fetch unavailable in this runtime", ok: true, status: "runtime-no-fetch", timestamp };
   const controller = typeof AbortController !== "undefined" ? new AbortController() : null;
@@ -147,7 +140,7 @@ async function backendHealthCheck(): Promise<BackendHealthResult> {
     }
     const payload = await response.clone().json().catch(() => null) as { code?: string; ok?: boolean; status?: string } | null;
     if (payload?.code === "BACKEND_UNAVAILABLE") {
-      return { message: "service worker/backend unavailable response", ok: false, status: payload.code, timestamp };
+      return { message: "backend unavailable response", ok: false, status: payload.code, timestamp };
     }
     return {
       message: `HTTP ${response.status}${payload?.status ? ` ${payload.status}` : ""}`,
@@ -167,71 +160,20 @@ async function backendHealthCheck(): Promise<BackendHealthResult> {
   }
 }
 
-function offlineReason(browserOnline: boolean, backendReachable: boolean, backendMessage: string) {
-  if (browserOnline || backendReachable) return "online";
-  return backendMessage ? `browser-offline-and-backend-unreachable: ${backendMessage}` : "browser-offline-and-backend-unreachable";
-}
-
-function logOfflineDiagnostics(input: { apiUrl: string; backendHealthStatus: string; backendReachable: boolean; browserOnline: boolean; lastHealthCheckAt: string; offlineReason: string }) {
-  if (typeof console === "undefined") return;
-  console.info(`[ONLINE CHECK] Browser online: ${input.browserOnline}`);
-  console.info(`[BACKEND CHECK] Backend reachable: ${input.backendReachable}; status: ${input.backendHealthStatus}; API URL: ${input.apiUrl}; checked: ${input.lastHealthCheckAt}`);
-  console.info(`[OFFLINE REASON] ${input.offlineReason}`);
-}
-
-function offlineDisabledByUrl() {
-  if (typeof window === "undefined") return false;
-  return new URLSearchParams(window.location.search).get("disableOffline") === "true";
-}
-
-export function subscribeNetworkStatus(callback: (isOnline: boolean) => void) {
-  if (typeof window === "undefined") return () => undefined;
-  const emit = () => {
-    const browserOnline = networkIsOnline();
-    void backendHealthCheck().then((backend) => {
-      const reason = offlineDisabledByUrl() ? "offline disabled by URL parameter" : offlineReason(browserOnline, backend.ok, backend.message);
-      logOfflineDiagnostics({ apiUrl: API_URL, backendHealthStatus: backend.message, backendReachable: backend.ok, browserOnline, lastHealthCheckAt: backend.timestamp, offlineReason: reason });
-      callback(offlineDisabledByUrl() || browserOnline || backend.ok);
-    });
-  };
-  window.addEventListener("online", emit);
-  window.addEventListener("offline", emit);
-  emit();
-  return () => {
-    window.removeEventListener("online", emit);
-    window.removeEventListener("offline", emit);
-  };
-}
-
-export async function registerPwaRuntime(onUpdate?: () => void) {
-  if (typeof navigator === "undefined" || !("serviceWorker" in navigator)) return { ready: false };
-  if (offlineDisabledByUrl()) {
+/** Unregister legacy service workers and clear PWA caches from prior offline mode. */
+export async function removeOfflineRuntime() {
+  if (typeof navigator !== "undefined" && "serviceWorker" in navigator) {
     const registrations = await navigator.serviceWorker.getRegistrations();
     await Promise.all(registrations.map((registration) => registration.unregister()));
-    if (typeof caches !== "undefined") {
-      const keys = await caches.keys();
-      await Promise.all(keys.filter((key) => key.startsWith("ecg-insight-pwa-")).map((key) => caches.delete(key)));
-    }
-    console.info("[OFFLINE REASON] offline disabled by URL parameter");
-    return { ready: false };
   }
-  const registration = await navigator.serviceWorker.register("/sw.js");
-  registration.addEventListener("updatefound", () => onUpdate?.());
-  navigator.serviceWorker.addEventListener("message", (event) => {
-    if (event.data?.type === "ECG_BACKGROUND_SYNC") {
-      window.dispatchEvent(new CustomEvent("ecg-insight-background-sync"));
-    }
-  });
-  return { ready: true, registration };
+  if (typeof caches !== "undefined") {
+    const keys = await caches.keys();
+    await Promise.all(safeArray(keys).filter((key) => key.startsWith("ecg-insight-pwa-")).map((key) => caches.delete(key)));
+  }
 }
 
 export async function requestBackgroundSync() {
-  if (typeof navigator === "undefined" || !("serviceWorker" in navigator)) return false;
-  const registration = await navigator.serviceWorker.ready;
-  const syncRegistration = registration as ServiceWorkerRegistration & { sync?: { register: (tag: string) => Promise<void> } };
-  if (!syncRegistration.sync) return false;
-  await syncRegistration.sync.register("ecg-insight-background-sync");
-  return true;
+  return false;
 }
 
 export async function queuePendingAction(input: Omit<PendingAction, "attempts" | "createdAt" | "id" | "status" | "updatedAt">) {
@@ -245,7 +187,6 @@ export async function queuePendingAction(input: Omit<PendingAction, "attempts" |
     updatedAt: now,
   };
   await putRecord(ACTION_STORE, action);
-  await requestBackgroundSync().catch(() => false);
   return action;
 }
 
@@ -260,7 +201,6 @@ export async function queueOfflineEcgUpload(input: Omit<OfflineEcgUpload, "attem
     updatedAt: now,
   };
   await putRecord(UPLOAD_STORE, upload);
-  await requestBackgroundSync().catch(() => false);
   return upload;
 }
 
@@ -279,7 +219,7 @@ export async function listOfflineUploads() {
 export async function processPendingActions(accessToken: string) {
   const actions = await listPendingActions();
   const completed: PendingAction[] = [];
-  for (const action of actions.filter((item) => item.status !== "synced")) {
+  for (const action of safeArray(actions).filter((item) => item.status !== "synced")) {
     const next: PendingAction = { ...action, attempts: action.attempts + 1, status: "syncing", updatedAt: new Date().toISOString() };
     await putRecord(ACTION_STORE, next);
     try {
@@ -314,14 +254,14 @@ export async function processPendingActions(accessToken: string) {
 export async function processOfflineUploads(accessToken: string) {
   const uploads = await listOfflineUploads();
   const completed: OfflineEcgUpload[] = [];
-  for (const upload of uploads.filter((item) => item.status !== "synced")) {
+  for (const upload of safeArray(uploads).filter((item) => item.status !== "synced")) {
     const next: OfflineEcgUpload = { ...upload, attempts: upload.attempts + 1, status: "syncing", updatedAt: new Date().toISOString() };
     await putRecord(UPLOAD_STORE, next);
     try {
       const [firstName, ...rest] = next.patientName.trim().split(/\s+/);
       const patient = await createPatient(accessToken, {
         dateOfBirth: next.dateOfBirth,
-        firstName: firstName || "Offline",
+        firstName: firstName || "Queued",
         gender: next.gender,
         lastName: rest.join(" ") || "Patient",
         medicalRecordNumber: next.medicalRecordNumber,
@@ -352,37 +292,25 @@ export async function processOfflineUploads(accessToken: string) {
 }
 
 export async function syncNow(accessToken: string) {
-  const browserOnline = networkIsOnline();
-  const backend = await backendHealthCheck();
-  const reason = offlineDisabledByUrl() ? "offline disabled by URL parameter" : offlineReason(browserOnline, backend.ok, backend.message);
-  logOfflineDiagnostics({ apiUrl: API_URL, backendHealthStatus: backend.message, backendReachable: backend.ok, browserOnline, lastHealthCheckAt: backend.timestamp, offlineReason: reason });
-  if (!offlineDisabledByUrl() && !browserOnline && !backend.ok) return { actions: [], uploads: [] };
   const [actions, uploads] = await Promise.all([processPendingActions(accessToken), processOfflineUploads(accessToken)]);
   await putRecord(META_STORE, { id: "lastSyncAt", value: new Date().toISOString() });
   return { actions, uploads };
 }
 
 export async function mobileSyncSnapshot(): Promise<MobileSyncSnapshot> {
-  const [actions, uploads, meta] = await Promise.all([
+  const [actions, uploads, meta, backend] = await Promise.all([
     listPendingActions(),
     listOfflineUploads(),
     getAllRecords<{ id: string; value: string }>(META_STORE),
+    backendHealthCheck(),
   ]);
-  const browserOnline = networkIsOnline();
-  const backend = await backendHealthCheck();
-  const reason = offlineDisabledByUrl() ? "offline disabled by URL parameter" : offlineReason(browserOnline, backend.ok, backend.message);
-  logOfflineDiagnostics({ apiUrl: API_URL, backendHealthStatus: backend.message, backendReachable: backend.ok, browserOnline, lastHealthCheckAt: backend.timestamp, offlineReason: reason });
   return {
     apiUrl: API_URL,
     backendHealthStatus: backend.message,
     backendReachable: backend.ok,
-    browserOnline,
-    isOnline: offlineDisabledByUrl() || browserOnline || backend.ok,
     lastHealthCheckAt: backend.timestamp,
     lastSyncAt: meta.find((item) => item.id === "lastSyncAt")?.value,
-    offlineReason: reason,
-    pendingActions: actions.filter((item) => item.status !== "synced").length,
-    pendingUploads: uploads.filter((item) => item.status !== "synced").length,
-    serviceWorkerReady: typeof navigator !== "undefined" && "serviceWorker" in navigator,
+    pendingActions: safeArray(actions).filter((item) => item.status !== "synced").length,
+    pendingUploads: safeArray(uploads).filter((item) => item.status !== "synced").length,
   };
 }

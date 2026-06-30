@@ -29,7 +29,7 @@
     {
       "name": "Sync Dashboard",
       "short_name": "Sync",
-      "description": "Review offline queue and synchronization status.",
+      "description": "Review queued uploads and synchronization status.",
       "url": "/sync-dashboard",
       "icons": [{ "src": "/icons/pwa-icon.svg", "sizes": "any", "type": "image/svg+xml" }]
     }

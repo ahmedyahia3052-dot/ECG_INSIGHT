@@ -1,28 +1,22 @@
 import { useCallback, useEffect, useState } from "react";
 import {
   mobileSyncSnapshot,
-  registerPwaRuntime,
-  subscribeNetworkStatus,
+  removeOfflineRuntime,
   syncNow,
   type MobileSyncSnapshot,
 } from "@/services/mobileOffline";
 
 const initialSnapshot: MobileSyncSnapshot = {
   apiUrl: "unknown",
-  backendReachable: true,
   backendHealthStatus: "not checked yet",
-  browserOnline: true,
-  isOnline: true,
+  backendReachable: true,
   lastHealthCheckAt: "not checked yet",
-  offlineReason: "online",
   pendingActions: 0,
   pendingUploads: 0,
-  serviceWorkerReady: false,
 };
 
 export function useMobileSync(accessToken?: string | null) {
   const [snapshot, setSnapshot] = useState<MobileSyncSnapshot>(initialSnapshot);
-  const [updateAvailable, setUpdateAvailable] = useState(false);
   const [syncing, setSyncing] = useState(false);
 
   const refresh = useCallback(async () => {
@@ -42,28 +36,21 @@ export function useMobileSync(accessToken?: string | null) {
   }, [accessToken, refresh]);
 
   useEffect(() => {
-    void registerPwaRuntime(() => setUpdateAvailable(true)).then(refresh).catch(() => refresh());
+    void removeOfflineRuntime().then(refresh).catch(() => refresh());
   }, [refresh]);
-
-  useEffect(() => subscribeNetworkStatus(() => {
-    void refresh();
-    if (accessToken) void runSync();
-  }), [accessToken, refresh, runSync]);
 
   useEffect(() => {
     if (typeof window === "undefined") return () => undefined;
-    const listener = () => {
-      if (accessToken) void runSync();
-    };
-    window.addEventListener("ecg-insight-background-sync", listener);
-    return () => window.removeEventListener("ecg-insight-background-sync", listener);
-  }, [accessToken, runSync]);
+    const interval = window.setInterval(() => {
+      void refresh();
+    }, 30_000);
+    return () => window.clearInterval(interval);
+  }, [refresh]);
 
   return {
     refresh,
     runSync,
     snapshot,
     syncing,
-    updateAvailable,
   };
 }

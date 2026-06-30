@@ -23,15 +23,10 @@ export async function requestPushPermission() {
 export async function showLocalNotification(title: string, options: NotificationOptions = {}) {
   const snapshot = pushPermissionSnapshot();
   if (!snapshot.supported || snapshot.permission !== "granted") return false;
-  const registration = "serviceWorker" in navigator ? await navigator.serviceWorker.ready.catch(() => null) : null;
-  if (registration) {
-    await registration.showNotification(title, {
-      badge: "/icons/pwa-icon.svg",
-      icon: "/icons/pwa-icon.svg",
-      ...options,
-    });
-    return true;
-  }
-  new Notification(title, options);
+  new Notification(title, {
+    badge: "/icons/pwa-icon.svg",
+    icon: "/icons/pwa-icon.svg",
+    ...options,
+  });
   return true;
 }

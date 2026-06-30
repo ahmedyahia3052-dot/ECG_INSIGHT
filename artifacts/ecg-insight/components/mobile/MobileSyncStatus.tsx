@@ -1,33 +1,41 @@
 import { Feather } from "@expo/vector-icons";
-import React from "react";
+import React, { useEffect, useRef } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
+import { useToast } from "@/components/interaction/PremiumInteraction";
 import { useAuth } from "@/context/AuthContext";
 import { useColors } from "@/hooks/useColors";
 import { useMobileSync } from "@/hooks/useMobileSync";
 
 export function MobileSyncStatus() {
   const colors = useColors();
+  const toast = useToast();
   const { authToken } = useAuth();
-  const { runSync, snapshot, syncing, updateAvailable } = useMobileSync(authToken?.token);
+  const { runSync, snapshot, syncing } = useMobileSync(authToken?.token);
+  const lastBackendToastRef = useRef("");
   const hasPending = snapshot.pendingActions + snapshot.pendingUploads > 0;
-  if (snapshot.isOnline && !hasPending && !updateAvailable) return null;
 
-  const tone = snapshot.isOnline ? colors.warning : colors.destructive;
-  const connectivityText = snapshot.isOnline
-    ? `Online · browser ${snapshot.browserOnline ? "online" : "offline"} · backend ${snapshot.backendReachable ? "reachable" : "unreachable"} · API ${snapshot.apiUrl}`
-    : `Offline · ${snapshot.offlineReason} · API ${snapshot.apiUrl} · checked ${snapshot.lastHealthCheckAt}`;
+  useEffect(() => {
+    if (snapshot.backendReachable) {
+      lastBackendToastRef.current = "";
+      return;
+    }
+    const toastKey = `${snapshot.backendHealthStatus}:${snapshot.lastHealthCheckAt}`;
+    if (lastBackendToastRef.current === toastKey) return;
+    lastBackendToastRef.current = toastKey;
+    toast.warning("Connection lost. Some features may be unavailable.", "");
+  }, [snapshot.apiUrl, snapshot.backendHealthStatus, snapshot.backendReachable, snapshot.lastHealthCheckAt, toast]);
+
+  if (!hasPending) return null;
+
   return (
-    <View style={[styles.container, { backgroundColor: colors.surface, borderColor: tone }]}>
-      <Feather name={snapshot.isOnline ? "wifi" : "wifi-off"} color={tone} size={16} />
+    <View style={[styles.container, { backgroundColor: colors.surface, borderColor: colors.warning }]}>
+      <Feather name="upload-cloud" color={colors.warning} size={16} />
       <Text style={[styles.text, { color: colors.text }]}>
-        {connectivityText} · {syncing ? "Syncing" : `${snapshot.pendingUploads} uploads, ${snapshot.pendingActions} actions pending`}
-        {updateAvailable ? " · Update ready" : ""}
+        {syncing ? "Syncing" : `${snapshot.pendingUploads} uploads, ${snapshot.pendingActions} actions pending`}
       </Text>
-      {snapshot.isOnline && hasPending ? (
-        <Pressable onPress={() => void runSync()} style={[styles.button, { borderColor: colors.border }]}>
-          <Text style={[styles.buttonText, { color: colors.primary }]}>Sync now</Text>
-        </Pressable>
-      ) : null}
+      <Pressable onPress={() => void runSync()} style={[styles.button, { borderColor: colors.border }]}>
+        <Text style={[styles.buttonText, { color: colors.primary }]}>Sync now</Text>
+      </Pressable>
     </View>
   );
 }
