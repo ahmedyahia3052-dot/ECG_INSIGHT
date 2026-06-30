@@ -73,6 +73,42 @@ type KnowledgeHit = {
   topic: string;
 };
 
+type MedicalIntent =
+  | "casual_conversation"
+  | "ecg_interpretation"
+  | "emergency_symptom_triage"
+  | "follow_up_advice"
+  | "general_medical_question"
+  | "greeting"
+  | "medication_question"
+  | "occupational_fitness"
+  | "uploaded_document_review";
+
+type AttachmentForAnalysis = {
+  analysisSummary: string | null;
+  confidence: number | null;
+  documentType: string | null;
+  extractedText: string | null;
+  kind: string;
+  medicalAnalysis: Prisma.JsonValue | null;
+  mimeType: string;
+  originalName: string;
+  recommendations: string[];
+  sizeBytes: number;
+  warnings: string[];
+};
+
+type AttachmentInsight = {
+  confidence: number;
+  documentType: string;
+  findings: string[];
+  interpretation: string;
+  name: string;
+  ocrStatus: string;
+  recommendations: string[];
+  warnings: string[];
+};
+
 const contextSchema = z.object({
   caseId: z.string().optional(),
   contextPath: z.string().optional(),
@@ -576,31 +612,184 @@ function buildPrompt(question: string, context: ClinicalContext, knowledge: Know
   ].join("\n");
 }
 
-function generateClinicalResponse(input: { context: ClinicalContext; knowledge: KnowledgeHit[]; prompt: string; question: string }) {
+function classifyMedicalIntent(question: string, attachments: AttachmentForAnalysis[]): MedicalIntent {
+  const text = question.toLowerCase().trim();
+  if (attachments.length || /upload|uploaded|attachment|file|document|image|pdf|report|scan|photo|lab result/.test(text)) return "uploaded_document_review";
+  if (/^(hi|hello|hey|good morning|good afternoon|good evening|salam|السلام)\b[!.?\s]*$/i.test(text)) return "greeting";
+  if (/thanks|thank you|ok thanks|appreciate|who are you|what can you do|help me\b/.test(text) && !/(pain|ecg|medicine|drug|blood|pressure|symptom)/.test(text)) return "casual_conversation";
+  if (/chest pain|severe pain|shortness of breath|dyspnea|faint|syncope|stroke|weakness|facial droop|crushing|sweating|hemoptysis|suicidal|shock/.test(text)) return "emergency_symptom_triage";
+  if (/medication|medicine|drug|dose|dosage|tablet|capsule|prescription|side effect|interaction|contraindication|start|stop|increase|decrease|beta blocker|statin|anticoag/.test(text)) return "medication_question";
+  if (/occupational|fitness|fit for work|work restriction|return to work|offshore|driver|safety-sensitive|duty/.test(text)) return "occupational_fitness";
+  if (/follow.?up|next step|monitor|repeat|when should|refer|appointment|plan/.test(text)) return "follow_up_advice";
+  if (/\becg\b|\bekg\b|qrs|qtc|st elevation|st depression|rhythm|atrial fibrillation|brady|tachy|interval|axis/.test(text)) return "ecg_interpretation";
+  return "general_medical_question";
+}
+
+function normalizeFindings(value: Prisma.JsonValue | null): string[] {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return [];
+  const findings = (value as { findings?: unknown }).findings;
+  return Array.isArray(findings) ? findings.filter((item): item is string => typeof item === "string" && item.trim().length > 0) : [];
+}
+
+function attachmentInsights(attachments: AttachmentForAnalysis[]): AttachmentInsight[] {
+  return attachments.map((attachment) => {
+    const documentType = attachment.documentType ?? attachment.kind.toUpperCase();
+    const findings = normalizeFindings(attachment.medicalAnalysis);
+    if (attachment.analysisSummary) findings.unshift(attachment.analysisSummary);
+    const readableText = attachment.extractedText?.trim();
+    const ocrStatus = readableText
+      ? `Readable text extracted (${Math.min(readableText.length, 12000)} characters).`
+      : "No reliable embedded/OCR text was extracted; interpretation is limited to file metadata and detected clinical cues.";
+    return {
+      confidence: attachment.confidence ?? (readableText ? 0.72 : 0.55),
+      documentType,
+      findings: Array.from(new Set(findings)).slice(0, 8),
+      interpretation: readableText
+        ? readableText.slice(0, 700)
+        : "No pixel-level diagnosis is generated without readable text. Review the original image/report before clinical decisions.",
+      name: attachment.originalName,
+      ocrStatus,
+      recommendations: attachment.recommendations.slice(0, 6),
+      warnings: attachment.warnings.slice(0, 6),
+    };
+  });
+}
+
+function clinicianFirstName(name?: string | null) {
+  const normalized = name?.replace(/^dr\.?\s+/i, "").trim();
+  return normalized?.split(/\s+/)[0] || "Doctor";
+}
+
+function referencesFromKnowledge(knowledge: KnowledgeHit[], max = 4) {
+  const references = knowledge.flatMap((entry) => entry.references.map((reference) => `${entry.sourceName}: ${reference}`));
+  return Array.from(new Set(references)).slice(0, max);
+}
+
+function citationObjects(context: ClinicalContext, knowledge: KnowledgeHit[]) {
+  return context.sources.concat(knowledge.map((entry) => ({ id: entry.id, label: entry.topic, source: entry.sourceName, tags: entry.tags, type: "knowledge" }))).slice(0, 12);
+}
+
+function generateClinicalResponse(input: { attachments: AttachmentForAnalysis[]; clinicianName?: string | null; context: ClinicalContext; intent: MedicalIntent; knowledge: KnowledgeHit[]; prompt: string; question: string }) {
   const risk = riskStratification(input.context, input.question);
   const confidence = confidenceScore(input.context, input.knowledge);
-  const patientSummary = input.context.patient
-    ? `${input.context.patient.age}-year-old ${input.context.patient.gender.toLowerCase()} ${input.context.patient.fullName} with ${input.context.patient.riskFactors.join(", ") || "no documented major risk factors"}. Medical history: ${input.context.patient.history}.`
-    : "No patient profile is currently open. Response is based on general ECG knowledge only.";
-  const ecgInterpretation = input.context.currentCase
-    ? `${input.context.currentCase.rhythm ?? "Rhythm not documented"} with HR ${input.context.currentCase.heartRate ?? "n/a"} bpm, ${input.context.currentCase.intervals}, axis ${input.context.currentCase.axis ?? "n/a"}, AI impression ${input.context.currentCase.diagnosis ?? "pending"}, physician impression ${input.context.currentCase.doctorDiagnosis ?? "pending"}, severity ${input.context.currentCase.severity ?? "not classified"}.`
-    : "No active ECG case is open. For case-specific interpretation, open an ECG case and ask again.";
-  const differential = differentialDiagnosis(input.question, input.context, input.knowledge);
-  const occupational = occupationalOpinion(risk, input.context, input.question);
-  const recommendations = recommendationsFor(risk, input.context, input.knowledge);
-  const followUp = followUpFor(risk, input.context);
+  const references = referencesFromKnowledge(input.knowledge);
+  const citations = citationObjects(input.context, input.knowledge);
   const warnings = medicalGuardrails(input.question, risk, input.knowledge);
-  const keyPoints = [
-    `Retrieved ${input.knowledge.length} enterprise medical knowledge references across ${Array.from(new Set(input.knowledge.map((entry) => entry.category))).join(", ") || "general medicine"}.`,
-    `Highest relevance: ${input.knowledge[0] ? `${input.knowledge[0].topic} (${Math.round(input.knowledge[0].relevanceScore * 100)}%)` : "no knowledge document retrieved"}.`,
-    `Risk tier: ${risk.level}.`,
-  ];
-  const references = input.knowledge.flatMap((entry) => entry.references.map((reference) => `${entry.sourceName}: ${reference}`));
-  const citations = input.context.sources.concat(input.knowledge.map((entry) => ({ id: entry.id, label: entry.topic, source: entry.sourceName, tags: entry.tags, type: "knowledge" }))).slice(0, 12);
+  const clinician = clinicianFirstName(input.clinicianName);
+  const insights = attachmentInsights(input.attachments);
+  const firstKnowledge = input.knowledge[0];
+  let content: string;
+
+  if (input.intent === "greeting") {
+    content = `Hello Dr ${clinician}. How may I assist you today?\n\n${DISCLAIMER}`;
+  } else if (input.intent === "casual_conversation") {
+    content = `I can help with concise medical Q&A, ECG interpretation, uploaded document review, medication safety checks, occupational fitness, and follow-up planning. What would you like to review?\n\n${DISCLAIMER}`;
+  } else if (input.intent === "emergency_symptom_triage") {
+    content = [
+      "## Urgent Triage",
+      "Chest pain, severe shortness of breath, syncope, neurologic deficit, shock, or severe sweating can indicate an emergency. If symptoms are active or severe, arrange immediate clinician/emergency assessment now.",
+      "",
+      "To triage safely, please clarify:",
+      "- Age and relevant cardiac risk factors?",
+      "- Pain location, onset, duration, severity, radiation, and triggers?",
+      "- Associated dyspnea, sweating, nausea, syncope, neurologic symptoms, or low blood pressure?",
+      "- Current ECG, vitals, troponin, and medications?",
+      "",
+      `Risk tier: ${risk.level}.`,
+      `Warnings: ${warnings.join(" ")}`,
+      "",
+      DISCLAIMER,
+    ].join("\n");
+  } else if (input.intent === "uploaded_document_review") {
+    content = [
+      "## Uploaded Document Review",
+      insights.length
+        ? insights.map((item, index) => [
+            `### ${index + 1}. ${item.name}`,
+            `Document Type: ${item.documentType}`,
+            `OCR Confidence: ${Math.round(item.confidence * 100)}%`,
+            `OCR Status: ${item.ocrStatus}`,
+            `Extracted Findings: ${item.findings.length ? item.findings.join("; ") : "No high-confidence structured findings extracted."}`,
+            `Clinical Interpretation: ${item.interpretation}`,
+            `Warnings: ${item.warnings.length ? item.warnings.join("; ") : DISCLAIMER}`,
+            `Recommendations: ${item.recommendations.length ? item.recommendations.join("; ") : "Correlate with the full clinical record and physician review."}`,
+          ].join("\n")).join("\n\n")
+        : "No attachment was available for review. Upload an ECG image/PDF, lab, echo, radiology report, prescription, or clinical PDF and ask again.",
+      "",
+      "## Answer",
+      insights.some((item) => item.interpretation.length > 0)
+        ? "I used the extracted attachment content above as the primary context. I will not infer visual diagnoses that were not extracted from the document or metadata."
+        : "No readable medical content was extracted, so I cannot provide a document-specific diagnosis.",
+      "",
+      `References: ${references.join(" | ") || "ECG Insight trusted medical knowledge base"}`,
+      DISCLAIMER,
+    ].join("\n");
+  } else if (input.intent === "medication_question") {
+    content = [
+      "## Medication Safety",
+      "Medication decisions depend on indication, dose, renal/hepatic function, allergies, interactions, pregnancy status, vitals, ECG intervals, and local formulary guidance.",
+      firstKnowledge ? `Relevant knowledge: ${firstKnowledge.content}` : "No specific medication knowledge source was retrieved for this question.",
+      "",
+      "Before changing therapy, confirm:",
+      "- Exact drug, dose, route, and timing.",
+      "- Current diagnoses and contraindications.",
+      "- Renal function, electrolytes, QT/QTc if relevant, and interacting drugs.",
+      "",
+      `Warnings: ${warnings.join(" ")}`,
+      `References: ${references.join(" | ") || "Internal medication safety knowledge"}`,
+      DISCLAIMER,
+    ].join("\n");
+  } else if (input.intent === "occupational_fitness") {
+    content = [
+      "## Occupational Fitness",
+      occupationalOpinion(risk, input.context, input.question),
+      "",
+      `Risk tier: ${risk.level}: ${risk.reason}`,
+      "Key determinants: symptoms, ECG abnormality severity, safety-sensitive role, access to emergency care, treatment stability, and physician clearance.",
+      "",
+      `Next steps: ${recommendationsFor(risk, input.context, input.knowledge).slice(0, 4).join(" ")}`,
+      DISCLAIMER,
+    ].join("\n");
+  } else if (input.intent === "follow_up_advice") {
+    content = [
+      "## Follow-up Advice",
+      ...followUpFor(risk, input.context).map((item) => `- ${item}`),
+      "",
+      `Risk tier: ${risk.level}: ${risk.reason}`,
+      references.length ? `References: ${references.join(" | ")}` : "References: ECG Insight trusted medical knowledge base",
+      DISCLAIMER,
+    ].join("\n");
+  } else if (input.intent === "ecg_interpretation") {
+    const ecgInterpretation = input.context.currentCase
+      ? `${input.context.currentCase.rhythm ?? "Rhythm not documented"}; HR ${input.context.currentCase.heartRate ?? "n/a"} bpm; ${input.context.currentCase.intervals}; axis ${input.context.currentCase.axis ?? "n/a"}; retrieved diagnosis ${input.context.currentCase.diagnosis ?? "pending"}.`
+      : "No active ECG case is open. Upload or select an ECG for case-specific interpretation.";
+    content = [
+      "## ECG Review",
+      ecgInterpretation,
+      "",
+      `Differential: ${differentialDiagnosis(input.question, input.context, input.knowledge).join("; ")}.`,
+      `Risk tier: ${risk.level}: ${risk.reason}`,
+      `Next steps: ${recommendationsFor(risk, input.context, input.knowledge).slice(0, 4).join(" ")}`,
+      `References: ${references.join(" | ") || "ECG Insight ECG knowledge base"}`,
+      DISCLAIMER,
+    ].join("\n");
+  } else {
+    const explanation = firstKnowledge
+      ? `${firstKnowledge.topic}: ${firstKnowledge.content}`
+      : "This is a general medical question. Please provide patient age, symptoms, relevant history, medications, and any test results for a more specific answer.";
+    content = [
+      "## Short Answer",
+      explanation,
+      "",
+      "I can go deeper if you want mechanisms, diagnosis, treatment options, or red flags.",
+      references.length ? `References: ${references.join(" | ")}` : "References: ECG Insight trusted medical knowledge base",
+      DISCLAIMER,
+    ].join("\n");
+  }
 
   return {
     confidence,
-    content: `${DISCLAIMER}\n\n## Clinical Summary\n${patientSummary}\n\n## Detailed Explanation\n${ecgInterpretation}\n\nDifferential diagnosis:\n${differential.map((item, index) => `${index + 1}. ${item}`).join("\n")}\n\nRisk stratification: ${risk.level}: ${risk.reason}\n\nOccupational fitness opinion: ${occupational}\n\nRecommendations:\n${recommendations.map((item) => `- ${item}`).join("\n")}\n\nFollow-up plan:\n${followUp.map((item) => `- ${item}`).join("\n")}\n\n## Key Points\n${keyPoints.map((item) => `- ${item}`).join("\n")}\n\n## Warnings\n${warnings.map((item) => `- ${item}`).join("\n")}\n\n## References\n${Array.from(new Set(references)).slice(0, 10).map((item) => `- ${item}`).join("\n") || "- Internal ECG Insight medical knowledge base"}\n\n## Citations\n${citations.map((source) => `- [${source.type}:${source.id}] ${source.source}: ${source.label}`).join("\n") || "- ECG Insight Knowledge Engine"}\n\n## Confidence Score\n${Math.round(confidence * 100)}%\n\n## Knowledge Tags\n${Array.from(new Set(input.knowledge.flatMap((entry) => entry.tags))).slice(0, 12).join(", ") || "general-ecg"}`,
+    content: `${content}\n\nConfidence Score: ${Math.round(confidence * 100)}%\nCitations: ${citations.map((source) => `[${source.type}:${source.id}] ${source.source}: ${source.label}`).join(" | ") || "ECG Insight Knowledge Engine"}`,
     prompt: input.prompt,
   };
 }
@@ -731,6 +920,14 @@ function classifyQuestion(question: string) {
   return "ECG Interpretation";
 }
 
+function tagForIntent(intent: MedicalIntent, fallback: ChatInput["tag"]) {
+  if (intent === "occupational_fitness") return "Occupational Fitness";
+  if (intent === "follow_up_advice" || intent === "emergency_symptom_triage") return "Follow-up";
+  if (intent === "ecg_interpretation") return "ECG Interpretation";
+  if (intent === "uploaded_document_review" || intent === "general_medical_question" || intent === "medication_question") return "Clinical Summary";
+  return fallback ?? "Clinical Summary";
+}
+
 function automaticConversationTitle(question: string) {
   const normalized = question
     .replace(/[^\w\s-]/g, " ")
@@ -749,7 +946,7 @@ async function conversationForUser(conversationId: string, userId: string) {
 async function executeCopilotChat(input: ChatInput, userId: string, started = Date.now()) {
   const currentSettings = await settings();
   if (!currentSettings.enabled) throw new AppError(503, "Medical AI Copilot is disabled by the developer owner.", "COPILOT_DISABLED");
-  const tag = input.tag ?? classifyQuestion(input.question);
+  const requestingUser = await prisma.user.findUnique({ select: { name: true }, where: { id: userId } });
   const generatedTitle = automaticConversationTitle(input.question);
   const conversation = input.conversationId
     ? await conversationForUser(input.conversationId, userId)
@@ -758,7 +955,7 @@ async function executeCopilotChat(input: ChatInput, userId: string, started = Da
           caseId: input.caseId,
           contextType: input.contextType,
           patientId: input.patientId,
-          tag,
+          tag: input.tag ?? classifyQuestion(input.question),
           title: generatedTitle,
           userId,
         },
@@ -787,7 +984,6 @@ async function executeCopilotChat(input: ChatInput, userId: string, started = Da
     });
   }
   const clinicalContext = await retrieveClinicalContext({ caseId: input.caseId ?? conversation.caseId ?? undefined, patientId: input.patientId ?? conversation.patientId ?? undefined });
-  const knowledge = await retrieveKnowledge(input.question, clinicalContext);
   const attachmentContext = userMessage.attachments.length
     ? `\nAttachments:\n${userMessage.attachments.map((attachment) => [
         `${attachment.kind.toUpperCase()} ${attachment.originalName}`,
@@ -801,8 +997,11 @@ async function executeCopilotChat(input: ChatInput, userId: string, started = Da
       ].filter(Boolean).join(" | ")).join("\n")}`
     : "";
   const enrichedQuestion = `${input.question}${attachmentContext}`;
+  const intent = classifyMedicalIntent(input.question, userMessage.attachments);
+  const tag = tagForIntent(intent, input.tag);
+  const knowledge = await retrieveKnowledge(enrichedQuestion, clinicalContext);
   const prompt = buildPrompt(enrichedQuestion, clinicalContext, knowledge.hits);
-  const result = generateClinicalResponse({ context: clinicalContext, knowledge: knowledge.hits, prompt, question: enrichedQuestion });
+  const result = generateClinicalResponse({ attachments: userMessage.attachments, clinicianName: requestingUser?.name, context: clinicalContext, intent, knowledge: knowledge.hits, prompt, question: enrichedQuestion });
   const responseTimeMs = Date.now() - started;
   const assistant = await prisma.copilotMessage.create({
     data: {

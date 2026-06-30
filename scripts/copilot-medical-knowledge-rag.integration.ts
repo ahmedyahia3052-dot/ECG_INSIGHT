@@ -54,7 +54,7 @@ async function main() {
   assert(meanTopScore > 0.18, `Mean retrieval quality score too low: ${meanTopScore.toFixed(3)}.`);
 
   const routeSource = await import("node:fs").then((fs) => fs.readFileSync("server/src/modules/copilot/copilot.routes.ts", "utf8"));
-  for (const marker of ["Clinical Summary", "Detailed Explanation", "Key Points", "Warnings", "References", "Citations", "AI assistance only. Clinical decisions remain the responsibility of the physician.", "medicalGuardrails", "semanticSearchKnowledge"]) {
+  for (const marker of ["classifyMedicalIntent", "uploaded_document_review", "emergency_symptom_triage", "Uploaded Document Review", "OCR Confidence", "Warnings", "References", "Citations", "AI assistance only. Clinical decisions remain the responsibility of the physician.", "medicalGuardrails", "semanticSearchKnowledge"]) {
     assert(routeSource.includes(marker), `Copilot RAG answer/guardrail marker missing: ${marker}`);
   }
 

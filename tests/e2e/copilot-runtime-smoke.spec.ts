@@ -30,7 +30,10 @@ test.describe("Copilot runtime hardening", () => {
           this.onend?.();
         }
       }
-      Object.assign(window, { SpeechRecognition: MockSpeechRecognition, webkitSpeechRecognition: MockSpeechRecognition });
+      Object.assign(window, {
+        SpeechRecognition: MockSpeechRecognition,
+        webkitSpeechRecognition: MockSpeechRecognition,
+      });
     });
 
     const loginResponse = await page.request.post(`${API_URL}/auth/login`, {
@@ -55,29 +58,58 @@ test.describe("Copilot runtime hardening", () => {
     await expectNoErrorBoundary();
 
     const composer = page.getByPlaceholder(/Ask about ECG interpretation/i);
+    async function sendAndWaitForAssistant(prompt: string, expectedText?: RegExp | string) {
+      await composer.fill(prompt);
+      const response = page.waitForResponse((item) => item.url().includes("/copilot/chat/stream") && item.status() === 201, { timeout: 45_000 });
+      await page.getByRole("button", { name: "Send" }).click();
+      await response;
+      await expect(page.getByText("Ready").first()).toBeVisible({ timeout: 45_000 });
+      await expect(page.getByText("AI Clinical Copilot").first()).toBeVisible({ timeout: 45_000 });
+      if (expectedText) await expect(page.getByText(expectedText).first()).toBeVisible({ timeout: 45_000 });
+      await expect(page).toHaveURL(/\/copilot\/[^/]+$/);
+      await expectNoErrorBoundary();
+    }
+
+    await sendAndWaitForAssistant("hi", /Hello Dr/i);
+    await page.getByRole("button", { name: "New Chat" }).click();
+    await sendAndWaitForAssistant("What is hypertension?", /Short Answer|hypertension/i);
+    await page.getByRole("button", { name: "New Chat" }).click();
+    await sendAndWaitForAssistant("I have chest pain and sweating", /Urgent Triage|emergency assessment/i);
+    await page.getByRole("button", { name: "New Chat" }).click();
+
     await page.getByRole("button", { name: "Voice" }).last().click();
     await expect(composer).toHaveValue(/runtime smoke voice transcript/i);
 
     const fileChooser = page.waitForEvent("filechooser");
     await page.getByRole("button", { name: "Upload Files" }).last().click();
     await (await fileChooser).setFiles({ buffer: Buffer.from("Troponin 0.42 potassium 5.7 ECG irregular rhythm"), mimeType: "text/plain", name: "runtime-labs.txt" });
-    await expect(page.getByText("runtime-labs.txt")).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByText("runtime-labs.txt").last()).toBeVisible({ timeout: 30_000 });
     await expectNoErrorBoundary();
 
     const ecgChooser = page.waitForEvent("filechooser");
     await page.getByRole("button", { name: "Upload ECG" }).last().click();
     await (await ecgChooser).setFiles({ buffer: Buffer.from("ECG rhythm strip PR interval QRS QTc ST depression"), mimeType: "application/pdf", name: "runtime-ecg.pdf" });
-    await expect(page.getByText("runtime-ecg.pdf")).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByText("runtime-ecg.pdf").last()).toBeVisible({ timeout: 30_000 });
     await expectNoErrorBoundary();
 
-    await composer.fill("Runtime smoke test: summarize uploaded ECG and labs with citations.");
-    const streamResponse = page.waitForResponse((response) => response.url().includes("/copilot/chat/stream") && response.status() === 201, { timeout: 45_000 });
-    await page.getByRole("button", { name: "Send" }).click();
-    await streamResponse;
-    await expect(page.getByText("Ready").first()).toBeVisible({ timeout: 45_000 });
-    await expect(page.getByText("AI Clinical Copilot").first()).toBeVisible({ timeout: 45_000 });
-    await expect(page).toHaveURL(/\/copilot\/[^/]+$/);
+    const imageChooser = page.waitForEvent("filechooser");
+    await page.getByRole("button", { name: "Upload Image" }).last().click();
+    await (await imageChooser).setFiles({ buffer: Buffer.from("89504e470d0a1a0a0000000d49484452", "hex"), mimeType: "image/png", name: "runtime-image.png" });
+    await expect(page.getByText("runtime-image.png").last()).toBeVisible({ timeout: 30_000 });
     await expectNoErrorBoundary();
+
+    await sendAndWaitForAssistant("Runtime smoke test: summarize uploaded ECG, image, and labs with citations.", /Uploaded Document Review|Document Type|OCR Confidence/i);
+
+    await page.getByRole("button", { name: "Play answer" }).first().click();
+    await expect(page.getByText(/Speaking|Voice paused/).first()).toBeVisible({ timeout: 10_000 });
+    await page.getByRole("button", { name: "Pause voice" }).first().click();
+    await expect(page.getByText("Voice paused").first()).toBeVisible({ timeout: 10_000 });
+    await page.getByRole("button", { name: "Resume voice" }).first().click();
+    await page.getByRole("button", { name: "Replay answer" }).first().click();
+    await page.getByRole("button", { name: "Stop voice" }).first().click();
+    await page.getByRole("button", { name: "Play answer" }).first().click();
+    await page.getByRole("button", { name: "Mute voice" }).first().click();
+    await page.getByRole("button", { name: "Unmute voice" }).first().click();
 
     const conversationUrl = page.url();
     await page.reload();

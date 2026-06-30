@@ -45,6 +45,17 @@ type SpeechWindow = Window & {
   webkitSpeechRecognition?: new () => SpeechRecognitionLike;
 };
 
+type SpeechControl = {
+  muted: boolean;
+  onMuteToggle: () => void;
+  onPauseResume: () => void;
+  onReplay: (content: string, id: string) => void;
+  onSpeak: (content: string, id: string) => void;
+  onStop: () => void;
+  paused: boolean;
+  speakingMessageId?: string;
+};
+
 const ATTACHMENT_RULES: Record<AttachmentKind, { accept: string; extensions: string[]; maxBytes: number; multiple: boolean }> = {
   ecg: { accept: ".jpg,.jpeg,.png,.pdf,application/pdf,image/jpeg,image/png", extensions: [".jpg", ".jpeg", ".pdf", ".png"], maxBytes: 25 * 1024 * 1024, multiple: true },
   file: { accept: ".pdf,.docx,.txt,.jpg,.jpeg,.png,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain,image/jpeg,image/png", extensions: [".docx", ".jpg", ".jpeg", ".pdf", ".png", ".txt"], maxBytes: 25 * 1024 * 1024, multiple: true },
@@ -111,6 +122,9 @@ export function CopilotWorkspaceScreen({ routeConversationId }: { routeConversat
   const [isRecording, setIsRecording] = useState(false);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [selectedId, setSelectedId] = useState<string | undefined>();
+  const [speechMuted, setSpeechMuted] = useState(false);
+  const [speechPaused, setSpeechPaused] = useState(false);
+  const [speakingMessageId, setSpeakingMessageId] = useState<string | undefined>();
   const [streamingMessage, setStreamingMessage] = useState("");
   const [status, setStatus] = useState("");
   const [uploadingFiles, setUploadingFiles] = useState<string[]>([]);
@@ -265,6 +279,80 @@ export function CopilotWorkspaceScreen({ routeConversationId }: { routeConversat
       showActionNotice("Microphone denied. Microphone permission denied.", "error");
     }
   }, [isRecording, showActionNotice, stopVoiceInput]);
+
+  const stopSpeaking = useCallback(() => {
+    if (typeof window !== "undefined" && "speechSynthesis" in window) {
+      window.speechSynthesis.cancel();
+    }
+    setSpeakingMessageId(undefined);
+    setSpeechPaused(false);
+  }, []);
+
+  const speakAssistantMessage = useCallback((content: string, messageId: string) => {
+    const text = content
+      .replace(/^#{1,3}\s+/gm, "")
+      .replace(/\[[^\]]+\]/g, "")
+      .replace(/\s+/g, " ")
+      .trim();
+    if (!text) {
+      showActionNotice("No answer text available for speech.", "error");
+      return;
+    }
+    if (speechMuted) {
+      showActionNotice("Voice output is muted.", "error");
+      return;
+    }
+    if (typeof window === "undefined" || !("speechSynthesis" in window) || !("SpeechSynthesisUtterance" in window)) {
+      showActionNotice("Voice playback is not supported by this browser.", "error");
+      return;
+    }
+    window.speechSynthesis.cancel();
+    const SpeechUtterance = window.SpeechSynthesisUtterance;
+    const utterance = new SpeechUtterance(text);
+    utterance.rate = 0.95;
+    utterance.pitch = 1;
+    utterance.onend = () => {
+      setSpeakingMessageId(undefined);
+      setSpeechPaused(false);
+    };
+    utterance.onerror = () => {
+      setSpeakingMessageId(undefined);
+      setSpeechPaused(false);
+      showActionNotice("Voice playback failed.", "error");
+    };
+    setSpeakingMessageId(messageId);
+    setSpeechPaused(false);
+    try {
+      window.speechSynthesis.speak(utterance);
+    } catch {
+      setSpeakingMessageId(undefined);
+      setSpeechPaused(false);
+      showActionNotice("Voice playback failed.", "error");
+    }
+  }, [showActionNotice, speechMuted]);
+
+  const pauseOrResumeSpeech = useCallback(() => {
+    if (typeof window === "undefined" || !("speechSynthesis" in window) || !speakingMessageId) return;
+    if (speechPaused) {
+      window.speechSynthesis.resume();
+      setSpeechPaused(false);
+      return;
+    }
+    window.speechSynthesis.pause();
+    setSpeechPaused(true);
+  }, [speakingMessageId, speechPaused]);
+
+  const replaySpeech = useCallback((content: string, id: string) => {
+    speakAssistantMessage(content, id);
+  }, [speakAssistantMessage]);
+
+  const toggleSpeechMute = useCallback(() => {
+    setSpeechMuted((current) => {
+      const next = !current;
+      if (next) stopSpeaking();
+      return next;
+    });
+  }, [stopSpeaking]);
 
   const navigateConversation = useCallback((conversationId: string) => {
     setSelectedId(conversationId);
@@ -455,6 +543,16 @@ export function CopilotWorkspaceScreen({ routeConversationId }: { routeConversat
 
   const sidebarVisible = !isMobile || mobileSidebarOpen;
   const contextVisible = contextOpen && !isMobile;
+  const speechControl: SpeechControl = {
+    muted: speechMuted,
+    onMuteToggle: toggleSpeechMute,
+    onPauseResume: pauseOrResumeSpeech,
+    onReplay: replaySpeech,
+    onSpeak: speakAssistantMessage,
+    onStop: stopSpeaking,
+    paused: speechPaused,
+    speakingMessageId,
+  };
 
   return (
     <View style={styles.shell}>
@@ -567,9 +665,9 @@ export function CopilotWorkspaceScreen({ routeConversationId }: { routeConversat
                 {EMPTY_MESSAGES.map((message) => <Text key={message} style={styles.emptyMessage}>{message}</Text>)}
               </View>
             ) : null}
-            {messages.map((message, index) => <MessageCard key={message?.id ?? `message-${index}`} message={message} onNotice={showActionNotice} />)}
+            {messages.map((message, index) => <MessageCard key={message?.id ?? `message-${index}`} message={message} onNotice={showActionNotice} speechControl={speechControl} />)}
             {status && !streamingMessage ? <Text style={styles.statusText}>{status}</Text> : null}
-            {streamingMessage ? <MessageCard message={{ attachments: [], citations: [], content: streamingMessage, createdAt: new Date().toISOString(), id: "streaming", role: "assistant" }} onNotice={showActionNotice} /> : null}
+            {streamingMessage ? <MessageCard message={{ attachments: [], citations: [], content: streamingMessage, createdAt: new Date().toISOString(), id: "streaming", role: "assistant" }} onNotice={showActionNotice} speechControl={speechControl} /> : null}
           </ScrollView>
 
           <View style={styles.composer}>
@@ -686,12 +784,14 @@ function ConversationList({
   );
 }
 
-function MessageCard({ message, onNotice }: { message: CopilotMessage; onNotice: (text: string, tone?: "error" | "success") => void }) {
+function MessageCard({ message, onNotice, speechControl }: { message: CopilotMessage; onNotice: (text: string, tone?: "error" | "success") => void; speechControl: SpeechControl }) {
   const assistant = message?.role === "assistant";
   const attachments = safeArray(message?.attachments);
   const citations = safeArray(message?.citations);
   const confidence = typeof message?.confidence === "number" && Number.isFinite(message.confidence) ? message.confidence : undefined;
   const content = safeString(message?.content);
+  const messageId = safeString(message?.id, "assistant-message");
+  const isSpeaking = assistant && speechControl.speakingMessageId === messageId;
   return (
     <View style={[styles.message, assistant ? styles.assistantMessage : styles.userMessage]}>
       <View style={styles.messageTop}>
@@ -708,6 +808,12 @@ function MessageCard({ message, onNotice }: { message: CopilotMessage; onNotice:
       {assistant ? (
         <View style={styles.answerTools}>
           <MiniAction icon="copy" label="Copy answer" onPress={() => copyText(content, onNotice)} />
+          <MiniAction icon="volume-2" label="Play answer" onPress={() => speechControl.onSpeak(content, messageId)} />
+          <MiniAction icon="repeat" label="Replay answer" onPress={() => speechControl.onReplay(content, messageId)} />
+          <MiniAction disabled={!isSpeaking} icon={speechControl.paused ? "play" : "pause"} label={speechControl.paused ? "Resume voice" : "Pause voice"} onPress={speechControl.onPauseResume} />
+          <MiniAction icon="square" label="Stop voice" onPress={speechControl.onStop} />
+          <MiniAction active={speechControl.muted} icon={speechControl.muted ? "volume-x" : "volume-1"} label={speechControl.muted ? "Unmute voice" : "Mute voice"} onPress={speechControl.onMuteToggle} />
+          {isSpeaking ? <Text style={styles.speakingState}>{speechControl.paused ? "Voice paused" : "Speaking..."}</Text> : null}
           {confidence !== undefined ? <Text style={styles.confidence}>Confidence {Math.round(confidence * 100)}%</Text> : null}
         </View>
       ) : null}
@@ -775,10 +881,10 @@ function HeaderTool({ disabled, icon, label, onPress }: { disabled?: boolean; ic
   );
 }
 
-function MiniAction({ icon, label, onPress, tone }: { icon: keyof typeof Feather.glyphMap; label: string; onPress: () => void; tone?: "danger" }) {
+function MiniAction({ active, disabled, icon, label, onPress, tone }: { active?: boolean; disabled?: boolean; icon: keyof typeof Feather.glyphMap; label: string; onPress: () => void; tone?: "danger" }) {
   return (
-    <Pressable accessibilityLabel={label} accessibilityRole="button" onPress={onPress} style={styles.miniAction}>
-      <Feather name={icon} size={12} color={tone === "danger" ? medicalTheme.critical : medicalTheme.muted} />
+    <Pressable accessibilityLabel={label} accessibilityRole="button" disabled={disabled} onPress={onPress} style={[styles.miniAction, active && styles.miniActionActive, disabled && styles.disabled]}>
+      <Feather name={icon} size={12} color={tone === "danger" ? medicalTheme.critical : active ? medicalTheme.primary : medicalTheme.muted} />
     </Pressable>
   );
 }
@@ -948,6 +1054,7 @@ const styles = StyleSheet.create({
   messageTop: { alignItems: "center", flexDirection: "row", gap: 8, justifyContent: "space-between" },
   messages: { flex: 1, minHeight: 0 },
   miniAction: { alignItems: "center", backgroundColor: "rgba(2,6,23,0.34)", borderRadius: 999, height: 24, justifyContent: "center", width: 24 },
+  miniActionActive: { backgroundColor: "rgba(20,221,230,0.16)" },
   richText: { gap: 2 },
   shell: { backgroundColor: "#020617", flex: 1, flexDirection: "row", gap: 14, minHeight: Platform.OS === "web" ? "calc(100vh - 130px)" as unknown as number : 760, overflow: "hidden", padding: 2 },
   sidebar: { backgroundColor: "rgba(15,23,42,0.88)", borderColor: glassBorder, flexBasis: 320, gap: 12, padding: 14, width: 320 },
@@ -956,6 +1063,7 @@ const styles = StyleSheet.create({
   sidebarList: { gap: 14, paddingBottom: 20 },
   sidebarMobile: { bottom: 0, left: 0, position: "absolute", top: 0, zIndex: 20 },
   sidebarTitle: { color: medicalTheme.text, fontSize: 22, fontWeight: "900" },
+  speakingState: { color: medicalTheme.primary, fontSize: 11, fontWeight: "900" },
   statusText: { color: medicalTheme.primary, fontSize: 13, fontWeight: "900", padding: 10 },
   titleInput: { borderBottomColor: "transparent", color: medicalTheme.text, fontSize: 18, fontWeight: "900", minHeight: 34, paddingVertical: 4 },
   titleStack: { gap: 2 },
