@@ -1,6 +1,11 @@
 import type { AttachmentForAnalysis, ChatContextInput, ConversationMemory, MedicalIntent } from "./copilot-types";
+import { runIntentPipeline } from "./intent-pipeline";
+import { conversationTopic, isEcgUploadPendingInterpretation } from "./intent-helpers";
+import { isFastPathFromPlan, shouldRetrieveClinicalContextFromPlan, shouldRetrieveKnowledgeFromPlan } from "./tool-router";
+import type { CopilotTool, IntentPipelineResult } from "./smart-intent-types";
 
 export type { MedicalIntent };
+export { conversationTopic, isEcgUploadPendingInterpretation };
 
 export type ConversationPatientHint = {
   age?: number;
@@ -10,17 +15,6 @@ export type ConversationPatientHint = {
 
 export function emptyClinicalContext() {
   return { criticalAlerts: [], documents: [], previousEcgs: [], reports: [], sources: [] };
-}
-
-export function conversationTopic(memory: ConversationMemory) {
-  const combined = memory.turns.map((turn) => turn.content).join(" ").toLowerCase();
-  if (/atrial fibrillation|\baf\b/.test(combined)) return "atrial fibrillation";
-  if (/hypertension|blood pressure/.test(combined)) return "hypertension";
-  if (/heart failure|\bhf\b/.test(combined)) return "heart failure";
-  if (/stemi|st elevation/.test(combined)) return "stemi";
-  if (/long qt|prolonged qt|qtc/.test(combined)) return "prolonged QT";
-  if (/prolonged qt|qt prolongation/.test(combined)) return "prolonged QT";
-  return "";
 }
 
 export function conversationPatientHint(memory: ConversationMemory): ConversationPatientHint {
@@ -35,40 +29,15 @@ export function conversationPatientHint(memory: ConversationMemory): Conversatio
 }
 
 export function classifyMedicalIntent(question: string, attachments: AttachmentForAnalysis[], memory: ConversationMemory): MedicalIntent {
-  const text = question.toLowerCase().trim();
-  if (/^(voice mode|hands[- ]free|talk to me|speak with me)\b/.test(text)) return "voice_conversation";
-  if (/^(hi|hello|hey|good morning|good afternoon|good evening|salam|السلام)\b[!.?\s]*$/i.test(text)) return "greeting";
-  if (/^how are you\b/.test(text)) return "small_talk";
-  if (/^(i need your help|need your help|can you help|help me)\b/.test(text)) return "small_talk";
-  if (/^(thanks|thank you|ok thanks|appreciate it)\b/.test(text)) return "small_talk";
-  if (/^who are you\b|^what can you do\b/.test(text)) return "small_talk";
-  if (/show sources|where did you get|what evidence|which guideline/.test(text)) return "show_sources";
-  if (attachments.length && isEcgUploadPendingInterpretation(question, attachments)) return "upload_analysis";
-  if (attachments.length || /upload|uploaded|attachment|attached file|review (this|the) (file|image|pdf|ecg)/.test(text)) return "upload_analysis";
-  if (/patient profile|patient information|who is (this|the) patient|show patient|medical history|patient demographics|look up patient|find patient|my patient|this patient|the patient/.test(text)) return "patient_information";
-  if (/generate report|write report|create report|draft report|clinical report|ecg report/.test(text)) return "generate_report";
-  if (/drug interaction|interact with|contraindicated with|can i give.*with/.test(text)) return "medication_question";
-  if (/guideline|esc|aha|acc|nice|protocol|recommendation from/.test(text)) return "general_medical_question";
-  if (/current case|this case|active ecg|open ecg|case summary/.test(text)) return "current_ecg_case";
-  if (/explain (the )?diagnosis|why (this|that) diagnosis|interpret diagnosis/.test(text)) return "explain_diagnosis";
-  if (/^(how is it treated|how do you treat|what about treatment|what are the options|how should i manage|what treatment would you consider|what would you recommend)\b/.test(text) && memory.turns.length > 0) return "follow_up_plan";
-  if (/chest pain|severe pain|shortness of breath|dyspnea|faint|syncope|stroke|weakness|facial droop|crushing|sweating|hemoptysis|suicidal|shock/.test(text)) return "emergency_triage";
-  if (/medication|medicine|drug|dose|dosage|tablet|capsule|prescription|side effect|contraindication|start|stop|increase|decrease|beta blocker|statin|anticoag/.test(text)) return "medication_question";
-  if (/occupational|fit for work|work restriction|return to work|offshore|driver|safety-sensitive|duty/.test(text)) return "occupational_fitness";
-  if (/follow.?up|next step|monitor|repeat|when should|refer|appointment|plan/.test(text)) return "follow_up_plan";
-  if (/\becg\b|\bekg\b|interpret (this|the) ecg|review (this|the) ecg|qrs|qtc|st elevation|st depression|rhythm|brady|tachy|interval|axis/.test(text)) return "ecg_interpretation";
-  if (/what causes|causes of|why does|what is|explain|how does|can you explain|tell me about|prolonged qt|stemi|nstemi/.test(text)) return "general_medical_question";
-  if (text.length < 2) return "unknown";
-  return "general_medical_question";
+  return runIntentPipeline({ attachments, chatInput: {}, memory, question }).classification.primaryMedicalIntent;
 }
 
-export function isEcgUploadPendingInterpretation(question: string, attachments: AttachmentForAnalysis[]) {
-  const hasEcg = attachments.some((attachment) => attachment.kind === "ecg" || /ecg|ekg/i.test(`${attachment.documentType ?? ""} ${attachment.originalName}`));
-  if (!hasEcg) return false;
-  return !/(interpret|review|analyze|analyse|read|explain|findings|diagnosis|what do you see|look at|summarize|summary)/i.test(question);
+export function classifyWithPipeline(question: string, attachments: AttachmentForAnalysis[], memory: ConversationMemory, chatInput: ChatContextInput = {}): IntentPipelineResult {
+  return runIntentPipeline({ attachments, chatInput, memory, question });
 }
 
-export function shouldRetrieveClinicalContext(intent: MedicalIntent, input: ChatContextInput) {
+export function shouldRetrieveClinicalContext(intent: MedicalIntent, input: ChatContextInput, tools?: CopilotTool[]) {
+  if (tools) return shouldRetrieveClinicalContextFromPlan(tools, input);
   if (["greeting", "general_medical_question", "medication_question", "small_talk", "unknown", "voice_conversation"].includes(intent)) {
     return false;
   }
@@ -78,7 +47,10 @@ export function shouldRetrieveClinicalContext(intent: MedicalIntent, input: Chat
   return false;
 }
 
-export function shouldRetrieveKnowledge(input: { attachments: AttachmentForAnalysis[]; intent: MedicalIntent; question: string }) {
+export function shouldRetrieveKnowledge(input: { attachments: AttachmentForAnalysis[]; intent: MedicalIntent; question: string; tools?: CopilotTool[]; smartIntent?: string }) {
+  if (input.tools) {
+    return shouldRetrieveKnowledgeFromPlan(input.tools, input.question, (input.smartIntent ?? "general_medical_question") as never);
+  }
   if (["greeting", "small_talk", "unknown", "voice_conversation", "show_sources", "current_ecg_case", "patient_information", "generate_report"].includes(input.intent)) {
     return false;
   }
@@ -130,9 +102,22 @@ export function casualResponse(question: string) {
   if (/^how are you\b/i.test(question.trim())) {
     return "I'm ready when you are. What would you like to work on?";
   }
+  if (/^who are you\b/i.test(question.trim())) {
+    return "I'm ECG Insight AI — your clinical copilot for ECG interpretation, cardiology questions, reports, and patient workflows.";
+  }
+  if (/^what can you do\b/i.test(question.trim())) {
+    return "I can help with ECG interpretation, medical questions, uploaded files, patient context, reports, and follow-up planning.";
+  }
+  if (/^(thanks|thank you|ok thanks|appreciate it|nice to meet you)\b/i.test(question.trim())) {
+    return "You're welcome. Let me know whenever you'd like to continue.";
+  }
+  if (/^(goodbye|bye|see you|talk later)\b/i.test(question.trim())) {
+    return "Goodbye for now. I'll be here when you need me.";
+  }
   return "Happy to help. Ask me about ECGs, cardiology, reports, or any clinical question on your mind.";
 }
 
-export function isFastPathIntent(intent: MedicalIntent) {
+export function isFastPathIntent(intent: MedicalIntent, tools?: CopilotTool[]) {
+  if (tools) return isFastPathFromPlan(tools);
   return ["greeting", "small_talk", "unknown", "voice_conversation"].includes(intent);
 }

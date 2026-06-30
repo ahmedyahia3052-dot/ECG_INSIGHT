@@ -13,13 +13,14 @@ import { CONVERSATION_SYSTEM_PROMPT } from "./conversation-system-prompt";
 import { attachmentInsights, composeConversationalResponse, dedupeCitations } from "./conversational-engine";
 import type { AttachmentInsight, Citation, ClinicalContext, ConversationMemory, KnowledgeHit } from "./copilot-types";
 import {
-  classifyMedicalIntent,
+  classifyWithPipeline,
   emptyClinicalContext,
   isFastPathIntent,
   shouldRetrieveClinicalContext,
   shouldRetrieveKnowledge,
   tagForIntent,
 } from "./intent-manager";
+import { parseCopilotProviderSettings } from "./intent-pipeline";
 import { semanticSearchKnowledge } from "./medical-knowledge";
 
 export const copilotRouter = Router();
@@ -260,11 +261,20 @@ function ownerOnly(req: { auth?: { id: string } }) {
 }
 
 async function settings() {
+  const defaultProvider = JSON.stringify({ classifier: "SmartIntentClassifier", developerMode: process.env.NODE_ENV !== "production" });
   return prisma.copilotSettings.upsert({
-    create: { enabled: true, provider: "RuleBasedRAG" },
+    create: { enabled: true, provider: defaultProvider },
     update: {},
     where: { id: "global" },
-  }).catch(() => prisma.copilotSettings.create({ data: { id: "global", enabled: true, provider: "RuleBasedRAG" } }));
+  }).catch(() => prisma.copilotSettings.create({ data: { id: "global", enabled: true, provider: defaultProvider } }));
+}
+
+async function copilotDeveloperModeEnabled(userId: string, provider: string) {
+  const parsed = parseCopilotProviderSettings(provider);
+  if (!parsed.developerMode) return false;
+  if (process.env.NODE_ENV !== "production") return true;
+  const user = await prisma.user.findUnique({ select: { email: true, protectedOwner: true, role: true }, where: { id: userId } });
+  return Boolean(user?.protectedOwner || user?.role === "SUPER_ADMIN" || user?.email?.toLowerCase() === OWNER_EMAIL);
 }
 
 function serializeConversation(conversation: {
@@ -500,7 +510,7 @@ async function retrieveKnowledge(question: string, context: ClinicalContext): Pr
     id: entry.id,
     references: entry.references,
     relevanceScore: 0.45,
-    sourceName: "ECG Knowledge Base",
+    sourceName: "Clinical knowledge index",
     sourceUrl: undefined,
     tags: entry.tags,
     topic: entry.topic,
@@ -636,9 +646,17 @@ async function executeCopilotChat(input: ChatInput, userId: string, started = Da
     });
   }
   const memory = await retrieveConversationMemory(conversation.id);
-  const intent = classifyMedicalIntent(input.question, userMessage.attachments, memory);
+  const pipeline = classifyWithPipeline(input.question, userMessage.attachments, memory, {
+    caseId: input.caseId ?? conversation.caseId ?? undefined,
+    patientId: input.patientId ?? conversation.patientId ?? undefined,
+  });
+  const { classification, plan } = pipeline;
+  const intent = classification.primaryMedicalIntent;
   const tag = tagForIntent(intent, input.tag);
-  const clinicalContext = shouldRetrieveClinicalContext(intent, input)
+  const clinicalContext = shouldRetrieveClinicalContext(intent, {
+    caseId: input.caseId ?? conversation.caseId ?? undefined,
+    patientId: input.patientId ?? conversation.patientId ?? undefined,
+  }, plan.tools)
     ? await retrieveClinicalContext({ caseId: input.caseId ?? conversation.caseId ?? undefined, patientId: input.patientId ?? conversation.patientId ?? undefined })
     : emptyClinicalContext();
   let storedCitations: Citation[] = [];
@@ -654,18 +672,26 @@ async function executeCopilotChat(input: ChatInput, userId: string, started = Da
   const knowledgeQuery = userMessage.attachments.length
     ? `${input.question} ${userMessage.attachments.map((attachment) => `${attachment.documentType ?? ""} ${attachment.analysisSummary ?? ""}`).join(" ")}`
     : input.question;
-  const knowledge = shouldRetrieveKnowledge({ attachments: userMessage.attachments, intent, question: input.question })
+  const knowledge = shouldRetrieveKnowledge({
+    attachments: userMessage.attachments,
+    intent,
+    question: input.question,
+    smartIntent: classification.primaryIntent,
+    tools: plan.tools,
+  })
     ? await retrieveKnowledge(knowledgeQuery, clinicalContext)
     : { hits: [], sources: [], tags: [] };
   void CONVERSATION_SYSTEM_PROMPT;
   const result = composeConversationalResponse({
     attachments: userMessage.attachments,
+    clarificationPrompt: classification.clarificationPrompt,
     clinicianName: requestingUser?.name,
     context: intent === "show_sources" ? { ...emptyClinicalContext(), sources: storedCitations } : clinicalContext,
     intent,
     knowledge: knowledge.hits,
     memory,
     question: input.question,
+    requiresClarification: classification.requiresClarification,
   });
   const responseTimeMs = Date.now() - started;
   const assistant = await prisma.copilotMessage.create({
@@ -681,7 +707,7 @@ async function executeCopilotChat(input: ChatInput, userId: string, started = Da
   await prisma.copilotUsageEvent.create({
     data: {
       conversationId: conversation.id,
-      question: `${input.question} | intent:${intent}`,
+      question: `${input.question} | intent:${classification.primaryIntent} | tools:${plan.tools.join(",")} | classifier:${classification.executionTimeMs}ms`,
       responseTimeMs,
       tag,
       userId,
@@ -695,7 +721,7 @@ async function executeCopilotChat(input: ChatInput, userId: string, started = Da
     },
     where: { id: conversation.id },
   });
-  return { assistant, conversation: updatedConversation, result, responseTimeMs, userMessage };
+  return { assistant, conversation: updatedConversation, pipeline, result, responseTimeMs, userMessage };
 }
 
 async function auditCopilotError(userId: string, error: unknown, question?: string) {
@@ -951,11 +977,22 @@ copilotRouter.post("/chat/stream", requireRole("DOCTOR"), async (req, res, next)
     res.setHeader("cache-control", "no-cache, no-transform");
     res.setHeader("connection", "keep-alive");
     writeSse(res, "status", { message: "Understanding your request..." });
-    const previewIntent = classifyMedicalIntent(body.question, [], { attachments: [], summary: "", turns: [] });
-    if (!isFastPathIntent(previewIntent)) {
+    const currentSettings = await settings();
+    const previewPipeline = classifyWithPipeline(body.question, [], { attachments: [], summary: "", turns: [] }, {
+      caseId: body.caseId,
+      patientId: body.patientId,
+    });
+    if (!isFastPathIntent(previewPipeline.classification.primaryMedicalIntent, previewPipeline.plan.tools)) {
       writeSse(res, "status", { message: "Reviewing clinical information..." });
     }
-    const { assistant, conversation, userMessage } = await executeCopilotChat(body, req.auth!.id, started);
+    const { assistant, conversation, pipeline, userMessage } = await executeCopilotChat(body, req.auth!.id, started);
+    const developerMode = await copilotDeveloperModeEnabled(req.auth!.id, currentSettings.provider);
+    if (developerMode) {
+      writeSse(res, "intent_debug", {
+        classification: pipeline.classification,
+        plan: pipeline.plan,
+      });
+    }
     writeSse(res, "conversation", { conversation: serializeConversation(conversation), message: serializeMessage(assistant), userMessage: serializeMessage(userMessage) });
     await streamAssistantContent(assistant.content, res, () => closed);
     if (!closed) writeSse(res, "done", { conversation: serializeConversation(conversation), message: serializeMessage(assistant), userMessage: serializeMessage(userMessage) });

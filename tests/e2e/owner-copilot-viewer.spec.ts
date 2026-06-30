@@ -95,15 +95,16 @@ test.describe("owner controls, copilot, ECG viewer, search, notifications, and e
     await expect(page.getByText("qa-labs.txt")).toBeVisible({ timeout: 30_000 });
 
     await clickStreamingButton("Send");
-    await expect(page.getByText(/Uploaded Document Review|AI Clinical Copilot/).first()).toBeVisible({ timeout: 45_000 });
+    await expect(page.getByText(/received the ECG|analyzing it now|I've reviewed the material/i).first()).toBeVisible({ timeout: 45_000 });
 
     await composer.fill("What causes AF and how should I think about risk?");
     await clickStreamingButton("Send");
-    await expect(page.getByText(/Short Answer|Atrial Fibrillation|AI Clinical Copilot/).first()).toBeVisible({ timeout: 45_000 });
+    await expect(page.getByText(/atrial fibrillation|irregular rhythm|stroke risk/i).first()).toBeVisible({ timeout: 45_000 });
+    await expect(page.getByText(/Short Answer|Confidence Score|Knowledge Base/i)).toHaveCount(0);
 
     await composer.fill("Using the files I uploaded earlier, what should I re-check?");
     await clickStreamingButton("Send");
-    await expect(page.getByText(/Uploaded Document Review|previously uploaded|AI Clinical Copilot/).first()).toBeVisible({ timeout: 45_000 });
+    await expect(page.getByText(/reviewed the material|qa-resting-ecg|qa-labs/i).first()).toBeVisible({ timeout: 45_000 });
 
     const pdfDownload = page.waitForEvent("download", { timeout: 30_000 }).catch(() => null);
     await page.getByRole("button", { name: "Export PDF" }).click();
@@ -117,9 +118,9 @@ test.describe("owner controls, copilot, ECG viewer, search, notifications, and e
     await expect(page.getByText(/Share sheet opened|Conversation deep link and text copied|Conversation text downloaded/)).toBeVisible({ timeout: 20_000 });
 
     await clickStreamingButton("Regenerate");
-    await expect(page.getByText("AI Clinical Copilot").first()).toBeVisible({ timeout: 45_000 });
+    await expect(page.getByText(/atrial fibrillation|reviewed the material|received the ECG/i).first()).toBeVisible({ timeout: 45_000 });
     await clickStreamingButton("Continue");
-    await expect(page.getByText("AI Clinical Copilot").first()).toBeVisible({ timeout: 45_000 });
+    await expect(page.getByText(/atrial fibrillation|reviewed the material|received the ECG/i).first()).toBeVisible({ timeout: 45_000 });
 
     expect(consoleErrors).toEqual([]);
     expect(failedRequests).toEqual([]);

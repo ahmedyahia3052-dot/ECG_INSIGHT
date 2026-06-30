@@ -12,12 +12,14 @@ import { analyticalIntent, casualResponse, conversationPatientHint, conversation
 
 type ComposeInput = {
   attachments: AttachmentForAnalysis[];
+  clarificationPrompt?: string;
   clinicianName?: string | null;
   context: ClinicalContext;
   intent: MedicalIntent;
   knowledge: KnowledgeHit[];
   memory: ConversationMemory;
   question: string;
+  requiresClarification?: boolean;
 };
 
 type ComposeResult = {
@@ -212,11 +214,21 @@ function composeCurrentCase(context: ClinicalContext) {
   ]);
 }
 
-function composeEcgInterpretation(context: ClinicalContext, question: string, knowledge: KnowledgeHit[]) {
-  if (!context.currentCase) {
+function composeEcgInterpretation(context: ClinicalContext, question: string, knowledge: KnowledgeHit[], attachments: AttachmentForAnalysis[]) {
+  const hasEcgAttachment = attachments.some((attachment) => attachment.kind === "ecg" || /ecg|ekg/i.test(`${attachment.documentType ?? ""} ${attachment.originalName}`));
+  if (!context.currentCase && !hasEcgAttachment) {
+    if (/interpret|analyze|analyse|review|read/.test(question.toLowerCase())) {
+      return "Please upload an ECG image first, or open the relevant case, and tell me what you'd like me to focus on.";
+    }
     return "Upload an ECG or open the case here, and tell me what you're most concerned about — rhythm, ischaemia, conduction, or QT prolongation.";
   }
+  if (!context.currentCase && hasEcgAttachment) {
+    return "I can see an uploaded ECG. Tell me what you'd like me to focus on — rhythm, ischaemia, conduction, QT prolongation, or a full interpretation.";
+  }
   const ecgCase = context.currentCase;
+  if (!ecgCase) {
+    return "Upload an ECG or open the case here, and tell me what you're most concerned about — rhythm, ischaemia, conduction, or QT prolongation.";
+  }
   const risk = riskStratification(context, question);
   const differentials = differentialDiagnosis(question, context, knowledge);
   const recs = recommendationsFor(risk, context, knowledge).slice(0, 3);
@@ -333,6 +345,9 @@ export function buildInternalClinicalBrief(question: string, context: ClinicalCo
 }
 
 export function composeConversationalResponse(input: ComposeInput): ComposeResult {
+  if (input.requiresClarification && input.clarificationPrompt) {
+    return { citations: [], confidence: null, content: input.clarificationPrompt };
+  }
   const citations = dedupeCitations(citationObjects(input.context, input.knowledge));
   const topic = conversationTopic(input.memory);
   const insights = attachmentInsights(input.attachments);
@@ -362,7 +377,7 @@ export function composeConversationalResponse(input: ComposeInput): ComposeResul
       content = composeCurrentCase(input.context);
       break;
     case "ecg_interpretation":
-      content = composeEcgInterpretation(input.context, input.question, input.knowledge);
+      content = composeEcgInterpretation(input.context, input.question, input.knowledge, input.attachments);
       break;
     case "upload_analysis":
       if (isEcgUploadPendingInterpretation(input.question, input.attachments)) {

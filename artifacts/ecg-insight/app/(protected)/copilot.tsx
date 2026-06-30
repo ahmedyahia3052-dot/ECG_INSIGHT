@@ -1,19 +1,21 @@
 import { Feather } from "@expo/vector-icons";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Image, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, useWindowDimensions, View } from "react-native";
 
 import { Badge, Card, EmptyState, medicalTheme, PrimaryButton } from "@/components/enterprise/EnterpriseUI";
 import { useAuth } from "@/context/AuthContext";
 import {
   downloadCopilotExport,
+  getCopilotSettings,
   getCopilotConversation,
   listCopilotConversations,
   streamCopilotMessage,
   uploadCopilotAttachment,
   type CopilotAttachment,
   type CopilotConversation,
+  type CopilotIntentDebug,
   type CopilotMessage,
   type CopilotTag,
 } from "@/services/copilot";
@@ -62,11 +64,12 @@ const WORKSPACE_STATE_KEY = "ecg-insight:copilot-workspace-state";
 function sanitizeAssistantContent(content: string) {
   return content
     .replace(/^##+\s.+$/gm, "")
+    .replace(/^Short Answer\s*$/gim, "")
     .replace(/^References:[\s\S]*$/im, "")
     .replace(/\nConfidence Score:\s*\d+%/gi, "")
     .replace(/\nCitations:\s*.+$/gim, "")
     .replace(/Risk tier:\s*(HIGH|MODERATE|LOW)/gi, "")
-    .replace(/Knowledge Base|Retrieved Medical Knowledge|Conversation memory:|Previously uploaded files:/gi, "")
+    .replace(/Knowledge Base|Retrieved Medical Knowledge|Conversation memory:|Previously uploaded files:|Uploaded Document Review|I can go deeper if you want\.?/gi, "")
     .replace(/Continuing from our earlier discussion about .+?\./gi, "")
     .replace(/I am using the earlier messages in this conversation for context\./gi, "")
     .replace(/AI assistance only\. Clinical decisions remain the responsibility of the physician\./gi, "")
@@ -116,11 +119,31 @@ export function CopilotWorkspaceScreen({ routeConversationId }: { routeConversat
   const [speechMuted, setSpeechMuted] = useState(false);
   const [speechPaused, setSpeechPaused] = useState(false);
   const [speakingMessageId, setSpeakingMessageId] = useState<string | undefined>();
+  const [intentDebug, setIntentDebug] = useState<CopilotIntentDebug | undefined>();
+  const [showIntentDebug, setShowIntentDebug] = useState(false);
   const [streamingMessage, setStreamingMessage] = useState("");
   const [status, setStatus] = useState("");
   const [uploadingFiles, setUploadingFiles] = useState<string[]>([]);
 
   const isMobile = width < 760;
+
+  const settingsQuery = useQuery({
+    enabled: !!token && (user?.protectedOwner || user?.role === "super_admin"),
+    queryFn: () => getCopilotSettings(token!),
+    queryKey: ["copilot-settings", token],
+    retry: false,
+  });
+  const developerModeEnabled = useMemo(() => {
+    const provider = settingsQuery.data?.settings.provider ?? "";
+    if (provider.startsWith("{")) {
+      try {
+        return Boolean(JSON.parse(provider).developerMode);
+      } catch {
+        return false;
+      }
+    }
+    return provider.includes("Debug") || __DEV__;
+  }, [settingsQuery.data?.settings.provider]);
 
   const conversationsQuery = useQuery({
     enabled: !!token,
@@ -344,6 +367,7 @@ export function CopilotWorkspaceScreen({ routeConversationId }: { routeConversat
       streamAbort.current = controller;
       setStatus("Thinking...");
       setStreamingMessage("");
+      setIntentDebug(undefined);
       let finalConversation: CopilotConversation | undefined;
       await streamCopilotMessage(token!, {
         caseId: explicitCaseId,
@@ -356,6 +380,7 @@ export function CopilotWorkspaceScreen({ routeConversationId }: { routeConversat
         tag: input.tag,
       }, (event) => {
         if (event.type === "status") setStatus(event.status ?? "");
+        if (event.type === "intent_debug" && event.intentDebug) setIntentDebug(event.intentDebug);
         if (event.type === "token" && event.token) setStreamingMessage((current) => `${current}${event.token}`);
         if (event.conversation) {
           finalConversation = event.conversation;
@@ -563,8 +588,33 @@ export function CopilotWorkspaceScreen({ routeConversationId }: { routeConversat
               <Feather name={voiceMode ? "headphones" : "mic"} size={16} color={medicalTheme.primary} />
               <Text style={styles.contextToggleText}>{voiceMode ? "Voice mode on" : "Voice mode"}</Text>
             </Pressable>
+            {developerModeEnabled ? (
+              <Pressable accessibilityRole="button" onPress={() => setShowIntentDebug((current) => !current)} style={styles.contextToggle}>
+                <Feather name="activity" size={16} color={medicalTheme.primary} />
+                <Text style={styles.contextToggleText}>{showIntentDebug ? "Hide intent debug" : "Intent debug"}</Text>
+              </Pressable>
+            ) : null}
           </View>
         </View>
+
+        {developerModeEnabled && showIntentDebug && intentDebug ? (
+          <View style={styles.intentDebugPanel}>
+            <Text style={styles.intentDebugTitle}>Intent Classifier (Developer Mode)</Text>
+            <Text style={styles.intentDebugLine}>Intent: {intentDebug.classification.primaryIntent} ({Math.round(intentDebug.classification.confidence * 100)}%)</Text>
+            <Text style={styles.intentDebugLine}>Medical intent: {intentDebug.classification.primaryMedicalIntent}</Text>
+            <Text style={styles.intentDebugLine}>Tools: {intentDebug.plan.tools.join(", ")}</Text>
+            <Text style={styles.intentDebugLine}>Latency: {intentDebug.classification.executionTimeMs} ms</Text>
+            <Text style={styles.intentDebugLine}>Emergency: {intentDebug.classification.emergencyPriority}</Text>
+            {intentDebug.classification.intents.length > 1 ? (
+              <Text style={styles.intentDebugLine}>Multi-intent: {intentDebug.classification.intents.map((item) => item.intent).join(" → ")}</Text>
+            ) : null}
+            {Object.entries(intentDebug.classification.entities).some(([, values]) => Array.isArray(values) && values.length > 0) ? (
+              <Text style={styles.intentDebugLine}>
+                Entities: {Object.entries(intentDebug.classification.entities).filter(([, values]) => Array.isArray(values) && values.length > 0).map(([key, values]) => `${key}=${(values as string[]).join("|")}`).join("; ")}
+              </Text>
+            ) : null}
+          </View>
+        ) : null}
 
         {actionNotice ? (
           <View style={[styles.actionNotice, actionNotice.tone === "error" ? styles.actionNoticeError : styles.actionNoticeSuccess]}>
@@ -926,6 +976,9 @@ const styles = StyleSheet.create({
   headerTool: { alignItems: "center", backgroundColor: "rgba(15,33,53,0.72)", borderColor: glassBorder, borderRadius: 999, borderWidth: 1, flexDirection: "row", gap: 6, paddingHorizontal: 10, paddingVertical: 7 },
   headerToolText: { color: medicalTheme.text, fontSize: 11, fontWeight: "900" },
   iconButton: { alignItems: "center", backgroundColor: "rgba(15,33,53,0.86)", borderColor: glassBorder, borderRadius: 999, borderWidth: 1, height: 34, justifyContent: "center", width: 34 },
+  intentDebugLine: { color: medicalTheme.muted, fontFamily: Platform.OS === "web" ? "monospace" : undefined, fontSize: 11, lineHeight: 16 },
+  intentDebugPanel: { backgroundColor: "rgba(15,23,42,0.88)", borderColor: "rgba(56,189,248,0.35)", borderRadius: 14, borderWidth: 1, gap: 4, marginBottom: 10, padding: 12 },
+  intentDebugTitle: { color: medicalTheme.primary, fontSize: 12, fontWeight: "900", marginBottom: 4 },
   inputRow: { alignItems: "flex-end", flexDirection: "row", flexWrap: "wrap", gap: 8 },
   kicker: { color: medicalTheme.primary, fontSize: 11, fontWeight: "900", letterSpacing: 1.2, textTransform: "uppercase" },
   main: { flex: 1, gap: 12, minHeight: 0, minWidth: 0 },

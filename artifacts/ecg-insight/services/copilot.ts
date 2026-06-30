@@ -74,7 +74,32 @@ export type CopilotChatInput = {
   question: string;
   tag: CopilotTag;
 };
-export type CopilotStreamEvent = { conversation?: CopilotConversation; message?: CopilotMessage; status?: string; token?: string; type: "conversation" | "done" | "error" | "status" | "token"; userMessage?: CopilotMessage };
+export type CopilotStreamEvent = {
+  conversation?: CopilotConversation;
+  intentDebug?: CopilotIntentDebug;
+  message?: CopilotMessage;
+  status?: string;
+  token?: string;
+  type: "conversation" | "done" | "error" | "intent_debug" | "status" | "token";
+  userMessage?: CopilotMessage;
+};
+
+export interface CopilotIntentDebug {
+  classification: {
+    confidence: number;
+    emergencyPriority: string;
+    entities: Record<string, string[] | number[]>;
+    executionTimeMs: number;
+    intents: Array<{ confidence: number; intent: string; reason: string }>;
+    primaryIntent: string;
+    primaryMedicalIntent: string;
+    requiresClarification: boolean;
+  };
+  plan: {
+    steps: Array<{ intent: string; medicalIntent: string; note: string; tools: string[] }>;
+    tools: string[];
+  };
+}
 
 export interface CopilotSettings {
   enabled: boolean;
@@ -207,8 +232,18 @@ function parseSseEvent(block: string) {
   const eventLine = block.split("\n").find((line) => line.startsWith("event:"));
   const dataLine = block.split("\n").find((line) => line.startsWith("data:"));
   if (!eventLine || !dataLine) return null;
-  const type = eventLine.replace("event:", "").trim() as "conversation" | "done" | "error" | "status" | "token";
-  const data = JSON.parse(dataLine.replace("data:", "").trim()) as { conversation?: CopilotConversation; message?: CopilotMessage | string; token?: string; userMessage?: CopilotMessage };
+  const type = eventLine.replace("event:", "").trim() as CopilotStreamEvent["type"];
+  const data = JSON.parse(dataLine.replace("data:", "").trim()) as {
+    classification?: CopilotIntentDebug["classification"];
+    conversation?: CopilotConversation;
+    message?: CopilotMessage | string;
+    plan?: CopilotIntentDebug["plan"];
+    token?: string;
+    userMessage?: CopilotMessage;
+  };
   if (type === "status" || type === "error") return { status: typeof data.message === "string" ? data.message : undefined, type };
+  if (type === "intent_debug" && data.classification && data.plan) {
+    return { intentDebug: { classification: data.classification, plan: data.plan }, type };
+  }
   return { conversation: data.conversation, message: typeof data.message === "string" ? undefined : data.message, token: data.token, type, userMessage: data.userMessage };
 }
