@@ -1,6 +1,6 @@
 import { Feather } from "@expo/vector-icons";
 import { Link, useRouter } from "expo-router";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { Linking, Pressable, StyleSheet, Text, View } from "react-native";
 import { z } from "zod";
 
@@ -15,7 +15,7 @@ const loginSchema = z.object({
 
 export default function LoginScreen() {
   const router = useRouter();
-  const { isAuthenticated, isLoading, login } = useAuth();
+  const { isAuthenticated, isLoading, login, user } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [remember, setRemember] = useState(true);
@@ -24,7 +24,22 @@ export default function LoginScreen() {
   const [oauthProviders, setOauthProviders] = useState<OAuthProviderStatus[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [oauthLoading, setOauthLoading] = useState<OAuthProvider | null>(null);
-  const configuredProviders = oauthProviders.filter((provider) => provider.configured);
+
+  const roles = useMemo(() => (user?.role ? [user.role] : []), [user?.role]);
+  const organizations = useMemo(
+    () => (user as { organizations?: unknown[] } | null)?.organizations ?? [],
+    [user],
+  );
+  const providers = oauthProviders ?? [];
+  const configuredProviders = (providers ?? []).filter((provider) => provider?.configured);
+
+  useEffect(() => {
+    console.log("LoginScreen state", {
+      roles,
+      providers,
+      organizations,
+    });
+  }, [roles, providers, organizations]);
 
   useEffect(() => {
     if (!isLoading && isAuthenticated) router.replace("/dashboard" as never);
@@ -32,7 +47,7 @@ export default function LoginScreen() {
 
   useEffect(() => {
     listOAuthProviders()
-      .then(({ providers }) => setOauthProviders(providers))
+      .then(({ providers: authProviders }) => setOauthProviders(Array.isArray(authProviders) ? authProviders : []))
       .catch(() => setOauthProviders([]));
   }, []);
 

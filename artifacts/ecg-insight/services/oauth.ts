@@ -8,12 +8,14 @@ export interface OAuthProviderStatus {
 }
 
 export async function listOAuthProviders() {
-  return apiRequest<{ providers: OAuthProviderStatus[] }>("/auth/oauth/providers");
+  const data = await apiRequest<{ providers?: OAuthProviderStatus[] | null }>("/auth/oauth/providers");
+  const providers = Array.isArray(data?.providers) ? data.providers : [];
+  return { providers };
 }
 
 export async function assertOAuthProviderReady(provider: OAuthProvider) {
   const { providers } = await listOAuthProviders();
-  const status = providers.find((item) => item.provider === provider);
+  const status = (providers ?? []).find((item) => item.provider === provider);
   if (!status?.configured) {
     throw new Error("Social login is temporarily unavailable. Please use email sign in.");
   }
