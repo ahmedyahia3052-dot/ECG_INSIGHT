@@ -231,7 +231,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const currentToken = token ?? useAuthStore.getState().accessToken;
       if (!currentToken) return;
       const payload = await apiRequest<UsersPayload>("/users", { accessToken: currentToken });
-      setState({ managedUsers: payload.users });
+      setState({ managedUsers: Array.isArray(payload.users) ? payload.users : [] });
     },
     [setState]
   );

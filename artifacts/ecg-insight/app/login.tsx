@@ -1,13 +1,13 @@
 import { Feather } from "@expo/vector-icons";
 import { Link, useRouter } from "expo-router";
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Linking, Pressable, StyleSheet, Text, View } from "react-native";
 import { z } from "zod";
 
 import { AuthCard, AuthMessage, AuthPrimaryButton, AuthTextField, AuthToggle, premiumAuthTheme, PremiumAuthShell } from "@/components/auth/PremiumAuth";
 import { useAuth } from "@/context/AuthContext";
+import { checkBackendHealth } from "@/services/api";
 import { assertOAuthProviderReady, listOAuthProviders, oauthStartUrl, type OAuthProvider, type OAuthProviderStatus } from "@/services/oauth";
-import { safeArray } from "@/utils/collections";
 
 const loginSchema = z.object({
   email: z.string().trim().min(1, "Email is required.").email("Enter a valid email address."),
@@ -16,43 +16,64 @@ const loginSchema = z.object({
 
 export default function LoginScreen() {
   const router = useRouter();
-  const { isAuthenticated, isLoading, login, user } = useAuth();
+  const { isAuthenticated, isLoading, login } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [remember, setRemember] = useState(true);
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [oauthProviders, setOauthProviders] = useState<OAuthProviderStatus[]>([]);
+  const [serverUnavailable, setServerUnavailable] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [oauthLoading, setOauthLoading] = useState<OAuthProvider | null>(null);
 
-  const roles = useMemo(() => (user?.role ? [user.role] : []), [user?.role]);
-  const organizations = useMemo(
-    () => (user as { organizations?: unknown[] } | null)?.organizations ?? [],
-    [user],
-  );
-  const configuredProviders = safeArray(oauthProviders).filter((provider) => provider?.configured);
-
-  useEffect(() => {
-    console.log("LoginScreen state", {
-      roles,
-      providers,
-      organizations,
-    });
-  }, [roles, providers, organizations]);
+  const providers = oauthProviders ?? [];
+  const configuredProviders = (providers ?? []).filter((provider) => provider?.configured);
 
   useEffect(() => {
     if (!isLoading && isAuthenticated) router.replace("/dashboard" as never);
   }, [isAuthenticated, isLoading, router]);
 
   useEffect(() => {
-    listOAuthProviders()
-      .then(({ providers: authProviders }) => setOauthProviders(Array.isArray(authProviders) ? authProviders : []))
-      .catch(() => setOauthProviders([]));
+    let cancelled = false;
+
+    void (async () => {
+      const health = await checkBackendHealth();
+      if (cancelled) return;
+
+      if (!health.ok) {
+        setServerUnavailable(true);
+        setOauthProviders([]);
+        return;
+      }
+
+      setServerUnavailable(false);
+
+      try {
+        const { providers: authProviders } = await listOAuthProviders();
+        if (cancelled) return;
+        setOauthProviders(Array.isArray(authProviders) ? authProviders : []);
+      } catch {
+        if (!cancelled) {
+          setServerUnavailable(true);
+          setOauthProviders([]);
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const submit = async () => {
     setError("");
+
+    if (serverUnavailable) {
+      setError("Server unavailable");
+      return;
+    }
+
     const parsed = loginSchema.safeParse({ email, password });
     if (!parsed.success) {
       setError(parsed.error.issues[0]?.message ?? "Enter a valid email and password.");
@@ -64,7 +85,13 @@ export default function LoginScreen() {
     setSubmitting(false);
 
     if (!result.success) {
-      setError(result.error ?? "Login failed.");
+      const message = result.error ?? "Login failed.";
+      if (/network|fetch|timeout|unavailable|ECONNREFUSED|502|503|504/i.test(message)) {
+        setServerUnavailable(true);
+        setError("Server unavailable");
+        return;
+      }
+      setError(message);
       return;
     }
 
@@ -72,6 +99,11 @@ export default function LoginScreen() {
   };
 
   const startOAuth = async (provider: OAuthProvider) => {
+    if (serverUnavailable) {
+      setError("Server unavailable");
+      return;
+    }
+
     setError("");
     setOauthLoading(provider);
     try {
@@ -94,6 +126,8 @@ export default function LoginScreen() {
           <Text style={styles.title}>Sign in</Text>
           <Text style={styles.subtitle}>Use your ECG Insight account credentials.</Text>
         </View>
+
+        {serverUnavailable ? <AuthMessage message="Server unavailable" tone="error" /> : null}
 
         <AuthTextField
           autoCapitalize="none"
@@ -130,21 +164,21 @@ export default function LoginScreen() {
 
         {error ? <AuthMessage message={error} tone="error" /> : null}
 
-        <AuthPrimaryButton disabled={submitting} icon="log-in" label={submitting ? "Signing in..." : "Sign In"} onPress={submit} />
+        <AuthPrimaryButton disabled={submitting || serverUnavailable} icon="log-in" label={submitting ? "Signing in..." : "Sign In"} onPress={submit} />
 
         {configuredProviders.length ? (
           <View style={styles.oauthGrid}>
             {configuredProviders.map(({ provider }) => (
-            <AuthPrimaryButton
-              disabled={oauthLoading !== null}
-              key={provider}
-              label={oauthLoading === provider ? "Checking..." : provider === "GOOGLE" ? "Google" : provider === "APPLE" ? "Apple" : "Microsoft"}
-              onPress={() => void startOAuth(provider)}
-              variant="outline"
-            />
+              <AuthPrimaryButton
+                disabled={oauthLoading !== null || serverUnavailable}
+                key={provider}
+                label={oauthLoading === provider ? "Checking..." : provider === "GOOGLE" ? "Google" : provider === "APPLE" ? "Apple" : "Microsoft"}
+                onPress={() => void startOAuth(provider)}
+                variant="outline"
+              />
             ))}
           </View>
-        ) : <AuthMessage message="Social sign in will be available in production deployment." />}
+        ) : serverUnavailable ? null : <AuthMessage message="Social sign in will be available in production deployment." />}
 
         <Text style={styles.createText}>
           New to ECG Insight? <Link href="/register" style={styles.link}>Create Account</Link>
