@@ -13,11 +13,14 @@ export function MobileSyncStatus() {
   if (snapshot.isOnline && !hasPending && !updateAvailable) return null;
 
   const tone = snapshot.isOnline ? colors.warning : colors.destructive;
+  const connectivityText = snapshot.isOnline
+    ? `Online · browser ${snapshot.browserOnline ? "online" : "offline"} · backend ${snapshot.backendReachable ? "reachable" : "unreachable"}`
+    : `Offline · ${snapshot.offlineReason}`;
   return (
     <View style={[styles.container, { backgroundColor: colors.surface, borderColor: tone }]}>
       <Feather name={snapshot.isOnline ? "wifi" : "wifi-off"} color={tone} size={16} />
       <Text style={[styles.text, { color: colors.text }]}>
-        {snapshot.isOnline ? "Online" : "Offline"} · {syncing ? "Syncing" : `${snapshot.pendingUploads} uploads, ${snapshot.pendingActions} actions pending`}
+        {connectivityText} · {syncing ? "Syncing" : `${snapshot.pendingUploads} uploads, ${snapshot.pendingActions} actions pending`}
         {updateAvailable ? " · Update ready" : ""}
       </Text>
       {snapshot.isOnline && hasPending ? (

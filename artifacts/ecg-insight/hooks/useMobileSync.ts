@@ -8,7 +8,10 @@ import {
 } from "@/services/mobileOffline";
 
 const initialSnapshot: MobileSyncSnapshot = {
+  backendReachable: true,
+  browserOnline: true,
   isOnline: true,
+  offlineReason: "online",
   pendingActions: 0,
   pendingUploads: 0,
   serviceWorkerReady: false,

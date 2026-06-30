@@ -33,6 +33,31 @@
     <main>
       <h1>ECG Insight is offline</h1>
       <p>Your cached dashboard and queued ECG uploads remain available. Reconnect to sync pending actions, uploads, and patient changes.</p>
+      <p id="offline-reason">Browser online: false · Backend reachable: unknown · Offline reason: waiting for reconnection.</p>
     </main>
+    <script>
+      const reason = document.getElementById("offline-reason");
+      async function recoverWhenReachable() {
+        const browserOnline = navigator.onLine !== false;
+        let backendReachable = false;
+        try {
+          const response = await fetch("/health", { cache: "no-store", headers: { accept: "application/json" } });
+          backendReachable = response.status < 500;
+        } catch {
+          backendReachable = false;
+        }
+        const offlineReason = browserOnline || backendReachable ? "online" : "browser-offline-and-backend-unreachable";
+        console.info(`[ECG Insight PWA] Browser online: ${browserOnline}`);
+        console.info(`[ECG Insight PWA] Backend reachable: ${backendReachable}`);
+        console.info(`[ECG Insight PWA] Offline reason: ${offlineReason}`);
+        if (reason) {
+          reason.textContent = `Browser online: ${browserOnline} · Backend reachable: ${backendReachable} · Offline reason: ${offlineReason}`;
+        }
+        if (browserOnline || backendReachable) window.location.reload();
+      }
+      window.addEventListener("online", recoverWhenReachable);
+      setInterval(recoverWhenReachable, 5000);
+      void recoverWhenReachable();
+    </script>
   </body>
 </html>

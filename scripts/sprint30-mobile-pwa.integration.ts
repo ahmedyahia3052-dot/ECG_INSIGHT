@@ -35,10 +35,15 @@ async function main() {
   assert(serviceWorker.includes("self.addEventListener(\"install\""), "Service worker should cache app shell during install.");
   assert(serviceWorker.includes("self.addEventListener(\"fetch\""), "Service worker should intercept fetch requests.");
   assert(serviceWorker.includes("ecg-insight-background-sync"), "Service worker should expose background sync workflow.");
+  assert(serviceWorker.includes("offlineApiResponse"), "Service worker should return JSON API failures instead of the offline HTML page.");
+  assert(serviceWorker.includes("request.mode === \"navigate\""), "Service worker should handle navigation fallback separately from API requests.");
 
   const offlineService = read(offlineServicePath);
   for (const token of ["indexedDB.open", "queueOfflineEcgUpload", "queuePendingAction", "processOfflineUploads", "processPendingActions", "conflictReason", "requestBackgroundSync"]) {
     assert(offlineService.includes(token), `Offline service should implement ${token}.`);
+  }
+  for (const token of ["backendReachable", "browserOnline", "offlineReason", "Backend reachable:", "Browser online:"]) {
+    assert(offlineService.includes(token), `Offline service should expose connectivity diagnostic ${token}.`);
   }
 
   const notifications = read(notificationPath);

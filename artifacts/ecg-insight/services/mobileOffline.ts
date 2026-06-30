@@ -1,4 +1,5 @@
 import { analyzeCase } from "./ai";
+import { API_ROOT_URL } from "./api";
 import { createCase, createPatient } from "./clinical";
 import { uploadClinicalEcgFile } from "./ecgFiles";
 import type { EcgAcquisitionAsset } from "./ecgImageProcessor";
@@ -43,8 +44,11 @@ export interface OfflineEcgUpload {
 }
 
 export interface MobileSyncSnapshot {
+  backendReachable: boolean;
+  browserOnline: boolean;
   isOnline: boolean;
   lastSyncAt?: string;
+  offlineReason: string;
   pendingActions: number;
   pendingUploads: number;
   serviceWorkerReady: boolean;
@@ -115,9 +119,51 @@ export function networkIsOnline() {
   return typeof navigator === "undefined" ? true : navigator.onLine !== false;
 }
 
+async function backendIsReachable() {
+  if (typeof fetch === "undefined") return true;
+  const controller = typeof AbortController !== "undefined" ? new AbortController() : null;
+  const timeout = setTimeout(() => controller?.abort(), 4_000);
+  try {
+    const response = await fetch(`${API_ROOT_URL}/health`, {
+      cache: "no-store",
+      credentials: "include",
+      headers: { accept: "application/json" },
+      signal: controller?.signal,
+    });
+    const contentType = response.headers.get("content-type") ?? "";
+    if (contentType.includes("text/html")) return false;
+    const payload = await response.clone().json().catch(() => null) as { code?: string; ok?: boolean } | null;
+    if (payload?.code === "BACKEND_UNAVAILABLE") return false;
+    return response.status > 0;
+  } catch {
+    return false;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+function offlineReason(browserOnline: boolean, backendReachable: boolean) {
+  if (browserOnline || backendReachable) return "online";
+  return "browser-offline-and-backend-unreachable";
+}
+
+function logOfflineDiagnostics(input: { backendReachable: boolean; browserOnline: boolean; offlineReason: string }) {
+  if (typeof console === "undefined") return;
+  console.info(`[ECG Insight PWA] Browser online: ${input.browserOnline}`);
+  console.info(`[ECG Insight PWA] Backend reachable: ${input.backendReachable}`);
+  console.info(`[ECG Insight PWA] Offline reason: ${input.offlineReason}`);
+}
+
 export function subscribeNetworkStatus(callback: (isOnline: boolean) => void) {
   if (typeof window === "undefined") return () => undefined;
-  const emit = () => callback(networkIsOnline());
+  const emit = () => {
+    const browserOnline = networkIsOnline();
+    void backendIsReachable().then((backendReachable) => {
+      const reason = offlineReason(browserOnline, backendReachable);
+      logOfflineDiagnostics({ backendReachable, browserOnline, offlineReason: reason });
+      callback(browserOnline || backendReachable);
+    });
+  };
   window.addEventListener("online", emit);
   window.addEventListener("offline", emit);
   emit();
@@ -266,7 +312,11 @@ export async function processOfflineUploads(accessToken: string) {
 }
 
 export async function syncNow(accessToken: string) {
-  if (!networkIsOnline()) return { actions: [], uploads: [] };
+  const browserOnline = networkIsOnline();
+  const backendReachable = await backendIsReachable();
+  const reason = offlineReason(browserOnline, backendReachable);
+  logOfflineDiagnostics({ backendReachable, browserOnline, offlineReason: reason });
+  if (!browserOnline && !backendReachable) return { actions: [], uploads: [] };
   const [actions, uploads] = await Promise.all([processPendingActions(accessToken), processOfflineUploads(accessToken)]);
   await putRecord(META_STORE, { id: "lastSyncAt", value: new Date().toISOString() });
   return { actions, uploads };
@@ -278,9 +328,16 @@ export async function mobileSyncSnapshot(): Promise<MobileSyncSnapshot> {
     listOfflineUploads(),
     getAllRecords<{ id: string; value: string }>(META_STORE),
   ]);
+  const browserOnline = networkIsOnline();
+  const backendReachable = await backendIsReachable();
+  const reason = offlineReason(browserOnline, backendReachable);
+  logOfflineDiagnostics({ backendReachable, browserOnline, offlineReason: reason });
   return {
-    isOnline: networkIsOnline(),
+    backendReachable,
+    browserOnline,
+    isOnline: browserOnline || backendReachable,
     lastSyncAt: meta.find((item) => item.id === "lastSyncAt")?.value,
+    offlineReason: reason,
     pendingActions: actions.filter((item) => item.status !== "synced").length,
     pendingUploads: uploads.filter((item) => item.status !== "synced").length,
     serviceWorkerReady: typeof navigator !== "undefined" && "serviceWorker" in navigator,
