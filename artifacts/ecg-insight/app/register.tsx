@@ -6,7 +6,8 @@ import { z } from "zod";
 
 import { AuthCard, AuthMessage, AuthPrimaryButton, AuthTextField, premiumAuthTheme, PremiumAuthShell } from "@/components/auth/PremiumAuth";
 import { useAuth, type UserRole } from "@/context/AuthContext";
-import { assertOAuthProviderReady, listOAuthProviders, oauthStartUrl, type OAuthProvider, type OAuthProviderStatus } from "@/services/oauth";
+import { useAuthOAuthProviders } from "@/hooks/useAuthOAuthProviders";
+import { assertOAuthProviderReady, oauthStartUrl, type OAuthProvider } from "@/services/oauth";
 import { safeArray } from "@/utils/collections";
 
 type RegistrationRole = {
@@ -106,12 +107,12 @@ const registerSchema = z.object({
 function SelectField({
   label,
   onChange,
-  options,
+  options = [],
   value,
 }: {
   label: string;
   onChange: (value: string) => void;
-  options: string[];
+  options?: string[];
   value: string;
 }) {
   const [query, setQuery] = useState(value);
@@ -200,23 +201,17 @@ export default function RegisterScreen() {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [error, setError] = useState("");
-  const [oauthProviders, setOauthProviders] = useState<OAuthProviderStatus[]>([]);
+  const { configuredProviders: rawConfiguredProviders } = useAuthOAuthProviders();
+  const configuredProviders = safeArray(rawConfiguredProviders);
   const [submitting, setSubmitting] = useState(false);
   const [oauthLoading, setOauthLoading] = useState<OAuthProvider | null>(null);
   const selectedRole = useMemo(() => roleOptions.find((item) => item.label === roleLabel) ?? roleOptions[0], [roleLabel]);
   const accountTypeLabel = useMemo(() => accountTypeOptions.find((item) => item.value === accountType)?.label ?? "Individual Account", [accountType]);
   const requiresOrganization = accountType !== "INDIVIDUAL";
-  const configuredProviders = useMemo(() => safeArray(oauthProviders).filter((provider) => provider.configured), [oauthProviders]);
 
   useEffect(() => {
     if (!isLoading && isAuthenticated) router.replace("/dashboard" as never);
   }, [isAuthenticated, isLoading, router]);
-
-  useEffect(() => {
-    listOAuthProviders()
-      .then(({ providers }) => setOauthProviders(providers))
-      .catch(() => setOauthProviders([]));
-  }, []);
 
   const submit = async () => {
     setError("");

@@ -33,7 +33,7 @@ export async function apiLogin(request: APIRequestContext, role: keyof typeof us
 
 export async function uiLogin(page: Page, role: keyof typeof users = "doctor") {
   await page.goto("/login");
-  if (!(await page.getByText("Welcome back").isVisible({ timeout: 5_000 }).catch(() => false))) {
+  if (!(await page.getByText(/Welcome Back/i).isVisible({ timeout: 5_000 }).catch(() => false))) {
     const logoutButton = page.getByRole("button", { name: /logout/i }).first();
     if (await logoutButton.isVisible().catch(() => false)) {
       await logoutButton.click();
@@ -41,7 +41,7 @@ export async function uiLogin(page: Page, role: keyof typeof users = "doctor") {
       await page.goto("/login?force=1");
     }
   }
-  await expect(page.getByText("Welcome back")).toBeVisible();
+  await expect(page.getByText(/Welcome Back/i)).toBeVisible();
   await page.getByPlaceholder(/doctor@hospital\.com|name@organization\.com/i).fill(users[role].email);
   await page.getByPlaceholder(/password/i).fill(users[role].password);
   await page.getByRole("button", { name: /sign in/i }).click();
@@ -55,7 +55,7 @@ export async function logout(page: Page) {
   } else {
     await page.goto("/login");
   }
-  await expect(page.getByText("Welcome back")).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByText(/Welcome Back/i)).toBeVisible({ timeout: 20_000 });
 }
 
 export async function createPatient(request: APIRequestContext, token: string, suffix = Date.now().toString()) {

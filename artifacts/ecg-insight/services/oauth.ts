@@ -7,15 +7,23 @@ export interface OAuthProviderStatus {
   provider: OAuthProvider;
 }
 
-export async function listOAuthProviders() {
-  const data = await apiRequest<{ providers?: OAuthProviderStatus[] | null }>("/auth/oauth/providers");
-  const providers = Array.isArray(data?.providers) ? data.providers : [];
-  return { providers };
+export const EMPTY_OAUTH_PROVIDERS: OAuthProviderStatus[] = [];
+
+export async function listOAuthProviders(): Promise<{ providers: OAuthProviderStatus[] }> {
+  try {
+    const data = await apiRequest<{ providers?: OAuthProviderStatus[] | null }>("/auth/oauth/providers");
+    if (!data || !Array.isArray(data.providers)) {
+      return { providers: EMPTY_OAUTH_PROVIDERS };
+    }
+    return { providers: data.providers };
+  } catch {
+    return { providers: EMPTY_OAUTH_PROVIDERS };
+  }
 }
 
 export async function assertOAuthProviderReady(provider: OAuthProvider) {
   const { providers } = await listOAuthProviders();
-  const status = (providers ?? []).find((item) => item.provider === provider);
+  const status = providers.find((item) => item.provider === provider);
   if (!status?.configured) {
     throw new Error("Social login is temporarily unavailable. Please use email sign in.");
   }

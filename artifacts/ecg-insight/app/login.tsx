@@ -6,8 +6,9 @@ import { z } from "zod";
 
 import { AuthCard, AuthMessage, AuthPrimaryButton, AuthTextField, AuthToggle, premiumAuthTheme, PremiumAuthShell } from "@/components/auth/PremiumAuth";
 import { useAuth } from "@/context/AuthContext";
-import { checkBackendHealth } from "@/services/api";
-import { assertOAuthProviderReady, listOAuthProviders, oauthStartUrl, type OAuthProvider, type OAuthProviderStatus } from "@/services/oauth";
+import { useAuthOAuthProviders } from "@/hooks/useAuthOAuthProviders";
+import { assertOAuthProviderReady, oauthStartUrl, type OAuthProvider } from "@/services/oauth";
+import { safeArray } from "@/utils/collections";
 
 const loginSchema = z.object({
   email: z.string().trim().min(1, "Email is required.").email("Enter a valid email address."),
@@ -17,54 +18,19 @@ const loginSchema = z.object({
 export default function LoginScreen() {
   const router = useRouter();
   const { isAuthenticated, isLoading, login } = useAuth();
+  const { configuredProviders: rawConfiguredProviders, serverUnavailable } = useAuthOAuthProviders();
+  const configuredProviders = safeArray(rawConfiguredProviders);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [remember, setRemember] = useState(true);
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
-  const [oauthProviders, setOauthProviders] = useState<OAuthProviderStatus[]>([]);
-  const [serverUnavailable, setServerUnavailable] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [oauthLoading, setOauthLoading] = useState<OAuthProvider | null>(null);
-
-  const providers = oauthProviders ?? [];
-  const configuredProviders = (providers ?? []).filter((provider) => provider?.configured);
 
   useEffect(() => {
     if (!isLoading && isAuthenticated) router.replace("/dashboard" as never);
   }, [isAuthenticated, isLoading, router]);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    void (async () => {
-      const health = await checkBackendHealth();
-      if (cancelled) return;
-
-      if (!health.ok) {
-        setServerUnavailable(true);
-        setOauthProviders([]);
-        return;
-      }
-
-      setServerUnavailable(false);
-
-      try {
-        const { providers: authProviders } = await listOAuthProviders();
-        if (cancelled) return;
-        setOauthProviders(Array.isArray(authProviders) ? authProviders : []);
-      } catch {
-        if (!cancelled) {
-          setServerUnavailable(true);
-          setOauthProviders([]);
-        }
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, []);
 
   const submit = async () => {
     setError("");
@@ -87,7 +53,6 @@ export default function LoginScreen() {
     if (!result.success) {
       const message = result.error ?? "Login failed.";
       if (/network|fetch|timeout|unavailable|ECONNREFUSED|502|503|504/i.test(message)) {
-        setServerUnavailable(true);
         setError("Server unavailable");
         return;
       }
