@@ -68,6 +68,26 @@ const EMPTY_MESSAGES = [
 
 const WORKSPACE_STATE_KEY = "ecg-insight:copilot-workspace-state";
 
+function safeArray<T>(value: T[] | null | undefined): T[] {
+  return Array.isArray(value) ? value : [];
+}
+
+function safeString(value: unknown, fallback = "") {
+  return typeof value === "string" ? value : fallback;
+}
+
+function safeDateTime(value: unknown, fallback = "Unknown time") {
+  const date = new Date(safeString(value));
+  if (Number.isNaN(date.getTime())) return fallback;
+  return date.toLocaleString([], { dateStyle: "medium", timeStyle: "short" });
+}
+
+function safeTime(value: unknown, fallback = "--:--") {
+  const date = new Date(safeString(value));
+  if (Number.isNaN(date.getTime())) return fallback;
+  return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+}
+
 export default function CopilotRoute() {
   return <CopilotWorkspaceScreen />;
 }
@@ -123,11 +143,11 @@ export function CopilotWorkspaceScreen({ routeConversationId }: { routeConversat
     retry: false,
   });
 
-  const conversations = conversationsQuery.data?.conversations ?? [];
-  const messages = selectedQuery.data?.messages ?? [];
+  const conversations = safeArray(conversationsQuery.data?.conversations);
+  const messages = safeArray(selectedQuery.data?.messages);
   const selectedConversation = conversations.find((item) => item.id === selectedId) ?? selectedQuery.data?.conversation;
-  const currentCase = casesQuery.data?.cases[0];
-  const currentPatient = patientsQuery.data?.patients[0] ?? currentCase?.patient;
+  const currentCase = safeArray(casesQuery.data?.cases)[0];
+  const currentPatient = safeArray(patientsQuery.data?.patients)[0] ?? currentCase?.patient;
   const characterCount = draft.length;
   const chatTitle = selectedConversation?.title ?? "New Clinical Conversation";
 
@@ -171,6 +191,10 @@ export function CopilotWorkspaceScreen({ routeConversationId }: { routeConversat
     try {
       setUploadingFiles((current) => current.concat(file.name));
       const payload = await uploadCopilotAttachment(token, formData);
+      if (!payload?.attachment?.id) {
+        showActionNotice("Upload response was incomplete.", "error");
+        return;
+      }
       if (file.type.startsWith("image/")) {
         const previewUrl = URL.createObjectURL(file);
         setAttachmentPreviews((current) => ({ ...current, [payload.attachment.id]: previewUrl }));
@@ -310,9 +334,9 @@ export function CopilotWorkspaceScreen({ routeConversationId }: { routeConversat
     const rawState = window.localStorage.getItem(WORKSPACE_STATE_KEY);
     if (!rawState) return;
     try {
-      const saved = JSON.parse(rawState) as { contextOpen?: boolean; selectedId?: string };
-      if (saved.contextOpen !== undefined) setContextOpen(saved.contextOpen);
-      if (saved.selectedId) router.replace(`/copilot/${saved.selectedId}` as never);
+      const saved = JSON.parse(rawState) as { contextOpen?: unknown; selectedId?: unknown };
+      if (typeof saved.contextOpen === "boolean") setContextOpen(saved.contextOpen);
+      if (typeof saved.selectedId === "string" && saved.selectedId.trim()) router.replace(`/copilot/${saved.selectedId}` as never);
     } catch {
       window.localStorage.removeItem(WORKSPACE_STATE_KEY);
     }
@@ -320,7 +344,11 @@ export function CopilotWorkspaceScreen({ routeConversationId }: { routeConversat
 
   useEffect(() => {
     if (typeof window === "undefined") return;
-    window.localStorage.setItem(WORKSPACE_STATE_KEY, JSON.stringify({ contextOpen, selectedId }));
+    try {
+      window.localStorage.setItem(WORKSPACE_STATE_KEY, JSON.stringify({ contextOpen, selectedId }));
+    } catch {
+      window.localStorage.removeItem(WORKSPACE_STATE_KEY);
+    }
   }, [contextOpen, selectedId]);
 
   useEffect(() => {
@@ -354,10 +382,10 @@ export function CopilotWorkspaceScreen({ routeConversationId }: { routeConversat
   }, [messages.length, selectedId, streamingMessage]);
 
   function sendPrompt(prompt: string, tag: CopilotTag, options: { autoExportPdf?: boolean } = {}) {
-    const trimmed = prompt.trim() || (attachments.length ? "Review the attached medical files, perform OCR-informed analysis, identify document or image type, explain findings, cite trusted medical knowledge, provide warnings, and suggest next steps." : "");
+    const trimmed = safeString(prompt).trim() || (attachments.length ? "Review the attached medical files, perform OCR-informed analysis, identify document or image type, explain findings, cite trusted medical knowledge, provide warnings, and suggest next steps." : "");
     if (!trimmed || !token || sendMutation.isPending) return;
     reportExportPendingRef.current = Boolean(options.autoExportPdf);
-    sendMutation.mutate({ attachmentIds: attachments.map((attachment) => attachment.id), prompt: trimmed, tag });
+    sendMutation.mutate({ attachmentIds: attachments.map((attachment) => attachment?.id).filter(Boolean), prompt: trimmed, tag });
   }
 
   function startNewChat() {
@@ -401,7 +429,7 @@ export function CopilotWorkspaceScreen({ routeConversationId }: { routeConversat
       return;
     }
     const deepLink = `${window.location.origin}/copilot/${selectedId}`;
-    const text = [selectedConversation?.title ?? "ECG Insight AI Copilot conversation", deepLink, ...messages.map((message) => `${message.role.toUpperCase()}: ${message.content}`)].join("\n\n");
+    const text = [selectedConversation?.title ?? "ECG Insight AI Copilot conversation", deepLink, ...messages.map((message) => `${safeString(message?.role, "message").toUpperCase()}: ${safeString(message?.content)}`)].join("\n\n");
     const webNavigator = navigator as Navigator & {
       clipboard?: { writeText: (text: string) => Promise<void> };
       share?: (data: { text: string; title: string; url: string }) => Promise<void>;
@@ -522,7 +550,11 @@ export function CopilotWorkspaceScreen({ routeConversationId }: { routeConversat
             contentContainerStyle={styles.messageList}
             onScroll={({ nativeEvent }) => {
               if (typeof window !== "undefined") {
-                window.localStorage.setItem(`${WORKSPACE_STATE_KEY}:scroll:${selectedId ?? "new"}`, String(nativeEvent.contentOffset.y));
+                try {
+                  window.localStorage.setItem(`${WORKSPACE_STATE_KEY}:scroll:${selectedId ?? "new"}`, String(nativeEvent.contentOffset.y));
+                } catch {
+                  // Ignore browser storage failures; chat rendering must never depend on scroll persistence.
+                }
               }
             }}
             ref={scrollRef}
@@ -535,7 +567,7 @@ export function CopilotWorkspaceScreen({ routeConversationId }: { routeConversat
                 {EMPTY_MESSAGES.map((message) => <Text key={message} style={styles.emptyMessage}>{message}</Text>)}
               </View>
             ) : null}
-            {messages.map((message) => <MessageCard key={message.id} message={message} onNotice={showActionNotice} />)}
+            {messages.map((message, index) => <MessageCard key={message?.id ?? `message-${index}`} message={message} onNotice={showActionNotice} />)}
             {status && !streamingMessage ? <Text style={styles.statusText}>{status}</Text> : null}
             {streamingMessage ? <MessageCard message={{ attachments: [], citations: [], content: streamingMessage, createdAt: new Date().toISOString(), id: "streaming", role: "assistant" }} onNotice={showActionNotice} /> : null}
           </ScrollView>
@@ -549,21 +581,23 @@ export function CopilotWorkspaceScreen({ routeConversationId }: { routeConversat
             </View>
             {attachments.length ? (
               <View style={styles.attachmentPanel}>
-                {attachments.map((attachment) => (
+                {attachments.map((attachment, index) => (
                   <AttachmentChip
                     attachment={attachment}
-                    key={attachment.id}
+                    key={attachment?.id ?? `attachment-${index}`}
                     onRemove={() => {
-                      const previewUrl = attachmentPreviews[attachment.id];
+                      const attachmentId = attachment?.id;
+                      if (!attachmentId) return;
+                      const previewUrl = attachmentPreviews[attachmentId];
                       if (previewUrl) URL.revokeObjectURL(previewUrl);
                       setAttachmentPreviews((current) => {
                         const next = { ...current };
-                        delete next[attachment.id];
+                        delete next[attachmentId];
                         return next;
                       });
-                      setAttachments((current) => current.filter((item) => item.id !== attachment.id));
+                      setAttachments((current) => current.filter((item) => item?.id !== attachmentId));
                     }}
-                    previewUrl={attachmentPreviews[attachment.id]}
+                    previewUrl={attachment?.id ? attachmentPreviews[attachment.id] : undefined}
                   />
                 ))}
               </View>
@@ -630,42 +664,51 @@ function ConversationList({
   onSelect: (id: string) => void;
   selectedId?: string;
 }) {
+  const safeConversations = safeArray(conversations);
   return (
     <View style={styles.group}>
       <View style={styles.groupHeader}>
         <Feather name="message-square" size={13} color={medicalTheme.primary} />
         <Text style={styles.groupTitle}>Conversations</Text>
       </View>
-      {conversations.length ? conversations.slice(0, 50).map((conversation) => (
-        <Pressable accessibilityRole="button" key={conversation.id} onPress={() => onSelect(conversation.id)} style={[styles.conversationItem, selectedId === conversation.id && styles.conversationItemActive]}>
-          <Text numberOfLines={1} style={styles.conversationTitle}>{conversation.title}</Text>
-          <Text numberOfLines={2} style={styles.conversationPreview}>{conversation.lastMessagePreview ?? "No messages yet."}</Text>
-          <Text style={styles.conversationMeta}>{new Date(conversation.updatedAt).toLocaleString([], { dateStyle: "medium", timeStyle: "short" })}</Text>
+      {safeConversations.length ? safeConversations.slice(0, 50).map((conversation, index) => {
+        const conversationId = safeString(conversation?.id);
+        if (!conversationId) return null;
+        return (
+        <Pressable accessibilityRole="button" key={conversationId || `conversation-${index}`} onPress={() => onSelect(conversationId)} style={[styles.conversationItem, selectedId === conversationId && styles.conversationItemActive]}>
+          <Text numberOfLines={1} style={styles.conversationTitle}>{safeString(conversation?.title, "New Clinical Conversation")}</Text>
+          <Text numberOfLines={2} style={styles.conversationPreview}>{safeString(conversation?.lastMessagePreview, "No messages yet.")}</Text>
+          <Text style={styles.conversationMeta}>{safeDateTime(conversation?.updatedAt)}</Text>
         </Pressable>
-      )) : <Text style={styles.emptyText}>No conversations yet.</Text>}
+        );
+      }) : <Text style={styles.emptyText}>No conversations yet.</Text>}
     </View>
   );
 }
 
 function MessageCard({ message, onNotice }: { message: CopilotMessage; onNotice: (text: string, tone?: "error" | "success") => void }) {
-  const assistant = message.role === "assistant";
+  const assistant = message?.role === "assistant";
+  const attachments = safeArray(message?.attachments);
+  const citations = safeArray(message?.citations);
+  const confidence = typeof message?.confidence === "number" && Number.isFinite(message.confidence) ? message.confidence : undefined;
+  const content = safeString(message?.content);
   return (
     <View style={[styles.message, assistant ? styles.assistantMessage : styles.userMessage]}>
       <View style={styles.messageTop}>
         <Text style={styles.messageRole}>{assistant ? "AI Clinical Copilot" : "You"}</Text>
-        <Text style={styles.messageTime}>{new Date(message.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</Text>
+        <Text style={styles.messageTime}>{safeTime(message?.createdAt)}</Text>
       </View>
-      <RichMedicalText content={message.content} />
-      {message.attachments?.length ? (
+      <RichMedicalText content={content} />
+      {attachments.length ? (
         <View style={styles.messageAttachments}>
-          {message.attachments.map((attachment) => <AttachmentChip attachment={attachment} key={attachment.id} />)}
+          {attachments.map((attachment, index) => <AttachmentChip attachment={attachment} key={attachment?.id ?? `message-attachment-${index}`} />)}
         </View>
       ) : null}
-      {message.citations?.length ? <CitationList citations={message.citations} /> : null}
+      {citations.length ? <CitationList citations={citations} /> : null}
       {assistant ? (
         <View style={styles.answerTools}>
-          <MiniAction icon="copy" label="Copy answer" onPress={() => copyText(message.content, onNotice)} />
-          {message.confidence !== undefined ? <Text style={styles.confidence}>Confidence {Math.round(message.confidence * 100)}%</Text> : null}
+          <MiniAction icon="copy" label="Copy answer" onPress={() => copyText(content, onNotice)} />
+          {confidence !== undefined ? <Text style={styles.confidence}>Confidence {Math.round(confidence * 100)}%</Text> : null}
         </View>
       ) : null}
     </View>
@@ -673,7 +716,7 @@ function MessageCard({ message, onNotice }: { message: CopilotMessage; onNotice:
 }
 
 function RichMedicalText({ content }: { content: string }) {
-  const lines = content.split("\n");
+  const lines = safeString(content).split("\n");
   let inCode = false;
   return (
     <View style={styles.richText}>
@@ -696,12 +739,13 @@ function RichMedicalText({ content }: { content: string }) {
 }
 
 function CitationList({ citations }: { citations: CopilotCitation[] }) {
+  const safeCitations = safeArray(citations);
   return (
     <View style={styles.citations}>
-      {citations.map((citation) => (
-        <View key={citation.id} style={styles.citation}>
+      {safeCitations.map((citation, index) => (
+        <View key={safeString(citation?.id, `citation-${index}`)} style={styles.citation}>
           <Feather name="link" size={12} color={medicalTheme.primary} />
-          <Text style={styles.citationText}>{citation.label} • {citation.source}</Text>
+          <Text style={styles.citationText}>{safeString(citation?.label, "Clinical source")} • {safeString(citation?.source, "ECG Insight")}</Text>
         </View>
       ))}
     </View>
@@ -740,24 +784,30 @@ function MiniAction({ icon, label, onPress, tone }: { icon: keyof typeof Feather
 }
 
 function AttachmentChip({ attachment, onRemove, previewUrl }: { attachment: CopilotAttachment; onRemove?: () => void; previewUrl?: string }) {
-  const findings = attachment.medicalAnalysis?.findings ?? [];
+  const findings = safeArray(attachment?.medicalAnalysis?.findings);
+  const warnings = safeArray(attachment?.warnings);
+  const recommendations = safeArray(attachment?.recommendations);
+  const originalName = safeString(attachment?.originalName, "Uploaded medical file");
+  const attachmentKind = safeString(attachment?.kind, "file");
+  const documentType = safeString(attachment?.documentType, attachmentKind).replace(/_/g, " ");
+  const confidence = typeof attachment?.confidence === "number" && Number.isFinite(attachment.confidence) ? attachment.confidence : undefined;
   return (
     <View style={styles.attachmentChip}>
-      {previewUrl ? <Image accessibilityLabel={`${attachment.originalName} preview`} source={{ uri: previewUrl }} style={styles.attachmentPreview} /> : null}
-      <Feather name={attachment.kind === "camera" ? "camera" : attachment.kind === "image" ? "image" : attachment.kind === "ecg" ? "activity" : attachment.kind === "echo" ? "heart" : attachment.kind === "labs" ? "clipboard" : "paperclip"} size={13} color={medicalTheme.primary} />
+      {previewUrl ? <Image accessibilityLabel={`${originalName} preview`} source={{ uri: previewUrl }} style={styles.attachmentPreview} /> : null}
+      <Feather name={attachmentKind === "camera" ? "camera" : attachmentKind === "image" ? "image" : attachmentKind === "ecg" ? "activity" : attachmentKind === "echo" ? "heart" : attachmentKind === "labs" ? "clipboard" : "paperclip"} size={13} color={medicalTheme.primary} />
       <View style={styles.attachmentChipText}>
-        <Text numberOfLines={1} style={styles.attachmentName}>{attachment.originalName}</Text>
+        <Text numberOfLines={1} style={styles.attachmentName}>{originalName}</Text>
         <Text style={styles.attachmentMeta}>
-          {(attachment.documentType ?? attachment.kind).replace(/_/g, " ")} • {formatFileSize(attachment.sizeBytes)}
-          {attachment.confidence !== undefined ? ` • ${Math.round(attachment.confidence * 100)}% confidence` : ""}
+          {documentType} • {formatFileSize(attachment?.sizeBytes)}
+          {confidence !== undefined ? ` • ${Math.round(confidence * 100)}% confidence` : ""}
         </Text>
-        {attachment.analysisSummary ? <Text numberOfLines={2} style={styles.attachmentSummary}>{attachment.analysisSummary}</Text> : null}
+        {safeString(attachment?.analysisSummary) ? <Text numberOfLines={2} style={styles.attachmentSummary}>{safeString(attachment?.analysisSummary)}</Text> : null}
         {findings.length ? <Text numberOfLines={2} style={styles.attachmentSummary}>Findings: {findings.join("; ")}</Text> : null}
-        {attachment.warnings?.length ? <Text numberOfLines={2} style={styles.attachmentWarning}>Warnings: {attachment.warnings.join("; ")}</Text> : null}
-        {attachment.recommendations?.length ? <Text numberOfLines={2} style={styles.attachmentSummary}>Next steps: {attachment.recommendations.join("; ")}</Text> : null}
+        {warnings.length ? <Text numberOfLines={2} style={styles.attachmentWarning}>Warnings: {warnings.join("; ")}</Text> : null}
+        {recommendations.length ? <Text numberOfLines={2} style={styles.attachmentSummary}>Next steps: {recommendations.join("; ")}</Text> : null}
       </View>
       {onRemove ? (
-        <Pressable accessibilityLabel={`Remove ${attachment.originalName}`} accessibilityRole="button" onPress={onRemove} style={styles.attachmentRemove}>
+        <Pressable accessibilityLabel={`Remove ${originalName}`} accessibilityRole="button" onPress={onRemove} style={styles.attachmentRemove}>
           <Feather name="x" size={12} color={medicalTheme.text} />
         </Pressable>
       ) : null}
@@ -774,10 +824,12 @@ function ComposerTool({ active, icon, label, onPress }: { active?: boolean; icon
   );
 }
 
-function formatFileSize(sizeBytes: number) {
-  if (sizeBytes < 1024) return `${sizeBytes} B`;
-  if (sizeBytes < 1024 * 1024) return `${Math.round(sizeBytes / 1024)} KB`;
-  return `${(sizeBytes / (1024 * 1024)).toFixed(1)} MB`;
+function formatFileSize(sizeBytes: number | null | undefined) {
+  const safeSize = typeof sizeBytes === "number" && Number.isFinite(sizeBytes) && sizeBytes >= 0 ? sizeBytes : undefined;
+  if (safeSize === undefined) return "Unknown size";
+  if (safeSize < 1024) return `${safeSize} B`;
+  if (safeSize < 1024 * 1024) return `${Math.round(safeSize / 1024)} KB`;
+  return `${(safeSize / (1024 * 1024)).toFixed(1)} MB`;
 }
 
 function copyText(content: string, onNotice?: (text: string, tone?: "error" | "success") => void) {
@@ -791,6 +843,7 @@ function copyText(content: string, onNotice?: (text: string, tone?: "error" | "s
 }
 
 function downloadBlob(blob: Blob, filename: string) {
+  if (typeof document === "undefined") return;
   const url = URL.createObjectURL(blob);
   const anchor = document.createElement("a");
   anchor.href = url;

@@ -1,6 +1,6 @@
 import { Feather } from "@expo/vector-icons";
 import { reloadAppAsync } from "expo";
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import {
   Modal,
   Platform,
@@ -24,6 +24,7 @@ export function ErrorFallback({ error, resetError }: ErrorFallbackProps) {
   const insets = useSafeAreaInsets();
 
   const [isModalVisible, setIsModalVisible] = useState(false);
+  const errorId = useMemo(() => `ERR-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).slice(2, 8).toUpperCase()}`, []);
 
   const handleRestart = async () => {
     try {
@@ -34,8 +35,15 @@ export function ErrorFallback({ error, resetError }: ErrorFallbackProps) {
     }
   };
 
+  const handleBackToDashboard = () => {
+    resetError();
+    if (typeof window !== "undefined") {
+      window.location.assign("/dashboard");
+    }
+  };
+
   const formatErrorDetails = (): string => {
-    let details = `Error: ${error.message}\n\n`;
+    let details = `Error ID: ${errorId}\nError: ${error.message}\n\n`;
     if (error.stack) {
       details += `Stack Trace:\n${error.stack}`;
     }
@@ -74,29 +82,79 @@ export function ErrorFallback({ error, resetError }: ErrorFallbackProps) {
         </Text>
 
         <Text style={[styles.message, { color: colors.mutedForeground }]}>
-          Please reload the app to continue.
+          The workspace recovered from a runtime issue. Use Retry or return to the dashboard.
         </Text>
 
-        <Pressable
-          onPress={handleRestart}
-          style={({ pressed }) => [
-            styles.button,
-            {
-              backgroundColor: colors.primary,
-              opacity: pressed ? 0.9 : 1,
-              transform: [{ scale: pressed ? 0.98 : 1 }],
-            },
-          ]}
-        >
-          <Text
-            style={[
-              styles.buttonText,
-              { color: colors.primaryForeground },
+        <Text style={[styles.errorId, { color: colors.mutedForeground }]}>
+          Error ID: {errorId}
+        </Text>
+
+        {__DEV__ ? (
+          <View style={[styles.inlineDetails, { backgroundColor: colors.card }]}>
+            <Text style={[styles.inlineDetailsTitle, { color: colors.foreground }]}>
+              Development details
+            </Text>
+            <Text numberOfLines={4} selectable style={[styles.inlineDetailsText, { color: colors.mutedForeground, fontFamily: monoFont }]}>
+              {error.message}
+            </Text>
+          </View>
+        ) : null}
+
+        <View style={styles.actions}>
+          <Pressable
+            accessibilityLabel="Retry"
+            accessibilityRole="button"
+            onPress={resetError}
+            style={({ pressed }) => [
+              styles.button,
+              {
+                backgroundColor: colors.primary,
+                opacity: pressed ? 0.9 : 1,
+                transform: [{ scale: pressed ? 0.98 : 1 }],
+              },
             ]}
           >
-            Try Again
-          </Text>
-        </Pressable>
+            <Text
+              style={[
+                styles.buttonText,
+                { color: colors.primaryForeground },
+              ]}
+            >
+              Retry
+            </Text>
+          </Pressable>
+
+          <Pressable
+            accessibilityLabel="Back to dashboard"
+            accessibilityRole="button"
+            onPress={handleBackToDashboard}
+            style={({ pressed }) => [
+              styles.secondaryButton,
+              {
+                borderColor: colors.border,
+                opacity: pressed ? 0.85 : 1,
+              },
+            ]}
+          >
+            <Text style={[styles.secondaryButtonText, { color: colors.foreground }]}>
+              Back to dashboard
+            </Text>
+          </Pressable>
+
+          <Pressable
+            accessibilityLabel="Reload app"
+            accessibilityRole="button"
+            onPress={handleRestart}
+            style={({ pressed }) => [
+              styles.linkButton,
+              { opacity: pressed ? 0.7 : 1 },
+            ]}
+          >
+            <Text style={[styles.linkButtonText, { color: colors.mutedForeground }]}>
+              Reload app
+            </Text>
+          </Pressable>
+        </View>
       </View>
 
       {__DEV__ ? (
@@ -187,6 +245,11 @@ const styles = StyleSheet.create({
     width: "100%",
     maxWidth: 600,
   },
+  actions: {
+    alignItems: "center",
+    gap: 10,
+    width: "100%",
+  },
   title: {
     fontSize: 28,
     fontWeight: "700",
@@ -197,6 +260,26 @@ const styles = StyleSheet.create({
     fontSize: 16,
     textAlign: "center",
     lineHeight: 24,
+  },
+  errorId: {
+    fontSize: 12,
+    fontWeight: "700",
+    textAlign: "center",
+  },
+  inlineDetails: {
+    borderRadius: 10,
+    padding: 12,
+    width: "100%",
+  },
+  inlineDetailsText: {
+    fontSize: 12,
+    lineHeight: 18,
+  },
+  inlineDetailsTitle: {
+    fontSize: 12,
+    fontWeight: "700",
+    marginBottom: 6,
+    textTransform: "uppercase",
   },
   topButton: {
     position: "absolute",
@@ -227,6 +310,28 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     textAlign: "center",
     fontSize: 16,
+  },
+  secondaryButton: {
+    alignItems: "center",
+    borderRadius: 8,
+    borderWidth: 1,
+    minWidth: 200,
+    paddingHorizontal: 24,
+    paddingVertical: 14,
+  },
+  secondaryButtonText: {
+    fontSize: 16,
+    fontWeight: "600",
+    textAlign: "center",
+  },
+  linkButton: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+  },
+  linkButtonText: {
+    fontSize: 13,
+    fontWeight: "600",
+    textAlign: "center",
   },
   modalOverlay: {
     flex: 1,
