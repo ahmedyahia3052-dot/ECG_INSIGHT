@@ -1,5 +1,5 @@
 import { analyzeCase } from "./ai";
-import { API_ROOT_URL } from "./api";
+import { API_ROOT_URL, API_URL } from "./api";
 import { createCase, createPatient } from "./clinical";
 import { uploadClinicalEcgFile } from "./ecgFiles";
 import type { EcgAcquisitionAsset } from "./ecgImageProcessor";
@@ -44,9 +44,12 @@ export interface OfflineEcgUpload {
 }
 
 export interface MobileSyncSnapshot {
+  apiUrl: string;
   backendReachable: boolean;
+  backendHealthStatus: string;
   browserOnline: boolean;
   isOnline: boolean;
+  lastHealthCheckAt: string;
   lastSyncAt?: string;
   offlineReason: string;
   pendingActions: number;
@@ -119,8 +122,16 @@ export function networkIsOnline() {
   return typeof navigator === "undefined" ? true : navigator.onLine !== false;
 }
 
-async function backendIsReachable() {
-  if (typeof fetch === "undefined") return true;
+type BackendHealthResult = {
+  message: string;
+  ok: boolean;
+  status: string;
+  timestamp: string;
+};
+
+async function backendHealthCheck(): Promise<BackendHealthResult> {
+  const timestamp = new Date().toISOString();
+  if (typeof fetch === "undefined") return { message: "fetch unavailable in this runtime", ok: true, status: "runtime-no-fetch", timestamp };
   const controller = typeof AbortController !== "undefined" ? new AbortController() : null;
   const timeout = setTimeout(() => controller?.abort(), 4_000);
   try {
@@ -131,37 +142,56 @@ async function backendIsReachable() {
       signal: controller?.signal,
     });
     const contentType = response.headers.get("content-type") ?? "";
-    if (contentType.includes("text/html")) return false;
-    const payload = await response.clone().json().catch(() => null) as { code?: string; ok?: boolean } | null;
-    if (payload?.code === "BACKEND_UNAVAILABLE") return false;
-    return response.status > 0;
-  } catch {
-    return false;
+    if (contentType.includes("text/html")) {
+      return { message: `health returned HTML from ${API_ROOT_URL}/health`, ok: false, status: "html-response", timestamp };
+    }
+    const payload = await response.clone().json().catch(() => null) as { code?: string; ok?: boolean; status?: string } | null;
+    if (payload?.code === "BACKEND_UNAVAILABLE") {
+      return { message: "service worker/backend unavailable response", ok: false, status: payload.code, timestamp };
+    }
+    return {
+      message: `HTTP ${response.status}${payload?.status ? ` ${payload.status}` : ""}`,
+      ok: response.ok && payload?.ok !== false,
+      status: payload?.status ?? String(response.status),
+      timestamp,
+    };
+  } catch (error) {
+    return {
+      message: error instanceof Error ? error.message : "backend health fetch failed",
+      ok: false,
+      status: "fetch-failed",
+      timestamp,
+    };
   } finally {
     clearTimeout(timeout);
   }
 }
 
-function offlineReason(browserOnline: boolean, backendReachable: boolean) {
+function offlineReason(browserOnline: boolean, backendReachable: boolean, backendMessage: string) {
   if (browserOnline || backendReachable) return "online";
-  return "browser-offline-and-backend-unreachable";
+  return backendMessage ? `browser-offline-and-backend-unreachable: ${backendMessage}` : "browser-offline-and-backend-unreachable";
 }
 
-function logOfflineDiagnostics(input: { backendReachable: boolean; browserOnline: boolean; offlineReason: string }) {
+function logOfflineDiagnostics(input: { apiUrl: string; backendHealthStatus: string; backendReachable: boolean; browserOnline: boolean; lastHealthCheckAt: string; offlineReason: string }) {
   if (typeof console === "undefined") return;
-  console.info(`[ECG Insight PWA] Browser online: ${input.browserOnline}`);
-  console.info(`[ECG Insight PWA] Backend reachable: ${input.backendReachable}`);
-  console.info(`[ECG Insight PWA] Offline reason: ${input.offlineReason}`);
+  console.info(`[ONLINE CHECK] Browser online: ${input.browserOnline}`);
+  console.info(`[BACKEND CHECK] Backend reachable: ${input.backendReachable}; status: ${input.backendHealthStatus}; API URL: ${input.apiUrl}; checked: ${input.lastHealthCheckAt}`);
+  console.info(`[OFFLINE REASON] ${input.offlineReason}`);
+}
+
+function offlineDisabledByUrl() {
+  if (typeof window === "undefined") return false;
+  return new URLSearchParams(window.location.search).get("disableOffline") === "true";
 }
 
 export function subscribeNetworkStatus(callback: (isOnline: boolean) => void) {
   if (typeof window === "undefined") return () => undefined;
   const emit = () => {
     const browserOnline = networkIsOnline();
-    void backendIsReachable().then((backendReachable) => {
-      const reason = offlineReason(browserOnline, backendReachable);
-      logOfflineDiagnostics({ backendReachable, browserOnline, offlineReason: reason });
-      callback(browserOnline || backendReachable);
+    void backendHealthCheck().then((backend) => {
+      const reason = offlineDisabledByUrl() ? "offline disabled by URL parameter" : offlineReason(browserOnline, backend.ok, backend.message);
+      logOfflineDiagnostics({ apiUrl: API_URL, backendHealthStatus: backend.message, backendReachable: backend.ok, browserOnline, lastHealthCheckAt: backend.timestamp, offlineReason: reason });
+      callback(offlineDisabledByUrl() || browserOnline || backend.ok);
     });
   };
   window.addEventListener("online", emit);
@@ -175,6 +205,16 @@ export function subscribeNetworkStatus(callback: (isOnline: boolean) => void) {
 
 export async function registerPwaRuntime(onUpdate?: () => void) {
   if (typeof navigator === "undefined" || !("serviceWorker" in navigator)) return { ready: false };
+  if (offlineDisabledByUrl()) {
+    const registrations = await navigator.serviceWorker.getRegistrations();
+    await Promise.all(registrations.map((registration) => registration.unregister()));
+    if (typeof caches !== "undefined") {
+      const keys = await caches.keys();
+      await Promise.all(keys.filter((key) => key.startsWith("ecg-insight-pwa-")).map((key) => caches.delete(key)));
+    }
+    console.info("[OFFLINE REASON] offline disabled by URL parameter");
+    return { ready: false };
+  }
   const registration = await navigator.serviceWorker.register("/sw.js");
   registration.addEventListener("updatefound", () => onUpdate?.());
   navigator.serviceWorker.addEventListener("message", (event) => {
@@ -313,10 +353,10 @@ export async function processOfflineUploads(accessToken: string) {
 
 export async function syncNow(accessToken: string) {
   const browserOnline = networkIsOnline();
-  const backendReachable = await backendIsReachable();
-  const reason = offlineReason(browserOnline, backendReachable);
-  logOfflineDiagnostics({ backendReachable, browserOnline, offlineReason: reason });
-  if (!browserOnline && !backendReachable) return { actions: [], uploads: [] };
+  const backend = await backendHealthCheck();
+  const reason = offlineDisabledByUrl() ? "offline disabled by URL parameter" : offlineReason(browserOnline, backend.ok, backend.message);
+  logOfflineDiagnostics({ apiUrl: API_URL, backendHealthStatus: backend.message, backendReachable: backend.ok, browserOnline, lastHealthCheckAt: backend.timestamp, offlineReason: reason });
+  if (!offlineDisabledByUrl() && !browserOnline && !backend.ok) return { actions: [], uploads: [] };
   const [actions, uploads] = await Promise.all([processPendingActions(accessToken), processOfflineUploads(accessToken)]);
   await putRecord(META_STORE, { id: "lastSyncAt", value: new Date().toISOString() });
   return { actions, uploads };
@@ -329,13 +369,16 @@ export async function mobileSyncSnapshot(): Promise<MobileSyncSnapshot> {
     getAllRecords<{ id: string; value: string }>(META_STORE),
   ]);
   const browserOnline = networkIsOnline();
-  const backendReachable = await backendIsReachable();
-  const reason = offlineReason(browserOnline, backendReachable);
-  logOfflineDiagnostics({ backendReachable, browserOnline, offlineReason: reason });
+  const backend = await backendHealthCheck();
+  const reason = offlineDisabledByUrl() ? "offline disabled by URL parameter" : offlineReason(browserOnline, backend.ok, backend.message);
+  logOfflineDiagnostics({ apiUrl: API_URL, backendHealthStatus: backend.message, backendReachable: backend.ok, browserOnline, lastHealthCheckAt: backend.timestamp, offlineReason: reason });
   return {
-    backendReachable,
+    apiUrl: API_URL,
+    backendHealthStatus: backend.message,
+    backendReachable: backend.ok,
     browserOnline,
-    isOnline: browserOnline || backendReachable,
+    isOnline: offlineDisabledByUrl() || browserOnline || backend.ok,
+    lastHealthCheckAt: backend.timestamp,
     lastSyncAt: meta.find((item) => item.id === "lastSyncAt")?.value,
     offlineReason: reason,
     pendingActions: actions.filter((item) => item.status !== "synced").length,

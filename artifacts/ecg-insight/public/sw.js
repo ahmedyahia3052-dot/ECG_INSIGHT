@@ -1,18 +1,7 @@
-const CACHE_NAME = "ecg-insight-pwa-v31";
+const CACHE_NAME = "ecg-insight-pwa-v32";
 const APP_SHELL = ["/", "/manifest.json", "/offline.html", "/icons/pwa-icon.svg"];
-
-function offlineApiResponse() {
-  return new Response(JSON.stringify({
-    code: "BACKEND_UNAVAILABLE",
-    message: "Backend service unavailable.",
-    ok: false,
-    status: "offline",
-  }), {
-    headers: { "content-type": "application/json" },
-    status: 503,
-    statusText: "Service Unavailable",
-  });
-}
+const API_BYPASS_PREFIXES = ["/api/", "/auth/", "/copilot/", "/patients/", "/ecg/"];
+const API_BYPASS_PATHS = ["/health", "/liveness", "/readiness"];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.addAll(APP_SHELL)).then(() => self.skipWaiting()));
@@ -21,7 +10,7 @@ self.addEventListener("install", (event) => {
 self.addEventListener("activate", (event) => {
   event.waitUntil(
     caches.keys()
-      .then((keys) => Promise.all(keys.filter((key) => key !== CACHE_NAME).map((key) => caches.delete(key))))
+      .then((keys) => Promise.all(keys.filter((key) => key.startsWith("ecg-insight-pwa-") && key !== CACHE_NAME).map((key) => caches.delete(key))))
       .then(() => self.clients.claim()),
   );
 });
@@ -30,11 +19,17 @@ self.addEventListener("fetch", (event) => {
   const request = event.request;
   if (request.method !== "GET") return;
   const url = new URL(request.url);
-  if (url.pathname.startsWith("/api/") || url.pathname === "/health" || url.pathname === "/liveness" || url.pathname === "/readiness") {
-    event.respondWith(fetch(request).catch(() => offlineApiResponse()));
+  if (url.searchParams.get("disableOffline") === "true") {
+    console.info("[SW FETCH] disableOffline bypass", url.href);
+    event.respondWith(fetch(request));
+    return;
+  }
+  if (API_BYPASS_PATHS.includes(url.pathname) || API_BYPASS_PREFIXES.some((prefix) => url.pathname.startsWith(prefix))) {
+    console.info("[SW FETCH] API bypass", url.pathname);
     return;
   }
   if (request.mode === "navigate") {
+    console.info("[SW FETCH] navigation", url.pathname);
     event.respondWith(
       fetch(request)
         .then((response) => {
@@ -48,6 +43,7 @@ self.addEventListener("fetch", (event) => {
     );
     return;
   }
+  console.info("[SW FETCH] asset", url.pathname);
   event.respondWith(
     caches.match(request).then((cached) => {
       const network = fetch(request)

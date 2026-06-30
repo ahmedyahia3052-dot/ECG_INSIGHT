@@ -14,8 +14,8 @@ export function MobileSyncStatus() {
 
   const tone = snapshot.isOnline ? colors.warning : colors.destructive;
   const connectivityText = snapshot.isOnline
-    ? `Online · browser ${snapshot.browserOnline ? "online" : "offline"} · backend ${snapshot.backendReachable ? "reachable" : "unreachable"}`
-    : `Offline · ${snapshot.offlineReason}`;
+    ? `Online · browser ${snapshot.browserOnline ? "online" : "offline"} · backend ${snapshot.backendReachable ? "reachable" : "unreachable"} · API ${snapshot.apiUrl}`
+    : `Offline · ${snapshot.offlineReason} · API ${snapshot.apiUrl} · checked ${snapshot.lastHealthCheckAt}`;
   return (
     <View style={[styles.container, { backgroundColor: colors.surface, borderColor: tone }]}>
       <Feather name={snapshot.isOnline ? "wifi" : "wifi-off"} color={tone} size={16} />

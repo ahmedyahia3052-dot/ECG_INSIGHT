@@ -14,7 +14,9 @@ function read(path: string) {
 async function main() {
   const manifestPath = "artifacts/ecg-insight/public/manifest.json";
   const serviceWorkerPath = "artifacts/ecg-insight/public/sw.js";
+  const apiConfigPath = "artifacts/ecg-insight/src/config/api.ts";
   const offlineServicePath = "artifacts/ecg-insight/services/mobileOffline.ts";
+  const offlinePagePath = "artifacts/ecg-insight/public/offline.html";
   const notificationPath = "artifacts/ecg-insight/services/mobileNotifications.ts";
   const syncHookPath = "artifacts/ecg-insight/hooks/useMobileSync.ts";
   const syncStatusPath = "artifacts/ecg-insight/components/mobile/MobileSyncStatus.tsx";
@@ -35,15 +37,29 @@ async function main() {
   assert(serviceWorker.includes("self.addEventListener(\"install\""), "Service worker should cache app shell during install.");
   assert(serviceWorker.includes("self.addEventListener(\"fetch\""), "Service worker should intercept fetch requests.");
   assert(serviceWorker.includes("ecg-insight-background-sync"), "Service worker should expose background sync workflow.");
-  assert(serviceWorker.includes("offlineApiResponse"), "Service worker should return JSON API failures instead of the offline HTML page.");
+  assert(serviceWorker.includes("API_BYPASS_PREFIXES"), "Service worker should explicitly bypass API-like requests.");
+  for (const token of ["/api/", "/auth/", "/copilot/", "/patients/", "/ecg/", "/health", "/liveness", "/readiness"]) {
+    assert(serviceWorker.includes(token), `Service worker should never return offline HTML for ${token}.`);
+  }
+  assert(serviceWorker.includes("disableOffline"), "Service worker should support emergency offline bypass.");
   assert(serviceWorker.includes("request.mode === \"navigate\""), "Service worker should handle navigation fallback separately from API requests.");
+
+  const apiConfig = read(apiConfigPath);
+  for (const token of ["EXPO_PUBLIC_API_URL", "VITE_API_URL", "NEXT_PUBLIC_API_URL", "window.location.origin", "DEFAULT_API_BASE_URL"]) {
+    assert(apiConfig.includes(token), `API config should resolve ${token}.`);
+  }
 
   const offlineService = read(offlineServicePath);
   for (const token of ["indexedDB.open", "queueOfflineEcgUpload", "queuePendingAction", "processOfflineUploads", "processPendingActions", "conflictReason", "requestBackgroundSync"]) {
     assert(offlineService.includes(token), `Offline service should implement ${token}.`);
   }
-  for (const token of ["backendReachable", "browserOnline", "offlineReason", "Backend reachable:", "Browser online:"]) {
+  for (const token of ["apiUrl", "backendHealthStatus", "lastHealthCheckAt", "backendReachable", "browserOnline", "offlineReason", "[ONLINE CHECK]", "[BACKEND CHECK]", "[OFFLINE REASON]", "disableOffline"]) {
     assert(offlineService.includes(token), `Offline service should expose connectivity diagnostic ${token}.`);
+  }
+
+  const offlinePage = read(offlinePagePath);
+  for (const token of ["navigator.onLine", "API URL:", "Backend health status:", "Last health check:", "Reason:", "disableOffline", "[ONLINE CHECK]", "[BACKEND CHECK]", "[OFFLINE REASON]"]) {
+    assert(offlinePage.includes(token), `Offline page should display diagnostic ${token}.`);
   }
 
   const notifications = read(notificationPath);
