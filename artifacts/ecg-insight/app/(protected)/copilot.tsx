@@ -15,6 +15,7 @@ import {
   uploadCopilotAttachment,
   type CopilotAttachment,
   type CopilotConversation,
+  type CopilotBrainDebug,
   type CopilotIntentDebug,
   type CopilotMessage,
   type CopilotTag,
@@ -119,7 +120,7 @@ export function CopilotWorkspaceScreen({ routeConversationId }: { routeConversat
   const [speechMuted, setSpeechMuted] = useState(false);
   const [speechPaused, setSpeechPaused] = useState(false);
   const [speakingMessageId, setSpeakingMessageId] = useState<string | undefined>();
-  const [intentDebug, setIntentDebug] = useState<CopilotIntentDebug | undefined>();
+  const [brainDebug, setBrainDebug] = useState<CopilotBrainDebug | undefined>();
   const [showIntentDebug, setShowIntentDebug] = useState(false);
   const [streamingMessage, setStreamingMessage] = useState("");
   const [status, setStatus] = useState("");
@@ -367,7 +368,7 @@ export function CopilotWorkspaceScreen({ routeConversationId }: { routeConversat
       streamAbort.current = controller;
       setStatus("Thinking...");
       setStreamingMessage("");
-      setIntentDebug(undefined);
+      setBrainDebug(undefined);
       let finalConversation: CopilotConversation | undefined;
       await streamCopilotMessage(token!, {
         caseId: explicitCaseId,
@@ -380,7 +381,18 @@ export function CopilotWorkspaceScreen({ routeConversationId }: { routeConversat
         tag: input.tag,
       }, (event) => {
         if (event.type === "status") setStatus(event.status ?? "");
-        if (event.type === "intent_debug" && event.intentDebug) setIntentDebug(event.intentDebug);
+        if (event.type === "brain_debug" && event.brainDebug) setBrainDebug(event.brainDebug);
+        if (event.type === "intent_debug" && event.intentDebug) {
+          setBrainDebug({
+            brainVersion: "v3",
+            classification: event.intentDebug.classification,
+            clinicalPlan: { description: "Legacy intent debug", steps: [] },
+            decision: { conversationalOnly: false, decisionPath: ["legacy"], emergencyEscalation: false, isClinical: false, isConversational: false, isEcgAnalysis: false, selectedTools: event.intentDebug.plan.tools, shouldRunTools: event.intentDebug.plan.tools[0] !== "no_tool" },
+            executionTimeMs: event.intentDebug.classification.executionTimeMs,
+            memoryState: { currentDiscussionTopic: "", followUpTopics: [], hasActiveCase: false, hasActivePatient: false, hasUploadedEcg: false, hasUploadedFiles: false, turnCount: 0 },
+            plan: event.intentDebug.plan,
+          });
+        }
         if (event.type === "token" && event.token) setStreamingMessage((current) => `${current}${event.token}`);
         if (event.conversation) {
           finalConversation = event.conversation;
@@ -597,21 +609,26 @@ export function CopilotWorkspaceScreen({ routeConversationId }: { routeConversat
           </View>
         </View>
 
-        {developerModeEnabled && showIntentDebug && intentDebug ? (
+        {developerModeEnabled && showIntentDebug && brainDebug ? (
           <View style={styles.intentDebugPanel}>
-            <Text style={styles.intentDebugTitle}>Intent Classifier (Developer Mode)</Text>
-            <Text style={styles.intentDebugLine}>Intent: {intentDebug.classification.primaryIntent} ({Math.round(intentDebug.classification.confidence * 100)}%)</Text>
-            <Text style={styles.intentDebugLine}>Medical intent: {intentDebug.classification.primaryMedicalIntent}</Text>
-            <Text style={styles.intentDebugLine}>Tools: {intentDebug.plan.tools.join(", ")}</Text>
-            <Text style={styles.intentDebugLine}>Latency: {intentDebug.classification.executionTimeMs} ms</Text>
-            <Text style={styles.intentDebugLine}>Emergency: {intentDebug.classification.emergencyPriority}</Text>
-            {intentDebug.classification.intents.length > 1 ? (
-              <Text style={styles.intentDebugLine}>Multi-intent: {intentDebug.classification.intents.map((item) => item.intent).join(" → ")}</Text>
-            ) : null}
-            {Object.entries(intentDebug.classification.entities).some(([, values]) => Array.isArray(values) && values.length > 0) ? (
+            <Text style={styles.intentDebugTitle}>AI Brain V3 (Developer Mode)</Text>
+            <Text style={styles.intentDebugLine}>Intent: {brainDebug.classification.primaryIntent} ({Math.round(brainDebug.classification.confidence * 100)}%)</Text>
+            <Text style={styles.intentDebugLine}>Medical intent: {brainDebug.classification.primaryMedicalIntent}</Text>
+            <Text style={styles.intentDebugLine}>Planner: {brainDebug.clinicalPlan.description}</Text>
+            <Text style={styles.intentDebugLine}>Tools: {brainDebug.decision.selectedTools.join(", ")}</Text>
+            <Text style={styles.intentDebugLine}>Decision path: {brainDebug.decision.decisionPath.join(" → ")}</Text>
+            <Text style={styles.intentDebugLine}>Brain latency: {brainDebug.executionTimeMs} ms</Text>
+            <Text style={styles.intentDebugLine}>Emergency: {brainDebug.classification.emergencyPriority}{brainDebug.decision.emergencyEscalation ? " (escalated)" : ""}</Text>
+            {brainDebug.memoryState.currentPatientAge || brainDebug.memoryState.currentDiscussionTopic ? (
               <Text style={styles.intentDebugLine}>
-                Entities: {Object.entries(intentDebug.classification.entities).filter(([, values]) => Array.isArray(values) && values.length > 0).map(([key, values]) => `${key}=${(values as string[]).join("|")}`).join("; ")}
+                Memory: {brainDebug.memoryState.currentPatientAge ? `${brainDebug.memoryState.currentPatientAge}y` : ""}{brainDebug.memoryState.currentDiscussionTopic ? ` topic=${brainDebug.memoryState.currentDiscussionTopic}` : ""}
               </Text>
+            ) : null}
+            {brainDebug.clinicalPlan.steps.length ? (
+              <Text style={styles.intentDebugLine}>Steps: {brainDebug.clinicalPlan.steps.map((step) => step.description).join(" → ")}</Text>
+            ) : null}
+            {brainDebug.classification.intents.length > 1 ? (
+              <Text style={styles.intentDebugLine}>Multi-intent: {brainDebug.classification.intents.map((item) => item.intent).join(" → ")}</Text>
             ) : null}
           </View>
         ) : null}

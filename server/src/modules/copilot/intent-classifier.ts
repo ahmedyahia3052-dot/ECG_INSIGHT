@@ -46,8 +46,11 @@ function classifyPrimaryIntent(text: string, attachments: AttachmentForAnalysis[
   if (/guideline|esc|aha|acc|nice|protocol|recommendation from/.test(text)) return matchIntent("medical_guidelines", 0.88, "guideline-request");
   if (/generate referral|referral letter|refer to cardiology/.test(text)) return matchIntent("generate_referral", 0.9, "referral-request");
   if (/generate letter|write letter|draft letter/.test(text)) return matchIntent("generate_letter", 0.88, "letter-request");
-  if (/generate report|write report|create report|draft report|clinical report|ecg report|generate medical report/.test(text)) {
+  if (/generate (?:a )?report|write report|create report|draft report|clinical report|ecg report|generate medical report/.test(text)) {
     return matchIntent("report_generation", 0.9, "report-request");
+  }
+  if (/compare.*ecg|ecg.*compare|previous ecg|prior ecg|compare this ecg/.test(text)) {
+    return matchIntent("ecg_comparison", 0.88, "ecg-comparison");
   }
   if (/return to work|fit for work|fitness for work|can i return to work|work restriction|offshore|driver|safety-sensitive/.test(text)) {
     return matchIntent("fitness_for_work", 0.9, "fitness-for-work");

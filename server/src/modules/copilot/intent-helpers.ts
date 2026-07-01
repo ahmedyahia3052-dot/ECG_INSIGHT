@@ -16,6 +16,17 @@ export function isEcgUploadPendingInterpretation(question: string, attachments: 
   return !/(interpret|review|analyze|analyse|read|explain|findings|diagnosis|what do you see|look at|summarize|summary)/i.test(question);
 }
 
+export function conversationPatientHint(memory: ConversationMemory) {
+  const userText = memory.turns.filter((turn) => turn.role === "user").map((turn) => turn.content).join(" ");
+  const ageMatch = userText.match(/\b(?:patient\s+is\s+|he\s+is\s+|she\s+is\s+|they\s+are\s+)?(\d{1,3})\s*(?:years?\s*old|year-old|y\/o|yo\b)/i);
+  const genderMatch = userText.match(/\b(male|female|man|woman)\b/i);
+  return {
+    age: ageMatch ? Number(ageMatch[1]) : undefined,
+    gender: genderMatch?.[1]?.toLowerCase(),
+    topic: conversationTopic(memory),
+  };
+}
+
 export function hasUploadedEcgAttachment(attachments: AttachmentForAnalysis[]) {
   return attachments.some((attachment) => attachment.kind === "ecg" || /ecg|ekg/i.test(`${attachment.documentType ?? ""} ${attachment.originalName}`));
 }

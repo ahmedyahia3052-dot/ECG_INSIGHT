@@ -75,14 +75,48 @@ export type CopilotChatInput = {
   tag: CopilotTag;
 };
 export type CopilotStreamEvent = {
+  brainDebug?: CopilotBrainDebug;
   conversation?: CopilotConversation;
   intentDebug?: CopilotIntentDebug;
   message?: CopilotMessage;
   status?: string;
   token?: string;
-  type: "conversation" | "done" | "error" | "intent_debug" | "status" | "token";
+  type: "brain_debug" | "conversation" | "done" | "error" | "intent_debug" | "status" | "token";
   userMessage?: CopilotMessage;
 };
+
+export interface CopilotBrainDebug {
+  brainVersion: "v3";
+  classification: CopilotIntentDebug["classification"];
+  clinicalPlan: {
+    description: string;
+    steps: Array<{ action: string; description: string; order: number; tool: string }>;
+  };
+  decision: {
+    conversationalOnly: boolean;
+    decisionPath: string[];
+    emergencyEscalation: boolean;
+    isClinical: boolean;
+    isConversational: boolean;
+    isEcgAnalysis: boolean;
+    selectedTools: string[];
+    shouldRunTools: boolean;
+  };
+  executionTimeMs: number;
+  memoryState: {
+    currentDiscussionTopic: string;
+    currentPatientAge?: number;
+    currentPatientGender?: string;
+    currentPatientName?: string;
+    followUpTopics: string[];
+    hasActiveCase: boolean;
+    hasActivePatient: boolean;
+    hasUploadedEcg: boolean;
+    hasUploadedFiles: boolean;
+    turnCount: number;
+  };
+  plan: CopilotIntentDebug["plan"];
+}
 
 export interface CopilotIntentDebug {
   classification: {
@@ -233,15 +267,27 @@ function parseSseEvent(block: string) {
   const dataLine = block.split("\n").find((line) => line.startsWith("data:"));
   if (!eventLine || !dataLine) return null;
   const type = eventLine.replace("event:", "").trim() as CopilotStreamEvent["type"];
-  const data = JSON.parse(dataLine.replace("data:", "").trim()) as {
-    classification?: CopilotIntentDebug["classification"];
+  const data = JSON.parse(dataLine.replace("data:", "").trim()) as CopilotBrainDebug & {
     conversation?: CopilotConversation;
     message?: CopilotMessage | string;
-    plan?: CopilotIntentDebug["plan"];
     token?: string;
     userMessage?: CopilotMessage;
   };
   if (type === "status" || type === "error") return { status: typeof data.message === "string" ? data.message : undefined, type };
+  if (type === "brain_debug" && data.brainVersion === "v3") {
+    return {
+      brainDebug: {
+        brainVersion: data.brainVersion,
+        classification: data.classification,
+        clinicalPlan: data.clinicalPlan,
+        decision: data.decision,
+        executionTimeMs: data.executionTimeMs,
+        memoryState: data.memoryState,
+        plan: data.plan,
+      },
+      type,
+    };
+  }
   if (type === "intent_debug" && data.classification && data.plan) {
     return { intentDebug: { classification: data.classification, plan: data.plan }, type };
   }

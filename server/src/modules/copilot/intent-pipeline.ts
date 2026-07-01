@@ -11,8 +11,9 @@ export function runIntentPipeline(input: IntentPipelineInput): IntentPipelineRes
 export function parseCopilotProviderSettings(provider: string) {
   if (provider.startsWith("{")) {
     try {
-      const parsed = JSON.parse(provider) as { classifier?: string; developerMode?: boolean };
+      const parsed = JSON.parse(provider) as { classifier?: string; brainVersion?: string; developerMode?: boolean };
       return {
+        brainVersion: parsed.brainVersion ?? "v3",
         classifier: parsed.classifier ?? "SmartIntentClassifier",
         developerMode: Boolean(parsed.developerMode),
       };
@@ -21,6 +22,7 @@ export function parseCopilotProviderSettings(provider: string) {
     }
   }
   return {
+    brainVersion: "v3",
     classifier: provider === "RuleBasedRAG" ? "SmartIntentClassifier" : provider,
     developerMode: provider.includes("Debug"),
   };
