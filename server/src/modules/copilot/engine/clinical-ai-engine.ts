@@ -1,8 +1,8 @@
 import type { ChatContextInput, ClinicalContext } from "../copilot-types";
-import { runClinicalAiCoreV2 } from "./v2/pipeline";
-import { buildMinimalDebugPayload } from "./v2/compat";
 import type { EngineDebugPayload, EngineInput, EngineResult } from "./types";
 import { CLINICAL_AI_ENGINE_VERSION } from "./types";
+import { runClinicalAiV3, toV3EngineResult } from "../v3/pipeline";
+import type { V3StreamCallbacks } from "../v3/types";
 
 export type EngineDependencies = {
   retrieveClinicalContext: (input: ChatContextInput) => Promise<ClinicalContext>;
@@ -11,16 +11,41 @@ export type EngineDependencies = {
 export async function runClinicalCopilotEngine(
   input: EngineInput,
   deps: EngineDependencies,
+  callbacks: V3StreamCallbacks = {},
 ): Promise<EngineResult> {
-  return runClinicalAiCoreV2(input, deps);
+  const started = performance.now();
+  const pipeline = await runClinicalAiV3(
+    {
+      attachments: input.attachments,
+      chatInput: input.chatInput,
+      clinicianName: input.clinicianName,
+      conversationId: input.conversationId,
+      memory: input.memory,
+      question: input.question,
+      voiceMode: input.voiceMode,
+    },
+    deps,
+    callbacks,
+  );
+  return toV3EngineResult(input, pipeline, Math.max(0, Math.round(performance.now() - started)));
 }
 
-export function previewClinicalCopilotEngine(input: EngineInput, deps: EngineDependencies) {
-  return runClinicalCopilotEngine(input, deps);
+export async function previewClinicalCopilotEngine(_input: EngineInput, _deps: EngineDependencies) {
+  return {
+    toolPlan: {
+      runClinicalContext: false,
+      runDrugDatabase: false,
+      runEcgEngine: false,
+      runKnowledge: false,
+      runOcr: false,
+      runPatientDatabase: false,
+      runReportGenerator: false,
+      tools: ["conversation"] as const,
+    },
+  };
 }
 
 export function buildEngineDebugPayload(engine: EngineResult): EngineDebugPayload {
-  const minimal = buildMinimalDebugPayload(engine);
   return {
     classification: engine.classification,
     communicationIntent: engine.communicationIntent,
@@ -36,10 +61,9 @@ export function buildEngineDebugPayload(engine: EngineResult): EngineDebugPayloa
         }
       : undefined,
     engineVersion: CLINICAL_AI_ENGINE_VERSION,
-    executionTimeMs: minimal.executionTimeMs,
+    executionTimeMs: engine.executionTimeMs,
     knowledgeRoute: engine.knowledgeRoute,
     plan: engine.plan,
     toolPlan: engine.toolPlan,
   };
 }
-

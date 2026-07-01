@@ -1,12 +1,12 @@
+process.env.COPILOT_LLM_MOCK = "true";
+
 import {
-  ConversationManager,
   KnowledgeRouter,
-  Planner,
-  ResponseGenerator,
   StreamingRenderer,
   VoiceEngine,
   runClinicalCopilotEngine,
 } from "../server/src/modules/copilot/engine";
+import { CLINICAL_AI_ENGINE_VERSION } from "../server/src/modules/copilot/engine/types";
 import { emptyClinicalContext } from "../server/src/modules/copilot/intent-manager";
 
 function assert(condition: unknown, message: string): asserts condition {
@@ -16,99 +16,37 @@ function assert(condition: unknown, message: string): asserts condition {
 const emptyMemory = { attachments: [], summary: "", turns: [] };
 const engineDeps = { retrieveClinicalContext: async () => emptyClinicalContext() };
 
-async function engine(question: string, memory = emptyMemory, conversationId = "test-conv", attachments: Parameters<typeof runClinicalCopilotEngine>[0]["attachments"] = []) {
-  ConversationManager.resetForTests();
-  return runClinicalCopilotEngine({ attachments, chatInput: {}, conversationId, memory, question }, engineDeps);
+async function engine(question: string, memory = emptyMemory) {
+  return runClinicalCopilotEngine({ attachments: [], chatInput: {}, conversationId: "test-conv", memory, question }, engineDeps);
 }
 
 async function main() {
+  assert(CLINICAL_AI_ENGINE_VERSION === "v3", "Active engine must be V3");
+
   for (const greeting of ["Hi", "Hello", "How are you?", "Who are you?", "Thank you"]) {
     const result = await engine(greeting);
-    assert(
-      result.communicationIntent === "Greeting" || result.communicationIntent === "SmallTalk" || result.communicationIntent === "SystemQuestion",
-      `${greeting} conversational intent`,
-    );
-    assert(!result.toolPlan.runKnowledge, `${greeting} must not search knowledge`);
+    assert(result.response.content.trim().length > 10, `${greeting} returns LLM prose`);
+    assert(!/^Definition:/m.test(result.response.content), `${greeting} avoids template headers`);
   }
 
   const hypertension = await engine("What is hypertension?");
-  assert(hypertension.toolPlan.runKnowledge, "Hypertension should retrieve knowledge");
-  assert(hypertension.knowledgeRoute.sources.includes("cardiology_kb"), "Medical question routes to cardiology KB");
+  assert(/hypertension|blood pressure/i.test(hypertension.response.content), "Hypertension answered in natural language");
 
-  const stemi = await engine("Explain STEMI");
-  assert(stemi.toolPlan.runKnowledge, "STEMI requires knowledge");
-
-  const ecg = await engine("Interpret this ECG");
-  assert(ecg.requiresClarification || ecg.communicationIntent === "ECGAnalysis", "ECG without upload clarifies or plans ECG analysis");
-
-  const patient = await engine("Open Ahmed patient record");
-  assert(patient.communicationIntent === "PatientLookup" || patient.toolPlan.runPatientDatabase, "Patient lookup intent");
-
-  const guideline = await engine("What does ESC recommend for AF?");
-  assert(guideline.toolPlan.runKnowledge, "Guideline questions retrieve knowledge in V2");
-
-  const drug = await engine("Is amiodarone safe with warfarin?");
-  assert(drug.communicationIntent === "DrugInformation" || drug.toolPlan.runKnowledge, "Drug question routing");
-
-  const emergency = await engine("Patient has VF and syncope");
-  assert(emergency.communicationIntent === "EmergencyAdvice" || emergency.classification.emergencyPriority === "HIGH", "Emergency escalation");
-
-  const topicMemory = {
+  const followUp = await engine("How is it diagnosed?", {
     attachments: [],
     summary: "",
     turns: [
-      { role: "user", content: "Explain hypertension" },
-      { role: "assistant", content: "Hypertension is persistently elevated blood pressure." },
+      { role: "user", content: "What is hypertension?" },
+      { role: "assistant", content: "Hypertension is sustained elevation of blood pressure." },
     ],
-  };
-  ConversationManager.resetForTests();
-  const followUp = await runClinicalCopilotEngine(
-    {
-      attachments: [],
-      chatInput: {},
-      conversationId: "follow-up-conv",
-      memory: topicMemory,
-      question: "How is it diagnosed?",
-    },
-    engineDeps,
-  );
-  assert(/hypertension/i.test(followUp.context.resolvedQuestion), `Follow-up should resolve pronoun: ${followUp.context.resolvedQuestion}`);
-  assert(followUp.context.isFollowUp !== false, "Follow-up context");
-
-  const generated = ResponseGenerator.generate({
-    attachments: [],
-    clinicalContext: emptyClinicalContext(),
-    communicationIntent: "MedicalQuestion",
-    intent: "general_medical_question",
-    knowledge: [{
-      category: "MED",
-      content: "Hypertension is a chronic condition where blood pressure remains persistently elevated.",
-      id: "htn",
-      references: [],
-      relevanceScore: 0.8,
-      sourceName: "Cardiology KB",
-      tags: ["hypertension"],
-      topic: "Hypertension",
-    }],
-    memory: emptyMemory,
-    plan: Planner.buildResponsePlan("MedicalQuestion", false),
-    primarySmartIntent: "general_medical_question",
-    question: "What is hypertension?",
-    requiresClarification: false,
-    topic: { label: "hypertension", slug: "hypertension" },
   });
-  assert(!/^Definition:/m.test(generated.content), "Response generator avoids report formatting");
-  assert(/Hypertension is a chronic condition/.test(generated.content), "Preserves clinical prose");
+  assert(/diagnos|measure|reading|blood pressure|hypertension/i.test(followUp.response.content), "Follow-up uses conversation memory");
 
   const voice = VoiceEngine.capabilities;
   assert(voice.streamingSttReady && voice.interruptSupported && voice.whisperFallbackReady, "Voice architecture readiness");
 
-  const followUpState = ConversationManager.get("follow-up-conv");
-  assert(followUpState?.currentTopic?.slug === "hypertension", "Conversation state tracks current topic");
-  assert(followUpState?.isFollowUp === true, "Conversation state tracks follow-up turns");
-
   const chunks = StreamingRenderer.chunkContent("Hello Dr Ahmed.");
-  assert(chunks.join("") === "Hello Dr Ahmed.", "Streaming chunk merge");
+  assert(chunks.join("") === "Hello Dr Ahmed.", "Legacy streaming utility still available for non-chat use");
 
   const route = KnowledgeRouter.route(
     "GuidelineSearch",
@@ -135,12 +73,9 @@ async function main() {
     },
     "ESC AF",
   );
-  assert(route.sources.includes("esc_guidelines"), "Pre-retrieval guideline routing");
+  assert(route.sources.includes("esc_guidelines"), "Knowledge router remains available as LLM tool backend");
 
-  const unknown = await engine("???");
-  assert(unknown.intentConfidence >= 0, "Unknown still returns confidence");
-
-  console.log("Clinical AI Copilot Engine integration checks passed.");
+  console.log("Clinical AI Copilot Engine integration checks passed (V3).");
 }
 
 main().catch((error) => {

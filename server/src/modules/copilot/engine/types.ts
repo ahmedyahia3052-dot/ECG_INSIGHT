@@ -11,7 +11,7 @@ import type {
 } from "../copilot-types";
 import type { CopilotTool, IntentClassificationResult, SmartIntent } from "../smart-intent-types";
 
-export const CLINICAL_AI_ENGINE_VERSION = "v2" as const;
+export const CLINICAL_AI_ENGINE_VERSION = "v3" as const;
 
 export type KnowledgeSource =
   | "aha_guidelines"

@@ -32,6 +32,7 @@ export default defineConfig({
       command: "npm run dev:api",
       env: {
         CLIENT_ORIGIN: baseURL,
+        COPILOT_LLM_MOCK: "1",
         EXPO_PUBLIC_API_URL: apiURL,
         NODE_ENV: "development",
         PORT: "3002",

@@ -16,8 +16,8 @@ import {
   dedupeCitations,
   previewClinicalCopilotEngine,
   runClinicalCopilotEngine,
-  StreamingRenderer,
 } from "./engine";
+import type { V3StreamCallbacks } from "./v3/types";
 import { transcribeWithWhisper } from "./voice-transcription.service";
 import { parseCopilotProviderSettings } from "./intent-pipeline";
 
@@ -273,7 +273,7 @@ function ownerOnly(req: { auth?: { id: string } }) {
 }
 
 async function settings() {
-  const defaultProvider = JSON.stringify({ engineVersion: "v2", developerMode: process.env.NODE_ENV !== "production" });
+  const defaultProvider = JSON.stringify({ brainVersion: "v3", developerMode: process.env.NODE_ENV !== "production", engineVersion: "v3" });
   return prisma.copilotSettings.upsert({
     create: { enabled: true, provider: defaultProvider },
     update: {},
@@ -541,7 +541,7 @@ async function conversationForUser(conversationId: string, userId: string) {
   return conversation;
 }
 
-async function executeCopilotChat(input: ChatInput, userId: string, started = Date.now()) {
+async function executeCopilotChat(input: ChatInput, userId: string, started = Date.now(), streamCallbacks: V3StreamCallbacks = {}) {
   const currentSettings = await settings();
   if (!currentSettings.enabled) throw new AppError(503, "Medical AI Copilot is disabled by the developer owner.", "COPILOT_DISABLED");
   const requestingUser = await prisma.user.findUnique({ select: { name: true }, where: { id: userId } });
@@ -585,7 +585,20 @@ async function executeCopilotChat(input: ChatInput, userId: string, started = Da
   void CONVERSATION_SYSTEM_PROMPT;
   const engine = await runClinicalCopilotEngine(
     {
-      attachments: userMessage.attachments,
+      attachments: userMessage.attachments.map((attachment) => ({
+        analysisSummary: attachment.analysisSummary,
+        attachmentId: attachment.id,
+        confidence: attachment.confidence,
+        documentType: attachment.documentType,
+        extractedText: attachment.extractedText,
+        kind: attachment.kind,
+        medicalAnalysis: attachment.medicalAnalysis,
+        mimeType: attachment.mimeType,
+        originalName: attachment.originalName,
+        recommendations: attachment.recommendations,
+        sizeBytes: attachment.sizeBytes,
+        warnings: attachment.warnings,
+      })),
       chatInput: {
         caseId: input.caseId ?? conversation.caseId ?? undefined,
         patientId: input.patientId ?? conversation.patientId ?? undefined,
@@ -599,6 +612,7 @@ async function executeCopilotChat(input: ChatInput, userId: string, started = Da
     {
       retrieveClinicalContext: (chatInput) => retrieveClinicalContext(chatInput),
     },
+    streamCallbacks,
   );
   const responseTimeMs = Date.now() - started;
   const assistant = await prisma.copilotMessage.create({
@@ -614,7 +628,7 @@ async function executeCopilotChat(input: ChatInput, userId: string, started = Da
   await prisma.copilotUsageEvent.create({
     data: {
       conversationId: conversation.id,
-      question: `${input.question} | engine:v2 | intent:${engine.communicationIntent} | smart:${engine.classification.primaryIntent} | tools:${engine.toolPlan.tools.join(",")} | latency:${engine.executionTimeMs}ms`,
+      question: `${input.question} | engine:v3 | tools:${engine.toolPlan.tools.join(",")} | latency:${engine.executionTimeMs}ms`,
       responseTimeMs,
       tag: engine.tag,
       userId,
@@ -646,10 +660,6 @@ async function auditCopilotError(userId: string, error: unknown, question?: stri
 function writeSse(res: { write: (chunk: string) => void }, event: string, data: unknown) {
   res.write(`event: ${event}\n`);
   res.write(`data: ${JSON.stringify(data)}\n\n`);
-}
-
-async function streamAssistantContent(content: string, res: { write: (chunk: string) => void }, cancelled: () => boolean) {
-  StreamingRenderer.streamToWriter(content, (event, data) => writeSse(res, event, data), cancelled);
 }
 
 copilotRouter.get("/settings", async (_req, res, next) => {
@@ -900,12 +910,18 @@ copilotRouter.post("/chat/stream", requireRole("DOCTOR"), async (req, res, next)
       },
       { retrieveClinicalContext: (chatInput) => retrieveClinicalContext(chatInput) },
     );
-    if (previewEngine.toolPlan.tools[0] !== "no_tool") {
+    if (previewEngine.toolPlan.tools[0] !== "conversation") {
       writeSse(res, "status", { message: "Reviewing clinical information..." });
     }
-    const { assistant, conversation, userMessage } = await executeCopilotChat(body, req.auth!.id, started);
+    const { assistant, conversation, userMessage } = await executeCopilotChat(body, req.auth!.id, started, {
+      onStatus: (message) => {
+        if (!closed) writeSse(res, "status", { message });
+      },
+      onToken: (token) => {
+        if (!closed) writeSse(res, "token", { token });
+      },
+    });
     writeSse(res, "conversation", { conversation: serializeConversation(conversation), message: serializeMessage(assistant), userMessage: serializeMessage(userMessage) });
-    await streamAssistantContent(assistant.content, res, () => closed);
     if (!closed) writeSse(res, "done", { conversation: serializeConversation(conversation), message: serializeMessage(assistant), userMessage: serializeMessage(userMessage) });
     res.end();
   } catch (error) {

@@ -64,6 +64,7 @@ export type MedicalIntent =
   | "voice_conversation";
 
 export type AttachmentForAnalysis = {
+  attachmentId?: string;
   analysisSummary: string | null;
   confidence: number | null;
   documentType: string | null;
