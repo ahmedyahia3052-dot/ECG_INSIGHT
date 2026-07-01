@@ -76,14 +76,32 @@ export type CopilotChatInput = {
 };
 export type CopilotStreamEvent = {
   brainDebug?: CopilotBrainDebug;
+  communicationDebug?: CopilotCommunicationDebug;
   conversation?: CopilotConversation;
   intentDebug?: CopilotIntentDebug;
   message?: CopilotMessage;
   status?: string;
   token?: string;
-  type: "brain_debug" | "conversation" | "done" | "error" | "intent_debug" | "status" | "token";
+  type: "brain_debug" | "communication_debug" | "conversation" | "done" | "error" | "intent_debug" | "status" | "token";
   userMessage?: CopilotMessage;
 };
+
+export interface CopilotCommunicationDebug {
+  brain: CopilotBrainDebug;
+  communicationVersion: "v1";
+  intent: string;
+  intentConfidence: number;
+  knowledgeSources: string[];
+  memoryTopic: string | null;
+  resolvedQuestion: string;
+  responsePlan: {
+    allowBullets: boolean;
+    maxParagraphs: number;
+    style: string;
+    suggestFollowUps: boolean;
+  };
+  sessionTurnCount: number;
+}
 
 export interface CopilotBrainDebug {
   brainVersion: "v3";
@@ -267,13 +285,29 @@ function parseSseEvent(block: string) {
   const dataLine = block.split("\n").find((line) => line.startsWith("data:"));
   if (!eventLine || !dataLine) return null;
   const type = eventLine.replace("event:", "").trim() as CopilotStreamEvent["type"];
-  const data = JSON.parse(dataLine.replace("data:", "").trim()) as CopilotBrainDebug & {
+  const data = JSON.parse(dataLine.replace("data:", "").trim()) as CopilotCommunicationDebug & CopilotBrainDebug & {
     conversation?: CopilotConversation;
     message?: CopilotMessage | string;
     token?: string;
     userMessage?: CopilotMessage;
   };
   if (type === "status" || type === "error") return { status: typeof data.message === "string" ? data.message : undefined, type };
+  if (type === "communication_debug" && data.communicationVersion === "v1") {
+    return {
+      communicationDebug: {
+        brain: data.brain,
+        communicationVersion: data.communicationVersion,
+        intent: data.intent,
+        intentConfidence: data.intentConfidence,
+        knowledgeSources: data.knowledgeSources,
+        memoryTopic: data.memoryTopic,
+        resolvedQuestion: data.resolvedQuestion,
+        responsePlan: data.responsePlan,
+        sessionTurnCount: data.sessionTurnCount,
+      },
+      type,
+    };
+  }
   if (type === "brain_debug" && data.brainVersion === "v3") {
     return {
       brainDebug: {

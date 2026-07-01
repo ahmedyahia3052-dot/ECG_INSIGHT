@@ -16,6 +16,7 @@ import {
   type CopilotAttachment,
   type CopilotConversation,
   type CopilotBrainDebug,
+  type CopilotCommunicationDebug,
   type CopilotIntentDebug,
   type CopilotMessage,
   type CopilotTag,
@@ -120,7 +121,7 @@ export function CopilotWorkspaceScreen({ routeConversationId }: { routeConversat
   const [speechMuted, setSpeechMuted] = useState(false);
   const [speechPaused, setSpeechPaused] = useState(false);
   const [speakingMessageId, setSpeakingMessageId] = useState<string | undefined>();
-  const [brainDebug, setBrainDebug] = useState<CopilotBrainDebug | undefined>();
+  const [brainDebug, setBrainDebug] = useState<CopilotBrainDebug | CopilotCommunicationDebug | undefined>();
   const [showIntentDebug, setShowIntentDebug] = useState(false);
   const [streamingMessage, setStreamingMessage] = useState("");
   const [status, setStatus] = useState("");
@@ -381,6 +382,7 @@ export function CopilotWorkspaceScreen({ routeConversationId }: { routeConversat
         tag: input.tag,
       }, (event) => {
         if (event.type === "status") setStatus(event.status ?? "");
+        if (event.type === "communication_debug" && event.communicationDebug) setBrainDebug(event.communicationDebug);
         if (event.type === "brain_debug" && event.brainDebug) setBrainDebug(event.brainDebug);
         if (event.type === "intent_debug" && event.intentDebug) {
           setBrainDebug({
@@ -611,25 +613,31 @@ export function CopilotWorkspaceScreen({ routeConversationId }: { routeConversat
 
         {developerModeEnabled && showIntentDebug && brainDebug ? (
           <View style={styles.intentDebugPanel}>
-            <Text style={styles.intentDebugTitle}>AI Brain V3 (Developer Mode)</Text>
-            <Text style={styles.intentDebugLine}>Intent: {brainDebug.classification.primaryIntent} ({Math.round(brainDebug.classification.confidence * 100)}%)</Text>
-            <Text style={styles.intentDebugLine}>Medical intent: {brainDebug.classification.primaryMedicalIntent}</Text>
-            <Text style={styles.intentDebugLine}>Planner: {brainDebug.clinicalPlan.description}</Text>
-            <Text style={styles.intentDebugLine}>Tools: {brainDebug.decision.selectedTools.join(", ")}</Text>
-            <Text style={styles.intentDebugLine}>Decision path: {brainDebug.decision.decisionPath.join(" → ")}</Text>
-            <Text style={styles.intentDebugLine}>Brain latency: {brainDebug.executionTimeMs} ms</Text>
-            <Text style={styles.intentDebugLine}>Emergency: {brainDebug.classification.emergencyPriority}{brainDebug.decision.emergencyEscalation ? " (escalated)" : ""}</Text>
-            {brainDebug.memoryState.currentPatientAge || brainDebug.memoryState.currentDiscussionTopic ? (
-              <Text style={styles.intentDebugLine}>
-                Memory: {brainDebug.memoryState.currentPatientAge ? `${brainDebug.memoryState.currentPatientAge}y` : ""}{brainDebug.memoryState.currentDiscussionTopic ? ` topic=${brainDebug.memoryState.currentDiscussionTopic}` : ""}
-              </Text>
-            ) : null}
-            {brainDebug.clinicalPlan.steps.length ? (
-              <Text style={styles.intentDebugLine}>Steps: {brainDebug.clinicalPlan.steps.map((step) => step.description).join(" → ")}</Text>
-            ) : null}
-            {brainDebug.classification.intents.length > 1 ? (
-              <Text style={styles.intentDebugLine}>Multi-intent: {brainDebug.classification.intents.map((item) => item.intent).join(" → ")}</Text>
-            ) : null}
+            <Text style={styles.intentDebugTitle}>
+              {"communicationVersion" in brainDebug ? "AI Communication Layer V1" : "AI Brain V3 (Developer Mode)"}
+            </Text>
+            {"communicationVersion" in brainDebug ? (
+              <>
+                <Text style={styles.intentDebugLine}>Intent: {brainDebug.intent} ({Math.round(brainDebug.intentConfidence * 100)}%)</Text>
+                <Text style={styles.intentDebugLine}>Resolved: {brainDebug.resolvedQuestion}</Text>
+                <Text style={styles.intentDebugLine}>Topic memory: {brainDebug.memoryTopic ?? "none"}</Text>
+                <Text style={styles.intentDebugLine}>Knowledge sources: {brainDebug.knowledgeSources.join(", ") || "none"}</Text>
+                <Text style={styles.intentDebugLine}>Response style: {brainDebug.responsePlan.style}</Text>
+                <Text style={styles.intentDebugLine}>Decision path: {brainDebug.brain.decision.decisionPath.join(" → ")}</Text>
+                <Text style={styles.intentDebugLine}>Planner: {brainDebug.brain.clinicalPlan.description}</Text>
+                <Text style={styles.intentDebugLine}>Tools: {brainDebug.brain.decision.selectedTools.join(", ")}</Text>
+                <Text style={styles.intentDebugLine}>Latency: {brainDebug.brain.executionTimeMs} ms</Text>
+              </>
+            ) : (
+              <>
+                <Text style={styles.intentDebugLine}>Intent: {brainDebug.classification.primaryIntent} ({Math.round(brainDebug.classification.confidence * 100)}%)</Text>
+                <Text style={styles.intentDebugLine}>Medical intent: {brainDebug.classification.primaryMedicalIntent}</Text>
+                <Text style={styles.intentDebugLine}>Planner: {brainDebug.clinicalPlan.description}</Text>
+                <Text style={styles.intentDebugLine}>Tools: {brainDebug.decision.selectedTools.join(", ")}</Text>
+                <Text style={styles.intentDebugLine}>Decision path: {brainDebug.decision.decisionPath.join(" → ")}</Text>
+                <Text style={styles.intentDebugLine}>Brain latency: {brainDebug.executionTimeMs} ms</Text>
+              </>
+            )}
           </View>
         ) : null}
 
