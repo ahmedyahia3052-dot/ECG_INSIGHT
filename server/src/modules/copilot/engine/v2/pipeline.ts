@@ -44,23 +44,22 @@ export async function runClinicalAiCoreV2(
     ? await deps.retrieveClinicalContext(input.chatInput)
     : emptyClinicalContext();
 
-  const knowledge = await KnowledgeRetrieval.fetch(reasoning, clinicalContext);
-  const knowledgeHits = knowledge.hits;
-  const knowledgeRoute = knowledge.route;
+  const knowledge = reasoning.needsKnowledge
+    ? await KnowledgeRetrieval.fetch(reasoning, clinicalContext)
+    : { hits: [], route: { query: reasoning.knowledgeQuery, sources: [] } };
 
   const draft = NaturalResponse.generate({
     clinicianName: input.clinicianName,
     clinicalContext,
     contextState: snapshot.contextState,
     insights,
-    knowledge: knowledgeHits,
+    knowledge: knowledge.hits,
     memory: input.memory,
     question: input.question,
     reasoning,
   });
 
-  const safety = SafetyValidation.assess(clinicalContext, input.question, reasoning);
-  const content = SafetyValidation.apply(draft, safety);
+  const content = SafetyValidation.apply(draft, SafetyValidation.assess(clinicalContext, input.question, reasoning));
 
   const session = ContextMemory.persist({
     conversationId: input.conversationId,
@@ -83,8 +82,8 @@ export async function runClinicalAiCoreV2(
       contextState: snapshot.contextState,
       insights,
       isFollowUp: snapshot.isFollowUp,
-      knowledgeHits,
-      knowledgeRoute,
+      knowledgeHits: knowledge.hits,
+      knowledgeRoute: knowledge.route,
       memory: input.memory,
       reasoning,
       resolvedQuestion: snapshot.contextState.resolvedQuestion,

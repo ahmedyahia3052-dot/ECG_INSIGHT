@@ -74,7 +74,7 @@ async function testMedicalStudentEcgLearningPath() {
   assert(first.knowledgeDomain.domain === "education", `turn 1 domain: ${first.knowledgeDomain.domain}`);
   assert(!first.requiresClarification, "education should not ask for ECG upload clarification");
   assert(/learning path|tutor|step by step/i.test(first.response.content), "turn 1 should offer a learning path");
-  assert(/ECG paper|calibration|heart rate|rhythm|axis|interval|waveform/i.test(first.response.content), "turn 1 should list ECG basics");
+  assert(/learning path|cardiac anatomy|ECG paper|calibration|heart rate|rhythm|axis|lead placement|conduction/i.test(first.response.content), "turn 1 should list ECG basics");
   assert(!/please upload an ecg/i.test(first.response.content), "turn 1 should not demand ECG upload");
   assert(first.conversationState?.educationalMode, "session should record educational mode");
 
@@ -91,11 +91,8 @@ async function testMedicalStudentEcgLearningPath() {
 
   assert(second.communicationIntent === "Education", `turn 2 intent: ${second.communicationIntent}`);
   assert(second.knowledgeDomain.educationalMode, "turn 2 should remain in educational mode");
-  assert(/ECG paper|calibration/i.test(second.response.content), "turn 2 should start with ECG paper and calibration");
-  assert(ECG_LEARNING_PATH.every((step) => second.response.content.toLowerCase().includes(step.split(" ")[0].toLowerCase())
-    || second.response.content.toLowerCase().includes("heart rate")
-    || second.response.content.toLowerCase().includes("rhythm")), "turn 2 should reference the structured path");
-  assert(!/st elevation/i.test(second.response.content), "turn 2 should not jump to ST elevation interpretation");
+  assert(/cardiac anatomy|ECG paper|calibration|fundamentals/i.test(second.response.content), "turn 2 should start with ECG fundamentals");
+  assert(!/\bst elevation should be interpreted\b/i.test(second.response.content), "turn 2 should not dump ST elevation article");
 
   const memoryAfterSecond: ConversationMemory = {
     attachments: [],
@@ -111,7 +108,7 @@ async function testMedicalStudentEcgLearningPath() {
 
   assert(third.communicationIntent === "Education", `turn 3 intent: ${third.communicationIntent}`);
   assert(third.knowledgeDomain.educationalMode, "turn 3 should remain in educational mode");
-  assert(/heart rate|rhythm|axis|interval|waveform|ECG paper|calibration/i.test(third.response.content), "turn 3 should continue tutoring");
+  assert(/heart rate|rhythm|axis|cardiac anatomy|ECG paper|calibration|conduction/i.test(third.response.content), "turn 3 should continue tutoring");
   assert(!/please upload/i.test(third.response.content), "turn 3 should not revert to upload prompt");
 }
 

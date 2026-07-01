@@ -1,7 +1,7 @@
 import type { AttachmentForAnalysis, ConversationMemory } from "../copilot-types";
-import type { IntentClassificationResult } from "../smart-intent-types";
 import { ContextManager } from "./context-manager";
 import type { SessionRecord } from "./conversation-manager";
+import { ConversationIntentEngine } from "./v2/conversation-intent";
 import { MedicalReasoning } from "./v2/medical-reasoning";
 import { ECG_LEARNING_PATH } from "./v2/types";
 
@@ -33,18 +33,26 @@ export { ECG_LEARNING_PATH };
 export const ClinicalKnowledgeRouter = {
   route(input: {
     attachments: AttachmentForAnalysis[];
-    classification: IntentClassificationResult;
+    classification: { primaryIntent: string };
     memory: ConversationMemory;
     previousSession?: SessionRecord;
     question: string;
     resolvedQuestion: string;
   }): ClinicalKnowledgeRouteResult {
+    void input.classification;
     const contextState = ContextManager.build({
       attachments: input.attachments,
       chatInput: {},
       memory: input.memory,
       previousTopicStack: input.previousSession?.topicStack ?? [],
       question: input.question,
+    });
+    const intent = ConversationIntentEngine.classify({
+      attachments: input.attachments,
+      contextState,
+      memory: input.memory,
+      question: input.question,
+      session: input.previousSession,
     });
     const reasoning = MedicalReasoning.analyze({
       attachments: input.attachments,
@@ -55,11 +63,11 @@ export const ClinicalKnowledgeRouter = {
       question: input.question,
       session: input.previousSession,
     });
-    const domain: ClinicalKnowledgeDomain = reasoning.educationalMode
+    const domain: ClinicalKnowledgeDomain = intent.isTutorMode || intent.intent === "medical_education"
       ? "education"
-      : reasoning.mode === "vision_review"
+      : ["ecg_interpretation", "image_discussion"].includes(intent.intent)
         ? "ecg_interpretation"
-        : reasoning.mode === "emergency"
+        : intent.intent === "emergency_advice"
           ? "emergency_assessment"
           : "clinical_reasoning";
     return {
@@ -68,7 +76,7 @@ export const ClinicalKnowledgeRouter = {
       educationalMode: reasoning.educationalMode,
       educationalTopic: reasoning.educationalTopic,
       learningStep: reasoning.learningStep,
-      reason: `v2-${reasoning.mode}`,
+      reason: intent.reason,
     };
   },
 };

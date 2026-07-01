@@ -32,6 +32,7 @@ export type ReasoningResult = {
   educationalMode: boolean;
   educationalTopic: EducationalTopic;
   emergencyLevel: EmergencyLevel;
+  internalIntent: import("./conversation-intent").ConversationIntent;
   knowledgeQuery: string;
   learningStep: number;
   mode: ConversationMode;
@@ -72,10 +73,12 @@ export type PipelineOutput = {
 };
 
 export const ECG_LEARNING_PATH = [
-  "ECG paper and calibration",
+  "Cardiac anatomy",
+  "Conduction system",
+  "ECG paper",
+  "Calibration",
+  "Lead placement",
   "Heart rate",
   "Rhythm",
   "Axis",
-  "Intervals (PR, QRS, QT)",
-  "Waveforms (P, QRS, ST, T)",
 ] as const;

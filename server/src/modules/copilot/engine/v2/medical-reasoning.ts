@@ -1,15 +1,9 @@
 import type { AttachmentForAnalysis, ChatContextInput, ConversationMemory } from "../../copilot-types";
 import type { ContextState } from "../types";
 import type { SessionRecord } from "../conversation-manager";
+import { ConversationIntentEngine, type ConversationIntent } from "./conversation-intent";
 import type { EducationalTopic, EmergencyLevel, ReasoningResult } from "./types";
 import { ECG_LEARNING_PATH } from "./types";
-
-const VISION_DOC_TYPES = /ecg|ekg|lab|laboratory|echo|echocardiogram|x-?ray|radiology|ct|mri|cxr|imaging/i;
-
-const ACUTE_EMERGENCY = [
-  "cardiac arrest", "ventricular fibrillation", "ventricular tachycardia",
-  "not breathing", "unresponsive", "collapsed", "anaphylaxis", "active bleeding",
-];
 
 type ReasonInput = {
   attachments: AttachmentForAnalysis[];
@@ -20,43 +14,6 @@ type ReasonInput = {
   question: string;
   session?: SessionRecord;
 };
-
-function conversationText(memory: ConversationMemory) {
-  return memory.turns.map((turn) => turn.content).join(" ").toLowerCase();
-}
-
-function asksToLearnEcg(text: string) {
-  return /\b(learn|learning|study|studying|teach me|help me (learn|understand|read)|how (?:do|can) i (?:learn|read|interpret)|want to learn|learning path|ecg basics|read an ecg|ecg fundamentals)\b/.test(text)
-    && /\b(ecg|ekg|electrocardiogram)\b/.test(text);
-}
-
-function isLearnerPersona(text: string) {
-  return /\b(medical student|student doctor|resident|trainee|junior doctor|new to cardiology|just starting)\b/.test(text);
-}
-
-function isEducationalFollowUp(text: string, memory: ConversationMemory) {
-  if (/^(where should i start|what should i learn first|what next|what's next|continue|go on|next step|next topic|keep going)\b/i.test(text.trim())) {
-    return /\b(learn|learning|study|medical student|tutor|tutorial|ecg basics|learning path|step by step)\b/.test(conversationText(memory));
-  }
-  return /\b(where (?:do|should) i start|what order|step by step|walk me through|guide me)\b/i.test(text);
-}
-
-function educationalContextActive(memory: ConversationMemory, session?: SessionRecord) {
-  if (session?.educationalMode) return true;
-  const combined = conversationText(memory);
-  if (!combined.trim()) return false;
-  return /\b(medical student|learn|learning|study|studying|tutor|tutorial|teach me|learning path|step by step|ecg basics|fundamentals|where should i start)\b/.test(combined);
-}
-
-function detectEducationalTopic(memory: ConversationMemory, text: string, session?: SessionRecord): EducationalTopic {
-  if (session?.educationalTopic && session.educationalTopic !== "none") return session.educationalTopic;
-  const combined = `${conversationText(memory)} ${text}`;
-  if (/\b(ecg|ekg|electrocardiogram)\b/.test(combined) && /\b(learn|study|basics|fundamentals|read|interpret)\b/.test(combined)) {
-    return "ecg_basics";
-  }
-  if (/\b(learn|study|basics|fundamentals)\b/.test(combined)) return "general_medicine";
-  return "none";
-}
 
 function learningStepFor(memory: ConversationMemory, text: string, session?: SessionRecord) {
   const current = session?.learningStep ?? 0;
@@ -70,86 +27,76 @@ function learningStepFor(memory: ConversationMemory, text: string, session?: Ses
   return 0;
 }
 
-function referencesPatient(text: string, contextState: ContextState) {
-  if (contextState.entityMemory.patientNames.length) return true;
-  return /\b(this patient|my patient|the patient|patient chart|patient record|patient profile|open .*patient|patient named)\b/i.test(text);
-}
-
-function referencesCase(text: string) {
-  return /\b(this case|the case|active case|current case|this tracing|this ecg|the tracing|uploaded|attached|the file|the image|the report)\b/i.test(text);
-}
-
-function isGreeting(text: string, memory: ConversationMemory) {
-  const trimmed = text.trim();
-  return /^(hi|hello|hey|good morning|good afternoon|good evening|salam)\b[!.?\s]*$/i.test(trimmed)
-    || (memory.turns.length === 0 && /^(hi|hello|hey)\b/i.test(trimmed));
-}
-
-function isFarewell(text: string) {
-  return /^(goodbye|bye|see you|talk later)\b/i.test(text.trim());
-}
-
-function isSmallTalk(text: string) {
-  return /^(how are you|who are you|what can you do|thanks|thank you)\b/i.test(text.trim());
-}
-
 function detectEmergency(text: string): EmergencyLevel {
   const lowered = text.toLowerCase();
-  if (ACUTE_EMERGENCY.some((term) => lowered.includes(term))) return "HIGH";
+  if (/\b(cardiac arrest|not breathing|unresponsive|collapsed|anaphylaxis|active bleeding)\b/.test(lowered)) return "HIGH";
   if (/\b(chest pain|syncope|crushing pain|stemi|shortness of breath|dyspnea)\b/.test(lowered)) return "MODERATE";
   return "NONE";
 }
 
-function hasVisionAttachments(attachments: AttachmentForAnalysis[], memory: ConversationMemory) {
-  const allNames = attachments.map((item) => `${item.documentType ?? ""} ${item.kind} ${item.originalName}`)
-    .concat(memory.attachments.map((item) => `${item.documentType ?? ""} ${item.name}`));
-  return allNames.some((label) => VISION_DOC_TYPES.test(label)) || attachments.length > 0 || memory.attachments.length > 0;
+function modeForIntent(intent: ConversationIntent): ReasoningResult["mode"] {
+  switch (intent) {
+    case "medical_education": return "education";
+    case "greeting": return "greeting";
+    case "general_conversation": return "small_talk";
+    case "emergency_advice": return "emergency";
+    case "case_discussion": return "patient_context";
+    case "ecg_interpretation":
+    case "image_discussion":
+    case "laboratory_interpretation":
+    case "radiology_interpretation": return "vision_review";
+    case "clarification_request": return "clarification";
+    case "follow_up": return "follow_up";
+    case "conversation_continuation": return "education";
+    default: return "clinical_question";
+  }
 }
 
-function needsEcgClarification(text: string, attachments: AttachmentForAnalysis[], memory: ConversationMemory, educational: boolean) {
-  if (educational) return false;
-  const hasEcg = attachments.some((a) => /ecg|ekg/i.test(`${a.documentType ?? ""} ${a.kind} ${a.originalName}`))
-    || memory.attachments.some((a) => /ecg|ekg/i.test(a.name));
-  if (hasEcg) return false;
-  return /\b(interpret|analyze|analyse|review|read)\b/i.test(text) && /\b(ecg|ekg|tracing|strip)\b/i.test(text);
+function needsKnowledgeForIntent(intent: ConversationIntent, tutorMode: boolean): boolean {
+  if (tutorMode || intent === "medical_education" || intent === "conversation_continuation") return false;
+  if (intent === "greeting" || intent === "general_conversation") return false;
+  if (intent === "clarification_request") return false;
+  if (intent === "case_discussion") return false;
+  return ["medical_explanation", "clinical_reasoning", "follow_up", "drug_question", "differential_diagnosis", "emergency_advice", "ecg_interpretation"].includes(intent);
+}
+
+function needsVisionForIntent(intent: ConversationIntent, attachments: AttachmentForAnalysis[], memory: ConversationMemory) {
+  if (["ecg_interpretation", "image_discussion", "laboratory_interpretation", "radiology_interpretation"].includes(intent)) {
+    return attachments.length > 0 || memory.attachments.length > 0;
+  }
+  return false;
+}
+
+function responseTagForIntent(intent: ConversationIntent, tutorMode: boolean) {
+  if (tutorMode || intent === "medical_education") return "Medical Education";
+  if (intent === "emergency_advice") return "Follow-up";
+  if (intent === "ecg_interpretation") return "ECG Interpretation";
+  return "Clinical Summary";
 }
 
 export const MedicalReasoning = {
   analyze(input: ReasonInput): ReasoningResult {
+    const intentResult = ConversationIntentEngine.classify({
+      attachments: input.attachments,
+      contextState: input.contextState,
+      memory: input.memory,
+      question: input.question,
+      session: input.session,
+    });
+
     const text = input.contextState.resolvedQuestion.toLowerCase();
-    const raw = input.question.toLowerCase();
-    const eduActive = educationalContextActive(input.memory, input.session);
-    const eduTopic = detectEducationalTopic(input.memory, text, input.session);
-    const educationalMode = eduActive
-      || asksToLearnEcg(text)
-      || asksToLearnEcg(raw)
-      || (isLearnerPersona(text) && /\b(ecg|ekg|help|learn)\b/.test(text))
-      || isEducationalFollowUp(input.question, input.memory);
     const emergencyLevel = detectEmergency(text);
+    const mode = modeForIntent(intentResult.intent);
+    const educationalTopic: EducationalTopic = intentResult.educationalTopic;
+    const tutorMode = intentResult.isTutorMode;
 
-    if (emergencyLevel === "HIGH") {
-      return {
-        clarificationPrompt: undefined,
-        educationalMode: false,
-        educationalTopic: "none",
-        emergencyLevel,
-        knowledgeQuery: input.contextState.resolvedQuestion,
-        learningStep: 0,
-        mode: "emergency",
-        needsClarification: false,
-        needsKnowledge: true,
-        needsPatientContext: Boolean(input.chatInput.patientId || input.chatInput.caseId),
-        needsVision: hasVisionAttachments(input.attachments, input.memory),
-        responseTag: "Follow-up",
-      };
-    }
-
-    if (needsEcgClarification(text, input.attachments, input.memory, educationalMode)) {
+    if (intentResult.intent === "clarification_request") {
       return {
         clarificationPrompt: "Share the ECG image or open the case here, and tell me what you'd like me to focus on — rhythm, ischaemia, conduction, or QT.",
         educationalMode: false,
         educationalTopic: "none",
         emergencyLevel,
+        internalIntent: intentResult.intent,
         knowledgeQuery: input.contextState.resolvedQuestion,
         learningStep: 0,
         mode: "clarification",
@@ -161,147 +108,42 @@ export const MedicalReasoning = {
       };
     }
 
-    if (educationalMode) {
+    if (intentResult.intent === "conversation_continuation" && intentResult.isLearner) {
       return {
         clarificationPrompt: undefined,
         educationalMode: true,
-        educationalTopic: eduTopic === "none" && /\b(ecg|ekg)\b/.test(text) ? "ecg_basics" : eduTopic,
+        educationalTopic: "none",
         emergencyLevel,
-        knowledgeQuery: input.contextState.resolvedQuestion,
-        learningStep: eduTopic === "ecg_basics" || /\b(ecg|ekg)\b/.test(text)
-          ? learningStepFor(input.memory, text, input.session)
-          : 0,
+        internalIntent: intentResult.intent,
+        knowledgeQuery: "",
+        learningStep: 0,
         mode: "education",
         needsClarification: false,
-        needsKnowledge: true,
+        needsKnowledge: false,
         needsPatientContext: false,
         needsVision: false,
         responseTag: "Medical Education",
       };
     }
 
-    if (isGreeting(text, input.memory)) {
-      return baseResult("greeting", input, emergencyLevel, false, false, false, "Clinical Summary");
-    }
-
-    if (isFarewell(text)) {
-      return baseResult("farewell", input, emergencyLevel, false, false, false, "Clinical Summary");
-    }
-
-    if (isSmallTalk(text)) {
-      return baseResult("small_talk", input, emergencyLevel, false, false, false, "Clinical Summary");
-    }
-
-    const visionAttachments = input.attachments.length > 0
-      || (input.memory.attachments.length > 0 && (referencesCase(text) || referencesPatient(text, input.contextState)));
-    if (visionAttachments && hasVisionAttachments(input.attachments, input.memory)) {
-      return {
-        clarificationPrompt: undefined,
-        educationalMode: false,
-        educationalTopic: "none",
-        emergencyLevel,
-        knowledgeQuery: input.contextState.resolvedQuestion,
-        learningStep: 0,
-        mode: "vision_review",
-        needsClarification: false,
-        needsKnowledge: /explain|why|what does|interpret|review|findings|abnormal/i.test(text),
-        needsPatientContext: referencesPatient(text, input.contextState) && Boolean(input.chatInput.patientId),
-        needsVision: true,
-        responseTag: "ECG Interpretation",
-      };
-    }
-
-    const wantsPatient = referencesPatient(text, input.contextState)
-      && (Boolean(input.chatInput.patientId) || Boolean(input.chatInput.caseId) || input.contextState.entityMemory.patientNames.length > 0);
-    if (wantsPatient) {
-      return {
-        clarificationPrompt: undefined,
-        educationalMode: false,
-        educationalTopic: "none",
-        emergencyLevel,
-        knowledgeQuery: input.contextState.resolvedQuestion,
-        learningStep: 0,
-        mode: "patient_context",
-        needsClarification: false,
-        needsKnowledge: false,
-        needsPatientContext: true,
-        needsVision: false,
-        responseTag: "Clinical Summary",
-      };
-    }
-
-    if (input.isFollowUp && input.contextState.activeTopic) {
-      return {
-        clarificationPrompt: undefined,
-        educationalMode: false,
-        educationalTopic: "none",
-        emergencyLevel,
-        knowledgeQuery: input.contextState.resolvedQuestion,
-        learningStep: 0,
-        mode: "follow_up",
-        needsClarification: false,
-        needsKnowledge: true,
-        needsPatientContext: Boolean(input.chatInput.patientId) && referencesPatient(text, input.contextState),
-        needsVision: false,
-        responseTag: "Clinical Summary",
-      };
-    }
-
-    if (emergencyLevel === "MODERATE") {
-      return {
-        clarificationPrompt: undefined,
-        educationalMode: false,
-        educationalTopic: "none",
-        emergencyLevel,
-        knowledgeQuery: input.contextState.resolvedQuestion,
-        learningStep: 0,
-        mode: "emergency",
-        needsClarification: false,
-        needsKnowledge: true,
-        needsPatientContext: Boolean(input.chatInput.patientId),
-        needsVision: hasVisionAttachments(input.attachments, input.memory),
-        responseTag: "Follow-up",
-      };
-    }
+    const learningStep = tutorMode && educationalTopic === "ecg_basics"
+      ? learningStepFor(input.memory, text, input.session)
+      : 0;
 
     return {
       clarificationPrompt: undefined,
-      educationalMode: false,
-      educationalTopic: "none",
+      educationalMode: tutorMode || intentResult.isEducational,
+      educationalTopic: tutorMode && educationalTopic === "none" && /\b(ecg|ekg)\b/i.test(text) ? "ecg_basics" : educationalTopic,
       emergencyLevel,
+      internalIntent: intentResult.intent,
       knowledgeQuery: input.contextState.resolvedQuestion,
-      learningStep: 0,
-      mode: "clinical_question",
+      learningStep,
+      mode,
       needsClarification: false,
-      needsKnowledge: true,
-      needsPatientContext: false,
-      needsVision: input.attachments.length > 0,
-      responseTag: input.contextState.activeTopic?.slug === "stemi" ? "ECG Interpretation" : "Clinical Summary",
+      needsKnowledge: needsKnowledgeForIntent(intentResult.intent, tutorMode),
+      needsPatientContext: intentResult.intent === "case_discussion" && Boolean(input.chatInput.patientId || input.chatInput.caseId),
+      needsVision: needsVisionForIntent(intentResult.intent, input.attachments, input.memory),
+      responseTag: responseTagForIntent(intentResult.intent, tutorMode),
     };
   },
 };
-
-function baseResult(
-  mode: ReasoningResult["mode"],
-  input: ReasonInput,
-  emergencyLevel: EmergencyLevel,
-  needsKnowledge: boolean,
-  needsPatientContext: boolean,
-  needsVision: boolean,
-  tag: string,
-): ReasoningResult {
-  return {
-    clarificationPrompt: undefined,
-    educationalMode: false,
-    educationalTopic: "none",
-    emergencyLevel,
-    knowledgeQuery: input.contextState.resolvedQuestion,
-    learningStep: 0,
-    mode,
-    needsClarification: false,
-    needsKnowledge,
-    needsPatientContext,
-    needsVision,
-    responseTag: tag,
-  };
-}

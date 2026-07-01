@@ -68,8 +68,16 @@ function resolvePronouns(question: string, activeTopic: TopicFrame | null): stri
     const match = text.match(/(diagnosed|treated|managed|detected|monitored)/i);
     if (match) return `How is ${activeTopic.label} ${match[1].toLowerCase()}?`;
   }
-  if (/^(what causes|why does|what are the causes of)\s+(it|this|that)\b/i.test(text)) {
+  if (/^(what causes|why does|why do|what are the causes of)\s+(it|this|that)\b/i.test(text)) {
     return text.replace(/\b(it|this|that)\b/i, activeTopic.label);
+  }
+  if (/\bwhy does (it|this|that)\b/i.test(text)) {
+    return text.replace(/\b(it|this|that)\b/i, activeTopic.label);
+  }
+  if (/^(what would you do next|what should i do next|what do you do next|how would you manage (it|this|that))\b/i.test(text)) {
+    return activeTopic.slug === "hypertension" || activeTopic.label
+      ? `What would you do next for ${activeTopic.label}?`
+      : text.replace(/\b(it|this|that)\b/i, activeTopic.label);
   }
   if (/^(what treatment|what drugs|which drugs|what medication)\b/i.test(text) && /\b(it|this|that)\b/i.test(text)) {
     return `What drugs are commonly used for ${activeTopic.label}?`;
@@ -119,9 +127,13 @@ export const ContextManager = {
   },
 
   isFollowUp(question: string, activeTopic: TopicFrame | null, memory: ConversationMemory): boolean {
-    if (!activeTopic || memory.turns.length < 2) return false;
+    if (memory.turns.length < 2) return false;
+    const text = question.trim();
+    if (/\b(this patient|the patient|my patient|those findings|the ecg|the report|the medication)\b/i.test(text)) return true;
+    if (/^(what would you do next|what should i do next|what do you do next)\b/i.test(text)) return true;
+    if (!activeTopic) return false;
     return /\b(it|this|that)\b/i.test(question)
-      || /^(how|what about|tell me more|also|what drugs|what treatment)/i.test(question.trim());
+      || /^(how|what about|tell me more|also|what drugs|what treatment|why does|why do)\b/i.test(text);
   },
 };
 

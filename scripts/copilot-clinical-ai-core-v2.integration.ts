@@ -114,7 +114,7 @@ async function testEducationPersistence() {
   const second = await ask("Where should I start?", memory, convId);
   assert(second.communicationIntent === "Education", "Educational follow-up stays educational");
   assert(/ECG paper|calibration/i.test(second.response.content), "Starts with ECG basics");
-  assert(ECG_LEARNING_PATH.length === 6, "ECG learning path has six steps");
+  assert(ECG_LEARNING_PATH.length === 8, "ECG learning path has eight steps");
 }
 
 async function testVisionAutoInvoke() {
