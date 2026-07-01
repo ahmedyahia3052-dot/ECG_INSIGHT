@@ -7,6 +7,7 @@ const EMERGENCY_TERMS = [
   "chest pain", "syncope", "cardiac arrest", "vf", "vt", "ventricular fibrillation", "ventricular tachycardia",
   "complete heart block", "stemi", "hyperkalemia", "brugada", "long qt", "massive pe", "pulmonary embolism",
   "shortness of breath", "dyspnea", "crushing pain", "facial droop", "stroke", "hemoptysis", "shock",
+  "collapsed", "unresponsive", "anaphylaxis", "not breathing", "active bleeding", "altered mental status",
 ];
 
 function matchIntent(intent: SmartIntent, confidence: number, reason: string): IntentMatch {
@@ -56,6 +57,9 @@ function classifyPrimaryIntent(text: string, attachments: AttachmentForAnalysis[
     return matchIntent("fitness_for_work", 0.9, "fitness-for-work");
   }
   if (/occupational|duty restriction|occupational fitness/.test(text)) return matchIntent("occupational_fitness", 0.88, "occupational-fitness");
+  if (/collapsed|unresponsive|anaphylaxis|not breathing|active bleeding|cardiac arrest|seizure/.test(text)) {
+    return matchIntent("emergency_warning", 0.95, "acute-emergency");
+  }
   if (/open\s+[a-z]+(?:\s+patient)?|open .*record|find patient|look up patient|patient lookup|open .*patient|show .*chart/.test(text) || entities.patientNames.length) {
     return matchIntent("patient_lookup", 0.9, "patient-lookup");
   }

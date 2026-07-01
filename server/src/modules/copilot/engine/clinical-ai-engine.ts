@@ -77,11 +77,16 @@ export async function runClinicalCopilotEngine(
   });
 
   const sessionTurnCount = input.memory.turns.length + 1;
-  ConversationManager.upsert({
+  const session = ConversationManager.upsert({
     conversationId: input.conversationId,
+    entityMemory: contextState.entityMemory,
     intent: intentStage.communicationIntent,
+    isFollowUp,
+    memory: input.memory,
     topicStack: contextState.topicStack,
     turnCount: sessionTurnCount,
+    voiceActive: Boolean(input.voiceMode),
+    voiceStatus: input.voiceMode ? "thinking" : "idle",
   });
 
   return {
@@ -99,6 +104,7 @@ export async function runClinicalCopilotEngine(
     sessionTurnCount,
     tag: tagForIntent(pipeline.classification.primaryMedicalIntent, "Clinical Summary"),
     toolPlan,
+    conversationState: session,
   };
 }
 
@@ -111,6 +117,16 @@ export function buildEngineDebugPayload(engine: EngineResult): EngineDebugPayloa
     classification: engine.classification,
     communicationIntent: engine.communicationIntent,
     context: engine.context,
+    conversationState: engine.conversationState
+      ? {
+          conversationSummary: engine.conversationState.conversationSummary,
+          currentTopic: engine.conversationState.currentTopic,
+          isFollowUp: engine.conversationState.isFollowUp,
+          previousTopic: engine.conversationState.previousTopic,
+          voiceActive: engine.conversationState.voiceActive,
+          voiceStatus: engine.conversationState.voiceStatus,
+        }
+      : undefined,
     engineVersion: CLINICAL_AI_ENGINE_VERSION,
     executionTimeMs: engine.executionTimeMs,
     knowledgeRoute: engine.knowledgeRoute,

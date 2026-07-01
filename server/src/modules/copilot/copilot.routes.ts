@@ -19,6 +19,7 @@ import {
   runClinicalCopilotEngine,
   StreamingRenderer,
 } from "./engine";
+import { transcribeWithWhisper } from "./voice-transcription.service";
 import { parseCopilotProviderSettings } from "./intent-pipeline";
 
 export const copilotRouter = Router();
@@ -27,6 +28,7 @@ export const registeredCopilotRoutes = [
   "GET /api/copilot/conversations/:conversationId",
   "POST /api/copilot/chat/stream",
   "POST /api/copilot/chat",
+  "POST /api/copilot/voice/transcribe",
 ] as const;
 
 copilotRouter.use(requireAuth);
@@ -62,6 +64,7 @@ const chatSchema = contextSchema.extend({
   conversationId: z.string().optional(),
   question: z.string().trim().min(1).max(4000),
   tag: z.enum(tags).default("ECG Interpretation"),
+  voiceMode: z.boolean().optional().default(false),
 });
 type ChatInput = z.infer<typeof chatSchema>;
 
@@ -247,6 +250,18 @@ const uploadAttachment = multer({
   },
   limits: { fileSize: 25 * 1024 * 1024 },
   storage: attachmentStorage,
+});
+
+const uploadVoiceAudio = multer({
+  fileFilter: (_req, file, cb) => {
+    if (!/^audio\//.test(file.mimetype)) {
+      cb(new AppError(400, "Audio file required.", "UNSUPPORTED_FORMAT"));
+      return;
+    }
+    cb(null, true);
+  },
+  limits: { fileSize: 25 * 1024 * 1024 },
+  storage: multer.memoryStorage(),
 });
 
 function ownerOnly(req: { auth?: { id: string } }) {
@@ -580,6 +595,7 @@ async function executeCopilotChat(input: ChatInput, userId: string, started = Da
       conversationId: conversation.id,
       memory,
       question: input.question,
+      voiceMode: input.voiceMode,
     },
     {
       retrieveClinicalContext: (chatInput) => retrieveClinicalContext(chatInput),
@@ -656,6 +672,16 @@ copilotRouter.put("/settings", requireRole("SUPER_ADMIN"), async (req, res, next
       where: { id: current.id },
     });
     res.json({ settings: updated });
+  } catch (error) {
+    next(error);
+  }
+});
+
+copilotRouter.post("/voice/transcribe", requireRole("DOCTOR"), uploadVoiceAudio.single("audio"), async (req, res, next) => {
+  try {
+    if (!req.file?.buffer?.length) throw new AppError(400, "Audio recording required.", "FILE_REQUIRED");
+    const text = await transcribeWithWhisper(req.file.buffer, req.file.mimetype || "audio/webm");
+    res.status(200).json({ partial: false, text });
   } catch (error) {
     next(error);
   }
@@ -865,7 +891,6 @@ copilotRouter.post("/chat/stream", requireRole("DOCTOR"), async (req, res, next)
     res.setHeader("cache-control", "no-cache, no-transform");
     res.setHeader("connection", "keep-alive");
     writeSse(res, "status", { message: "Understanding your request..." });
-    const currentSettings = await settings();
     const previewEngine = await previewClinicalCopilotEngine(
       {
         attachments: [],
@@ -880,6 +905,7 @@ copilotRouter.post("/chat/stream", requireRole("DOCTOR"), async (req, res, next)
       writeSse(res, "status", { message: "Reviewing clinical information..." });
     }
     const { assistant, conversation, engine, userMessage } = await executeCopilotChat(body, req.auth!.id, started);
+    const currentSettings = await settings();
     const developerMode = await copilotDeveloperModeEnabled(req.auth!.id, currentSettings.provider);
     if (developerMode) {
       writeSse(res, "engine_debug", buildEngineDebugPayload(engine));

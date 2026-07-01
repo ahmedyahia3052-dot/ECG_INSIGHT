@@ -8,16 +8,20 @@ export type VoicePipelineState = {
   streamingLlmReady: boolean;
   streamingSttReady: boolean;
   streamingTtsReady: boolean;
+  whisperFallbackReady: boolean;
 };
 
 export const VoiceEngine = {
   capabilities: {
     interruptSupported: true,
+    mediaRecorderReady: true,
     resumeSupported: true,
     silenceDetectionReady: true,
     streamingLlmReady: true,
     streamingSttReady: true,
     streamingTtsReady: true,
+    webSpeechReady: true,
+    whisperFallbackReady: true,
   } as const,
 
   initialState(): VoicePipelineState {
@@ -31,6 +35,7 @@ export const VoiceEngine = {
       streamingLlmReady: true,
       streamingSttReady: true,
       streamingTtsReady: true,
+      whisperFallbackReady: true,
     };
   },
 

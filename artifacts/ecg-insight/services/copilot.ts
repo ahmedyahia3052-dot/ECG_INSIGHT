@@ -73,6 +73,7 @@ export type CopilotChatInput = {
   patientId?: string;
   question: string;
   tag: CopilotTag;
+  voiceMode?: boolean;
 };
 export type CopilotStreamEvent = {
   brainDebug?: CopilotBrainDebug;
@@ -224,6 +225,17 @@ export async function sendCopilotMessage(accessToken: string, input: CopilotChat
 
 export async function uploadCopilotAttachment(accessToken: string, formData: FormData) {
   return apiRequest<{ attachment: CopilotAttachment }>("/copilot/attachments", {
+    accessToken,
+    body: formData,
+    headers: {},
+    method: "POST",
+  });
+}
+
+export async function transcribeVoiceAudio(accessToken: string, audio: Blob, mimeType: string) {
+  const formData = new FormData();
+  formData.append("audio", audio, mimeType.includes("webm") ? "recording.webm" : "recording.wav");
+  return apiRequest<{ partial: boolean; text: string }>("/copilot/voice/transcribe", {
     accessToken,
     body: formData,
     headers: {},

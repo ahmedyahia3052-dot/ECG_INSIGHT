@@ -8,21 +8,17 @@ import { Badge, Card, EmptyState, medicalTheme, PrimaryButton } from "@/componen
 import { useAuth } from "@/context/AuthContext";
 import {
   downloadCopilotExport,
-  getCopilotSettings,
   getCopilotConversation,
   listCopilotConversations,
   streamCopilotMessage,
+  transcribeVoiceAudio,
   uploadCopilotAttachment,
   type CopilotAttachment,
   type CopilotConversation,
-  type CopilotBrainDebug,
-  type CopilotCommunicationDebug,
-  type CopilotEngineDebug,
-  type CopilotIntentDebug,
   type CopilotMessage,
   type CopilotTag,
 } from "@/services/copilot";
-import { ClinicalVoiceEngine } from "@/services/voiceEngine";
+import { ClinicalVoiceEngine, type VoiceStatus } from "@/services/voiceEngine";
 import { safeArray } from "@/utils/collections";
 
 type AttachmentKind = "ecg" | "file" | "image";
@@ -92,12 +88,18 @@ export function CopilotWorkspaceScreen({ routeConversationId }: { routeConversat
   const { caseId: scopedCaseId, patientId: scopedPatientId } = useLocalSearchParams<{ caseId?: string; patientId?: string }>();
   const attachmentPreviewsRef = useRef<Record<string, string>>({});
   const voiceEngineRef = useRef<ClinicalVoiceEngine | null>(null);
+  const voiceModeRef = useRef(false);
+  const speechMutedRef = useRef(false);
+  const sendPromptRef = useRef<(prompt: string, tag: CopilotTag) => void>(() => undefined);
+  const sendPendingRef = useRef(false);
   const scrollRef = useRef<ScrollView>(null);
   const streamAbort = useRef<AbortController | null>(null);
   const { width } = useWindowDimensions();
   const { authToken, user } = useAuth();
   const token = authToken?.token;
   const [voiceMode, setVoiceMode] = useState(false);
+  const [voiceStatus, setVoiceStatus] = useState<VoiceStatus>("idle");
+  const [liveTranscript, setLiveTranscript] = useState("");
   const [actionNotice, setActionNotice] = useState<{ tone: "error" | "success"; text: string } | undefined>();
   const [attachments, setAttachments] = useState<CopilotAttachment[]>([]);
   const [attachmentPreviews, setAttachmentPreviews] = useState<Record<string, string>>({});
@@ -108,31 +110,11 @@ export function CopilotWorkspaceScreen({ routeConversationId }: { routeConversat
   const [speechMuted, setSpeechMuted] = useState(false);
   const [speechPaused, setSpeechPaused] = useState(false);
   const [speakingMessageId, setSpeakingMessageId] = useState<string | undefined>();
-  const [brainDebug, setBrainDebug] = useState<CopilotBrainDebug | CopilotCommunicationDebug | CopilotEngineDebug | undefined>();
-  const [showIntentDebug, setShowIntentDebug] = useState(false);
   const [streamingMessage, setStreamingMessage] = useState("");
   const [status, setStatus] = useState("");
   const [uploadingFiles, setUploadingFiles] = useState<string[]>([]);
 
   const isMobile = width < 760;
-
-  const settingsQuery = useQuery({
-    enabled: !!token && (user?.protectedOwner || user?.role === "super_admin"),
-    queryFn: () => getCopilotSettings(token!),
-    queryKey: ["copilot-settings", token],
-    retry: false,
-  });
-  const developerModeEnabled = useMemo(() => {
-    const provider = settingsQuery.data?.settings.provider ?? "";
-    if (provider.startsWith("{")) {
-      try {
-        return Boolean(JSON.parse(provider).developerMode);
-      } catch {
-        return false;
-      }
-    }
-    return provider.includes("Debug") || __DEV__;
-  }, [settingsQuery.data?.settings.provider]);
 
   const conversationsQuery = useQuery({
     enabled: !!token,
@@ -170,27 +152,59 @@ export function CopilotWorkspaceScreen({ routeConversationId }: { routeConversat
   }, []);
 
   useEffect(() => {
+    voiceModeRef.current = voiceMode;
+  }, [voiceMode]);
+
+  useEffect(() => {
+    speechMutedRef.current = speechMuted;
+  }, [speechMuted]);
+
+  useEffect(() => {
+    if (!token) return;
     voiceEngineRef.current = new ClinicalVoiceEngine({
       onError: (message) => showActionNotice(message, "error"),
-      onInterimTranscript: (transcript) => setDraft((current) => `${current}${current ? " " : ""}${transcript}`.trimStart()),
+      onFinalTranscript: (transcript) => {
+        setDraft(transcript);
+        setLiveTranscript(transcript);
+        if (voiceModeRef.current) {
+          voiceEngineRef.current?.markThinking();
+          sendPromptRef.current(transcript, selectedConversation?.tag ?? "Clinical Summary");
+        }
+      },
+      onNetworkChange: (online) => {
+        if (!online) showActionNotice("Network connection lost.", "error");
+      },
+      onPartialTranscript: (transcript) => {
+        setLiveTranscript(transcript);
+        setDraft(transcript);
+      },
       onPermissionDenied: () => showActionNotice("Microphone permission denied.", "error"),
       onRecordingEnd: () => setIsRecording(false),
       onRecordingStart: () => {
         setIsRecording(true);
-        showActionNotice("Voice recording started.");
+        setLiveTranscript("");
       },
-      onSilence: () => showActionNotice("Voice input paused after silence.", "success"),
+      onSilence: () => {
+        if (!voiceModeRef.current) showActionNotice("Voice input paused after silence.", "success");
+      },
       onSpeakingEnd: () => {
         setSpeakingMessageId(undefined);
         setSpeechPaused(false);
+        if (voiceModeRef.current && !speechMutedRef.current && !sendPendingRef.current) {
+          void voiceEngineRef.current?.startRecording();
+        }
       },
       onSpeakingStart: (messageId) => {
         setSpeakingMessageId(messageId);
         setSpeechPaused(false);
       },
+      onStatusChange: (status) => setVoiceStatus(status),
+    }, async (audio, mimeType) => {
+      const payload = await transcribeVoiceAudio(token, audio, mimeType);
+      return payload.text;
     });
-    return () => voiceEngineRef.current?.interrupt();
-  }, [showActionNotice]);
+    return () => voiceEngineRef.current?.dispose();
+  }, [selectedConversation?.tag, showActionNotice, token]);
 
   const uploadComposerFile = useCallback(async (file: File, kind: AttachmentKind) => {
     if (!token) {
@@ -256,8 +270,11 @@ export function CopilotWorkspaceScreen({ routeConversationId }: { routeConversat
       stopVoiceInput();
       return;
     }
-    voiceEngineRef.current?.setVoiceMode(voiceMode);
-    voiceEngineRef.current?.startRecording();
+    if (voiceMode) {
+      void voiceEngineRef.current?.startRecording();
+      return;
+    }
+    void voiceEngineRef.current?.startRecording();
   }, [isRecording, stopVoiceInput, voiceMode]);
 
   const stopSpeaking = useCallback(() => {
@@ -300,8 +317,10 @@ export function CopilotWorkspaceScreen({ routeConversationId }: { routeConversat
       streamAbort.current = controller;
       setStatus("Thinking...");
       setStreamingMessage("");
-      setBrainDebug(undefined);
+      voiceEngineRef.current?.markThinking();
       let finalConversation: CopilotConversation | undefined;
+      let assistantContent = "";
+      let assistantMessageId = "stream-assistant";
       await streamCopilotMessage(token!, {
         caseId: explicitCaseId,
         attachmentIds: input.attachmentIds,
@@ -311,49 +330,67 @@ export function CopilotWorkspaceScreen({ routeConversationId }: { routeConversat
         patientId: explicitPatientId,
         question: input.prompt,
         tag: input.tag,
+        voiceMode: voiceModeRef.current,
       }, (event) => {
         if (event.type === "status") setStatus(event.status ?? "");
-        if (event.type === "engine_debug" && event.engineDebug) setBrainDebug(event.engineDebug);
-        if (event.type === "communication_debug" && event.communicationDebug) setBrainDebug(event.communicationDebug);
-        if (event.type === "brain_debug" && event.brainDebug) setBrainDebug(event.brainDebug);
-        if (event.type === "intent_debug" && event.intentDebug) {
-          setBrainDebug({
-            brainVersion: "v3",
-            classification: event.intentDebug.classification,
-            clinicalPlan: { description: "Legacy intent debug", steps: [] },
-            decision: { conversationalOnly: false, decisionPath: ["legacy"], emergencyEscalation: false, isClinical: false, isConversational: false, isEcgAnalysis: false, selectedTools: event.intentDebug.plan.tools, shouldRunTools: event.intentDebug.plan.tools[0] !== "no_tool" },
-            executionTimeMs: event.intentDebug.classification.executionTimeMs,
-            memoryState: { currentDiscussionTopic: "", followUpTopics: [], hasActiveCase: false, hasActivePatient: false, hasUploadedEcg: false, hasUploadedFiles: false, turnCount: 0 },
-            plan: event.intentDebug.plan,
-          });
+        if (event.type === "token" && event.token) {
+          assistantContent += event.token;
+          setStreamingMessage((current) => `${current}${event.token}`);
+          if (voiceModeRef.current) {
+            voiceEngineRef.current?.feedSpeech(assistantContent, assistantMessageId);
+          }
         }
-        if (event.type === "token" && event.token) setStreamingMessage((current) => `${current}${event.token}`);
+        if (event.message?.content) {
+          assistantContent = event.message.content;
+          assistantMessageId = event.message.id ?? assistantMessageId;
+        }
         if (event.conversation) {
           finalConversation = event.conversation;
           setSelectedId(event.conversation.id);
           router.replace(`/copilot/${event.conversation.id}` as never);
         }
       }, controller.signal);
-      return finalConversation;
+      return { assistantContent, assistantMessageId, conversation: finalConversation };
     },
     retry: 1,
     retryDelay: 1200,
-    onSuccess: () => {
+    onSuccess: (result) => {
       Object.values(attachmentPreviews).forEach((previewUrl) => URL.revokeObjectURL(previewUrl));
       setAttachments([]);
       setAttachmentPreviews({});
       setDraft("");
+      setLiveTranscript("");
       setStatus("");
       setStreamingMessage("");
       streamAbort.current = null;
       invalidate();
+      if (voiceModeRef.current && result?.assistantContent && voiceEngineRef.current?.getState().status !== "speaking") {
+        voiceEngineRef.current?.speak(sanitizeAssistantContent(result.assistantContent), result.assistantMessageId);
+      }
     },
     onError: () => {
       setStatus("Connection interrupted. Your conversation is saved; please retry when ready.");
       setStreamingMessage("");
       streamAbort.current = null;
+      if (voiceModeRef.current) {
+        void voiceEngineRef.current?.startRecording();
+      }
     },
   });
+
+  useEffect(() => {
+    sendPendingRef.current = sendMutation.isPending;
+  }, [sendMutation.isPending]);
+
+  useEffect(() => {
+    voiceEngineRef.current?.setVoiceMode(voiceMode);
+    if (voiceMode && !sendMutation.isPending && voiceStatus === "idle" && !isRecording) {
+      void voiceEngineRef.current?.startRecording();
+    }
+    if (!voiceMode) {
+      voiceEngineRef.current?.cancelRecording();
+    }
+  }, [isRecording, sendMutation.isPending, voiceMode, voiceStatus]);
 
   useEffect(() => {
     if (routeConversationId && routeConversationId !== selectedId) setSelectedId(routeConversationId);
@@ -413,8 +450,13 @@ export function CopilotWorkspaceScreen({ routeConversationId }: { routeConversat
   function sendPrompt(prompt: string, tag: CopilotTag) {
     const trimmed = safeString(prompt).trim() || (attachments.length ? "Review the attached medical files, perform OCR-informed analysis, identify document or image type, explain findings, cite trusted medical knowledge, provide warnings, and suggest next steps." : "");
     if (!trimmed || !token || sendMutation.isPending) return;
+    voiceEngineRef.current?.stopRecording();
     sendMutation.mutate({ attachmentIds: safeArray(attachments).map((attachment) => attachment?.id).filter(Boolean) as string[], prompt: trimmed, tag });
   }
+
+  useEffect(() => {
+    sendPromptRef.current = sendPrompt;
+  });
 
   function startNewChat() {
     setSelectedId(undefined);
@@ -482,6 +524,17 @@ export function CopilotWorkspaceScreen({ routeConversationId }: { routeConversat
   }
 
   const sidebarVisible = !isMobile || mobileSidebarOpen;
+  const statusBadgeLabel = sendMutation.isPending
+    ? "Thinking"
+    : voiceStatus === "listening"
+      ? "Listening"
+      : voiceStatus === "transcribing"
+        ? "Transcribing"
+        : voiceStatus === "speaking"
+          ? "Speaking"
+          : voiceMode
+            ? "Voice mode"
+            : "Ready";
   const speechControl: SpeechControl = {
     muted: speechMuted,
     onMuteToggle: toggleSpeechMute,
@@ -529,62 +582,15 @@ export function CopilotWorkspaceScreen({ routeConversationId }: { routeConversat
             </View>
           </View>
           <View style={styles.topButtons}>
-            <Badge label={sendMutation.isPending ? "Streaming" : voiceMode ? "Voice mode" : "Ready"} tone={sendMutation.isPending ? "warning" : "success"} />
+            <View testID="copilot-voice-status">
+              <Badge label={statusBadgeLabel} tone={sendMutation.isPending || voiceStatus === "transcribing" ? "warning" : voiceStatus === "listening" || voiceStatus === "speaking" ? "primary" : "success"} />
+            </View>
             <Pressable accessibilityRole="button" onPress={() => setVoiceMode((current) => !current)} style={styles.contextToggle}>
               <Feather name={voiceMode ? "headphones" : "mic"} size={16} color={medicalTheme.primary} />
               <Text style={styles.contextToggleText}>{voiceMode ? "Voice mode on" : "Voice mode"}</Text>
             </Pressable>
-            {developerModeEnabled ? (
-              <Pressable accessibilityRole="button" onPress={() => setShowIntentDebug((current) => !current)} style={styles.contextToggle}>
-                <Feather name="activity" size={16} color={medicalTheme.primary} />
-                <Text style={styles.contextToggleText}>{showIntentDebug ? "Hide intent debug" : "Intent debug"}</Text>
-              </Pressable>
-            ) : null}
           </View>
         </View>
-
-        {developerModeEnabled && showIntentDebug && brainDebug ? (
-          <View style={styles.intentDebugPanel}>
-            <Text style={styles.intentDebugTitle}>
-              {"engineVersion" in brainDebug
-                ? "Clinical AI Copilot Engine V2"
-                : "communicationVersion" in brainDebug
-                  ? "AI Communication Layer V1"
-                  : "AI Brain V3 (Developer Mode)"}
-            </Text>
-            {"engineVersion" in brainDebug ? (
-              <>
-                <Text style={styles.intentDebugLine}>Intent: {brainDebug.communicationIntent} ({Math.round(brainDebug.classification.confidence * 100)}%)</Text>
-                <Text style={styles.intentDebugLine}>Resolved: {brainDebug.context.resolvedQuestion}</Text>
-                <Text style={styles.intentDebugLine}>Topic: {brainDebug.context.activeTopic?.label ?? "none"}</Text>
-                <Text style={styles.intentDebugLine}>Knowledge route: {brainDebug.knowledgeRoute.sources.join(", ") || "none"}</Text>
-                <Text style={styles.intentDebugLine}>Tools: {brainDebug.toolPlan.tools.join(", ")}</Text>
-                <Text style={styles.intentDebugLine}>Latency: {brainDebug.executionTimeMs} ms</Text>
-              </>
-            ) : "communicationVersion" in brainDebug ? (
-              <>
-                <Text style={styles.intentDebugLine}>Intent: {brainDebug.intent} ({Math.round(brainDebug.intentConfidence * 100)}%)</Text>
-                <Text style={styles.intentDebugLine}>Resolved: {brainDebug.resolvedQuestion}</Text>
-                <Text style={styles.intentDebugLine}>Topic memory: {brainDebug.memoryTopic ?? "none"}</Text>
-                <Text style={styles.intentDebugLine}>Knowledge sources: {brainDebug.knowledgeSources.join(", ") || "none"}</Text>
-                <Text style={styles.intentDebugLine}>Response style: {brainDebug.responsePlan.style}</Text>
-                <Text style={styles.intentDebugLine}>Decision path: {brainDebug.brain.decision.decisionPath.join(" → ")}</Text>
-                <Text style={styles.intentDebugLine}>Planner: {brainDebug.brain.clinicalPlan.description}</Text>
-                <Text style={styles.intentDebugLine}>Tools: {brainDebug.brain.decision.selectedTools.join(", ")}</Text>
-                <Text style={styles.intentDebugLine}>Latency: {brainDebug.brain.executionTimeMs} ms</Text>
-              </>
-            ) : (
-              <>
-                <Text style={styles.intentDebugLine}>Intent: {brainDebug.classification.primaryIntent} ({Math.round(brainDebug.classification.confidence * 100)}%)</Text>
-                <Text style={styles.intentDebugLine}>Medical intent: {brainDebug.classification.primaryMedicalIntent}</Text>
-                <Text style={styles.intentDebugLine}>Planner: {brainDebug.clinicalPlan.description}</Text>
-                <Text style={styles.intentDebugLine}>Tools: {brainDebug.decision.selectedTools.join(", ")}</Text>
-                <Text style={styles.intentDebugLine}>Decision path: {brainDebug.decision.decisionPath.join(" → ")}</Text>
-                <Text style={styles.intentDebugLine}>Brain latency: {brainDebug.executionTimeMs} ms</Text>
-              </>
-            )}
-          </View>
-        ) : null}
 
         {actionNotice ? (
           <View style={[styles.actionNotice, actionNotice.tone === "error" ? styles.actionNoticeError : styles.actionNoticeSuccess]}>
@@ -679,6 +685,9 @@ export function CopilotWorkspaceScreen({ routeConversationId }: { routeConversat
                 <Feather name="loader" size={13} color={medicalTheme.primary} />
                 <Text style={styles.uploadProgressText}>Uploading {uploadingFiles.join(", ")}...</Text>
               </View>
+            ) : null}
+            {liveTranscript && (isRecording || voiceStatus === "transcribing") ? (
+              <Text style={styles.liveTranscript} testID="copilot-live-transcript">{liveTranscript}</Text>
             ) : null}
             <View style={styles.inputRow}>
               <TextInput
@@ -952,6 +961,7 @@ const styles = StyleSheet.create({
   intentDebugTitle: { color: medicalTheme.primary, fontSize: 12, fontWeight: "900", marginBottom: 4 },
   inputRow: { alignItems: "flex-end", flexDirection: "row", flexWrap: "wrap", gap: 8 },
   kicker: { color: medicalTheme.primary, fontSize: 11, fontWeight: "900", letterSpacing: 1.2, textTransform: "uppercase" },
+  liveTranscript: { color: medicalTheme.primary, fontSize: 13, fontWeight: "800", lineHeight: 20, paddingHorizontal: 4 },
   main: { flex: 1, gap: 12, minHeight: 0, minWidth: 0 },
   message: { borderRadius: 20, borderWidth: 1, gap: 4, maxWidth: "86%", padding: 14 },
   messageBullet: { color: medicalTheme.text, fontSize: 14, lineHeight: 22, paddingLeft: 8 },

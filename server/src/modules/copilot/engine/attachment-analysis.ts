@@ -20,8 +20,8 @@ export function attachmentInsights(attachments: AttachmentForAnalysis[]): Attach
       interpretation: readableText ? readableText.slice(0, 700) : "",
       name: attachment.originalName,
       ocrStatus: readableText ? "text-available" : "limited",
-      recommendations: attachment.recommendations.slice(0, 6),
-      warnings: attachment.warnings.filter((warning) => !/AI assistance only/i.test(warning)).slice(0, 6),
+      recommendations: (attachment.recommendations ?? []).slice(0, 6),
+      warnings: (attachment.warnings ?? []).filter((warning) => !/AI assistance only/i.test(warning)).slice(0, 6),
     };
   });
 }

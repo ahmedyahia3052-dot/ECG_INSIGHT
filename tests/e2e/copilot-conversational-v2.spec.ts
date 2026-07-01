@@ -5,26 +5,64 @@ test.describe("Clinical AI Copilot Engine V2", () => {
   test.beforeEach(async ({ page }) => {
     await page.addInitScript(() => {
       class MockSpeechRecognition {
-        continuous = false;
-        interimResults = false;
+        continuous = true;
+        interimResults = true;
         lang = "en-US";
         onend: (() => void) | null = null;
         onerror: ((event: { error?: string }) => void) | null = null;
-        onresult: ((event: { results: ArrayLike<{ 0: { transcript: string }; isFinal: boolean }> }) => void) | null = null;
+        onresult: ((event: {
+          resultIndex: number;
+          results: ArrayLike<{ 0: { transcript: string }; isFinal: boolean; length: number }>;
+        }) => void) | null = null;
         start() {
           setTimeout(() => {
-            this.onresult?.({ results: [{ 0: { transcript: "hello copilot" }, isFinal: true }] });
+            this.onresult?.({
+              resultIndex: 0,
+              results: [{ 0: { transcript: "hello copilot" }, isFinal: true, length: 1 }],
+            });
             this.onend?.();
           }, 20);
         }
         stop() {
           this.onend?.();
         }
+        abort() {
+          this.onend?.();
+        }
       }
       Object.assign(window, {
         SpeechRecognition: MockSpeechRecognition,
         webkitSpeechRecognition: MockSpeechRecognition,
+        MediaRecorder: class {
+          static isTypeSupported() { return true; }
+          state = "inactive";
+          ondataavailable: ((event: { data: Blob }) => void) | null = null;
+          onstop: (() => void) | null = null;
+          constructor(_stream: MediaStream) { void _stream; }
+          start() { this.state = "recording"; }
+          stop() {
+            this.ondataavailable?.({ data: new Blob(["mock"], { type: "audio/webm" }) });
+            this.onstop?.();
+          }
+        },
       });
+      navigator.mediaDevices.getUserMedia = async () => ({
+        getTracks: () => [{ stop: () => undefined }],
+      } as MediaStream);
+      window.speechSynthesis = {
+        cancel: () => undefined,
+        pause: () => undefined,
+        resume: () => undefined,
+        speak: (utterance) => {
+          setTimeout(() => {
+            utterance.onstart?.({});
+            utterance.onend?.({});
+          }, 20);
+        },
+      };
+      window.SpeechSynthesisUtterance = class {
+        constructor(text) { this.text = text; }
+      };
     });
 
     const loginResponse = await page.request.post(`${API_URL}/auth/login`, {

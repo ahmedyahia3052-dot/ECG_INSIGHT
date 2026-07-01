@@ -115,7 +115,7 @@ for (const marker of ["classifyMedicalIntent", "shouldRetrieveClinicalContext", 
 for (const marker of ["ResponseGenerator", "buildInternalClinicalBrief", "runClinicalCopilotEngine"]) {
   assert(copilotEngine.includes(marker) || copilotResponseGenerator.includes(marker), `Clinical AI engine is missing marker: ${marker}`);
 }
-for (const marker of ["CONVERSATION_SYSTEM_PROMPT", "Senior Clinical Cardiology Assistant", "Never reveal"]) {
+for (const marker of ["CONVERSATION_SYSTEM_PROMPT", "Senior Clinical Colleague", "Never reveal"]) {
   assert(copilotSystemPrompt.includes(marker), `Copilot conversation system prompt is missing marker: ${marker}`);
 }
 for (const marker of ["createUnifiedNotification", "unreadNotificationCount", "processScheduledNotifications", "emitRealtime", "REPORT_GENERATION", "read: false"]) {

@@ -22,6 +22,9 @@ const REPORT_PATTERNS = [
   /^#{1,3}\s.+$/gm,
   /^Short Answer\s*$/gim,
   /^Definition:\s*/gim,
+  /^Causes:\s*/gim,
+  /^Recommendation:\s*/gim,
+  /^Recommendations:\s*/gim,
   /^ECG Criteria:\s*/gim,
   /^ECG criteria:\s*/gim,
   /ECG criteria:\s*/gi,
@@ -36,7 +39,57 @@ const REPORT_PATTERNS = [
   /Risk tier:\s*(HIGH|MODERATE|LOW)/gi,
   /Uploaded Document Review/gi,
   /AI assistance only\. Clinical decisions remain the responsibility of the physician\./gi,
+  /Intent:\s*.+$/gim,
+  /Knowledge route:\s*.+$/gim,
 ];
+
+const FOLLOW_UP_OPTIONS: Record<string, string> = {
+  "atrial fibrillation": "diagnosis, rate versus rhythm control, anticoagulation, or red flags",
+  hypertension: "diagnosis, treatment, complications, or lifestyle management",
+  "heart failure": "symptoms, diagnosis, treatment, or monitoring",
+  stemi: "ECG criteria, immediate management, or complications",
+  diabetes: "diagnosis, treatment, complications, or monitoring",
+  copd: "diagnosis, exacerbation management, or long-term care",
+  asthma: "diagnosis, acute management, or controller therapy",
+  pneumonia: "diagnosis, antibiotic choice, or disposition",
+  "pulmonary embolism": "diagnosis, risk stratification, or anticoagulation",
+  anemia: "workup, transfusion thresholds, or underlying causes",
+  sepsis: "recognition, initial resuscitation, or source control",
+  syncope: "risk stratification, ECG clues, or admission criteria",
+  "prolonged QT": "causes, medication review, or torsades risk",
+};
+
+function followUpOffer(topic: string, question: string) {
+  if (!topic || /would you like|tell me more about|share (a little )?more|what would you like/i.test(question)) return "";
+  const options = FOLLOW_UP_OPTIONS[topic] ?? "diagnosis, treatment, or when urgent evaluation is needed";
+  if (/^(what is|explain|can you explain|tell me about|how does|why does|what causes)\b/i.test(question.trim())) {
+    return `Would you like me to explain ${options}?`;
+  }
+  return "";
+}
+
+function appendFollowUp(content: string, topic: string, question: string, plan: ResponsePlan) {
+  if (!plan.suggestFollowUps) return content;
+  const offer = followUpOffer(topic, question);
+  if (!offer || content.includes(offer)) return content;
+  return `${content}\n\n${offer}`;
+}
+
+function incompleteClinicalPrompt(question: string) {
+  const lowered = question.toLowerCase();
+  if (/chest pain|syncope|dyspnea|shortness of breath|palpitations|abdominal pain|altered mental status/.test(lowered)
+    && !/(age|year-old|bp|blood pressure|heart rate|ecg|ekg|troponin|symptoms for|since|hours|days)/.test(lowered)) {
+    return "To think this through safely, I'd start with age, symptom onset, associated features, vitals, and any ECG or troponin results you already have. What can you share?";
+  }
+  if (/new confusion|elderly patient|young athlete|unintentional weight loss|hemoptysis|foot ulcer|diabetic patient with/.test(lowered)
+    && !/(year-old|vitals|fever|glucose|duration|since|days|hours|history of)/.test(lowered)) {
+    return "I'd narrow this with a few key details first — age, timing, associated symptoms, vitals, and any results you already have. What can you tell me?";
+  }
+  if (/interpret|analyze|analyse|review|read/.test(lowered) && /ecg|ekg|tracing|strip/.test(lowered)) {
+    return "Please upload the ECG or open the case here, and tell me what you'd like me to focus on — rhythm, ischaemia, conduction, or QT prolongation.";
+  }
+  return "";
+}
 
 function polish(content: string, plan: ResponsePlan) {
   let formatted = content;
@@ -198,18 +251,36 @@ function composeEcgInterpretation(context: ClinicalContext, question: string, kn
 function composeUploadReview(insights: AttachmentInsight[], remembered: AttachmentInsight[]) {
   const all = insights.concat(remembered);
   if (!all.length) return "Attach an ECG, lab, image, or report and tell me what you'd like me to focus on.";
-  const summaries = all.map((item) => {
-    const focus = item.findings.length ? item.findings.join("; ").replace(/\.$/, "") : item.interpretation.replace(/\.$/, "");
-    return `${item.name.replace(/\.[^.]+$/, "")}: ${focus}`;
+  const paragraphs = all.map((item) => {
+    const name = item.name.replace(/\.[^.]+$/, "");
+    const type = item.documentType?.replace(/_/g, " ").toLowerCase() ?? "medical document";
+    const findings = item.findings.length
+      ? item.findings.join("; ").replace(/\.$/, "")
+      : item.interpretation.replace(/\.$/, "");
+    if (/lab|cbc|chemistry|troponin|bmp|cmp/.test(`${type} ${name}`.toLowerCase())) {
+      return `From the ${name} laboratory report, the extracted values suggest ${findings}. I'd correlate this with symptoms, medications, renal function, and prior trends before acting on OCR text alone.`;
+    }
+    if (/echo|echocardiogram|ultrasound/.test(`${type} ${name}`.toLowerCase())) {
+      return `On the ${name} echo report, the key points appear to be ${findings}. I'd confirm chamber size, valve disease, and systolic function against the source document.`;
+    }
+    if (/x-?ray|radiology|ct|mri|cxr/.test(`${type} ${name}`.toLowerCase())) {
+      return `The ${name} imaging report highlights ${findings}. I'd review the full report and clinical context before relying on extracted text alone.`;
+    }
+    if (/ecg|ekg/.test(`${type} ${name}`.toLowerCase())) {
+      return `From the uploaded ECG (${name}), I note ${findings}. Tell me if you want a rhythm-focused read, ischaemia review, or a full interpretation.`;
+    }
+    if (/prescription|medication list|rx/.test(`${type} ${name}`.toLowerCase())) {
+      return `The prescription (${name}) lists ${findings}. I'd confirm indications, doses, interactions, and renal or hepatic dosing before signing off.`;
+    }
+    return `In ${name}, the main findings read as ${findings}. I'd verify this against the original document and the clinical picture.`;
   });
-  return joinSentences([
-    `I've reviewed the material you shared`,
-    summaries.join(". "),
-    "I'd correlate each item with the full chart and your own read of the source documents before acting on extracted text",
-  ]);
+  return paragraphs.join("\n\n");
 }
 
 function composeMedicalAnswer(question: string, knowledge: KnowledgeHit[], topic: string) {
+  const incomplete = incompleteClinicalPrompt(question);
+  if (incomplete) return incomplete;
+
   const primary = knowledge[0];
   const simple = /^(what is|explain|can you explain|how does|why does|what causes|tell me about)\b/i.test(question.trim());
   if (topic && /treat|management|options|plan|follow|drugs|medication/.test(question.toLowerCase())) {
@@ -219,16 +290,16 @@ function composeMedicalAnswer(question: string, knowledge: KnowledgeHit[], topic
     const hit = knowledge.find((entry) => /diagnos|screen|measure|reading|workup|criteria|office|ambulatory/i.test(`${entry.topic} ${entry.content}`.toLowerCase())
       && `${entry.topic} ${entry.tags.join(" ")}`.toLowerCase().includes(topic.split(" ")[0]));
     if (hit) return knowledgeParagraph(hit, "");
-    return `Diagnosis of ${topic} usually combines repeated blood pressure readings, clinical history, examination, and any indicated laboratory or imaging tests.`;
+    return `${topic.charAt(0).toUpperCase()}${topic.slice(1)} is usually diagnosed with targeted history, examination, and confirmatory testing appropriate to the presentation. I'd tailor the workup once I know symptoms, timing, and any results you already have.`;
   }
   if (primary) {
     const answer = knowledgeParagraph(primary, "");
-    if (simple && answer.length < 420) return answer;
-    if (simple) return `${answer.split(".").slice(0, 2).join(". ").trim()}. Ask if you'd like mechanisms, treatment, or red flags.`;
+    if (simple && answer.length < 520) return answer;
+    if (simple) return `${answer.split(".").slice(0, 3).join(". ").trim()}.`;
     return answer;
   }
   if (topic) return topicTreatment(topic, knowledge);
-  return "I can help with that. Share a little more context — symptoms, ECG findings, or the decision you're weighing — and I'll be more specific.";
+  return "I can help with that. Share a little more context — symptoms, timing, ECG findings, or the decision you're weighing — and I'll be more specific.";
 }
 
 function composeReport(context: ClinicalContext) {
@@ -353,6 +424,7 @@ export const ResponseGenerator = {
       content = `${content}\n\nOne caution: there may be high-risk features here — please prioritize urgent physician review if the patient is symptomatic.`;
     }
 
+    content = appendFollowUp(content, topic, input.question, input.plan);
     return { content: polish(content, input.plan) };
   },
 };

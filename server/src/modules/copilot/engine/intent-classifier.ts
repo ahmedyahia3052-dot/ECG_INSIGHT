@@ -4,7 +4,7 @@ import { mapSmartIntentToCommunicationIntent, type CommunicationIntent } from ".
 
 export const INTENT_CONFIDENCE_THRESHOLD = 0.55;
 
-const CLARIFICATION = "I want to make sure I help you correctly. Are you asking about ECG interpretation, a clinical concept, a patient record, an uploaded file, or something else?";
+const CLARIFICATION = "I want to make sure I understand you correctly — are you asking about a clinical concept, an ECG, a patient chart, an uploaded report, or something else?";
 
 export const IntentClassifier = {
   classify(question: string, attachments: Parameters<typeof classifySmartIntent>[1], memory: ConversationMemory) {

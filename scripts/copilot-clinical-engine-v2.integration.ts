@@ -101,7 +101,11 @@ async function main() {
   assert(/Hypertension is a chronic condition/.test(generated.content), "Preserves clinical prose");
 
   const voice = VoiceEngine.capabilities;
-  assert(voice.streamingSttReady && voice.interruptSupported, "Voice architecture readiness");
+  assert(voice.streamingSttReady && voice.interruptSupported && voice.whisperFallbackReady, "Voice architecture readiness");
+
+  const followUpState = ConversationManager.get("follow-up-conv");
+  assert(followUpState?.currentTopic?.slug === "hypertension", "Conversation state tracks current topic");
+  assert(followUpState?.isFollowUp === true, "Conversation state tracks follow-up turns");
 
   const chunks = StreamingRenderer.chunkContent("Hello Dr Ahmed.");
   assert(chunks.join("") === "Hello Dr Ahmed.", "Streaming chunk merge");
@@ -136,7 +140,7 @@ async function main() {
   const unknown = await engine("???");
   assert(unknown.intentConfidence >= 0, "Unknown still returns confidence");
 
-  console.log("Clinical AI Copilot Engine V2 integration checks passed.");
+  console.log("Clinical AI Copilot Engine integration checks passed.");
 }
 
 main().catch((error) => {

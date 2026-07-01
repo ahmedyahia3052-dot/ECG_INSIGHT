@@ -7,6 +7,14 @@ export function conversationTopic(memory: ConversationMemory) {
   if (/heart failure|\bhf\b/.test(combined)) return "heart failure";
   if (/stemi|st elevation/.test(combined)) return "stemi";
   if (/long qt|prolonged qt|qtc/.test(combined)) return "prolonged QT";
+  if (/diabetes|hyperglycemia/.test(combined)) return "diabetes";
+  if (/\bcopd\b|chronic obstructive/.test(combined)) return "copd";
+  if (/anemia|anaemia/.test(combined)) return "anemia";
+  if (/asthma/.test(combined)) return "asthma";
+  if (/pneumonia/.test(combined)) return "pneumonia";
+  if (/pulmonary embolism|\bpe\b/.test(combined)) return "pulmonary embolism";
+  if (/sepsis|septic/.test(combined)) return "sepsis";
+  if (/syncope|fainting/.test(combined)) return "syncope";
   return "";
 }
 

@@ -10,7 +10,7 @@ import type {
 } from "../copilot-types";
 import type { CopilotTool, IntentClassificationResult, SmartIntent } from "../smart-intent-types";
 
-export const CLINICAL_AI_ENGINE_VERSION = "v2" as const;
+export const CLINICAL_AI_ENGINE_VERSION = "clinical-ai-core-v1" as const;
 
 export type KnowledgeSource =
   | "aha_guidelines"
@@ -109,12 +109,14 @@ export type EngineInput = {
   conversationId: string;
   memory: ConversationMemory;
   question: string;
+  voiceMode?: boolean;
 };
 
 export type EngineResult = {
   classification: IntentClassificationResult;
   communicationIntent: CommunicationIntent;
   context: ContextState;
+  conversationState?: import("./conversation-manager").ConversationState;
   executionTimeMs: number;
   intentConfidence: number;
   knowledgeHits: KnowledgeHit[];
@@ -132,6 +134,14 @@ export type EngineDebugPayload = {
   classification: IntentClassificationResult;
   communicationIntent: CommunicationIntent;
   context: ContextState;
+  conversationState?: {
+    conversationSummary: string;
+    currentTopic: TopicFrame | null;
+    isFollowUp: boolean;
+    previousTopic: TopicFrame | null;
+    voiceActive: boolean;
+    voiceStatus: string;
+  };
   engineVersion: typeof CLINICAL_AI_ENGINE_VERSION;
   executionTimeMs: number;
   knowledgeRoute: KnowledgeRoute;

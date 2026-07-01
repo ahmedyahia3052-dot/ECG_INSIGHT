@@ -30,7 +30,7 @@ function extractPatientNames(text: string) {
   for (const match of text.matchAll(/\bopen\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)(?:\s+patient|\s+record|\s+chart)?/gi)) {
     names.push(match[1].trim());
   }
-  for (const match of text.matchAll(/\bpatient\s+(?:named\s+)?([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)/gi)) {
+  for (const match of text.matchAll(/\bpatient\s+(?:named\s+)?([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)/g)) {
     names.push(match[1].trim());
   }
   return unique(names);
