@@ -21,6 +21,7 @@ export type SmartIntent =
   | "goodbye"
   | "greeting"
   | "medical_guidelines"
+  | "medical_education"
   | "occupational_fitness"
   | "patient_history"
   | "patient_lookup"

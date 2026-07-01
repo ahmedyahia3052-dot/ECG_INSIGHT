@@ -5,6 +5,9 @@ export const Planner = {
     if (intent === "Greeting" || intent === "SmallTalk" || intent === "SystemQuestion") {
       return { allowBullets: false, maxParagraphs: 3, style: "supportive", suggestFollowUps: false };
     }
+    if (intent === "Education") {
+      return { allowBullets: true, maxParagraphs: 6, style: "supportive", suggestFollowUps: false };
+    }
     if (intent === "MedicalQuestion" || intent === "GuidelineSearch" || intent === "DrugInformation" || intent === "FollowUpQuestion") {
       return {
         allowBullets: false,

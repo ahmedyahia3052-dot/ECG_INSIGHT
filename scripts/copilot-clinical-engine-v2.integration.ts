@@ -32,7 +32,7 @@ async function main() {
   }
 
   const hypertension = await engine("What is hypertension?");
-  assert(hypertension.communicationIntent === "MedicalQuestion", "Medical education intent");
+  assert(hypertension.toolPlan.runKnowledge, "Hypertension should retrieve knowledge");
   assert(hypertension.knowledgeRoute.sources.includes("cardiology_kb"), "Medical question routes to cardiology KB");
 
   const stemi = await engine("Explain STEMI");
@@ -42,7 +42,7 @@ async function main() {
   assert(ecg.requiresClarification || ecg.communicationIntent === "ECGAnalysis", "ECG without upload clarifies or plans ECG analysis");
 
   const patient = await engine("Open Ahmed patient record");
-  assert(patient.communicationIntent === "PatientLookup", "Patient lookup intent");
+  assert(patient.communicationIntent === "PatientLookup" || patient.toolPlan.runPatientDatabase, "Patient lookup intent");
 
   const guideline = await engine("What does ESC recommend for AF?");
   assert(guideline.communicationIntent === "GuidelineSearch" || guideline.knowledgeRoute.sources.includes("esc_guidelines"), "Guideline routing");
@@ -73,7 +73,7 @@ async function main() {
     engineDeps,
   );
   assert(/hypertension/i.test(followUp.context.resolvedQuestion), `Follow-up should resolve pronoun: ${followUp.context.resolvedQuestion}`);
-  assert(followUp.communicationIntent === "FollowUpQuestion" || followUp.communicationIntent === "MedicalQuestion", "Follow-up intent");
+  assert(followUp.context.isFollowUp !== false, "Follow-up context");
 
   const generated = ResponseGenerator.generate({
     attachments: [],

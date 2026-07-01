@@ -23,12 +23,14 @@ export async function installCopilotVoiceMocks(page: Page, transcripts: string[]
             resultIndex: 0,
             results: [{ 0: { transcript: partial }, isFinal: false, length: 1 }],
           });
-          this.onresult?.({
-            resultIndex: 1,
-            results: [{ 0: { transcript }, isFinal: true, length: 1 }],
-          });
+          window.setTimeout(() => {
+            this.onresult?.({
+              resultIndex: 0,
+              results: [{ 0: { transcript }, isFinal: true, length: 1 }],
+            });
+            window.setTimeout(() => this.onend?.(), 80);
+          }, 30);
         }, 40);
-        window.setTimeout(() => this.onend?.(), 120);
       }
       stop() {
         this.onend?.();
@@ -72,17 +74,9 @@ export async function installCopilotVoiceMocks(page: Page, transcripts: string[]
       speak: (utterance: SpeechSynthesisUtterance) => {
         window.setTimeout(() => {
           utterance.onstart?.({} as SpeechSynthesisEvent);
-          utterance.onend?.({} as SpeechSynthesisEvent);
-        }, 20);
+          window.setTimeout(() => utterance.onend?.({} as SpeechSynthesisEvent), 10);
+        }, 0);
       },
     } as SpeechSynthesis;
-    window.SpeechSynthesisUtterance = class {
-      onend: ((event: SpeechSynthesisEvent) => void) | null = null;
-      onerror: ((event: SpeechSynthesisErrorEvent) => void) | null = null;
-      onstart: ((event: SpeechSynthesisEvent) => void) | null = null;
-      rate = 1;
-      pitch = 1;
-      constructor(public text: string) {}
-    } as typeof SpeechSynthesisUtterance;
   }, { items: transcripts });
 }

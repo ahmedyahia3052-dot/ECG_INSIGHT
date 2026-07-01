@@ -92,6 +92,7 @@ export function CopilotWorkspaceScreen({ routeConversationId }: { routeConversat
   const speechMutedRef = useRef(false);
   const sendPromptRef = useRef<(prompt: string, tag: CopilotTag) => void>(() => undefined);
   const sendPendingRef = useRef(false);
+  const conversationTagRef = useRef<CopilotTag>("Clinical Summary");
   const scrollRef = useRef<ScrollView>(null);
   const streamAbort = useRef<AbortController | null>(null);
   const { width } = useWindowDimensions();
@@ -160,6 +161,10 @@ export function CopilotWorkspaceScreen({ routeConversationId }: { routeConversat
   }, [speechMuted]);
 
   useEffect(() => {
+    conversationTagRef.current = selectedConversation?.tag ?? "Clinical Summary";
+  }, [selectedConversation?.tag]);
+
+  useEffect(() => {
     if (!token) return;
     voiceEngineRef.current = new ClinicalVoiceEngine({
       onError: (message) => showActionNotice(message, "error"),
@@ -168,7 +173,7 @@ export function CopilotWorkspaceScreen({ routeConversationId }: { routeConversat
         setLiveTranscript(transcript);
         if (voiceModeRef.current) {
           voiceEngineRef.current?.markThinking();
-          sendPromptRef.current(transcript, selectedConversation?.tag ?? "Clinical Summary");
+          sendPromptRef.current(transcript, conversationTagRef.current);
         }
       },
       onNetworkChange: (online) => {
@@ -204,7 +209,7 @@ export function CopilotWorkspaceScreen({ routeConversationId }: { routeConversat
       return payload.text;
     });
     return () => voiceEngineRef.current?.dispose();
-  }, [selectedConversation?.tag, showActionNotice, token]);
+  }, [showActionNotice, token]);
 
   const uploadComposerFile = useCallback(async (file: File, kind: AttachmentKind) => {
     if (!token) {

@@ -34,6 +34,8 @@ function sourcesForIntent(intent: CommunicationIntent, context: ContextState, to
         : [];
     case "EmergencyAdvice":
       return ["ecg_database", "cardiology_kb", "esc_guidelines", "aha_guidelines"];
+    case "Education":
+      return ["cardiology_kb", "internal_knowledge_base"];
     default:
       return [];
   }

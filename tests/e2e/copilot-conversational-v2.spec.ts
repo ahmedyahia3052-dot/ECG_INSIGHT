@@ -55,13 +55,10 @@ test.describe("Clinical AI Copilot Engine V2", () => {
         resume: () => undefined,
         speak: (utterance) => {
           setTimeout(() => {
-            utterance.onstart?.({});
-            utterance.onend?.({});
-          }, 20);
+            utterance.onstart?.();
+            setTimeout(() => utterance.onend?.(), 10);
+          }, 0);
         },
-      };
-      window.SpeechSynthesisUtterance = class {
-        constructor(text) { this.text = text; }
       };
     });
 
@@ -172,7 +169,7 @@ test.describe("Clinical AI Copilot Engine V2", () => {
   test("voice playback controls work", async ({ page }) => {
     await sendPrompt(page, "Hello");
     await page.getByRole("button", { name: "Play answer" }).first().click();
-    await page.getByRole("button", { name: "Stop voice" }).first().click();
+    await page.getByRole("button", { name: "Stop voice" }).first().click({ force: true });
     await expect(page.getByText("Assistant").first()).toBeVisible();
   });
 

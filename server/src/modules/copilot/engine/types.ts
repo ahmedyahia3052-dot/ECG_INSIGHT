@@ -1,4 +1,5 @@
 import type { Prisma } from "@prisma/client";
+import type { ClinicalKnowledgeRouteResult } from "./clinical-knowledge-router";
 import type {
   AttachmentForAnalysis,
   AttachmentInsight,
@@ -34,6 +35,7 @@ export type CommunicationIntent =
   | "DrugInformation"
   | "ECGAnalysis"
   | "ECGUpload"
+  | "Education"
   | "EmergencyAdvice"
   | "FileAnalysis"
   | "FollowUpQuestion"
@@ -119,6 +121,7 @@ export type EngineResult = {
   conversationState?: import("./conversation-manager").ConversationState;
   executionTimeMs: number;
   intentConfidence: number;
+  knowledgeDomain: ClinicalKnowledgeRouteResult;
   knowledgeHits: KnowledgeHit[];
   knowledgeRoute: KnowledgeRoute;
   medicalIntent: MedicalIntent;
@@ -157,6 +160,7 @@ export type GenerateInput = {
   communicationIntent: CommunicationIntent;
   intent: MedicalIntent;
   knowledge: KnowledgeHit[];
+  knowledgeDomain?: ClinicalKnowledgeRouteResult;
   memory: ConversationMemory;
   plan: ResponsePlan;
   question: string;
@@ -180,6 +184,7 @@ export function mapSmartIntentToCommunicationIntent(intent: SmartIntent): Commun
     emergency_warning: "EmergencyAdvice",
     evidence_search: "GuidelineSearch",
     explain_medical_concept: "MedicalQuestion",
+    medical_education: "Education",
     fitness_for_work: "OccupationalFitness",
     general_medical_question: "MedicalQuestion",
     generate_letter: "ReportGeneration",

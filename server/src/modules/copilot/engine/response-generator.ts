@@ -16,6 +16,8 @@ import {
 import { mapSmartIntentToMedicalIntent } from "../intent-classifier";
 import type { SmartIntent } from "../smart-intent-types";
 import { attachmentInsights } from "./attachment-analysis";
+import { ECG_LEARNING_PATH } from "./clinical-knowledge-router";
+import type { ClinicalKnowledgeRouteResult } from "./clinical-knowledge-router";
 import type { CommunicationIntent, GenerateInput, ResponsePlan } from "./types";
 
 const REPORT_PATTERNS = [
@@ -178,6 +180,111 @@ function topicTreatment(topic: string, knowledge: KnowledgeHit[]) {
   }
   if (hit) return knowledgeParagraph(hit, "Treatment should be individualized to the patient context and local guidelines.");
   return "Tell me a little more about the clinical context and I can narrow the management options.";
+}
+
+function ecgLearningPathList() {
+  return ECG_LEARNING_PATH.map((item, index) => `${index + 1}. ${item}`).join("\n");
+}
+
+function stepLesson(stepIndex: number, knowledge: KnowledgeHit[]) {
+  const step = ECG_LEARNING_PATH[Math.max(0, Math.min(stepIndex - 1, ECG_LEARNING_PATH.length - 1))];
+  const hit = knowledge.find((entry) => entry.topic.toLowerCase().includes(step.split(" ")[0].toLowerCase()));
+  switch (step) {
+    case "ECG paper and calibration":
+      return joinSentences([
+        "On standard ECG paper, each small square is 1 mm and each large square is 5 mm",
+        "At 25 mm/s paper speed, one large square equals 0.2 seconds; at 10 mm/mV calibration, a 1 mV deflection is 10 mm tall",
+        "Before interpreting anything, confirm the speed and calibration marks on the tracing",
+      ]);
+    case "Heart rate":
+      return joinSentences([
+        "For regular rhythms, divide 300 by the number of large squares between consecutive R waves",
+        "For irregular rhythms, count R waves in a 6-second strip and multiply by 10",
+        hit ? knowledgeParagraph(hit, "") : "Always report rate with the rhythm description",
+      ]);
+    case "Rhythm":
+      return joinSentences([
+        "Ask: is the rhythm regular, where is the P wave, and is every P followed by a QRS?",
+        "Sinus rhythm has an upright P in lead II, a constant PR interval, and a QRS after every P",
+        hit ? knowledgeParagraph(hit, "") : "Irregularly irregular rhythm without discrete P waves suggests atrial fibrillation until proven otherwise",
+      ]);
+    case "Axis":
+      return joinSentences([
+        "Estimate axis from leads I and aVF: both positive suggests normal axis, I positive and aVF negative suggests left axis",
+        "Marked axis deviation can suggest ventricular hypertrophy, conduction disease, or prior infarction",
+        hit ? knowledgeParagraph(hit, "") : "Axis is a quick screen before you move to intervals and ST-T changes",
+      ]);
+    case "Intervals (PR, QRS, QT)":
+      return joinSentences([
+        "Measure PR, QRS, and QT in the same lead whenever possible — usually lead II or V5",
+        "Normal PR is roughly 120–200 ms, QRS under 120 ms, and QT should be interpreted with rate correction (QTc)",
+        hit ? knowledgeParagraph(hit, "") : "Prolonged PR suggests AV delay, wide QRS suggests ventricular conduction delay, and long QT raises arrhythmia risk",
+      ]);
+    case "Waveforms (P, QRS, ST, T)":
+      return joinSentences([
+        "Systematically inspect P-wave morphology, QRS shape, ST segment position, and T-wave symmetry",
+        "ST elevation or depression must be interpreted with distribution, morphology, symptoms, and serial tracings",
+        hit ? knowledgeParagraph(hit, "") : "Waveform analysis comes after rate, rhythm, axis, and intervals are established",
+      ]);
+    default:
+      return hit ? knowledgeParagraph(hit, "Let's work through this step carefully.") : "Let's work through this step carefully.";
+  }
+}
+
+function composeEducation(
+  question: string,
+  knowledgeDomain: ClinicalKnowledgeRouteResult | undefined,
+  knowledge: KnowledgeHit[],
+) {
+  const topic = knowledgeDomain?.educationalTopic ?? "none";
+  const step = knowledgeDomain?.learningStep ?? 0;
+  const lowered = question.toLowerCase();
+
+  if (topic === "ecg_basics") {
+    if (/^(where should i start|what should i learn first|how do i start)\b/i.test(question.trim())
+      || /\bwhere (?:do|should) i start\b/i.test(lowered)) {
+      const first = ECG_LEARNING_PATH[0];
+      const lesson = stepLesson(1, knowledge);
+      return [
+        "Great question — for ECG, build foundations before pattern-spotting.",
+        `Start with ${first}: ${lesson}`,
+        `Here is the full path we'll follow:\n${ecgLearningPathList()}`,
+        `When you're ready, say "next step" and we'll move to ${ECG_LEARNING_PATH[1]}.`,
+      ].join("\n\n");
+    }
+
+    if (/\b(next|continue|what next|go on|next step|next topic|keep going)\b/i.test(lowered) && step > 0) {
+      const current = ECG_LEARNING_PATH[Math.min(step - 1, ECG_LEARNING_PATH.length - 1)];
+      const next = ECG_LEARNING_PATH[Math.min(step, ECG_LEARNING_PATH.length - 1)];
+      const lesson = stepLesson(step, knowledge);
+      const closing = step < ECG_LEARNING_PATH.length
+        ? `When this feels clear, say "next step" and we'll cover ${next}.`
+        : "You've covered the core systematic read — next we can practice on example tracings whenever you're ready.";
+      return [
+        `Step ${step}: ${current}.`,
+        lesson,
+        closing,
+      ].join("\n\n");
+    }
+
+    return [
+      "Absolutely — I'd be glad to tutor you through ECG step by step.",
+      "We'll build this the way clinicians learn in training: fundamentals first, then systematic interpretation.",
+      `Your learning path:\n${ecgLearningPathList()}`,
+      "You don't need to upload an ECG to get started — I'll teach you the framework first, then we can practice on example tracings when you're ready.",
+      "Where would you like to start, or shall we begin with ECG paper and calibration?",
+    ].join("\n\n");
+  }
+
+  const hit = knowledge[0];
+  if (/\b(where should i start|what should i learn first)\b/i.test(lowered)) {
+    return [
+      "A solid order is: basic sciences and exam skills, then history-taking and physical examination, then diagnostics (labs, ECG, imaging), and finally clinical reasoning on cases.",
+      "Tell me which subject you're studying and I'll outline a step-by-step plan.",
+    ].join("\n\n");
+  }
+  if (hit) return knowledgeParagraph(hit, "Tell me what topic you're studying and I'll guide you step by step.");
+  return "I'd be happy to tutor you. Tell me what you're studying — ECG, cardiology, internal medicine, or another topic — and we'll build a learning path together.";
 }
 
 function composeEcgUploadAcknowledgment(attachments: AttachmentForAnalysis[]) {
@@ -394,6 +501,9 @@ export const ResponseGenerator = {
         } else {
           content = composeUploadReview(insights, rememberedFiles);
         }
+        break;
+      case "Education":
+        content = composeEducation(input.question, input.knowledgeDomain, input.knowledge);
         break;
       case "DrugInformation":
       case "MedicalQuestion":

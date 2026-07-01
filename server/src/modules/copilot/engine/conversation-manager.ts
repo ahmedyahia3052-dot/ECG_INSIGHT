@@ -6,9 +6,12 @@ export type ConversationState = {
   conversationId: string;
   conversationSummary: string;
   currentTopic: TopicFrame | null;
+  educationalMode: boolean;
+  educationalTopic: "ecg_basics" | "general_medicine" | "none";
   entities: EntityMemory;
   isFollowUp: boolean;
   lastIntent: CommunicationIntent;
+  learningStep: number;
   previousTopic: TopicFrame | null;
   topicStack: TopicFrame[];
   turnCount: number;
@@ -27,9 +30,12 @@ export const ConversationManager = {
 
   upsert(input: {
     conversationId: string;
+    educationalMode?: boolean;
+    educationalTopic?: ConversationState["educationalTopic"];
     entityMemory?: EntityMemory;
     intent: CommunicationIntent;
     isFollowUp?: boolean;
+    learningStep?: number;
     memory?: ConversationMemory;
     topicStack: TopicFrame[];
     turnCount: number;
@@ -47,9 +53,12 @@ export const ConversationManager = {
         ? ConversationSummarizer.summarize(input.memory, currentTopic)
         : previous?.conversationSummary ?? "",
       currentTopic,
+      educationalMode: input.educationalMode ?? previous?.educationalMode ?? false,
+      educationalTopic: input.educationalTopic ?? previous?.educationalTopic ?? "none",
       entities: input.entityMemory ?? previous?.entities ?? { ages: [], diseases: [], drugs: [], patientNames: [] },
       isFollowUp: input.isFollowUp ?? previous?.isFollowUp ?? false,
       lastIntent: input.intent,
+      learningStep: input.learningStep ?? previous?.learningStep ?? 0,
       previousTopic,
       topicStack: input.topicStack.length ? input.topicStack : previous?.topicStack ?? [],
       turnCount: input.turnCount,
@@ -70,9 +79,12 @@ export const ConversationManager = {
       conversationId,
       conversationSummary: "",
       currentTopic: null,
+      educationalMode: false,
+      educationalTopic: "none",
       entities: { ages: [], diseases: [], drugs: [], patientNames: [] },
       isFollowUp: false,
       lastIntent: "Unknown",
+      learningStep: 0,
       previousTopic: null,
       topicStack: [],
       turnCount: 0,

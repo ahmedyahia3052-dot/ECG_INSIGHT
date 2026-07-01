@@ -79,6 +79,7 @@ export class ClinicalVoiceEngine {
   private audioChunks: Blob[] = [];
   private recordingMimeType = "audio/webm";
   private finalTranscript = "";
+  private latestPartial = "";
   private silenceTimer: ReturnType<typeof setTimeout> | null = null;
   private speechTimeoutTimer: ReturnType<typeof setTimeout> | null = null;
   private whisperTranscriber?: WhisperTranscriber;
@@ -164,6 +165,7 @@ export class ClinicalVoiceEngine {
     if (this.state.recording) return;
 
     this.finalTranscript = "";
+    this.latestPartial = "";
     this.audioChunks = [];
     this.finishingRecording = false;
     this.utteranceFinalized = false;
@@ -367,9 +369,11 @@ export class ClinicalVoiceEngine {
     }
     if (final) {
       this.finalTranscript = punctuate(`${this.finalTranscript} ${final}`.trim());
+      this.latestPartial = this.finalTranscript;
       this.callbacks.onPartialTranscript(this.finalTranscript);
     } else if (interim) {
-      this.callbacks.onPartialTranscript(punctuate(`${this.finalTranscript} ${interim}`.trim()));
+      this.latestPartial = punctuate(`${this.finalTranscript} ${interim}`.trim());
+      this.callbacks.onPartialTranscript(this.latestPartial);
     }
   }
 
@@ -382,7 +386,7 @@ export class ClinicalVoiceEngine {
     this.recognition = null;
     this.releaseMediaStream();
 
-    const liveTranscript = this.finalTranscript.trim();
+    const liveTranscript = this.finalTranscript.trim() || this.latestPartial.trim();
     if (liveTranscript) {
       this.utteranceFinalized = true;
       this.callbacks.onFinalTranscript(liveTranscript);

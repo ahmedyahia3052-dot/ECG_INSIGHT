@@ -1,3 +1,5 @@
+export { ClinicalKnowledgeRouter, ECG_LEARNING_PATH } from "./clinical-knowledge-router";
+export type { ClinicalKnowledgeDomain, ClinicalKnowledgeRouteResult, EducationalTopic } from "./clinical-knowledge-router";
 export {
   buildEngineDebugPayload,
   previewClinicalCopilotEngine,

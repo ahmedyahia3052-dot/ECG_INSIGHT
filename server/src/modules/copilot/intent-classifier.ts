@@ -31,13 +31,44 @@ function detectSecondaryIntents(text: string): SmartIntent[] {
   return intents;
 }
 
+function asksToLearnEcg(text: string) {
+  return /\b(learn|learning|study|studying|teach me|help me (learn|understand|read)|how (?:do|can) i (?:learn|read|interpret)|want to learn|learning path|ecg basics|read an ecg|ecg fundamentals)\b/.test(text)
+    && /\b(ecg|ekg|electrocardiogram)\b/.test(text);
+}
+
+function isLearnerPersona(text: string) {
+  return /\b(medical student|student doctor|resident|trainee|junior doctor|new to cardiology|just starting)\b/.test(text);
+}
+
+function isEducationalFollowUp(text: string, memory: ConversationMemory) {
+  if (/^(where should i start|what should i learn first|what next|what's next|continue|go on|next step|next topic|keep going|tell me more about that)\b/i.test(text.trim())) {
+    const combined = memory.turns.map((turn) => turn.content).join(" ").toLowerCase();
+    return /\b(learn|learning|study|medical student|tutor|tutorial|ecg basics|learning path|step by step)\b/.test(combined);
+  }
+  return /\b(where (?:do|should) i start|what order|step by step|walk me through|guide me)\b/i.test(text);
+}
+
+function educationalContextInMemory(memory: ConversationMemory) {
+  const combined = memory.turns.map((turn) => turn.content).join(" ").toLowerCase();
+  return /\b(medical student|learn|learning|study|studying|tutor|tutorial|teach me|learning path|step by step|ecg basics|fundamentals|where should i start)\b/.test(combined);
+}
+
 function classifyPrimaryIntent(text: string, attachments: AttachmentForAnalysis[], memory: ConversationMemory, entities: ExtractedEntities): IntentMatch {
   if (/^(voice mode|hands[- ]free|talk to me|speak with me)\b/.test(text)) return matchIntent("voice_conversation", 0.98, "voice-mode-request");
   if (/^(hi|hello|hey|good morning|good afternoon|good evening|salam|welcome back)\b[!.?\s]*$/i.test(text)) return matchIntent("greeting", 0.99, "greeting-phrase");
   if (/^(goodbye|bye|see you|talk later)\b/.test(text)) return matchIntent("goodbye", 0.97, "goodbye-phrase");
   if (/^(thanks|thank you|ok thanks|appreciate it|nice to meet you)\b/.test(text)) return matchIntent("thanks", 0.96, "thanks-phrase");
   if (/^how are you\b|^who are you\b|^what can you do\b|^(i need your help|need your help|can you help|help me)\b/.test(text)) {
+    if (/\b(learn|learning|study|teach)\b/.test(text) && /\b(ecg|ekg|medicine|cardiology|clinical)\b/.test(text)) {
+      return matchIntent("medical_education", 0.92, "help-with-learning");
+    }
     return matchIntent("small_talk", 0.95, "small-talk-phrase");
+  }
+  if (asksToLearnEcg(text) || (isLearnerPersona(text) && /\b(ecg|ekg|help|learn)\b/.test(text))) {
+    return matchIntent("medical_education", 0.94, "ecg-learning-request");
+  }
+  if (isEducationalFollowUp(text, memory) || (educationalContextInMemory(memory) && /\b(next|continue|what next|go on|next step|next topic)\b/.test(text))) {
+    return matchIntent("medical_education", 0.9, "educational-follow-up");
   }
   if (/show sources|where did you get|what evidence|which guideline|evidence search/.test(text)) return matchIntent("evidence_search", 0.9, "evidence-request");
   if (/drug interaction|interact with|contraindicated with|can i give.*with/.test(text)) return matchIntent("drug_interaction", 0.92, "drug-interaction");
@@ -92,6 +123,9 @@ function classifyPrimaryIntent(text: string, attachments: AttachmentForAnalysis[
   if (/^(explain|what is|tell me about|can you explain|how does|why does|what causes)\b/.test(text)) {
     return matchIntent("explain_medical_concept", 0.86, "explain-request");
   }
+  if (educationalContextInMemory(memory) && /\b(ecg|ekg|qrs|qtc|rhythm|interval|axis|waveform)\b/.test(text)) {
+    return matchIntent("medical_education", 0.82, "educational-ecg-topic");
+  }
   if (/\becg\b|\bekg\b|qrs|qtc|st elevation|st depression|rhythm|brady|tachy|interval|axis/.test(text)) return matchIntent("ecg_interpretation", 0.8, "ecg-language");
   if (/cardiology|coronary|valve|heart failure|arrhythmia/.test(text)) return matchIntent("cardiology_question", 0.78, "cardiology-topic");
   if (/what causes|causes of|why does|what is|explain|how does|can you explain|tell me about|prolonged qt|stemi|nstemi|hypertension|qt interval/.test(text)) {
@@ -123,6 +157,7 @@ export function mapSmartIntentToMedicalIntent(intent: SmartIntent): MedicalInten
     case "medical_guidelines":
     case "cardiology_question":
     case "explain_medical_concept":
+    case "medical_education":
     case "general_medical_question": return "general_medical_question";
     case "uploaded_ecg_analysis":
     case "summarize": return "upload_analysis";
@@ -156,8 +191,9 @@ export function classifySmartIntent(question: string, attachments: AttachmentFor
   }
   const intents = [primary, ...secondary.map((intent) => matchIntent(intent, Math.max(primary.confidence - 0.12, 0.55), "secondary-intent"))];
   const emergencyPriority = detectEmergency(text, entities);
-  const ambiguousEcg = (primary.intent === "ecg_interpretation" && primary.reason === "ambiguous-ecg-request")
-    || (primary.intent === "ecg_interpretation" && !hasUploadedEcgAttachment(attachments) && !memory.attachments.some((item) => /ecg|ekg/i.test(item.name)) && /interpret|analyze|analyse|review (this|the|my)? ?ecg/.test(text));
+  const ambiguousEcg = primary.intent !== "medical_education"
+    && ((primary.intent === "ecg_interpretation" && primary.reason === "ambiguous-ecg-request")
+    || (primary.intent === "ecg_interpretation" && !hasUploadedEcgAttachment(attachments) && !memory.attachments.some((item) => /ecg|ekg/i.test(item.name)) && /interpret|analyze|analyse|review (this|the|my)? ?ecg/.test(text)));
   const followUpWithoutPatient = primary.intent === "create_follow_up_plan" && !memory.turns.some((turn) => /\bpatient\b|\d{1,3}\s*y/.test(turn.content)) && !conversationTopic(memory);
   return {
     confidence: primary.confidence,
