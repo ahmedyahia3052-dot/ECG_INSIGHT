@@ -16,6 +16,8 @@ export default defineConfig({
     ["junit", { outputFile: "test-results/playwright-junit.xml" }],
   ],
   retries: isCI ? 2 : 0,
+  // Copilot E2E shares one API instance; parallel workers cause stream timeouts.
+  workers: 1,
   testDir: "tests/e2e",
   timeout: 90_000,
   use: {

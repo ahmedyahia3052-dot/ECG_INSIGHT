@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { API_URL } from "./utils/qa";
+import { installCopilotVoiceMocks } from "./utils/voice-mocks";
 
 test.describe("Clinical AI Copilot Engine V2", () => {
   test.beforeEach(async ({ page }) => {
@@ -156,8 +157,12 @@ test.describe("Clinical AI Copilot Engine V2", () => {
   });
 
   test("voice recording populates composer", async ({ page }) => {
+    await installCopilotVoiceMocks(page, ["hello copilot"]);
+    await page.reload();
+    await expect(page.getByText("Clinical Copilot Workspace")).toBeVisible({ timeout: 30_000 });
     await page.getByRole("button", { name: "Voice" }).last().click();
-    await expect(page.getByPlaceholder(/Message the assistant|Ask about ECG/i)).toHaveValue(/hello copilot/i);
+    const composer = page.getByPlaceholder(/Message the assistant|Ask about ECG/i);
+    await expect(composer).toHaveValue(/hello copilot/i, { timeout: 15_000 });
   });
 
   test("streaming tokens render assistant output", async ({ page }) => {
