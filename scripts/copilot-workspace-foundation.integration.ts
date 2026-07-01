@@ -68,7 +68,7 @@ for (const marker of [
   "lastMessagePreview",
   "registeredCopilotRoutes",
   "retrieveConversationMemory",
-  "shouldRetrieveKnowledge",
+  "runClinicalCopilotEngine",
 ]) {
   assert(copilotRoutes.includes(marker), `Copilot backend missing simplified chat marker: ${marker}`);
 }

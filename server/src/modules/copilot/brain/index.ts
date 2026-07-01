@@ -4,7 +4,6 @@ export { ConversationContextService } from "./conversation-context.service";
 export { ConversationStateManager } from "./conversation-state-manager";
 export { DecisionEngine } from "./decision-engine";
 export { MemoryManager } from "./memory-manager";
-export { ResponseComposer } from "./response-composer.service";
 export { BrainToolRouter } from "./tool-router.service";
 export type {
   BrainDebugPayload,

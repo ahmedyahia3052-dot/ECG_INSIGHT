@@ -10,21 +10,16 @@ import { requireAuth, requireRole } from "../../middleware/auth";
 import { AppError } from "../../middleware/error";
 import { assertResourceAccess, canAccessCase, canAccessPatient } from "../../utils/resource-access";
 import { CONVERSATION_SYSTEM_PROMPT } from "./conversation-system-prompt";
-import { attachmentInsights, composeConversationalResponse, dedupeCitations } from "./conversational-engine";
-import type { AttachmentInsight, Citation, ClinicalContext, ConversationMemory, KnowledgeHit } from "./copilot-types";
+import type { AttachmentInsight, Citation, ClinicalContext, ConversationMemory } from "./copilot-types";
 import {
-  buildCommunicationDebugPayload,
-  CommunicationResponseComposer,
-  KnowledgeRouter,
-  previewCommunicationLayerV1,
-  runCommunicationLayerV1,
-} from "./communication";
-import {
-  emptyClinicalContext,
-  isFastPathIntent,
-} from "./intent-manager";
+  attachmentInsights,
+  buildEngineDebugPayload,
+  dedupeCitations,
+  previewClinicalCopilotEngine,
+  runClinicalCopilotEngine,
+  StreamingRenderer,
+} from "./engine";
 import { parseCopilotProviderSettings } from "./intent-pipeline";
-import { semanticSearchKnowledge } from "./medical-knowledge";
 
 export const copilotRouter = Router();
 export const registeredCopilotRoutes = [
@@ -481,59 +476,6 @@ async function retrieveClinicalContext(input: { caseId?: string; patientId?: str
   return context;
 }
 
-async function retrieveKnowledge(question: string, context: ClinicalContext): Promise<{ hits: KnowledgeHit[]; sources: Citation[]; tags: string[] }> {
-  const haystack = [
-    question,
-    context.currentCase?.diagnosis,
-    context.currentCase?.doctorDiagnosis,
-    context.currentCase?.rhythm,
-    context.currentCase?.severity,
-    ...context.previousEcgs,
-    ...context.reports,
-    ...context.criticalAlerts,
-  ].filter(Boolean).join(" ").toLowerCase();
-  const terms = clinicalTerms(haystack);
-  const enterpriseHits = await semanticSearchKnowledge(question, { contextTerms: terms, take: 8 });
-  const hits = await prisma.eCGKnowledgeEntry.findMany({
-    orderBy: { updatedAt: "desc" },
-    take: 8,
-    where: {
-      OR: [
-        { tags: { hasSome: terms } },
-        ...terms.slice(0, 8).flatMap((term) => [
-          { topic: { contains: term, mode: "insensitive" as const } },
-          { content: { contains: term, mode: "insensitive" as const } },
-        ]),
-      ],
-    },
-  });
-  const legacySelected: KnowledgeHit[] = hits.map((entry) => ({
-    category: entry.category,
-    content: entry.content,
-    id: entry.id,
-    references: entry.references,
-    relevanceScore: 0.45,
-    sourceName: "Clinical knowledge index",
-    sourceUrl: undefined,
-    tags: entry.tags,
-    topic: entry.topic,
-  }));
-  const enterpriseSelected: KnowledgeHit[] = enterpriseHits.map((entry) => ({
-    category: String(entry.domain),
-    content: entry.content,
-    id: entry.id,
-    references: entry.references,
-    relevanceScore: entry.relevanceScore,
-    sourceName: entry.sourceName,
-    sourceUrl: entry.sourceUrl,
-    tags: entry.tags,
-    topic: entry.title,
-  }));
-  const selected = enterpriseSelected.concat(legacySelected).sort((left, right) => right.relevanceScore - left.relevanceScore).slice(0, 10);
-  const sources = selected.map((entry) => ({ id: entry.id, label: entry.topic, source: entry.sourceName, tags: entry.tags, type: "knowledge" }));
-  return { hits: selected, sources, tags: Array.from(new Set(selected.flatMap((entry) => entry.tags))).slice(0, 16) };
-}
-
 async function retrieveConversationMemory(conversationId: string): Promise<ConversationMemory> {
   const recent = await prisma.copilotMessage.findMany({
     include: { attachments: { orderBy: { createdAt: "asc" } } },
@@ -559,29 +501,6 @@ function ageFromDob(dateOfBirth: Date) {
   const monthDiff = now.getMonth() - dateOfBirth.getMonth();
   if (monthDiff < 0 || (monthDiff === 0 && now.getDate() < dateOfBirth.getDate())) age -= 1;
   return Math.max(age, 0);
-}
-
-function clinicalTerms(text: string) {
-  const aliases: Record<string, string[]> = {
-    af: ["af", "atrial", "fibrillation"],
-    flutter: ["flutter"],
-    hyperkalemia: ["hyperkalemia", "potassium"],
-    hypokalemia: ["hypokalemia", "potassium"],
-    ischemia: ["ischemia", "st", "depression", "elevation"],
-    lbbb: ["lbbb", "bundle", "branch"],
-    lvh: ["lvh", "hypertrophy"],
-    nstemi: ["nstemi", "troponin", "ischemia"],
-    pac: ["pac", "premature", "atrial"],
-    pericarditis: ["pericarditis"],
-    pvc: ["pvc", "premature", "ventricular"],
-    qt: ["qt", "qtc", "torsades"],
-    rbbb: ["rbbb", "bundle", "branch"],
-    rvh: ["rvh", "hypertrophy"],
-    stemi: ["stemi", "st", "elevation"],
-  };
-  const raw = text.split(/\W+/).filter((word) => word.length > 1);
-  const expanded = raw.flatMap((word) => aliases[word] ?? [word]);
-  return Array.from(new Set(expanded)).slice(0, 24);
 }
 
 function classifyQuestion(question: string) {
@@ -649,56 +568,29 @@ async function executeCopilotChat(input: ChatInput, userId: string, started = Da
     });
   }
   const memory = await retrieveConversationMemory(conversation.id);
-  const comm = runCommunicationLayerV1({
-    attachments: userMessage.attachments,
-    chatInput: {
-      caseId: input.caseId ?? conversation.caseId ?? undefined,
-      patientId: input.patientId ?? conversation.patientId ?? undefined,
-    },
-    clinicianName: requestingUser?.name,
-    conversationId: conversation.id,
-    memory,
-    question: input.question,
-  });
-  const brain = comm.brain;
-  const { classification, decision, plan } = brain;
-  const intent = brain.medicalIntent;
-  const tag = brain.tag;
-  const clinicalContext = decision.runClinicalContext
-    ? await retrieveClinicalContext({ caseId: input.caseId ?? conversation.caseId ?? undefined, patientId: input.patientId ?? conversation.patientId ?? undefined })
-    : emptyClinicalContext();
-  let storedCitations: Citation[] = [];
-  if (intent === "show_sources") {
-    const previousAssistant = await prisma.copilotMessage.findFirst({
-      orderBy: { createdAt: "desc" },
-      where: { conversationId: conversation.id, role: "assistant" },
-    });
-    storedCitations = Array.isArray(previousAssistant?.citations)
-      ? (previousAssistant!.citations as Citation[])
-      : [];
-  }
-  const knowledgeQuery = userMessage.attachments.length
-    ? `${comm.resolvedQuestion} ${userMessage.attachments.map((attachment) => `${attachment.documentType ?? ""} ${attachment.analysisSummary ?? ""}`).join(" ")}`
-    : comm.resolvedQuestion;
-  const knowledge = decision.runKnowledgeSearch
-    ? await retrieveKnowledge(knowledgeQuery, clinicalContext)
-    : { hits: [], sources: [], tags: [] };
-  const routedKnowledgeHits = KnowledgeRouter.filterHits(knowledge.hits, comm.knowledgeRoute);
   void CONVERSATION_SYSTEM_PROMPT;
-  const result = CommunicationResponseComposer.compose({
-    brain: comm.brain,
-    clinicalContext: intent === "show_sources" ? { ...emptyClinicalContext(), sources: storedCitations } : clinicalContext,
-    communicationIntent: comm.communicationIntent,
-    composeFn: composeConversationalResponse,
-    knowledgeHits: routedKnowledgeHits,
-    responsePlan: comm.responsePlan,
-  });
+  const engine = await runClinicalCopilotEngine(
+    {
+      attachments: userMessage.attachments,
+      chatInput: {
+        caseId: input.caseId ?? conversation.caseId ?? undefined,
+        patientId: input.patientId ?? conversation.patientId ?? undefined,
+      },
+      clinicianName: requestingUser?.name,
+      conversationId: conversation.id,
+      memory,
+      question: input.question,
+    },
+    {
+      retrieveClinicalContext: (chatInput) => retrieveClinicalContext(chatInput),
+    },
+  );
   const responseTimeMs = Date.now() - started;
   const assistant = await prisma.copilotMessage.create({
     data: {
-      citations: dedupeCitations(result.citations) as unknown as Prisma.InputJsonValue,
-      confidence: result.confidence,
-      content: result.content,
+      citations: [] as unknown as Prisma.InputJsonValue,
+      confidence: null,
+      content: engine.response.content,
       conversationId: conversation.id,
       responseTimeMs,
       role: "assistant",
@@ -707,21 +599,21 @@ async function executeCopilotChat(input: ChatInput, userId: string, started = Da
   await prisma.copilotUsageEvent.create({
     data: {
       conversationId: conversation.id,
-      question: `${input.question} | comm:v1 | intent:${comm.communicationIntent} | brain:${classification.primaryIntent} | tools:${plan.tools.join(",")} | latency:${comm.executionTimeMs}ms`,
+      question: `${input.question} | engine:v2 | intent:${engine.communicationIntent} | smart:${engine.classification.primaryIntent} | tools:${engine.toolPlan.tools.join(",")} | latency:${engine.executionTimeMs}ms`,
       responseTimeMs,
-      tag,
+      tag: engine.tag,
       userId,
     },
   });
   const updatedConversation = await prisma.copilotConversation.update({
     data: {
-      tag,
+      tag: engine.tag,
       title: existingUserMessages === 0 && conversation.title === "New Clinical Conversation" ? generatedTitle : conversation.title,
       updatedAt: new Date(),
     },
     where: { id: conversation.id },
   });
-  return { assistant, brain: comm.brain, comm, conversation: updatedConversation, result, responseTimeMs, userMessage };
+  return { assistant, conversation: updatedConversation, engine, responseTimeMs, userMessage };
 }
 
 async function auditCopilotError(userId: string, error: unknown, question?: string) {
@@ -742,11 +634,7 @@ function writeSse(res: { write: (chunk: string) => void }, event: string, data: 
 }
 
 async function streamAssistantContent(content: string, res: { write: (chunk: string) => void }, cancelled: () => boolean) {
-  const chunks = content.match(/.{1,18}(\s|$)/g) ?? [content];
-  for (const chunk of chunks) {
-    if (cancelled()) return;
-    writeSse(res, "token", { token: chunk });
-  }
+  StreamingRenderer.streamToWriter(content, (event, data) => writeSse(res, event, data), cancelled);
 }
 
 copilotRouter.get("/settings", async (_req, res, next) => {
@@ -978,20 +866,23 @@ copilotRouter.post("/chat/stream", requireRole("DOCTOR"), async (req, res, next)
     res.setHeader("connection", "keep-alive");
     writeSse(res, "status", { message: "Understanding your request..." });
     const currentSettings = await settings();
-    const previewComm = previewCommunicationLayerV1({
-      attachments: [],
-      chatInput: { caseId: body.caseId, patientId: body.patientId },
-      conversationId: body.conversationId ?? "preview",
-      memory: { attachments: [], summary: "", turns: [] },
-      question: body.question,
-    });
-    if (!isFastPathIntent(previewComm.brain.medicalIntent, previewComm.brain.plan.tools)) {
+    const previewEngine = await previewClinicalCopilotEngine(
+      {
+        attachments: [],
+        chatInput: { caseId: body.caseId, patientId: body.patientId },
+        conversationId: body.conversationId ?? "preview",
+        memory: { attachments: [], summary: "", turns: [] },
+        question: body.question,
+      },
+      { retrieveClinicalContext: (chatInput) => retrieveClinicalContext(chatInput) },
+    );
+    if (previewEngine.toolPlan.tools[0] !== "no_tool") {
       writeSse(res, "status", { message: "Reviewing clinical information..." });
     }
-    const { assistant, comm, conversation, userMessage } = await executeCopilotChat(body, req.auth!.id, started);
+    const { assistant, conversation, engine, userMessage } = await executeCopilotChat(body, req.auth!.id, started);
     const developerMode = await copilotDeveloperModeEnabled(req.auth!.id, currentSettings.provider);
     if (developerMode) {
-      writeSse(res, "communication_debug", buildCommunicationDebugPayload(comm));
+      writeSse(res, "engine_debug", buildEngineDebugPayload(engine));
     }
     writeSse(res, "conversation", { conversation: serializeConversation(conversation), message: serializeMessage(assistant), userMessage: serializeMessage(userMessage) });
     await streamAssistantContent(assistant.content, res, () => closed);

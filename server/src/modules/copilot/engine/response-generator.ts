@@ -1,72 +1,67 @@
-import type { Prisma } from "@prisma/client";
 import type {
   AttachmentForAnalysis,
   AttachmentInsight,
-  Citation,
   ClinicalContext,
   ConversationMemory,
   KnowledgeHit,
-  MedicalIntent,
-} from "./copilot-types";
-import { analyticalIntent, casualResponse, conversationPatientHint, conversationTopic, greetingResponse, helpRequestResponse, isEcgUploadPendingInterpretation } from "./intent-manager";
+} from "../copilot-types";
+import {
+  analyticalIntent,
+  casualResponse,
+  conversationPatientHint,
+  greetingResponse,
+  helpRequestResponse,
+  isEcgUploadPendingInterpretation,
+} from "../intent-manager";
+import { mapSmartIntentToMedicalIntent } from "../intent-classifier";
+import type { SmartIntent } from "../smart-intent-types";
+import { attachmentInsights } from "./attachment-analysis";
+import type { CommunicationIntent, GenerateInput, ResponsePlan } from "./types";
 
-type ComposeInput = {
-  attachments: AttachmentForAnalysis[];
-  clarificationPrompt?: string;
-  clinicianName?: string | null;
-  context: ClinicalContext;
-  intent: MedicalIntent;
-  knowledge: KnowledgeHit[];
-  memory: ConversationMemory;
-  question: string;
-  requiresClarification?: boolean;
-};
+const REPORT_PATTERNS = [
+  /^#{1,3}\s.+$/gm,
+  /^Short Answer\s*$/gim,
+  /^Definition:\s*/gim,
+  /^ECG Criteria:\s*/gim,
+  /^ECG criteria:\s*/gim,
+  /ECG criteria:\s*/gi,
+  /^Criteria:\s*/gim,
+  /^References:\s*/gim,
+  /^References:[\s\S]*$/im,
+  /^Differential diagnosis:\s*/gim,
+  /^Knowledge Base\s*/gim,
+  /^Retrieved Medical Knowledge\s*/gim,
+  /\nConfidence Score:\s*\d+%/gi,
+  /\nCitations:\s*.+$/gim,
+  /Risk tier:\s*(HIGH|MODERATE|LOW)/gi,
+  /Uploaded Document Review/gi,
+  /AI assistance only\. Clinical decisions remain the responsibility of the physician\./gi,
+];
 
-type ComposeResult = {
-  citations: Citation[];
-  confidence: number | null;
-  content: string;
-};
-
-function normalizeFindings(value: Prisma.JsonValue | null): string[] {
-  if (!value || typeof value !== "object" || Array.isArray(value)) return [];
-  const findings = (value as { findings?: unknown }).findings;
-  return Array.isArray(findings) ? findings.filter((item): item is string => typeof item === "string" && item.trim().length > 0) : [];
+function polish(content: string, plan: ResponsePlan) {
+  let formatted = content;
+  for (const pattern of REPORT_PATTERNS) formatted = formatted.replace(pattern, "");
+  formatted = formatted.replace(/\n{3,}/g, "\n\n").trim();
+  const parts = formatted.split(/\n\n+/).filter(Boolean);
+  if (parts.length > plan.maxParagraphs) formatted = parts.slice(0, plan.maxParagraphs).join("\n\n").trim();
+  return formatted.trim();
 }
 
-function attachmentInsights(attachments: AttachmentForAnalysis[]): AttachmentInsight[] {
-  return attachments.map((attachment) => {
-    const documentType = attachment.documentType ?? attachment.kind.toUpperCase();
-    const findings = normalizeFindings(attachment.medicalAnalysis);
-    if (attachment.analysisSummary) findings.unshift(attachment.analysisSummary);
-    const readableText = attachment.extractedText?.trim();
-    return {
-      confidence: attachment.confidence ?? (readableText ? 0.72 : 0.55),
-      documentType,
-      findings: Array.from(new Set(findings)).slice(0, 8),
-      interpretation: readableText ? readableText.slice(0, 700) : "",
-      name: attachment.originalName,
-      ocrStatus: readableText ? "text-available" : "limited",
-      recommendations: attachment.recommendations.slice(0, 6),
-      warnings: attachment.warnings.filter((warning) => !/AI assistance only/i.test(warning)).slice(0, 6),
-    };
-  });
+function joinSentences(parts: string[]) {
+  return parts.filter(Boolean).map((part) => part.trim().replace(/\.$/, "")).join(". ").replace(/\.\./g, ".").trim() + (parts.length ? "." : "");
 }
 
-function citationObjects(context: ClinicalContext, knowledge: KnowledgeHit[]) {
-  return context.sources
-    .concat(knowledge.map((entry) => ({ id: entry.id, label: entry.topic, source: entry.sourceName, tags: entry.tags, type: "knowledge" })))
-    .slice(0, 12);
+function proseList(items: string[], conjunction = "and") {
+  const cleaned = items.filter(Boolean);
+  if (!cleaned.length) return "";
+  if (cleaned.length === 1) return cleaned[0];
+  if (cleaned.length === 2) return `${cleaned[0]} ${conjunction} ${cleaned[1]}`;
+  return `${cleaned.slice(0, -1).join(", ")}, ${conjunction} ${cleaned[cleaned.length - 1]}`;
 }
 
-function dedupeCitations(citations: Citation[]) {
-  const seen = new Set<string>();
-  return citations.filter((citation) => {
-    const key = `${citation.type}:${citation.id}`;
-    if (seen.has(key)) return false;
-    seen.add(key);
-    return true;
-  }).slice(0, 10);
+function knowledgeParagraph(hit: KnowledgeHit | undefined, fallback: string) {
+  if (!hit) return fallback;
+  return hit.content.replace(/\s+/g, " ").trim();
 }
 
 function riskStratification(context: ClinicalContext, question: string) {
@@ -81,22 +76,6 @@ function riskStratification(context: ClinicalContext, question: string) {
     return { level: context.currentCase.severity === "CRITICAL" ? ("HIGH" as const) : ("MODERATE" as const), reason: `Case severity is classified as ${context.currentCase.severity}.` };
   }
   return { level: "LOW" as const, reason: "No high-risk feature was retrieved from the current context." };
-}
-
-function confidenceScore(intent: MedicalIntent, context: ClinicalContext, knowledge: KnowledgeHit[], insights: AttachmentInsight[]) {
-  if (!analyticalIntent(intent)) return null;
-  let score = 0.45;
-  if (knowledge.length >= 2) score += 0.12;
-  if (knowledge[0]?.relevanceScore && knowledge[0].relevanceScore > 0.35) score += 0.1;
-  if (context.currentCase) score += 0.12;
-  if (context.patient && ["patient_information", "current_ecg_case", "generate_report", "explain_diagnosis", "ecg_interpretation"].includes(intent)) score += 0.08;
-  if (insights.length) {
-    const ocrAverage = insights.reduce((sum, item) => sum + item.confidence, 0) / insights.length;
-    score += Math.min(ocrAverage * 0.15, 0.12);
-  }
-  if (context.currentCase?.diagnosis && context.currentCase?.doctorDiagnosis && context.currentCase.diagnosis === context.currentCase.doctorDiagnosis) score += 0.05;
-  if (context.criticalAlerts.length) score -= 0.08;
-  return Math.max(0.35, Math.min(score, 0.96));
 }
 
 function differentialDiagnosis(question: string, context: ClinicalContext, knowledge: KnowledgeHit[]) {
@@ -129,23 +108,6 @@ function followUpFor(risk: { level: string }, context: ClinicalContext) {
   return context.currentCase ? ["routine follow-up if symptomatic or if occupational policy requires surveillance"] : ["open the relevant patient or ECG case if you need patient-specific follow-up"];
 }
 
-function joinSentences(parts: string[]) {
-  return parts.filter(Boolean).map((part) => part.trim().replace(/\.$/, "")).join(". ").replace(/\.\./g, ".").trim() + (parts.length ? "." : "");
-}
-
-function proseList(items: string[], conjunction = "and") {
-  const cleaned = items.filter(Boolean);
-  if (!cleaned.length) return "";
-  if (cleaned.length === 1) return cleaned[0];
-  if (cleaned.length === 2) return `${cleaned[0]} ${conjunction} ${cleaned[1]}`;
-  return `${cleaned.slice(0, -1).join(", ")}, ${conjunction} ${cleaned[cleaned.length - 1]}`;
-}
-
-function knowledgeParagraph(hit: KnowledgeHit | undefined, fallback: string) {
-  if (!hit) return fallback;
-  return hit.content.replace(/\s+/g, " ").trim();
-}
-
 function topicTreatment(topic: string, knowledge: KnowledgeHit[]) {
   const hit = knowledge.find((entry) => entry.topic.toLowerCase().includes(topic.split(" ")[0])) ?? knowledge[0];
   if (topic === "atrial fibrillation") {
@@ -163,18 +125,6 @@ function topicTreatment(topic: string, knowledge: KnowledgeHit[]) {
   }
   if (hit) return knowledgeParagraph(hit, "Treatment should be individualized to the patient context and local guidelines.");
   return "Tell me a little more about the clinical context and I can narrow the management options.";
-}
-
-function composeSources(citations: Citation[]) {
-  if (!citations.length) {
-    return "I don't have prior source material stored for the last answer yet. Ask a clinical question first, then I can summarize what I relied on.";
-  }
-  const names = citations.slice(0, 5).map((source) => source.source).filter(Boolean);
-  const unique = Array.from(new Set(names));
-  return joinSentences([
-    "For the previous answer, I mainly drew on established cardiology guidance and our internal clinical knowledge",
-    unique.length ? `including material aligned with ${proseList(unique.slice(0, 3))}` : "",
-  ]);
 }
 
 function composeEcgUploadAcknowledgment(attachments: AttachmentForAnalysis[]) {
@@ -262,8 +212,14 @@ function composeUploadReview(insights: AttachmentInsight[], remembered: Attachme
 function composeMedicalAnswer(question: string, knowledge: KnowledgeHit[], topic: string) {
   const primary = knowledge[0];
   const simple = /^(what is|explain|can you explain|how does|why does|what causes|tell me about)\b/i.test(question.trim());
-  if (topic && /treat|management|options|plan|follow/.test(question.toLowerCase())) {
+  if (topic && /treat|management|options|plan|follow|drugs|medication/.test(question.toLowerCase())) {
     return topicTreatment(topic, knowledge);
+  }
+  if (topic && /diagnos|detect|screen|workup/.test(question.toLowerCase())) {
+    const hit = knowledge.find((entry) => /diagnos|screen|measure|reading|workup|criteria|office|ambulatory/i.test(`${entry.topic} ${entry.content}`.toLowerCase())
+      && `${entry.topic} ${entry.tags.join(" ")}`.toLowerCase().includes(topic.split(" ")[0]));
+    if (hit) return knowledgeParagraph(hit, "");
+    return `Diagnosis of ${topic} usually combines repeated blood pressure readings, clinical history, examination, and any indicated laboratory or imaging tests.`;
   }
   if (primary) {
     const answer = knowledgeParagraph(primary, "");
@@ -322,17 +278,84 @@ function composeFollowUp(topic: string, context: ClinicalContext, question: stri
   return [lead, extra].filter(Boolean).join("\n\n");
 }
 
-function composeExplainDiagnosis(context: ClinicalContext, knowledge: KnowledgeHit[]) {
-  const diagnosis = context.currentCase?.doctorDiagnosis ?? context.currentCase?.diagnosis;
-  if (diagnosis) {
-    return joinSentences([
-      `The working diagnosis here is ${diagnosis}`,
-      "I can walk through supporting findings, alternative explanations, and practical next steps if you'd like",
-    ]);
-  }
-  if (knowledge[0]) return knowledgeParagraph(knowledge[0], "Tell me which diagnosis you'd like explained, or open the relevant ECG case first.");
-  return "Tell me which diagnosis you'd like explained, or open the relevant ECG case first.";
+function medicalIntentForCommunication(_intent: CommunicationIntent, primarySmartIntent: SmartIntent) {
+  return mapSmartIntentToMedicalIntent(primarySmartIntent);
 }
+
+export const ResponseGenerator = {
+  generate(input: GenerateInput & { primarySmartIntent: SmartIntent }): { content: string } {
+    if (input.requiresClarification && input.clarificationPrompt) {
+      return { content: polish(input.clarificationPrompt, input.plan) };
+    }
+
+    const topic = input.topic?.slug ?? "";
+    const insights = attachmentInsights(input.attachments);
+    const rememberedFiles = input.memory.attachments.filter((attachment) => !insights.some((current) => current.name === attachment.name));
+    const medicalIntent = medicalIntentForCommunication(input.communicationIntent, input.primarySmartIntent);
+    const risk = riskStratification(input.clinicalContext, input.question);
+    let content: string;
+
+    switch (input.communicationIntent) {
+      case "Greeting":
+        content = greetingResponse(input.clinicianName, input.question.length + (input.memory.turns.length * 17));
+        break;
+      case "SmallTalk":
+        content = /^(i need your help|need your help|can you help|help me)\b/i.test(input.question.trim())
+          ? helpRequestResponse()
+          : casualResponse(input.question);
+        break;
+      case "SystemQuestion":
+        content = "Voice mode is ready — speak naturally and I'll reply conversationally. You can interrupt playback whenever you need to.";
+        break;
+      case "PatientLookup":
+        content = composePatient(input.clinicalContext);
+        break;
+      case "ECGAnalysis":
+      case "Comparison":
+        content = composeEcgInterpretation(input.clinicalContext, input.question, input.knowledge, input.attachments);
+        break;
+      case "ECGUpload":
+      case "FileAnalysis":
+      case "DocumentReview":
+      case "ImageInterpretation":
+        if (isEcgUploadPendingInterpretation(input.question, input.attachments)) {
+          content = composeEcgUploadAcknowledgment(input.attachments);
+        } else {
+          content = composeUploadReview(insights, rememberedFiles);
+        }
+        break;
+      case "DrugInformation":
+      case "MedicalQuestion":
+      case "GuidelineSearch":
+      case "Unknown":
+        content = composeMedicalAnswer(input.question, input.knowledge, topic);
+        break;
+      case "ReportGeneration":
+        content = composeReport(input.clinicalContext);
+        break;
+      case "FollowUpQuestion":
+        content = /diagnos|treat|drug|medication|causes|management|screen|workup/i.test(input.question) && topic
+          ? composeMedicalAnswer(input.question, input.knowledge, topic)
+          : composeFollowUp(topic, input.clinicalContext, input.question, input.knowledge, input.memory);
+        break;
+      case "EmergencyAdvice":
+        content = composeEmergency(input.question, input.clinicalContext);
+        break;
+      case "OccupationalFitness":
+      case "RiskAssessment":
+        content = composeOccupational(input.clinicalContext, input.question, input.knowledge);
+        break;
+      default:
+        content = composeMedicalAnswer(input.question, input.knowledge, topic);
+    }
+
+    if (input.communicationIntent !== "EmergencyAdvice" && risk.level === "HIGH" && analyticalIntent(medicalIntent)) {
+      content = `${content}\n\nOne caution: there may be high-risk features here — please prioritize urgent physician review if the patient is symptomatic.`;
+    }
+
+    return { content: polish(content, input.plan) };
+  },
+};
 
 export function buildInternalClinicalBrief(question: string, context: ClinicalContext, knowledge: KnowledgeHit[], memory: ConversationMemory) {
   return [
@@ -343,82 +366,3 @@ export function buildInternalClinicalBrief(question: string, context: ClinicalCo
     memory.turns.length ? `Turns: ${memory.turns.length}` : "",
   ].filter(Boolean).join("\n");
 }
-
-export function composeConversationalResponse(input: ComposeInput): ComposeResult {
-  if (input.requiresClarification && input.clarificationPrompt) {
-    return { citations: [], confidence: null, content: input.clarificationPrompt };
-  }
-  const citations = dedupeCitations(citationObjects(input.context, input.knowledge));
-  const topic = conversationTopic(input.memory);
-  const insights = attachmentInsights(input.attachments);
-  const rememberedFiles = input.memory.attachments.filter((attachment) => !insights.some((current) => current.name === attachment.name));
-  const risk = riskStratification(input.context, input.question);
-  let content: string;
-
-  switch (input.intent) {
-    case "greeting":
-      content = greetingResponse(input.clinicianName, input.question.length + (input.memory.turns.length * 17));
-      break;
-    case "small_talk":
-      content = /^(i need your help|need your help|can you help|help me)\b/i.test(input.question.trim())
-        ? helpRequestResponse()
-        : casualResponse(input.question);
-      break;
-    case "voice_conversation":
-      content = "Voice mode is ready — speak naturally from the composer and I'll reply conversationally. You can interrupt playback whenever you need to.";
-      break;
-    case "show_sources":
-      content = composeSources(citations);
-      break;
-    case "patient_information":
-      content = composePatient(input.context);
-      break;
-    case "current_ecg_case":
-      content = composeCurrentCase(input.context);
-      break;
-    case "ecg_interpretation":
-      content = composeEcgInterpretation(input.context, input.question, input.knowledge, input.attachments);
-      break;
-    case "upload_analysis":
-      if (isEcgUploadPendingInterpretation(input.question, input.attachments)) {
-        content = composeEcgUploadAcknowledgment(input.attachments);
-      } else {
-        content = composeUploadReview(insights, rememberedFiles);
-      }
-      break;
-    case "medication_question":
-    case "general_medical_question":
-    case "unknown":
-      content = composeMedicalAnswer(input.question, input.knowledge, topic);
-      break;
-    case "generate_report":
-      content = composeReport(input.context);
-      break;
-    case "explain_diagnosis":
-      content = composeExplainDiagnosis(input.context, input.knowledge);
-      break;
-    case "follow_up_plan":
-      content = composeFollowUp(topic, input.context, input.question, input.knowledge, input.memory);
-      break;
-    case "emergency_triage":
-      content = composeEmergency(input.question, input.context);
-      break;
-    case "occupational_fitness":
-      content = composeOccupational(input.context, input.question, input.knowledge);
-      break;
-    default:
-      content = composeMedicalAnswer(input.question, input.knowledge, topic);
-  }
-
-  if (input.intent !== "emergency_triage" && risk.level === "HIGH" && analyticalIntent(input.intent)) {
-    content = `${content}\n\nOne caution: there may be high-risk features here — please prioritize urgent physician review if the patient is symptomatic.`;
-  }
-
-  return {
-    citations,
-    confidence: confidenceScore(input.intent, input.context, input.knowledge, insights),
-    content: content.trim(),
-  };
-}
-
-export { attachmentInsights, dedupeCitations };

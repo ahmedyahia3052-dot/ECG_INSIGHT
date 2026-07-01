@@ -77,14 +77,44 @@ export type CopilotChatInput = {
 export type CopilotStreamEvent = {
   brainDebug?: CopilotBrainDebug;
   communicationDebug?: CopilotCommunicationDebug;
+  engineDebug?: CopilotEngineDebug;
   conversation?: CopilotConversation;
   intentDebug?: CopilotIntentDebug;
   message?: CopilotMessage;
   status?: string;
   token?: string;
-  type: "brain_debug" | "communication_debug" | "conversation" | "done" | "error" | "intent_debug" | "status" | "token";
+  type: "brain_debug" | "communication_debug" | "conversation" | "done" | "engine_debug" | "error" | "intent_debug" | "status" | "token";
   userMessage?: CopilotMessage;
 };
+
+export interface CopilotEngineDebug {
+  classification: CopilotIntentDebug["classification"];
+  communicationIntent: string;
+  context: {
+    activeTopic: { label: string; slug: string } | null;
+    resolvedQuestion: string;
+    topicStack: Array<{ label: string; slug: string }>;
+  };
+  engineVersion: "v2";
+  executionTimeMs: number;
+  knowledgeRoute: { query: string; sources: string[] };
+  plan: {
+    allowBullets: boolean;
+    maxParagraphs: number;
+    style: string;
+    suggestFollowUps: boolean;
+  };
+  toolPlan: {
+    runClinicalContext: boolean;
+    runDrugDatabase: boolean;
+    runEcgEngine: boolean;
+    runKnowledge: boolean;
+    runOcr: boolean;
+    runPatientDatabase: boolean;
+    runReportGenerator: boolean;
+    tools: string[];
+  };
+}
 
 export interface CopilotCommunicationDebug {
   brain: CopilotBrainDebug;
@@ -280,50 +310,30 @@ function csrfTokenFromCookie() {
   return cookie ? decodeURIComponent(cookie.slice("ecg_csrf_token=".length)) : null;
 }
 
-function parseSseEvent(block: string) {
+function parseSseEvent(block: string): CopilotStreamEvent | null {
   const eventLine = block.split("\n").find((line) => line.startsWith("event:"));
   const dataLine = block.split("\n").find((line) => line.startsWith("data:"));
   if (!eventLine || !dataLine) return null;
   const type = eventLine.replace("event:", "").trim() as CopilotStreamEvent["type"];
-  const data = JSON.parse(dataLine.replace("data:", "").trim()) as CopilotCommunicationDebug & CopilotBrainDebug & {
-    conversation?: CopilotConversation;
-    message?: CopilotMessage | string;
-    token?: string;
-    userMessage?: CopilotMessage;
-  };
+  const data = JSON.parse(dataLine.replace("data:", "").trim()) as Record<string, unknown>;
   if (type === "status" || type === "error") return { status: typeof data.message === "string" ? data.message : undefined, type };
+  if (type === "engine_debug" && data.engineVersion === "v2") {
+    return { engineDebug: data as unknown as CopilotEngineDebug, type };
+  }
   if (type === "communication_debug" && data.communicationVersion === "v1") {
-    return {
-      communicationDebug: {
-        brain: data.brain,
-        communicationVersion: data.communicationVersion,
-        intent: data.intent,
-        intentConfidence: data.intentConfidence,
-        knowledgeSources: data.knowledgeSources,
-        memoryTopic: data.memoryTopic,
-        resolvedQuestion: data.resolvedQuestion,
-        responsePlan: data.responsePlan,
-        sessionTurnCount: data.sessionTurnCount,
-      },
-      type,
-    };
+    return { communicationDebug: data as unknown as CopilotCommunicationDebug, type };
   }
   if (type === "brain_debug" && data.brainVersion === "v3") {
-    return {
-      brainDebug: {
-        brainVersion: data.brainVersion,
-        classification: data.classification,
-        clinicalPlan: data.clinicalPlan,
-        decision: data.decision,
-        executionTimeMs: data.executionTimeMs,
-        memoryState: data.memoryState,
-        plan: data.plan,
-      },
-      type,
-    };
+    return { brainDebug: data as unknown as CopilotBrainDebug, type };
   }
   if (type === "intent_debug" && data.classification && data.plan) {
-    return { intentDebug: { classification: data.classification, plan: data.plan }, type };
+    return { intentDebug: { classification: data.classification, plan: data.plan } as CopilotIntentDebug, type };
   }
-  return { conversation: data.conversation, message: typeof data.message === "string" ? undefined : data.message, token: data.token, type, userMessage: data.userMessage };
+  return {
+    conversation: data.conversation as CopilotConversation | undefined,
+    message: typeof data.message === "string" ? undefined : data.message as CopilotMessage | undefined,
+    token: typeof data.token === "string" ? data.token : undefined,
+    type,
+    userMessage: data.userMessage as CopilotMessage | undefined,
+  };
 }

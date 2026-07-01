@@ -17,28 +17,15 @@ import {
   type CopilotConversation,
   type CopilotBrainDebug,
   type CopilotCommunicationDebug,
+  type CopilotEngineDebug,
   type CopilotIntentDebug,
   type CopilotMessage,
   type CopilotTag,
 } from "@/services/copilot";
+import { ClinicalVoiceEngine } from "@/services/voiceEngine";
 import { safeArray } from "@/utils/collections";
 
 type AttachmentKind = "ecg" | "file" | "image";
-type SpeechRecognitionLike = {
-  continuous: boolean;
-  interimResults: boolean;
-  lang: string;
-  onend: (() => void) | null;
-  onerror: ((event: { error?: string }) => void) | null;
-  onresult: ((event: { results: ArrayLike<{ 0: { transcript: string }; isFinal: boolean }> }) => void) | null;
-  start: () => void;
-  stop: () => void;
-};
-
-type SpeechWindow = Window & {
-  SpeechRecognition?: new () => SpeechRecognitionLike;
-  webkitSpeechRecognition?: new () => SpeechRecognitionLike;
-};
 
 type SpeechControl = {
   muted: boolean;
@@ -104,7 +91,7 @@ export function CopilotWorkspaceScreen({ routeConversationId }: { routeConversat
   const router = useRouter();
   const { caseId: scopedCaseId, patientId: scopedPatientId } = useLocalSearchParams<{ caseId?: string; patientId?: string }>();
   const attachmentPreviewsRef = useRef<Record<string, string>>({});
-  const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
+  const voiceEngineRef = useRef<ClinicalVoiceEngine | null>(null);
   const scrollRef = useRef<ScrollView>(null);
   const streamAbort = useRef<AbortController | null>(null);
   const { width } = useWindowDimensions();
@@ -121,7 +108,7 @@ export function CopilotWorkspaceScreen({ routeConversationId }: { routeConversat
   const [speechMuted, setSpeechMuted] = useState(false);
   const [speechPaused, setSpeechPaused] = useState(false);
   const [speakingMessageId, setSpeakingMessageId] = useState<string | undefined>();
-  const [brainDebug, setBrainDebug] = useState<CopilotBrainDebug | CopilotCommunicationDebug | undefined>();
+  const [brainDebug, setBrainDebug] = useState<CopilotBrainDebug | CopilotCommunicationDebug | CopilotEngineDebug | undefined>();
   const [showIntentDebug, setShowIntentDebug] = useState(false);
   const [streamingMessage, setStreamingMessage] = useState("");
   const [status, setStatus] = useState("");
@@ -178,10 +165,32 @@ export function CopilotWorkspaceScreen({ routeConversationId }: { routeConversat
   }, []);
 
   const stopVoiceInput = useCallback(() => {
-    recognitionRef.current?.stop();
-    recognitionRef.current = null;
+    voiceEngineRef.current?.stopRecording();
     setIsRecording(false);
   }, []);
+
+  useEffect(() => {
+    voiceEngineRef.current = new ClinicalVoiceEngine({
+      onError: (message) => showActionNotice(message, "error"),
+      onInterimTranscript: (transcript) => setDraft((current) => `${current}${current ? " " : ""}${transcript}`.trimStart()),
+      onPermissionDenied: () => showActionNotice("Microphone permission denied.", "error"),
+      onRecordingEnd: () => setIsRecording(false),
+      onRecordingStart: () => {
+        setIsRecording(true);
+        showActionNotice("Voice recording started.");
+      },
+      onSilence: () => showActionNotice("Voice input paused after silence.", "success"),
+      onSpeakingEnd: () => {
+        setSpeakingMessageId(undefined);
+        setSpeechPaused(false);
+      },
+      onSpeakingStart: (messageId) => {
+        setSpeakingMessageId(messageId);
+        setSpeechPaused(false);
+      },
+    });
+    return () => voiceEngineRef.current?.interrupt();
+  }, [showActionNotice]);
 
   const uploadComposerFile = useCallback(async (file: File, kind: AttachmentKind) => {
     if (!token) {
@@ -247,103 +256,25 @@ export function CopilotWorkspaceScreen({ routeConversationId }: { routeConversat
       stopVoiceInput();
       return;
     }
-    if (Platform.OS !== "web" || typeof window === "undefined") {
-      showActionNotice("Voice input is not supported by this browser.", "error");
-      return;
-    }
-    const speechWindow = window as SpeechWindow;
-    const Recognition = speechWindow.SpeechRecognition ?? speechWindow.webkitSpeechRecognition;
-    if (!Recognition) {
-      showActionNotice("Voice input is not supported by this browser.", "error");
-      return;
-    }
-    try {
-      const recognition = new Recognition();
-      recognition.continuous = true;
-      recognition.interimResults = true;
-      recognition.lang = "en-US";
-      recognition.onresult = (event) => {
-        const transcript = Array.from(event.results)
-          .map((result) => result[0].transcript)
-          .join(" ")
-          .trim();
-        if (transcript) setDraft((current) => `${current}${current ? " " : ""}${transcript}`.trimStart());
-      };
-      recognition.onerror = (event) => {
-        stopVoiceInput();
-        showActionNotice(event.error === "not-allowed" ? "Microphone denied. Microphone permission denied." : "Voice input failed.", "error");
-      };
-      recognition.onend = () => setIsRecording(false);
-      recognitionRef.current = recognition;
-      recognition.start();
-      setIsRecording(true);
-      showActionNotice("Voice recording started.");
-    } catch {
-      showActionNotice("Microphone denied. Microphone permission denied.", "error");
-    }
-  }, [isRecording, showActionNotice, stopVoiceInput]);
+    voiceEngineRef.current?.setVoiceMode(voiceMode);
+    voiceEngineRef.current?.startRecording();
+  }, [isRecording, stopVoiceInput, voiceMode]);
 
   const stopSpeaking = useCallback(() => {
-    if (typeof window !== "undefined" && "speechSynthesis" in window) {
-      window.speechSynthesis.cancel();
-    }
+    voiceEngineRef.current?.stopSpeaking();
     setSpeakingMessageId(undefined);
     setSpeechPaused(false);
   }, []);
 
   const speakAssistantMessage = useCallback((content: string, messageId: string) => {
-    const text = content
-      .replace(/^#{1,3}\s+/gm, "")
-      .replace(/\[[^\]]+\]/g, "")
-      .replace(/\s+/g, " ")
-      .trim();
-    if (!text) {
-      showActionNotice("No answer text available for speech.", "error");
-      return;
-    }
-    if (speechMuted) {
-      showActionNotice("Voice output is muted.", "error");
-      return;
-    }
-    if (typeof window === "undefined" || !("speechSynthesis" in window) || !("SpeechSynthesisUtterance" in window)) {
-      showActionNotice("Voice playback is not supported by this browser.", "error");
-      return;
-    }
-    window.speechSynthesis.cancel();
-    const SpeechUtterance = window.SpeechSynthesisUtterance;
-    const utterance = new SpeechUtterance(text);
-    utterance.rate = 0.95;
-    utterance.pitch = 1;
-    utterance.onend = () => {
-      setSpeakingMessageId(undefined);
-      setSpeechPaused(false);
-    };
-    utterance.onerror = () => {
-      setSpeakingMessageId(undefined);
-      setSpeechPaused(false);
-      showActionNotice("Voice playback failed.", "error");
-    };
-    setSpeakingMessageId(messageId);
-    setSpeechPaused(false);
-    try {
-      window.speechSynthesis.speak(utterance);
-    } catch {
-      setSpeakingMessageId(undefined);
-      setSpeechPaused(false);
-      showActionNotice("Voice playback failed.", "error");
-    }
-  }, [showActionNotice, speechMuted]);
+    voiceEngineRef.current?.setMuted(speechMuted);
+    voiceEngineRef.current?.speak(content, messageId);
+  }, [speechMuted]);
 
   const pauseOrResumeSpeech = useCallback(() => {
-    if (typeof window === "undefined" || !("speechSynthesis" in window) || !speakingMessageId) return;
-    if (speechPaused) {
-      window.speechSynthesis.resume();
-      setSpeechPaused(false);
-      return;
-    }
-    window.speechSynthesis.pause();
-    setSpeechPaused(true);
-  }, [speakingMessageId, speechPaused]);
+    voiceEngineRef.current?.pauseOrResumeSpeaking();
+    setSpeechPaused((current) => !current);
+  }, []);
 
   const replaySpeech = useCallback((content: string, id: string) => {
     speakAssistantMessage(content, id);
@@ -352,10 +283,10 @@ export function CopilotWorkspaceScreen({ routeConversationId }: { routeConversat
   const toggleSpeechMute = useCallback(() => {
     setSpeechMuted((current) => {
       const next = !current;
-      if (next) stopSpeaking();
+      voiceEngineRef.current?.setMuted(next);
       return next;
     });
-  }, [stopSpeaking]);
+  }, []);
 
   const navigateConversation = useCallback((conversationId: string) => {
     setSelectedId(conversationId);
@@ -382,6 +313,7 @@ export function CopilotWorkspaceScreen({ routeConversationId }: { routeConversat
         tag: input.tag,
       }, (event) => {
         if (event.type === "status") setStatus(event.status ?? "");
+        if (event.type === "engine_debug" && event.engineDebug) setBrainDebug(event.engineDebug);
         if (event.type === "communication_debug" && event.communicationDebug) setBrainDebug(event.communicationDebug);
         if (event.type === "brain_debug" && event.brainDebug) setBrainDebug(event.brainDebug);
         if (event.type === "intent_debug" && event.intentDebug) {
@@ -614,9 +546,22 @@ export function CopilotWorkspaceScreen({ routeConversationId }: { routeConversat
         {developerModeEnabled && showIntentDebug && brainDebug ? (
           <View style={styles.intentDebugPanel}>
             <Text style={styles.intentDebugTitle}>
-              {"communicationVersion" in brainDebug ? "AI Communication Layer V1" : "AI Brain V3 (Developer Mode)"}
+              {"engineVersion" in brainDebug
+                ? "Clinical AI Copilot Engine V2"
+                : "communicationVersion" in brainDebug
+                  ? "AI Communication Layer V1"
+                  : "AI Brain V3 (Developer Mode)"}
             </Text>
-            {"communicationVersion" in brainDebug ? (
+            {"engineVersion" in brainDebug ? (
+              <>
+                <Text style={styles.intentDebugLine}>Intent: {brainDebug.communicationIntent} ({Math.round(brainDebug.classification.confidence * 100)}%)</Text>
+                <Text style={styles.intentDebugLine}>Resolved: {brainDebug.context.resolvedQuestion}</Text>
+                <Text style={styles.intentDebugLine}>Topic: {brainDebug.context.activeTopic?.label ?? "none"}</Text>
+                <Text style={styles.intentDebugLine}>Knowledge route: {brainDebug.knowledgeRoute.sources.join(", ") || "none"}</Text>
+                <Text style={styles.intentDebugLine}>Tools: {brainDebug.toolPlan.tools.join(", ")}</Text>
+                <Text style={styles.intentDebugLine}>Latency: {brainDebug.executionTimeMs} ms</Text>
+              </>
+            ) : "communicationVersion" in brainDebug ? (
               <>
                 <Text style={styles.intentDebugLine}>Intent: {brainDebug.intent} ({Math.round(brainDebug.intentConfidence * 100)}%)</Text>
                 <Text style={styles.intentDebugLine}>Resolved: {brainDebug.resolvedQuestion}</Text>
@@ -674,6 +619,7 @@ export function CopilotWorkspaceScreen({ routeConversationId }: { routeConversat
 
           <ScrollView
             contentContainerStyle={styles.messageList}
+            testID="copilot-message-thread"
             onScroll={({ nativeEvent }) => {
               if (typeof window !== "undefined") {
                 try {

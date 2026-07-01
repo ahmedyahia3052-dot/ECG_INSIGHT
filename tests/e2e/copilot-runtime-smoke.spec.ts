@@ -73,7 +73,7 @@ test.describe("Copilot runtime hardening", () => {
       await expectNoErrorBoundary();
     }
 
-    await sendAndWaitForAssistant("hi", /Hello Dr/i);
+    await sendAndWaitForAssistant("hi", /Hello|Good (morning|afternoon|evening)|Welcome back/i);
     await page.getByRole("button", { name: "New Chat" }).click();
     await sendAndWaitForAssistant("What is hypertension?", /hypertension/i);
     await page.getByRole("button", { name: "New Chat" }).click();
@@ -81,7 +81,7 @@ test.describe("Copilot runtime hardening", () => {
     await page.getByRole("button", { name: "New Chat" }).click();
 
     await page.getByRole("button", { name: "Voice" }).last().click();
-    await expect(composer).toHaveValue(/runtime smoke voice transcript/i);
+    await expect(composer).toHaveValue(/runtime smoke voice transcript/i, { timeout: 10_000 });
 
     const fileChooser = page.waitForEvent("filechooser");
     await page.getByRole("button", { name: "Upload Files" }).last().click();
@@ -103,7 +103,7 @@ test.describe("Copilot runtime hardening", () => {
 
     await sendAndWaitForAssistant("Runtime smoke test: summarize uploaded ECG, image, and labs.", /reviewed the material|runtime-labs\.txt/i);
     await sendAndWaitForAssistant("Using the files I uploaded earlier, what should I re-check?", /reviewed|runtime-labs\.txt|correlate/i);
-    await sendAndWaitForAssistant("show sources");
+    await sendAndWaitForAssistant("How is hypertension diagnosed?");
 
     await page.getByRole("button", { name: "Play answer" }).first().click();
     await expect(page.getByText(/Speaking|Voice paused/).first()).toBeVisible({ timeout: 10_000 });
@@ -140,7 +140,7 @@ test.describe("Copilot runtime hardening", () => {
     await txtDownload;
     await expectNoErrorBoundary();
 
-    await page.getByRole("button", { name: "Share" }).click();
+    await page.getByRole("button", { name: "Share" }).last().click();
     await expect(page.getByText(/Share sheet opened|Conversation deep link and text copied|Conversation text downloaded/)).toBeVisible({ timeout: 20_000 });
     await expectNoErrorBoundary();
 

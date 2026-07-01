@@ -67,7 +67,7 @@ for (const marker of [
   "readBestEffortOcrText",
   "medicalAnalysis",
   "retrieveConversationMemory",
-  "shouldRetrieveKnowledge",
+  "runClinicalCopilotEngine",
 ]) {
   assert(routes.includes(marker), `Copilot backend simplified-chat marker missing: ${marker}`);
 }
