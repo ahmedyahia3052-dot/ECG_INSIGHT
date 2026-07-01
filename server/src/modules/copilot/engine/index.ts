@@ -10,7 +10,6 @@ export { attachmentInsights } from "./attachment-analysis";
 export { dedupeCitations } from "./citations";
 export { ContextManager, ConversationSummarizer } from "./context-manager";
 export { ConversationManager } from "./conversation-manager";
-export { IntentClassifier, INTENT_CONFIDENCE_THRESHOLD } from "./intent-classifier";
 export { KnowledgeRouter } from "./knowledge-router";
 export { retrieveRoutedKnowledge } from "./knowledge-retrieval";
 export { Planner } from "./planner";

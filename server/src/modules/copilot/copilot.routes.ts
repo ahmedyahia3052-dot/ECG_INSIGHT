@@ -13,7 +13,6 @@ import { CONVERSATION_SYSTEM_PROMPT } from "./conversation-system-prompt";
 import type { AttachmentInsight, Citation, ClinicalContext, ConversationMemory } from "./copilot-types";
 import {
   attachmentInsights,
-  buildEngineDebugPayload,
   dedupeCitations,
   previewClinicalCopilotEngine,
   runClinicalCopilotEngine,
@@ -274,7 +273,7 @@ function ownerOnly(req: { auth?: { id: string } }) {
 }
 
 async function settings() {
-  const defaultProvider = JSON.stringify({ brainVersion: "v3", classifier: "SmartIntentClassifier", developerMode: process.env.NODE_ENV !== "production" });
+  const defaultProvider = JSON.stringify({ engineVersion: "v2", developerMode: process.env.NODE_ENV !== "production" });
   return prisma.copilotSettings.upsert({
     create: { enabled: true, provider: defaultProvider },
     update: {},
@@ -904,12 +903,7 @@ copilotRouter.post("/chat/stream", requireRole("DOCTOR"), async (req, res, next)
     if (previewEngine.toolPlan.tools[0] !== "no_tool") {
       writeSse(res, "status", { message: "Reviewing clinical information..." });
     }
-    const { assistant, conversation, engine, userMessage } = await executeCopilotChat(body, req.auth!.id, started);
-    const currentSettings = await settings();
-    const developerMode = await copilotDeveloperModeEnabled(req.auth!.id, currentSettings.provider);
-    if (developerMode) {
-      writeSse(res, "engine_debug", buildEngineDebugPayload(engine));
-    }
+    const { assistant, conversation, userMessage } = await executeCopilotChat(body, req.auth!.id, started);
     writeSse(res, "conversation", { conversation: serializeConversation(conversation), message: serializeMessage(assistant), userMessage: serializeMessage(userMessage) });
     await streamAssistantContent(assistant.content, res, () => closed);
     if (!closed) writeSse(res, "done", { conversation: serializeConversation(conversation), message: serializeMessage(assistant), userMessage: serializeMessage(userMessage) });

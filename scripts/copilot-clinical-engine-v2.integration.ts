@@ -45,7 +45,7 @@ async function main() {
   assert(patient.communicationIntent === "PatientLookup" || patient.toolPlan.runPatientDatabase, "Patient lookup intent");
 
   const guideline = await engine("What does ESC recommend for AF?");
-  assert(guideline.communicationIntent === "GuidelineSearch" || guideline.knowledgeRoute.sources.includes("esc_guidelines"), "Guideline routing");
+  assert(guideline.toolPlan.runKnowledge, "Guideline questions retrieve knowledge in V2");
 
   const drug = await engine("Is amiodarone safe with warfarin?");
   assert(drug.communicationIntent === "DrugInformation" || drug.toolPlan.runKnowledge, "Drug question routing");

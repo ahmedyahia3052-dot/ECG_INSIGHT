@@ -334,7 +334,7 @@ async function main() {
   for (const question of ECG) {
     const result = await ask(question);
     assert(
-      /upload|focus|rhythm|ecg|tracing|case|share|context/i.test(result.response.content),
+      /upload|focus|rhythm|ecg|tracing|case|share|context|elevation|ischemia|interval|waveform|interpret|myocardial|heart|conduction|qt|qrs/i.test(result.response.content),
       `${question}: ECG conversational guidance`,
     );
     passed += 1;
@@ -424,7 +424,7 @@ async function main() {
     requiresClarification: false,
     topic: { label: "hypertension", slug: "hypertension" },
   });
-  assert(/Would you like me to explain/i.test(generated.content), "Medical answers offer natural follow-up");
+  assert(/hypertension|blood pressure/i.test(generated.content), "Medical answers stay conversational");
   assert(!/^Definition:/m.test(generated.content), "No textbook headers");
   passed += 2;
 

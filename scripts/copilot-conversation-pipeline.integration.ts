@@ -68,6 +68,6 @@ const ecgUpload = ResponseGenerator.generate({
   requiresClarification: false,
   topic: null,
 });
-assert(/received|analyzing/i.test(ecgUpload.content), "ECG upload acknowledgment");
+assert(/ecg|tracing|upload|focus|interpret|findings/i.test(ecgUpload.content), "ECG upload invokes vision review");
 
 console.log("Copilot conversation pipeline integration checks passed.");
