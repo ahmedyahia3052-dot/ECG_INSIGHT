@@ -66,9 +66,20 @@ The copilot module (`server/src/modules/copilot/v3/llm-provider.ts`) remains a t
 Set these in `.env.development` or `.env.production`:
 
 ```env
+OLLAMA_ENABLED=true
 LLM_PROVIDER=ollama
 OLLAMA_BASE_URL=http://127.0.0.1:11434
 OLLAMA_MODEL=llama3.2:1b
+```
+
+When `OLLAMA_ENABLED=true` or `LLM_PROVIDER=ollama`, Copilot **never** requires `AI_MODEL_API_KEY` or `OPENAI_API_KEY`.
+
+Optional cloud fallback (disabled by default):
+
+```env
+LLM_OPENAI_FALLBACK=true
+OPENAI_API_KEY=sk-...
+LLM_PROVIDER=openai
 ```
 
 | Variable | Description |

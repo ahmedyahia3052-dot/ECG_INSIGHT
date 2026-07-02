@@ -1,8 +1,15 @@
 import { env } from "../config/env";
 import { log } from "../utils/logger";
+import {
+  assertCopilotLlmConfiguration,
+  isOllamaLlmEnabled,
+  isOpenAiFallbackEnabled,
+  isOpenAiLlmConfigured,
+} from "./llm-config";
 import { logOllamaStartup, probeOllama, type OllamaRuntimeState } from "./ollama-runtime";
 import { MockProvider } from "./providers/mock.provider";
 import { OllamaProvider } from "./providers/ollama.provider";
+import { OpenAiCompatibleProvider } from "./providers/openai.provider";
 import type { ILlmProvider } from "./providers/llm-provider.interface";
 
 let activeProvider: ILlmProvider | undefined;
@@ -17,6 +24,7 @@ export function shouldForceMockProvider() {
 
 function logProviderSelected(provider: ILlmProvider, reason: string) {
   log("info", "LLM provider selected.", {
+    apiKeyRequired: false,
     model: provider.model,
     provider: provider.providerName,
     reason,
@@ -25,6 +33,18 @@ function logProviderSelected(provider: ILlmProvider, reason: string) {
 
 function createOllamaProvider(state: OllamaRuntimeState) {
   return new OllamaProvider(state.selectedModel, state.baseUrl);
+}
+
+function tryCreateOpenAiProvider(): ILlmProvider | null {
+  if (!isOpenAiLlmConfigured() && !isOpenAiFallbackEnabled()) return null;
+  try {
+    return new OpenAiCompatibleProvider();
+  } catch (error) {
+    log("warn", "OpenAI provider unavailable.", {
+      error: error instanceof Error ? error.message : String(error),
+    });
+    return null;
+  }
 }
 
 async function connectOllamaProvider(): Promise<ILlmProvider | null> {
@@ -39,7 +59,7 @@ export function getOllamaRuntimeState(): OllamaRuntimeState | undefined {
 }
 
 export async function refreshOllamaRuntime() {
-  if (shouldForceMockProvider() || env.LLM_PROVIDER !== "ollama") {
+  if (shouldForceMockProvider() || !isOllamaLlmEnabled()) {
     return getOllamaRuntimeState();
   }
   const provider = await connectOllamaProvider();
@@ -53,6 +73,7 @@ export async function refreshOllamaRuntime() {
 export async function initializeLlmProvider() {
   if (initialized) return;
   initialized = true;
+  assertCopilotLlmConfiguration();
 
   if (shouldForceMockProvider()) {
     activeProvider = new MockProvider();
@@ -67,27 +88,46 @@ export async function initializeLlmProvider() {
     return;
   }
 
-  if (env.LLM_PROVIDER !== "ollama") {
+  if (isOllamaLlmEnabled()) {
+    log("info", "Copilot LLM mode: local Ollama (no API key required).", {
+      baseUrl: env.OLLAMA_BASE_URL,
+      model: env.OLLAMA_MODEL,
+      ollamaEnabled: env.OLLAMA_ENABLED,
+    });
+
+    ollamaRuntime = await probeOllama();
+    logOllamaStartup(ollamaRuntime);
+
+    if (ollamaRuntime.connected) {
+      activeProvider = createOllamaProvider(ollamaRuntime);
+      logProviderSelected(activeProvider, "ollama-startup-verified");
+      return;
+    }
+
+    const openAi = tryCreateOpenAiProvider();
+    if (openAi) {
+      activeProvider = openAi;
+      logProviderSelected(activeProvider, "ollama-unreachable-openai-fallback");
+      return;
+    }
+
+    log("warn", "Ollama unavailable at startup; falling back to Mock LLM provider.", {
+      baseUrl: ollamaRuntime.baseUrl,
+      model: env.OLLAMA_MODEL,
+    });
     activeProvider = new MockProvider();
-    logProviderSelected(activeProvider, "llm-provider-not-ollama");
+    logProviderSelected(activeProvider, "ollama-unreachable-mock-fallback");
     return;
   }
 
-  ollamaRuntime = await probeOllama();
-  logOllamaStartup(ollamaRuntime);
-
-  if (ollamaRuntime.connected) {
-    activeProvider = createOllamaProvider(ollamaRuntime);
-    logProviderSelected(activeProvider, "ollama-startup-verified");
+  if (isOpenAiLlmConfigured()) {
+    activeProvider = tryCreateOpenAiProvider() ?? new MockProvider();
+    logProviderSelected(activeProvider, "openai-explicit");
     return;
   }
 
-  log("warn", "Ollama unavailable at startup; falling back to Mock LLM provider.", {
-    baseUrl: ollamaRuntime.baseUrl,
-    model: env.OLLAMA_MODEL,
-  });
   activeProvider = new MockProvider();
-  logProviderSelected(activeProvider, "ollama-unreachable-fallback");
+  logProviderSelected(activeProvider, "default-mock");
 }
 
 export async function ensureOllamaProvider(): Promise<ILlmProvider> {
@@ -95,37 +135,47 @@ export async function ensureOllamaProvider(): Promise<ILlmProvider> {
     return new MockProvider();
   }
 
-  if (env.LLM_PROVIDER !== "ollama") {
-    return getActiveLlmProvider();
-  }
+  if (isOllamaLlmEnabled()) {
+    if (activeProvider?.providerName === "ollama" && ollamaRuntime?.connected) {
+      return activeProvider;
+    }
 
-  if (activeProvider?.providerName === "ollama" && ollamaRuntime?.connected) {
+    const provider = await connectOllamaProvider();
+    if (provider) {
+      logOllamaStartup(ollamaRuntime!);
+      activeProvider = provider;
+      logProviderSelected(activeProvider, "ollama-runtime-reconnected");
+      return activeProvider;
+    }
+
+    const openAi = tryCreateOpenAiProvider();
+    if (openAi) {
+      activeProvider = openAi;
+      logProviderSelected(activeProvider, "ollama-runtime-openai-fallback");
+      return openAi;
+    }
+
+    if (!activeProvider) {
+      activeProvider = new MockProvider();
+      logProviderSelected(activeProvider, "ollama-reconnect-mock-fallback");
+    }
     return activeProvider;
   }
 
-  const provider = await connectOllamaProvider();
-  if (provider) {
-    logOllamaStartup(ollamaRuntime!);
-    activeProvider = provider;
-    logProviderSelected(activeProvider, "ollama-runtime-reconnected");
-    return activeProvider;
-  }
-
-  if (!activeProvider) {
-    activeProvider = new MockProvider();
-    logProviderSelected(activeProvider, "ollama-reconnect-fallback");
-  }
-  return activeProvider;
+  return getActiveLlmProvider();
 }
 
 export function getActiveLlmProvider(): ILlmProvider {
   if (!activeProvider) {
-    if (env.LLM_PROVIDER === "ollama" && !shouldForceMockProvider() && ollamaRuntime?.connected) {
+    if (isOllamaLlmEnabled() && !shouldForceMockProvider() && ollamaRuntime?.connected) {
       activeProvider = createOllamaProvider(ollamaRuntime);
       logProviderSelected(activeProvider, "lazy-ollama");
-    } else if (env.LLM_PROVIDER === "ollama" && !shouldForceMockProvider()) {
+    } else if (isOllamaLlmEnabled() && !shouldForceMockProvider()) {
       activeProvider = new OllamaProvider();
       logProviderSelected(activeProvider, "lazy-ollama-unprobed");
+    } else if (isOpenAiLlmConfigured()) {
+      activeProvider = tryCreateOpenAiProvider() ?? new MockProvider();
+      logProviderSelected(activeProvider, "lazy-openai");
     } else {
       activeProvider = new MockProvider();
       logProviderSelected(activeProvider, "lazy-mock");
@@ -138,8 +188,11 @@ export async function resolveLlmProvider(): Promise<ILlmProvider> {
   if (shouldForceMockProvider()) {
     return new MockProvider();
   }
-  if (env.LLM_PROVIDER === "ollama") {
+  if (isOllamaLlmEnabled()) {
     return ensureOllamaProvider();
+  }
+  if (isOpenAiLlmConfigured()) {
+    return tryCreateOpenAiProvider() ?? getActiveLlmProvider();
   }
   return getActiveLlmProvider();
 }
