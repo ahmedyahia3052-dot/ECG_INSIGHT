@@ -13,7 +13,10 @@ const developmentDefaults = {
   CLIENT_ORIGIN: "http://localhost:8081",
   DATABASE_URL: "postgresql://postgres:postgres@localhost:5432/ecg_insight",
   EXPO_PUBLIC_API_URL: "http://localhost:3002/api",
+  LLM_PROVIDER: "ollama",
   LOG_LEVEL: "info",
+  OLLAMA_BASE_URL: "http://127.0.0.1:11434",
+  OLLAMA_MODEL: "llama3.2:1b",
   JWT_REFRESH_SECRET:
     "dev-refresh-938cfdc355358b3b4d1879f159a0252b7b7fe3b08bcb0979d98b8ec4b82d684d",
   JWT_SECRET:
@@ -76,8 +79,11 @@ const envSchema = z
     }),
     GOOGLE_OAUTH_CLIENT_ID: z.string().optional(),
     GOOGLE_OAUTH_CLIENT_SECRET: z.string().optional(),
+    LLM_PROVIDER: z.enum(["ollama"]).default("ollama"),
     LOG_LEVEL: z.enum(["debug", "info", "warn", "error"]).default("info"),
     MICROSOFT_OAUTH_CLIENT_ID: z.string().optional(),
+    OLLAMA_BASE_URL: z.string().url().default("http://127.0.0.1:11434"),
+    OLLAMA_MODEL: z.string().min(1).default("llama3.2:1b"),
     MICROSOFT_OAUTH_CLIENT_SECRET: z.string().optional(),
     NODE_ENV: z.enum(["development", "test", "production"]),
     OAUTH_CALLBACK_BASE_URL: optionalUrl,

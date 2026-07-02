@@ -1,5 +1,6 @@
 import { env } from "../config/env";
 import { prisma } from "../config/prisma";
+import { initializeLlmProvider } from "../llm/llm-registry";
 import { log } from "../utils/logger";
 
 export async function runStartupChecks() {
@@ -9,8 +10,9 @@ export async function runStartupChecks() {
   });
 
   await prisma.$queryRaw`SELECT 1`;
+  await initializeLlmProvider();
 
   log("info", "Startup checks completed.", {
-    checks: ["environment", "database"],
+    checks: ["environment", "database", "llm-provider"],
   });
 }

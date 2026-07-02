@@ -338,6 +338,10 @@ export function CopilotWorkspaceScreen({ routeConversationId }: { routeConversat
         voiceMode: voiceModeRef.current,
       }, (event) => {
         if (event.type === "status") setStatus(event.status ?? "");
+        if (event.type === "error" && event.status) {
+          setStatus(event.status);
+          throw new Error(event.status);
+        }
         if (event.type === "token" && event.token) {
           assistantContent += event.token;
           setStreamingMessage((current) => `${current}${event.token}`);
@@ -373,8 +377,11 @@ export function CopilotWorkspaceScreen({ routeConversationId }: { routeConversat
         voiceEngineRef.current?.speak(sanitizeAssistantContent(result.assistantContent), result.assistantMessageId);
       }
     },
-    onError: () => {
-      setStatus("Connection interrupted. Your conversation is saved; please retry when ready.");
+    onError: (error) => {
+      const message = error instanceof Error && error.message.trim()
+        ? error.message
+        : "Connection interrupted. Your conversation is saved; please retry when ready.";
+      setStatus(message);
       setStreamingMessage("");
       streamAbort.current = null;
       if (voiceModeRef.current) {

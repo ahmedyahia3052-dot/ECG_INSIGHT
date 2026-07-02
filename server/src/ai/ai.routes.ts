@@ -1,6 +1,7 @@
 import type { Prisma } from "@prisma/client";
 import { Router } from "express";
 import { z } from "zod";
+import { AiChatService } from "./services/ai-chat.service";
 import { prisma } from "../config/prisma";
 import { requireAuth, requireRole } from "../middleware/auth";
 import { assertCanRunAnalysis, recordAnalysisUsage } from "../subscriptions/monetization.service";
@@ -19,6 +20,28 @@ import {
 } from "./ai.service";
 
 export const aiRouter = Router();
+
+aiRouter.get("/health", async (_req, res, next) => {
+  try {
+    res.json(await AiChatService.getHealth());
+  } catch (error) {
+    next(error);
+  }
+});
+
+aiRouter.get("/models", async (_req, res, next) => {
+  try {
+    const health = await AiChatService.getHealth();
+    if (!health.online) {
+      res.json({ models: [], online: false, provider: health.provider });
+      return;
+    }
+    const models = await AiChatService.listInstalledModels();
+    res.json({ models, online: true, provider: health.provider });
+  } catch (error) {
+    next(error);
+  }
+});
 
 aiRouter.use(requireAuth);
 

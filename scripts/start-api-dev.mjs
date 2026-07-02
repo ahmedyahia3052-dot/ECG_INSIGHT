@@ -3,8 +3,12 @@ import { spawn } from "node:child_process";
 const env = {
   ...process.env,
   CLIENT_ORIGIN: process.env.CLIENT_ORIGIN ?? "http://localhost:8081",
-  EXPO_PUBLIC_API_URL: "http://localhost:3002/api",
+  COPILOT_LLM_MOCK: process.env.COPILOT_LLM_MOCK ?? "false",
+  EXPO_PUBLIC_API_URL: process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:3002/api",
+  LLM_PROVIDER: process.env.LLM_PROVIDER ?? "ollama",
   NODE_ENV: "development",
+  OLLAMA_BASE_URL: process.env.OLLAMA_BASE_URL ?? "http://127.0.0.1:11434",
+  OLLAMA_MODEL: process.env.OLLAMA_MODEL ?? "llama3.2:1b",
   PORT: "3002",
 };
 
