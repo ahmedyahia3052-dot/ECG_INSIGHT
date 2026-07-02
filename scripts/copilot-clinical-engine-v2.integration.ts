@@ -21,7 +21,7 @@ async function engine(question: string, memory = emptyMemory) {
 }
 
 async function main() {
-  assert(CLINICAL_AI_ENGINE_VERSION === "v3", "Active engine must be V3");
+  assert(CLINICAL_AI_ENGINE_VERSION === "clinical-ai-core-v1", "Active engine must be Clinical AI Core v1");
 
   for (const greeting of ["Hi", "Hello", "How are you?", "Who are you?", "Thank you"]) {
     const result = await engine(greeting);

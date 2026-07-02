@@ -24,7 +24,7 @@ async function ask(question: string, memory: ConversationMemory = emptyMemory, c
 }
 
 async function main() {
-  assert(CLINICAL_AI_ENGINE_VERSION === "v3", `engine version must be v3, got ${CLINICAL_AI_ENGINE_VERSION}`);
+  assert(CLINICAL_AI_ENGINE_VERSION === "clinical-ai-core-v1", `engine version must be clinical-ai-core-v1, got ${CLINICAL_AI_ENGINE_VERSION}`);
 
   await ask("Hello");
   await ask("What is hypertension?");
@@ -53,13 +53,14 @@ async function main() {
       warnings: [],
     }],
     chatInput: {},
-    conversationId: "v3-vision",
+    conversationId: "core-attachment-conv",
     memory: emptyMemory,
     question: "What do you see on this ECG?",
   }, engineDeps);
-  assert(/ECG|ST|elevation|tracing|rhythm/i.test(vision.response.content), "Upload analysis informs LLM answer");
+  assert(vision.response.content.trim().length > 20, "Attachment question returns conversational LLM response (Sprint 1: no vision tools)");
+  assert(!vision.toolPlan.runEcgEngine, "ECG analyzer tool must not run in Sprint 1 core");
 
-  assert(ECG_LEARNING_PATH.length === 8, "ECG learning path reference data preserved for tools");
+  assert(ECG_LEARNING_PATH.length === 13, "ECG tutor curriculum has 13 lessons");
 
   const generated = ResponseGenerator.generate({
     attachments: [],
@@ -76,7 +77,7 @@ async function main() {
   });
   assert(generated.content.includes("legacy shim") || generated.content.length > 0, "Legacy ResponseGenerator shim remains isolated from V3 pipeline");
 
-  console.log("copilot-clinical-ai-core-v2.integration.ts: all tests passed (V3)");
+  console.log("copilot-clinical-ai-core-v2.integration.ts: all tests passed (Clinical AI Core)");
 }
 
 main().catch((error) => {

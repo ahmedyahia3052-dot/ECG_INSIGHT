@@ -1,8 +1,8 @@
 import type { ChatContextInput, ClinicalContext } from "../copilot-types";
 import type { EngineDebugPayload, EngineInput, EngineResult } from "./types";
 import { CLINICAL_AI_ENGINE_VERSION } from "./types";
-import { runClinicalAiV3, toV3EngineResult } from "../v3/pipeline";
-import type { V3StreamCallbacks } from "../v3/types";
+import { runClinicalAiCore, toCoreEngineResult } from "../core/pipeline";
+import type { CoreStreamCallbacks } from "../core/types";
 
 export type EngineDependencies = {
   retrieveClinicalContext: (input: ChatContextInput) => Promise<ClinicalContext>;
@@ -11,10 +11,10 @@ export type EngineDependencies = {
 export async function runClinicalCopilotEngine(
   input: EngineInput,
   deps: EngineDependencies,
-  callbacks: V3StreamCallbacks = {},
+  callbacks: CoreStreamCallbacks = {},
 ): Promise<EngineResult> {
   const started = performance.now();
-  const pipeline = await runClinicalAiV3(
+  const pipeline = await runClinicalAiCore(
     {
       attachments: input.attachments,
       chatInput: input.chatInput,
@@ -27,7 +27,7 @@ export async function runClinicalCopilotEngine(
     deps,
     callbacks,
   );
-  return toV3EngineResult(input, pipeline, Math.max(0, Math.round(performance.now() - started)));
+  return toCoreEngineResult(input, pipeline, Math.max(0, Math.round(performance.now() - started)));
 }
 
 export async function previewClinicalCopilotEngine(_input: EngineInput, _deps: EngineDependencies) {

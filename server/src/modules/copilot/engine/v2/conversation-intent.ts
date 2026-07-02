@@ -104,6 +104,11 @@ function hasVisionAttachments(attachments: AttachmentForAnalysis[], memory: Conv
     || memory.attachments.length > 0;
 }
 
+function isAcuteEmergency(text: string) {
+  return /\b(cardiac arrest|not breathing|unresponsive|collapsed|anaphylaxis|active bleeding|gi bleeding|gastrointestinal bleed|hypotension|shortness of breath|facial droop|stroke|overdose|altered mental status|rigors|ventricular fibrillation|\bvf\b|ventricular tachycardia|\bvt\b|syncope|trauma patient|trauma with|chest pain.*diaphoresis|diaphoresis.*chest pain)\b/i.test(text)
+    || /\b(severe shortness of breath|possible stroke|high fever.*confusion|fever with rigors)\b/i.test(text);
+}
+
 export const ConversationIntentEngine = {
   classify(input: IntentInput): ConversationIntentResult {
     const text = input.contextState.resolvedQuestion.toLowerCase();
@@ -117,7 +122,7 @@ export const ConversationIntentEngine = {
         || /^(how|what about|why|tell me more|also|what would you|what should i|what next)/i.test(raw.trim())
         || /^(how is it|why does it|what causes it)\b/i.test(raw.trim()));
 
-    if (/\b(cardiac arrest|not breathing|unresponsive|collapsed|anaphylaxis|active bleeding|ventricular fibrillation|\bvf\b|ventricular tachycardia|\bvt\b|syncope)\b/i.test(text)) {
+    if (isAcuteEmergency(text) || isAcuteEmergency(raw)) {
       return { educationalTopic: "none", intent: "emergency_advice", isEducational: false, isFollowUp: followUp, isLearner, isTutorMode: false, reason: "acute-emergency" };
     }
 

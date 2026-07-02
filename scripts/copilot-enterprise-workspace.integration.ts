@@ -1,3 +1,5 @@
+process.env.COPILOT_LLM_MOCK = "true";
+
 import { createServer } from "node:http";
 import { PrismaClient } from "@prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";

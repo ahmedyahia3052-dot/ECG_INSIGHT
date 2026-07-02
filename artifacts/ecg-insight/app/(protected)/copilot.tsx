@@ -48,7 +48,6 @@ const WORKSPACE_STATE_KEY = "ecg-insight:copilot-workspace-state";
 
 function sanitizeAssistantContent(content: string) {
   return content
-    .replace(/^##+\s.+$/gm, "")
     .replace(/^Short Answer\s*$/gim, "")
     .replace(/^References:[\s\S]*$/im, "")
     .replace(/\nConfidence Score:\s*\d+%/gi, "")
@@ -61,6 +60,14 @@ function sanitizeAssistantContent(content: string) {
     .replace(/\n{3,}/g, "\n\n")
     .trim();
 }
+
+const TUTOR_COMMANDS = [
+  { command: "/teach", label: "Teach" },
+  { command: "/quiz", label: "Quiz" },
+  { command: "/case", label: "Case" },
+  { command: "/explain", label: "Explain" },
+  { command: "/summarize", label: "Summarize" },
+] as const;
 
 function safeString(value: unknown, fallback = "") {
   return typeof value === "string" ? value : fallback;
@@ -698,6 +705,19 @@ export function CopilotWorkspaceScreen({ routeConversationId }: { routeConversat
                 <Text style={styles.uploadProgressText}>Uploading {uploadingFiles.join(", ")}...</Text>
               </View>
             ) : null}
+            <View style={styles.commandRow}>
+              {TUTOR_COMMANDS.map(({ command, label }) => (
+                <Pressable
+                  accessibilityLabel={`Insert ${label} command`}
+                  accessibilityRole="button"
+                  key={command}
+                  onPress={() => setDraft((current) => (current.trim() ? `${current.trim()} ${command}` : `${command} `))}
+                  style={styles.commandChip}
+                >
+                  <Text style={styles.commandChipText}>{command}</Text>
+                </Pressable>
+              ))}
+            </View>
             {liveTranscript && (isRecording || voiceStatus === "transcribing") ? (
               <Text style={styles.liveTranscript} testID="copilot-live-transcript">{liveTranscript}</Text>
             ) : null}
@@ -803,14 +823,34 @@ function RichMedicalText({ content }: { content: string }) {
         }
         if (inCode) return <Text key={index} style={styles.codeText}>{line || " "}</Text>;
         if (!line.trim()) return <View key={`space-${index}`} style={styles.messageSpace} />;
-        if (line.startsWith("## ")) return <Text key={index} style={styles.messageHeading}>{line.replace(/^##\s*/, "")}</Text>;
-        if (line.startsWith("### ")) return <Text key={index} style={styles.messageSubheading}>{line.replace(/^###\s*/, "")}</Text>;
-        if (line.startsWith("- ")) return <Text key={index} style={styles.messageBullet}>• {line.slice(2)}</Text>;
-        if (/^\d+\.\s/.test(line)) return <Text key={index} style={styles.messageText}>{line}</Text>;
+        if (line.startsWith("## ")) return <Text key={index} style={styles.messageHeading}><InlineMarkdown text={line.replace(/^##\s*/, "")} /></Text>;
+        if (line.startsWith("### ")) return <Text key={index} style={styles.messageSubheading}><InlineMarkdown text={line.replace(/^###\s*/, "")} /></Text>;
+        if (line.startsWith("- ")) return <Text key={index} style={styles.messageBullet}>• <InlineMarkdown text={line.slice(2)} /></Text>;
+        if (/^\d+\.\s/.test(line)) return <Text key={index} style={styles.messageText}><InlineMarkdown text={line} /></Text>;
         if (line.includes("|")) return <Text key={index} style={styles.messageTable}>{line}</Text>;
-        return <Text key={index} style={styles.messageText}>{line}</Text>;
+        return <Text key={index} style={styles.messageText}><InlineMarkdown text={line} /></Text>;
       })}
     </View>
+  );
+}
+
+function InlineMarkdown({ text }: { text: string }) {
+  const parts = text.split(/(\*\*.+?\*\*|\*.+?\*|`[^`]+`)/g);
+  return (
+    <Text>
+      {parts.map((part, index) => {
+        if (part.startsWith("**") && part.endsWith("**")) {
+          return <Text key={index} style={styles.inlineBold}>{part.slice(2, -2)}</Text>;
+        }
+        if (part.startsWith("*") && part.endsWith("*") && !part.startsWith("**")) {
+          return <Text key={index} style={styles.inlineItalic}>{part.slice(1, -1)}</Text>;
+        }
+        if (part.startsWith("`") && part.endsWith("`")) {
+          return <Text key={index} style={styles.inlineCode}>{part.slice(1, -1)}</Text>;
+        }
+        return part;
+      })}
+    </Text>
   );
 }
 
@@ -931,7 +971,13 @@ const styles = StyleSheet.create({
   citationText: { color: medicalTheme.text, fontSize: 11, fontWeight: "800" },
   citations: { flexDirection: "row", flexWrap: "wrap", gap: 6, marginTop: 8 },
   codeText: { backgroundColor: "#020617", borderColor: glassBorder, borderRadius: 8, borderWidth: 1, color: "#D6E4FF", fontFamily: Platform.select({ web: "monospace", default: undefined }), fontSize: 12, lineHeight: 18, padding: 8 },
+  inlineBold: { fontWeight: "800" },
+  inlineCode: { backgroundColor: "rgba(15,23,42,0.8)", color: "#D6E4FF", fontFamily: Platform.select({ web: "monospace", default: undefined }), fontSize: 12 },
+  inlineItalic: { fontStyle: "italic" },
   composer: { backgroundColor: "rgba(15,23,42,0.92)", borderColor: glassBorder, borderRadius: 22, borderWidth: 1, gap: 10, padding: 12 },
+  commandChip: { backgroundColor: "rgba(30,41,59,0.85)", borderColor: glassBorder, borderRadius: 999, borderWidth: 1, paddingHorizontal: 10, paddingVertical: 6 },
+  commandChipText: { color: medicalTheme.primary, fontSize: 11, fontWeight: "800" },
+  commandRow: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   composerInput: { color: medicalTheme.text, flex: 1, fontSize: 14, lineHeight: 21, maxHeight: 150, minHeight: 54, minWidth: 240, padding: 10 },
   composerTool: { alignItems: "center", backgroundColor: "rgba(20,221,230,0.08)", borderColor: glassBorder, borderRadius: 999, borderWidth: 1, flexDirection: "row", gap: 6, paddingHorizontal: 9, paddingVertical: 6 },
   composerToolActive: { backgroundColor: "rgba(239,68,68,0.16)", borderColor: "rgba(239,68,68,0.45)" },

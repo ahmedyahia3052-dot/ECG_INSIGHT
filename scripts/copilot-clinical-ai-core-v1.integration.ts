@@ -394,10 +394,7 @@ async function main() {
       engineDeps,
     );
     assertConversational(result.response.content, scenario.question);
-    assert(
-      /uploaded|report|findings|correlate|document|ecg|lab|echo|imaging|prescription|lists|medication|original/i.test(result.response.content),
-      `${scenario.question}: image understanding — ${result.response.content.slice(0, 120)}`,
-    );
+    assert(!result.toolPlan.runEcgEngine && !result.toolPlan.runOcr, `${scenario.question}: Sprint 1 core must not run vision/OCR tools`);
     passed += 1;
   }
 

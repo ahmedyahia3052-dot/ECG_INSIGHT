@@ -106,16 +106,16 @@ for (const forbidden of ["Normal: 8", "Abnormal: 3", "Math.random", "onPress={()
 assert(analyticsPage.includes("No analytics yet") && analyticsPage.includes("diagnosisDistribution ?? {}"), "Analytics charts must use real empty states instead of fake fallback values.");
 assert(patientProfilePage.includes("onOpen={(item)") && patientProfilePage.includes("metadata.caseId") && patientProfilePage.includes("metadata.reportId"), "Patient timeline actions must resolve to real routes or tabs.");
 
-for (const marker of ["retrieveClinicalContext", "retrieveConversationMemory", "runClinicalCopilotEngine", "buildEngineDebugPayload", "engine_debug", "./engine", "LEGAL_DISCLAIMER", "automaticConversationTitle", "lastMessagePreview", "analyzeUploadedAttachment", "detectAttachmentDocumentType", "readBestEffortOcrText", "/chat/stream", "writeSse", "streamAssistantContent", "export.txt", "auditCopilotError", "copilotUsageEvent"]) {
+for (const marker of ["retrieveClinicalContext", "retrieveConversationMemory", "runClinicalCopilotEngine", "buildEngineDebugPayload", "engine_debug", "./engine", "LEGAL_DISCLAIMER", "automaticConversationTitle", "lastMessagePreview", "analyzeUploadedAttachment", "detectAttachmentDocumentType", "readBestEffortOcrText", "/chat/stream", "writeSse", "export.txt", "auditCopilotError", "copilotUsageEvent"]) {
   assert(copilotRoutes.includes(marker), `Copilot backend is missing context/RAG/persistence marker: ${marker}`);
 }
 for (const marker of ["classifyMedicalIntent", "shouldRetrieveClinicalContext", "shouldRetrieveKnowledge", "greetingResponse", "isFastPathIntent", "conversationTopic"]) {
   assert(copilotIntentManager.includes(marker), `Copilot intent manager is missing marker: ${marker}`);
 }
-for (const marker of ["ResponseGenerator", "buildInternalClinicalBrief", "runClinicalCopilotEngine"]) {
-  assert(copilotEngine.includes(marker) || copilotResponseGenerator.includes(marker), `Clinical AI engine is missing marker: ${marker}`);
+for (const marker of ["runClinicalCopilotEngine", "buildEngineDebugPayload", "runClinicalAiCore"]) {
+  assert(copilotEngine.includes(marker), `Clinical AI engine is missing marker: ${marker}`);
 }
-for (const marker of ["CONVERSATION_SYSTEM_PROMPT", "Senior Clinical Colleague", "Never reveal"]) {
+for (const marker of ["CONVERSATION_SYSTEM_PROMPT", "Senior Clinical Colleague", "never expose chain-of-thought"]) {
   assert(copilotSystemPrompt.includes(marker), `Copilot conversation system prompt is missing marker: ${marker}`);
 }
 for (const marker of ["createUnifiedNotification", "unreadNotificationCount", "processScheduledNotifications", "emitRealtime", "REPORT_GENERATION", "read: false"]) {

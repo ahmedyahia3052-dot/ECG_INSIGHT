@@ -1,6 +1,5 @@
 import type { AttachmentForAnalysis, ChatContextInput, ClinicalContext } from "../../copilot-types";
-import { retrieveRoutedKnowledge } from "../../engine/knowledge-retrieval";
-import { semanticSearchKnowledge } from "../../medical-knowledge";
+import { KnowledgeService } from "../../../knowledge-engine";
 import type { KnowledgeRoute } from "../../engine/types";
 import { analyzeAttachmentStructured } from "./document-analyzer";
 
@@ -34,20 +33,19 @@ export async function executeCopilotTool(
     case "medical_knowledge_search":
     case "medical_search": {
       const query = String(args.query ?? "");
-      const route: KnowledgeRoute = { query, sources: ["cardiology_kb", "internal_knowledge_base", "ecg_database"] };
-      const hits = await retrieveRoutedKnowledge(route, await ctx.retrieveClinicalContext(ctx.chatInput));
-      return { hits: hits.slice(0, 6).map((hit) => ({ content: hit.content.slice(0, 600), source: hit.sourceName, topic: hit.topic })), query };
+      const result = await KnowledgeService.search({ query, limit: 6 });
+      return KnowledgeService.toToolPayload(result);
     }
     case "clinical_guidelines": {
       const query = String(args.query ?? "");
       const route: KnowledgeRoute = { query, sources: ["esc_guidelines", "aha_guidelines", "cardiology_kb"] };
-      const hits = await retrieveRoutedKnowledge(route, await ctx.retrieveClinicalContext(ctx.chatInput));
+      const hits = await KnowledgeService.searchRouted(route);
       return { guidelines: hits.slice(0, 5).map((hit) => ({ content: hit.content.slice(0, 600), source: hit.sourceName, topic: hit.topic })), query };
     }
     case "drug_database": {
       const query = String(args.query ?? "");
-      const hits = await semanticSearchKnowledge(query, { domains: ["DRUGS", "CARDIOLOGY"], take: 5 });
-      return { drugs: hits.map((hit) => ({ content: hit.content.slice(0, 600), source: hit.sourceName, title: hit.title })), query };
+      const result = await KnowledgeService.search({ query, intent: "drug_question", limit: 5 });
+      return { drugs: result.hits.map((hit) => ({ content: hit.content.slice(0, 600), source: hit.sourceName, title: hit.topic })), query };
     }
     case "patient_record_retrieval": {
       const clinicalContext = await ctx.retrieveClinicalContext({
@@ -81,21 +79,8 @@ export async function executeCopilotTool(
     }
     case "medical_ocr": {
       const attachment = attachmentById(ctx.attachments, typeof args.attachmentId === "string" ? args.attachmentId : undefined);
-      if (!attachment) return { error: "no_attachment" };
-      return {
-        documentType: attachment.documentType ?? attachment.kind,
-        extractedText: (attachment.extractedText ?? "").slice(0, 4000),
-        name: attachment.originalName,
-      };
-    }
-    case "clinical_calculator": {
-      const calculator = String(args.calculator ?? "qtc");
-      return {
-        calculator,
-        disclaimer: "Calculator output requires validated clinical inputs.",
-        inputs: args.inputs ?? {},
-        note: "Use validated inputs at bedside; this tool returns structured placeholder until wired to score engines.",
-      };
+      if (!attachment) return { error: "no_document_attachment" };
+      return analyzeAttachmentStructured(attachment);
     }
     default:
       return { error: "unknown_tool", name };

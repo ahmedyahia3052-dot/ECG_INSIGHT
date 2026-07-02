@@ -25,7 +25,7 @@ async function ask(question: string, memory = emptyMemory, conversationId = "v3-
 }
 
 async function main() {
-  assert(CLINICAL_AI_ENGINE_VERSION === "v3", "Engine version must be v3");
+  assert(CLINICAL_AI_ENGINE_VERSION === "clinical-ai-core-v1", "Engine version must be clinical-ai-core-v1");
   assert(MEDICAL_ASSISTANT_V3_SYSTEM_PROMPT.includes("never expose chain-of-thought"), "System prompt safety rules");
 
   const v2NaturalResponse = fs.readFileSync(
@@ -35,7 +35,7 @@ async function main() {
   const engineSource = fs.readFileSync(path.join("server", "src", "modules", "copilot", "engine", "clinical-ai-engine.ts"), "utf8");
   assert(!engineSource.includes("runClinicalAiCoreV2"), "V2 pipeline must not be active");
   assert(!engineSource.includes("NaturalResponse.generate"), "Template generator must not be wired");
-  assert(engineSource.includes("runClinicalAiV3"), "V3 pipeline must be active");
+  assert(engineSource.includes("runClinicalAiCore"), "Clinical AI Core pipeline must be active");
 
   const routesSource = fs.readFileSync(path.join("server", "src", "modules", "copilot", "copilot.routes.ts"), "utf8");
   assert(!routesSource.includes("streamAssistantContent"), "Fake chunk streaming must be removed");
@@ -117,7 +117,7 @@ async function main() {
     assert(!/Knowledge route:/i.test(result.response.content), `No routing artifacts for: ${question}`);
   }
 
-  console.log(`Clinical AI V3 integration passed (${scenarios.length} conversational scenarios).`);
+  console.log(`Clinical AI Core integration passed (${scenarios.length} conversational scenarios).`);
 }
 
 main().catch((error) => {

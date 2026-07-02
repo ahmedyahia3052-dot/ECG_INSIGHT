@@ -64,7 +64,7 @@ async function main() {
     assert(intentSource.includes(marker), `Copilot intent manager marker missing: ${marker}`);
   }
   assert(engineSource.includes("runClinicalCopilotEngine"), "Clinical AI engine marker missing.");
-  assert(responseSource.includes("semanticSearchKnowledge"), "Knowledge retrieval marker missing.");
+  assert(responseSource.includes("KnowledgeService"), "Knowledge retrieval must delegate to Knowledge Service");
 
   console.log(`Enterprise medical knowledge RAG quality passed: ${questions.length} questions, domain ${Math.round(domainAccuracy * 100)}%, citation ${Math.round(citationAccuracy * 100)}%, mean score ${meanTopScore.toFixed(3)}.`);
 }

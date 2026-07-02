@@ -45,13 +45,16 @@ const TOPIC_KEYWORDS: Array<{ pattern: RegExp; slug: string; label: string }> = 
 ];
 
 function detectTopic(memory: ConversationMemory, question: string): TopicFrame | null {
+  const sources = [...memory.turns].reverse().map((turn) => turn.content).concat(question);
+  for (const text of sources) {
+    const lowered = text.toLowerCase();
+    for (const entry of TOPIC_KEYWORDS) {
+      if (entry.pattern.test(lowered)) return { label: entry.label, slug: entry.slug };
+    }
+    if (/^\s*af\s*[?.!]?\s*$/i.test(lowered)) return { label: "atrial fibrillation", slug: "atrial fibrillation" };
+  }
   const fromMemory = conversationTopic(memory);
   if (fromMemory) return { label: TOPIC_LABELS[fromMemory] ?? fromMemory, slug: fromMemory };
-  const lowered = question.toLowerCase();
-  for (const entry of TOPIC_KEYWORDS) {
-    if (entry.pattern.test(lowered)) return { label: entry.label, slug: entry.slug };
-  }
-  if (/^\s*af\s*[?.!]?\s*$/i.test(lowered)) return { label: "atrial fibrillation", slug: "atrial fibrillation" };
   return null;
 }
 

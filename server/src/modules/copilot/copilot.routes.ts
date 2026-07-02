@@ -13,6 +13,7 @@ import { CONVERSATION_SYSTEM_PROMPT } from "./conversation-system-prompt";
 import type { AttachmentInsight, Citation, ClinicalContext, ConversationMemory } from "./copilot-types";
 import {
   attachmentInsights,
+  buildEngineDebugPayload,
   dedupeCitations,
   previewClinicalCopilotEngine,
   runClinicalCopilotEngine,
@@ -273,7 +274,7 @@ function ownerOnly(req: { auth?: { id: string } }) {
 }
 
 async function settings() {
-  const defaultProvider = JSON.stringify({ brainVersion: "v3", developerMode: process.env.NODE_ENV !== "production", engineVersion: "v3" });
+  const defaultProvider = JSON.stringify({ brainVersion: "core-v1", developerMode: process.env.NODE_ENV !== "production", engineVersion: "core-v1" });
   return prisma.copilotSettings.upsert({
     create: { enabled: true, provider: defaultProvider },
     update: {},
@@ -494,12 +495,12 @@ async function retrieveConversationMemory(conversationId: string): Promise<Conve
   const recent = await prisma.copilotMessage.findMany({
     include: { attachments: { orderBy: { createdAt: "asc" } } },
     orderBy: { createdAt: "desc" },
-    take: 12,
+    take: 24,
     where: { conversationId },
   });
   const ordered = recent.reverse();
   const turns = ordered.map((message) => ({
-    content: message.content.replace(/\s+/g, " ").slice(0, 360),
+    content: message.content.replace(/\s+/g, " ").slice(0, 800),
     role: message.role,
   }));
   const attachments = attachmentInsights(ordered.flatMap((message) => message.attachments));
@@ -628,7 +629,7 @@ async function executeCopilotChat(input: ChatInput, userId: string, started = Da
   await prisma.copilotUsageEvent.create({
     data: {
       conversationId: conversation.id,
-      question: `${input.question} | engine:v3 | tools:${engine.toolPlan.tools.join(",")} | latency:${engine.executionTimeMs}ms`,
+      question: `${input.question} | engine:core-v1 | tools:${engine.toolPlan.tools.join(",")} | latency:${engine.executionTimeMs}ms`,
       responseTimeMs,
       tag: engine.tag,
       userId,
@@ -913,7 +914,7 @@ copilotRouter.post("/chat/stream", requireRole("DOCTOR"), async (req, res, next)
     if (previewEngine.toolPlan.tools[0] !== "conversation") {
       writeSse(res, "status", { message: "Reviewing clinical information..." });
     }
-    const { assistant, conversation, userMessage } = await executeCopilotChat(body, req.auth!.id, started, {
+    const { assistant, conversation, engine, userMessage } = await executeCopilotChat(body, req.auth!.id, started, {
       onStatus: (message) => {
         if (!closed) writeSse(res, "status", { message });
       },
@@ -921,6 +922,7 @@ copilotRouter.post("/chat/stream", requireRole("DOCTOR"), async (req, res, next)
         if (!closed) writeSse(res, "token", { token });
       },
     });
+    if (!closed) writeSse(res, "engine_debug", buildEngineDebugPayload(engine));
     writeSse(res, "conversation", { conversation: serializeConversation(conversation), message: serializeMessage(assistant), userMessage: serializeMessage(userMessage) });
     if (!closed) writeSse(res, "done", { conversation: serializeConversation(conversation), message: serializeMessage(assistant), userMessage: serializeMessage(userMessage) });
     res.end();

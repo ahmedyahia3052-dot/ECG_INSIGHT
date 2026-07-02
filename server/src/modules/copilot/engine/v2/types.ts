@@ -73,12 +73,17 @@ export type PipelineOutput = {
 };
 
 export const ECG_LEARNING_PATH = [
-  "Cardiac anatomy",
-  "Conduction system",
-  "ECG paper",
-  "Calibration",
-  "Lead placement",
-  "Heart rate",
-  "Rhythm",
+  "Cardiac Anatomy",
+  "Electrical Conduction",
+  "ECG Paper",
+  "Leads",
+  "Waves",
+  "Intervals",
   "Axis",
+  "Hypertrophy",
+  "Bundle Branch Block",
+  "Arrhythmias",
+  "STEMI",
+  "NSTEMI",
+  "Clinical Interpretation",
 ] as const;

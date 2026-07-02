@@ -29,28 +29,119 @@ function parseSessionContext(messages: LlmChatMessage[]): MockSessionContext | n
 }
 
 function buildMockReply(messages: LlmChatMessage[]): string {
-  const lastUser = [...messages].reverse().find((item) => item.role === "user")?.content ?? "";
+  const userMessages = messages.filter((item) => item.role === "user").map((item) => item.content.trim());
+  const lastUser = userMessages.at(-1) ?? "";
   const systemText = messages.filter((item) => item.role === "system").map((item) => item.content).join("\n");
   const session = parseSessionContext(messages);
+  const repeatedQuestion = userMessages.length >= 2 && userMessages.at(-1) === userMessages.at(-2);
+
+  const tutorStructured = (title: string, explanation: string, pearl: string, points: string[], next: string) =>
+    `## ${title}\n\n## Explanation\n${explanation}\n\n### Clinical Pearl\n${pearl}\n\n## Key Points\n${points.map((point) => `- ${point}`).join("\n")}\n\n## Next Lesson\n${next}`;
 
   let text = "Happy to help — tell me a bit more about what you'd like to explore.";
 
-  if (/Resolved question: How is hypertension diagnosed/i.test(systemText) && /diagnos/i.test(lastUser)) {
-    text = "Hypertension is diagnosed with repeated blood pressure readings in a calm setting, often confirmed with ambulatory or home monitoring, plus assessment of end-organ effects.";
+  if (repeatedQuestion && lastUser) {
+    text = tutorStructured(
+      "Reviewing Your Question Again",
+      `You asked about "${lastUser}" again — here is a fresh walkthrough using what we already discussed in this thread.`,
+      "Repeating a concept from a new angle often solidifies retention.",
+      ["Same topic, clearer framing", "Build on prior turns in this chat", "Ask /quiz when ready to test yourself"],
+      "Say **next** or use /teach to continue the curriculum.",
+    );
+  } else if (/\/quiz\b/i.test(lastUser)) {
+    text = tutorStructured(
+      "ECG Quick Quiz",
+      "Question 1: Which interval reflects AV nodal conduction? Question 2: Which lead pair helps estimate frontal plane axis?",
+      "Quiz yourself before looking up answers — retrieval practice beats passive rereading.",
+      ["PR interval = AV conduction", "Lead I and aVF for axis", "Regularly irregular rhythm suggests AF"],
+      "Use /teach for the next lesson when you're ready.",
+    );
+  } else if (/\/summarize\b/i.test(lastUser)) {
+    text = tutorStructured(
+      "Conversation Summary",
+      "We reviewed your recent questions in this thread and the main teaching points covered so far.",
+      "Summaries are most useful when you note one gap to revisit.",
+      ["Key topics from this chat are captured above", "Use /teach to resume structured lessons"],
+      "Continue with /teach or ask a follow-up question.",
+    );
+  } else if (/\/explain\b/i.test(lastUser)) {
+    text = tutorStructured(
+      "Concept Explanation",
+      "I'll explain the requested topic step-by-step in plain clinical language.",
+      "Anchor each abstract term to something you can see on the tracing.",
+      ["Definition first", "Then physiology", "Then clinical relevance"],
+      "Use /quiz to test understanding.",
+    );
+  } else if (/\/case\b/i.test(lastUser)) {
+    text = tutorStructured(
+      "ECG Case Discussion",
+      "A 58-year-old has substernal pressure. Vitals are stable. What is your first ECG-focused step?",
+      "Always secure rate, rhythm, and ST segments before advanced localization.",
+      ["Immediate 12-lead ECG", "Serial troponins when ischemia is suspected", "Correlate symptoms with territory"],
+      "Use /explain STEMI when you want criteria review.",
+    );
   } else if (systemText.includes("TUTOR MODE") && /where should i start|what should i learn first|how do i start/i.test(lastUser)) {
-    text = "Start with cardiac anatomy and how depolarization maps to each waveform, then we'll move to rate and rhythm on the next step.";
-  } else if (systemText.includes("TUTOR MODE") && /learn ecg|teach me ecg|want to learn ecg|from zero/i.test(lastUser)) {
-    text = "Perfect — we'll build ECG step by step from fundamentals. Say where you'd like to start and we'll go one concept at a time.";
+    text = tutorStructured(
+      "Starting Your ECG Journey",
+      "Start with cardiac anatomy — how chamber depolarization maps to each ECG waveform — before intervals or ischemia patterns.",
+      "Fundamentals first prevents pattern-matching without understanding.",
+      ["Anatomy → conduction → paper → leads", "One lesson at a time", "Use /teach to jump to a topic"],
+      "Next: **Electrical Conduction** — say `next`.",
+    );
+  } else if (systemText.includes("TUTOR MODE") && /next|continue|what next/i.test(lastUser)) {
+    text = tutorStructured(
+      "Continuing Step by Step",
+      "We'll build on the previous ECG lesson before advancing to morphology or pathology.",
+      "Each step should feel complete before moving on.",
+      ["Review prior key points", "Ask /quiz to test retention", "Use /teach for a specific topic"],
+      "Say which topic you'd like next or use /teach.",
+    );
+  } else if (systemText.includes("TUTOR MODE") && /learn ecg|teach me ecg|want to learn ecg|from zero|learn ECG/i.test(lastUser)) {
+    text = tutorStructured(
+      "Learn ECG Step by Step",
+      "We'll build ECG fundamentals from zero — one concept at a time through the full curriculum.",
+      "Structured progression beats jumping to STEMI criteria on day one.",
+      ["13-lesson ECG path", "Use /teach, /quiz, /case", "Say where to start"],
+      "Try `/teach cardiac anatomy` or ask **where should I start?**",
+    );
+  } else if (systemText.includes("TUTOR MODE") || systemText.includes("TEACH MODE") || /\/teach\b/i.test(lastUser)) {
+    text = tutorStructured(
+      "Cardiac Anatomy",
+      "The heart has four chambers. Atrial depolarization precedes ventricular depolarization, and each chamber contributes to the vectors seen across the 12 ECG leads.",
+      "Relate chamber location to the leads that best view that territory before memorizing criteria.",
+      ["RA/LA depolarization forms the P wave", "Ventricular mass drives QRS voltage", "Coronary territories map to territories on the tracing"],
+      "Next up: **Electrical Conduction** — say `next` or `/teach conduction`.",
+    );
+  } else if (/Resolved question: How is hypertension diagnosed/i.test(systemText) && /diagnos/i.test(lastUser)) {
+    text = "Hypertension is diagnosed with repeated blood pressure readings in a calm setting, often confirmed with ambulatory or home monitoring, plus assessment of end-organ effects.";
   } else if (session) {
     if (session.internalIntent === "greeting" || /^hello|hi\b/i.test(lastUser.trim())) {
       text = "Hello — I'm here to help with cardiology questions, case discussion, or step-by-step teaching whenever you're ready.";
     } else if (session.educationalMode) {
       if (/where should i start|what should i learn first|how do i start/i.test(lastUser)) {
-        text = "Start with cardiac anatomy and how depolarization maps to each waveform, then we'll move to rate and rhythm on the next step.";
+        text = tutorStructured(
+          "Starting Your ECG Journey",
+          "Begin with cardiac anatomy — how chamber depolarization maps to each waveform — before intervals or ischemia patterns.",
+          "Fundamentals first prevents pattern-matching without understanding.",
+          ["Anatomy → conduction → paper → leads", "One lesson at a time", "Use /teach to jump to a topic"],
+          "Next: **Electrical Conduction** — say `next`.",
+        );
       } else if (/next|continue|what next/i.test(lastUser)) {
-        text = "Good — let's continue step by step. We'll keep building on the previous concept before moving to morphology or pathology.";
+        text = tutorStructured(
+          "Continuing Step by Step",
+          "We'll build on the previous lesson before advancing to morphology or pathology.",
+          "Each step should feel complete before moving on.",
+          ["Review prior key points", "Ask /quiz to test retention", "Use /teach for a specific topic"],
+          "Say which topic you'd like next or use /teach.",
+        );
       } else if (/learn ecg|teach me ecg|want to learn ecg|from zero/i.test(lastUser)) {
-        text = "Perfect — we'll build ECG step by step from fundamentals. Say where you'd like to start and we'll go one concept at a time.";
+        text = tutorStructured(
+          "ECG From Zero",
+          "We'll build ECG step by step from fundamentals through clinical interpretation.",
+          "Structured progression beats jumping to STEMI criteria on day one.",
+          ["13-lesson curriculum", "Use /teach, /quiz, /case", "Say where to start"],
+          "Try `/teach cardiac anatomy` to begin.",
+        );
       } else if (session.userRole === "medical_student") {
         text = "Great — tell me what you'd like to focus on. ECG is an excellent place to start if you're early in cardiology.";
       } else {
