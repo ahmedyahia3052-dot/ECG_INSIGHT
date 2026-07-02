@@ -29,8 +29,9 @@ async function main() {
   assert(classifyQuality(92) === "Excellent", "Excellent quality classification failed.");
 
   assert(validateEcgImageAsset(asset()).length === 0, "Valid upload image was rejected.");
-  assert(validateEcgImageAsset(asset({ mimeType: "application/pdf", name: "ecg.pdf" })).some((error) => error.includes("Unsupported")), "Unsupported format was not rejected.");
-  assert(validateEcgImageAsset(asset({ size: 26 * 1024 * 1024 })).some((error) => error.includes("File too large")), "Oversized image was not rejected.");
+  assert(validateEcgImageAsset(asset({ mimeType: "application/pdf", name: "ecg.pdf" })).length === 0, "PDF ECG import should be accepted.");
+  assert(validateEcgImageAsset(asset({ mimeType: "image/gif", name: "bad.gif" })).some((error) => error.includes("Unsupported")), "Unsupported format was not rejected.");
+  assert(validateEcgImageAsset(asset({ size: 51 * 1024 * 1024 })).some((error) => error.includes("File too large")), "Oversized image was not rejected.");
 
   const goodQuality = assessEcgImageQuality(asset({ name: "clear-12lead-ecg.jpg", size: 900 * 1024 }));
   assert(goodQuality.score >= 60, "Expected clear ECG image to score as analyzable.");

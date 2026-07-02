@@ -2,6 +2,7 @@ import fs from "node:fs/promises";
 import { createServer } from "node:http";
 import path from "node:path";
 import bcrypt from "bcryptjs";
+import sharp from "sharp";
 import { PrismaClient } from "@prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { createApp } from "../server/src/app";
@@ -27,12 +28,29 @@ function expectStatus(response: { body: unknown; status: number }, expected: num
   assert(response.status === expected, `${label}: expected ${expected} but got ${response.status}: ${JSON.stringify(response.body).slice(0, 500)}`);
 }
 
+async function createSyntheticEcgGridImage(outputPath: string) {
+  const width = 800;
+  const height = 600;
+  const pixels = Buffer.alloc(width * height * 3, 255);
+  for (let y = 0; y < height; y += 1) {
+    for (let x = 0; x < width; x += 1) {
+      const index = (y * width + x) * 3;
+      const grid = (x % 10 === 0 || y % 10 === 0) ? 220 : 255;
+      const trace = y > 120 && y < 140 && Math.sin(x / 18) > 0.4 ? 40 : grid;
+      pixels[index] = trace;
+      pixels[index + 1] = trace;
+      pixels[index + 2] = trace;
+    }
+  }
+  await sharp(pixels, { raw: { channels: 3, height, width } }).png().toFile(outputPath);
+}
+
 async function main() {
   const stamp = Date.now();
   const uploadRoot = path.resolve(process.cwd(), "uploads", "digitization-tests");
   await fs.mkdir(uploadRoot, { recursive: true });
-  const imagePath = path.join(uploadRoot, `ecg-${stamp}.png`);
-  await fs.writeFile(imagePath, Buffer.from("89504e470d0a1a0a", "hex"));
+  const imagePath = path.join(uploadRoot, `test-50mm-20mm-ecg-${stamp}.png`);
+  await createSyntheticEcgGridImage(imagePath);
 
   const passwordHash = await bcrypt.hash("password", 12);
   const user = await prisma.user.create({
@@ -72,7 +90,7 @@ async function main() {
       mimeType: "image/png",
       originalName: "test-50mm-20mm-ecg.png",
       patientId: patient.id,
-      sizeBytes: 240_000,
+      sizeBytes: (await fs.stat(imagePath)).size,
       storagePath: imagePath,
       storedName: path.basename(imagePath),
       uploadedById: user.id,

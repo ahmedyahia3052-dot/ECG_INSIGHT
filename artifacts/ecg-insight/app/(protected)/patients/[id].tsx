@@ -96,6 +96,7 @@ export default function PatientProfileScreen() {
         </View>
         <View style={styles.actions}>
           <PrimaryButton label="Upload ECG" onPress={() => router.push("/upload-ecg" as never)} />
+          <PrimaryButton label="ECG Workspace" onPress={() => router.push(`/ecg-workspace?patientId=${patient.id}` as never)} variant="outline" />
           <PrimaryButton label="Analyze ECG" onPress={() => router.push("/ecg-analysis" as never)} variant="outline" />
           <PrimaryButton label="Generate Report" onPress={() => cases[0] ? reportMutation.mutate(cases[0].id) : router.push("/reports" as never)} variant="outline" />
           <PrimaryButton label="Upload Document" onPress={() => setActiveTab("documents")} variant="outline" />

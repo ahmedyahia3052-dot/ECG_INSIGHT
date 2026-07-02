@@ -3,12 +3,12 @@ import type { Prisma } from "@prisma/client";
 import { AppError } from "../middleware/error";
 import type { ECGPreprocessingArtifact } from "./domain";
 
-const acceptedExtensions = new Set([".jpg", ".jpeg", ".png", ".pdf"]);
+const acceptedExtensions = new Set([".jpg", ".jpeg", ".png", ".bmp", ".tif", ".tiff", ".pdf"]);
 
 function acceptedFormat(originalName: string): ECGPreprocessingArtifact["acceptedFormat"] {
   const ext = path.extname(originalName).toLowerCase();
   if (!acceptedExtensions.has(ext)) {
-    throw new AppError(400, "Unsupported ECG image/PDF format. Accepted formats: jpg, jpeg, png, pdf.", "UNSUPPORTED_ECG_INGESTION_FORMAT");
+    throw new AppError(400, "Unsupported ECG image/PDF format. Accepted formats: jpg, jpeg, png, bmp, tiff, pdf.", "UNSUPPORTED_ECG_INGESTION_FORMAT");
   }
   return ext.slice(1) as ECGPreprocessingArtifact["acceptedFormat"];
 }
@@ -62,9 +62,10 @@ export function mergeEcgMetadata(
   return {
     ...current,
     ingestion: {
-      acceptedFormats: ["jpg", "jpeg", "png", "pdf"],
+      acceptedFormats: ["jpg", "jpeg", "png", "bmp", "tiff", "pdf"],
       capturedAt: new Date().toISOString(),
       supportsCameraCapture: true,
+      supportsClipboardPaste: true,
       supportsDragAndDrop: true,
     },
     preprocessing: toJsonObject(preprocessing),

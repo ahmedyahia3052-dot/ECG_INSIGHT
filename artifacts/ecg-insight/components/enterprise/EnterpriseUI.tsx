@@ -44,6 +44,7 @@ const NAV_ITEMS: NavItem[] = [
   { group: "CLINICAL", href: "/ecg-analysis", icon: "activity", title: "ECG Analysis" },
   { group: "CLINICAL", href: "/ecg-cases", icon: "clipboard", title: "ECG Cases" },
   { group: "CLINICAL", href: "/upload-ecg", icon: "upload-cloud", title: "Upload ECG" },
+  { group: "CLINICAL", href: "/ecg-workspace", icon: "image", title: "ECG Workspace" },
   { group: "CLINICAL", href: "/patients", icon: "users", title: "Patients" },
   { group: "CLINICAL", href: "/reports", icon: "file-text", title: "Reports" },
   { group: "WORKSPACE", href: "/copilot", icon: "message-square", title: "AI Copilot" },
@@ -76,6 +77,7 @@ const PAGE_TITLES: Record<string, { subtitle: string; title: string }> = {
   "/settings": { subtitle: "Workspace preferences, accessibility, and clinical defaults.", title: "Settings" },
   "/team-management": { subtitle: "Manage users, roles, access, and clinical workspace membership.", title: "Team Management" },
   "/upload-ecg": { subtitle: "Capture, upload, preview, analyze, validate, and save ECG records.", title: "Upload ECG" },
+  "/ecg-workspace": { subtitle: "Import, preprocess, digitize, and review ECG images with lead and grid detection.", title: "ECG Workspace" },
 };
 
 function roleRank(role?: string) {

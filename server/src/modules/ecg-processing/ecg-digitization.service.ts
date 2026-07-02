@@ -1,52 +1,28 @@
-import fs from "node:fs/promises";
 import type { ECGAnnotationType, ECGFile, Prisma } from "@prisma/client";
 import { prisma } from "../../config/prisma";
 import { AppError } from "../../middleware/error";
+import { detectGridCalibrationFromFile } from "../ecg-digitization/grid-detector";
+import { runDigitizationPipeline } from "../ecg-digitization/digitizer";
+import { isPdfEcgFile, isRasterEcgFile } from "../ecg-digitization/image-processing";
 
-const STANDARD_LEADS = ["I", "II", "III", "aVR", "aVL", "aVF", "V1", "V2", "V3", "V4", "V5", "V6"] as const;
+export type {
+  DigitizationPreprocessing,
+  DigitizationQuality,
+  DigitizedLead,
+  GridCalibration,
+  LeadSegment,
+} from "../ecg-digitization/types";
+
+import {
+  DigitizationPreprocessing,
+  DigitizationQuality,
+  DigitizedLead,
+  GridCalibration,
+  LeadSegment,
+  STANDARD_LEADS,
+} from "../ecg-digitization/types";
+
 const DEFAULT_SAMPLING_RATE = 500;
-
-type LeadName = (typeof STANDARD_LEADS)[number];
-
-export interface DigitizedLead {
-  durationSeconds: number;
-  lead: string;
-  samples: number[];
-  samplingRate: number;
-}
-
-export interface GridCalibration {
-  confidence: number;
-  gainMmPerMv: 5 | 10 | 20;
-  gridDetected: boolean;
-  paperSpeedMmPerSec: 25 | 50;
-}
-
-export interface DigitizationPreprocessing {
-  autoRotationDegrees: number;
-  borderDetected: boolean;
-  contrastEnhanced: boolean;
-  croppingOptimization: { heightPercent: number; widthPercent: number; xPercent: number; yPercent: number };
-  deskewDegrees: number;
-  gridEnhanced: boolean;
-  noiseReduced: boolean;
-  perspectiveCorrected: boolean;
-  shadowRemoved: boolean;
-}
-
-export interface DigitizationQuality {
-  score: number;
-  warnings: string[];
-}
-
-export interface LeadSegment {
-  confidence: number;
-  heightPercent: number;
-  lead: string;
-  widthPercent: number;
-  xPercent: number;
-  yPercent: number;
-}
 
 export interface DigitalEcgPayload {
   annotations: Array<{
@@ -78,11 +54,11 @@ export interface DigitalEcgPayload {
 }
 
 function isImage(file: ECGFile) {
-  return file.mimeType.startsWith("image/") || /\.(png|jpe?g)$/i.test(file.originalName);
+  return isRasterEcgFile(file.originalName, file.mimeType);
 }
 
 function isPdf(file: ECGFile) {
-  return file.mimeType === "application/pdf" || /\.pdf$/i.test(file.originalName);
+  return isPdfEcgFile(file.originalName, file.mimeType);
 }
 
 function isDigitizableSource(file: ECGFile) {
@@ -91,137 +67,6 @@ function isDigitizableSource(file: ECGFile) {
 
 function seedFor(file: ECGFile) {
   return [...`${file.id}-${file.originalName}-${file.sizeBytes}`].reduce((sum, char) => sum + char.charCodeAt(0), 0);
-}
-
-function byteMetrics(buffer: Buffer) {
-  const bytes = Array.from(buffer.subarray(0, Math.min(buffer.length, 250_000)));
-  const sample = bytes.length ? bytes : [0];
-  const mean = sample.reduce((sum, value) => sum + value, 0) / sample.length;
-  const variance = sample.reduce((sum, value) => sum + (value - mean) ** 2, 0) / sample.length;
-  const contrast = Math.sqrt(variance) / 128;
-  const darkRatio = sample.filter((value) => value < 72).length / sample.length;
-  const brightRatio = sample.filter((value) => value > 184).length / sample.length;
-  const edgeDensity = sample.slice(1).filter((value, index) => Math.abs(value - sample[index]) > 34).length / Math.max(sample.length - 1, 1);
-  const noise = sample.slice(2).filter((value, index) => Math.abs(value - 2 * sample[index + 1] + sample[index]) > 48).length / Math.max(sample.length - 2, 1);
-  const histogram = new Array<number>(16).fill(0);
-  for (const value of sample) histogram[Math.min(15, Math.floor(value / 16))] += 1;
-  const entropy = -histogram.reduce((sum, count) => {
-    if (!count) return sum;
-    const probability = count / sample.length;
-    return sum + probability * Math.log2(probability);
-  }, 0) / 4;
-  return {
-    brightRatio,
-    contrast: Number(Math.min(1, contrast).toFixed(3)),
-    darkRatio,
-    edgeDensity: Number(edgeDensity.toFixed(3)),
-    entropy: Number(Math.min(1, entropy).toFixed(3)),
-    noise: Number(noise.toFixed(3)),
-    resolutionProxy: buffer.length,
-  };
-}
-
-function preprocessingFor(file: ECGFile, buffer: Buffer): DigitizationPreprocessing {
-  const metrics = byteMetrics(buffer);
-  const borderDetected = metrics.edgeDensity > 0.04 || file.sizeBytes > 25_000;
-  const deskewDegrees = Number((((seedFor(file) % 61) - 30) / 10).toFixed(1));
-  return {
-    autoRotationDegrees: file.originalName.toLowerCase().includes("rotated") ? 90 : 0,
-    borderDetected,
-    contrastEnhanced: metrics.contrast < 0.62 || metrics.brightRatio > 0.35,
-    croppingOptimization: {
-      heightPercent: borderDetected ? 92 : 100,
-      widthPercent: borderDetected ? 94 : 100,
-      xPercent: borderDetected ? 3 : 0,
-      yPercent: borderDetected ? 4 : 0,
-    },
-    deskewDegrees,
-    gridEnhanced: metrics.edgeDensity > 0.035,
-    noiseReduced: metrics.noise > 0.08,
-    perspectiveCorrected: borderDetected && Math.abs(deskewDegrees) >= 0.8,
-    shadowRemoved: metrics.darkRatio > 0.18,
-  };
-}
-
-function detectLeadSegments(metrics: ReturnType<typeof byteMetrics>): LeadSegment[] {
-  const confidence = Number(Math.min(0.98, Math.max(0.68, 0.72 + metrics.edgeDensity + metrics.entropy * 0.14 - metrics.noise * 0.2)).toFixed(2));
-  const columns = 4;
-  const rows = 3;
-  return STANDARD_LEADS.map((lead, index) => ({
-    confidence,
-    heightPercent: 100 / rows - 5,
-    lead,
-    widthPercent: 100 / columns - 4,
-    xPercent: (index % columns) * (100 / columns) + 2,
-    yPercent: Math.floor(index / columns) * (100 / rows) + 3,
-  }));
-}
-
-function qualityFor(file: ECGFile, metrics: ReturnType<typeof byteMetrics>, preprocessing: DigitizationPreprocessing, segments: LeadSegment[], calibration: GridCalibration): DigitizationQuality {
-  const warnings: string[] = [];
-  let score = 52;
-  if (file.sizeBytes < 20_000) {
-    score -= 18;
-    warnings.push("Low resolution ECG source may reduce trace extraction accuracy.");
-  } else if (file.sizeBytes > 120_000) {
-    score += 12;
-  }
-  if (!preprocessing.borderDetected) {
-    score -= 10;
-    warnings.push("ECG paper border was not confidently detected; crop may include non-ECG regions.");
-  }
-  if (!calibration.gridDetected) {
-    score -= 16;
-    warnings.push("ECG grid calibration was not confidently detected.");
-  }
-  if (segments.length !== 12) {
-    score -= 24;
-    warnings.push("Missing leads detected during 12-lead segmentation.");
-  }
-  if (metrics.noise > 0.16) {
-    score -= 12;
-    warnings.push("Severe noise artifacts detected in source image.");
-  }
-  if (metrics.contrast < 0.22) {
-    score -= 12;
-    warnings.push("Poor contrast may obscure waveform tracing.");
-  }
-  if (metrics.brightRatio > 0.72 || metrics.darkRatio > 0.72) {
-    score -= 10;
-    warnings.push("Possible cropped or incomplete ECG tracing detected.");
-  }
-  if (metrics.entropy < 0.18) {
-    score -= 10;
-    warnings.push("Unrecognized or low-information ECG layout.");
-  }
-  if (preprocessing.contrastEnhanced) score += 4;
-  if (preprocessing.noiseReduced) score += 4;
-  if (preprocessing.gridEnhanced) score += 6;
-  return { score: Math.max(0, Math.min(100, Math.round(score))), warnings };
-}
-
-export function detectGridCalibration(file: Pick<ECGFile, "metadataJson" | "originalName" | "sizeBytes">): GridCalibration {
-  const metadata = file.metadataJson && typeof file.metadataJson === "object" ? (file.metadataJson as Record<string, unknown>) : {};
-  const speed = Number(metadata["paperSpeedMmPerSec"]) || (file.originalName.toLowerCase().includes("50mm") ? 50 : 25);
-  const gain = Number(metadata["gainMmPerMv"]) || (file.originalName.toLowerCase().includes("20mm") ? 20 : file.originalName.toLowerCase().includes("5mm") ? 5 : 10);
-  const confidence = Math.min(0.98, Math.max(0.62, file.sizeBytes / (200 * 1024)));
-
-  return {
-    confidence: Number(confidence.toFixed(2)),
-    gainMmPerMv: speed === 50 && gain === 5 ? 10 : gain === 5 || gain === 20 ? gain : 10,
-    gridDetected: true,
-    paperSpeedMmPerSec: speed === 50 ? 50 : 25,
-  };
-}
-
-function detectGridCalibrationFromBytes(file: Pick<ECGFile, "metadataJson" | "originalName" | "sizeBytes">, metrics: ReturnType<typeof byteMetrics>): GridCalibration {
-  const base = detectGridCalibration(file);
-  const confidence = Number(Math.min(0.99, Math.max(0.45, base.confidence * 0.55 + metrics.edgeDensity * 1.8 + metrics.entropy * 0.22 - metrics.noise * 0.25)).toFixed(2));
-  return {
-    ...base,
-    confidence,
-    gridDetected: confidence >= 0.58 && metrics.edgeDensity >= 0.025,
-  };
 }
 
 function ecgSample(index: number, leadIndex: number, seed: number) {
@@ -262,39 +107,17 @@ export function reconstructLeads(file: ECGFile, calibration = detectGridCalibrat
   }));
 }
 
-function reconstructLeadsFromSource(file: ECGFile, buffer: Buffer, calibration: GridCalibration, segments: LeadSegment[]): DigitizedLead[] {
-  const durationSeconds = file.originalName.toLowerCase().includes("rhythm") || isPdf(file) ? 10 : 2.5;
-  const sampleCount = Math.round(durationSeconds * DEFAULT_SAMPLING_RATE);
-  const source = buffer.length ? buffer : Buffer.from(`${file.id}-${file.originalName}`);
-  const seed = seedFor(file);
-  return STANDARD_LEADS.map((lead, leadIndex) => {
-    const segment = segments.find((item) => item.lead === lead);
-    const raw = Array.from({ length: sampleCount }, (_value, index) => {
-      const sourceA = source[(index * 7 + leadIndex * 97) % source.length] ?? 128;
-      const sourceB = source[(index * 11 + leadIndex * 53 + seed) % source.length] ?? 128;
-      const traceInfluence = ((sourceA - sourceB) / 255) * 0.045;
-      const calibrated = (ecgSample(index, leadIndex, seed) + traceInfluence) * (10 / calibration.gainMmPerMv);
-      return calibrated * (segment?.confidence ?? 0.8);
-    });
-    const baselineWindow = Math.max(24, Math.round(DEFAULT_SAMPLING_RATE * 0.16));
-    const baselineRemoved = raw.map((sample, index) => {
-      const start = Math.max(0, index - baselineWindow);
-      const end = Math.min(raw.length, index + baselineWindow);
-      const baseline = raw.slice(start, end).reduce((sum, value) => sum + value, 0) / Math.max(end - start, 1);
-      return sample - baseline * 0.18;
-    });
-    const smoothed = baselineRemoved.map((sample, index) => {
-      const previous = baselineRemoved[index - 1] ?? sample;
-      const next = baselineRemoved[index + 1] ?? sample;
-      return (previous + sample * 2 + next) / 4;
-    });
-    const maxAmplitude = Math.max(0.2, ...smoothed.map((sample) => Math.abs(sample)));
-    return {
-      durationSeconds,
-      lead,
-      samples: smoothed.map((sample) => Number((sample / maxAmplitude).toFixed(5))),
-      samplingRate: DEFAULT_SAMPLING_RATE,
-    };
+export function detectGridCalibration(file: Pick<ECGFile, "metadataJson" | "originalName" | "sizeBytes">): GridCalibration {
+  return detectGridCalibrationFromFile(file, {
+    blurScore: 12,
+    brightness: 0.5,
+    contrast: 0.4,
+    darkRatio: 0.1,
+    edgeDensity: 0.05,
+    entropy: 0.4,
+    height: 1,
+    noise: 0.05,
+    width: 1,
   });
 }
 
@@ -343,6 +166,19 @@ function fileDownloadUrl(fileId: string) {
   return `/api/ecg/files/${fileId}/download`;
 }
 
+function processedImageUrl(file: ECGFile) {
+  const metadata = file.metadataJson && typeof file.metadataJson === "object" ? file.metadataJson as Record<string, unknown> : {};
+  const digitization = metadata["digitization"] && typeof metadata["digitization"] === "object"
+    ? metadata["digitization"] as Record<string, unknown>
+    : {};
+  const hasProcessed = Boolean(
+    metadata["enhancedImagePath"]
+    || digitization["enhancedImagePath"]
+    || digitization["processedImagePath"],
+  );
+  return hasProcessed ? `/api/ecg/files/${file.id}/processed-image` : fileDownloadUrl(file.id);
+}
+
 function serializeAnnotation(annotation: {
   annotationType?: ECGAnnotationType;
   endIndex: number;
@@ -381,36 +217,40 @@ export async function reconstructCaseEcg(caseId: string, actorId: string, overri
   }
 
   try {
-    const buffer = await fs.readFile(file.storagePath);
-    const metrics = byteMetrics(buffer);
-    const preprocessing = preprocessingFor(file, buffer);
-    const byteCalibration = detectGridCalibrationFromBytes(file, metrics);
-    const calibration = { ...byteCalibration, ...override } as GridCalibration;
-    const leadSegments = detectLeadSegments(metrics);
-    const quality = qualityFor(file, metrics, preprocessing, leadSegments, calibration);
+    const pipeline = await runDigitizationPipeline(file, override);
+    const {
+      calibration,
+      durationSeconds,
+      enhancedImagePath,
+      leadSegments,
+      leads,
+      preprocessing,
+      quality,
+    } = pipeline;
     const extractionTimestamp = new Date().toISOString();
-    const leads = reconstructLeadsFromSource(file, buffer, calibration, leadSegments);
-    const duration = Math.max(...leads.map((lead) => lead.durationSeconds));
     const digitizationMetadata = {
       calibration,
+      enhancedImagePath,
       extractionTimestamp,
       leadSegments,
+      pipelineVersion: "ecg-digitization-v6",
       preprocessing,
       quality,
       source: {
-        byteLength: buffer.length,
         mimeType: file.mimeType,
         originalName: file.originalName,
+        sizeBytes: file.sizeBytes,
       },
     } as unknown as Prisma.InputJsonObject;
     await prisma.eCGFile.update({
       data: {
-        duration,
+        duration: durationSeconds,
         fileType: isImage(file) ? "IMAGE" : isPdf(file) ? "PDF_REPORT" : "WAVEFORM",
         metadataJson: {
           ...(file.metadataJson && typeof file.metadataJson === "object" ? (file.metadataJson as Record<string, unknown>) : {}),
           digitization: digitizationMetadata,
           digitizationStatus: "available",
+          enhancedImagePath,
           gainMmPerMv: calibration.gainMmPerMv,
           gridDetected: calibration.gridDetected,
           paperSpeedMmPerSec: calibration.paperSpeedMmPerSec,
@@ -517,7 +357,7 @@ export async function getDigitalEcg(caseId: string): Promise<DigitalEcgPayload> 
     },
     durationSeconds,
     ecgFileId: file.id,
-    enhancedImageUrl: fileDownloadUrl(file.id),
+    enhancedImageUrl: processedImageUrl(file),
     extractionTimestamp: digitization.extractionTimestamp,
     leadSegments: digitization.leadSegments,
     leads: leads.map((lead) => ({

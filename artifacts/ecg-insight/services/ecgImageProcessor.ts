@@ -42,11 +42,19 @@ export interface ProcessedEcgImage {
   warnings: string[];
 }
 
-export const MAX_ECG_INPUT_BYTES = 25 * 1024 * 1024;
-export const TARGET_ECG_UPLOAD_BYTES = 5 * 1024 * 1024;
+export const MAX_ECG_INPUT_BYTES = 50 * 1024 * 1024;
+export const TARGET_ECG_UPLOAD_BYTES = 8 * 1024 * 1024;
 
-const supportedMimeTypes = new Set(["image/jpeg", "image/jpg", "image/png"]);
-const supportedExtensions = new Set(["jpg", "jpeg", "png"]);
+const supportedMimeTypes = new Set([
+  "application/pdf",
+  "image/bmp",
+  "image/jpeg",
+  "image/jpg",
+  "image/png",
+  "image/tiff",
+  "image/x-ms-bmp",
+]);
+const supportedExtensions = new Set(["bmp", "jpg", "jpeg", "pdf", "png", "tif", "tiff"]);
 
 export function classifyQuality(score: number): QualityClassification {
   if (score < 40) return "Poor";
@@ -60,12 +68,12 @@ export function validateEcgImageAsset(asset: EcgAcquisitionAsset) {
   const extension = asset.name.split(".").pop()?.toLowerCase() ?? "";
   const mimeType = asset.mimeType.toLowerCase();
 
-  if (!supportedMimeTypes.has(mimeType) || !supportedExtensions.has(extension)) {
-    errors.push("Unsupported format. Use JPG, JPEG, or PNG ECG images.");
+  if (!supportedMimeTypes.has(mimeType) && !supportedExtensions.has(extension)) {
+    errors.push("Unsupported format. Use JPG, JPEG, PNG, BMP, TIFF, or PDF.");
   }
 
   if (asset.size && asset.size > MAX_ECG_INPUT_BYTES) {
-    errors.push("File too large. Maximum ECG image size is 25 MB.");
+    errors.push("File too large. Maximum ECG image size is 50 MB.");
   }
 
   return errors;
@@ -85,6 +93,16 @@ export function assessEcgImageQuality(asset: EcgAcquisitionAsset): EcgQualityAss
   const lighting = name.includes("dark") || name.includes("shadow") ? 45 : 76;
   const signalVisibility = name.includes("ecg") || name.includes("ekg") || name.includes("12lead") ? 86 : 64;
   const croppingQuality = name.includes("crop") || name.includes("scan") ? 82 : 72;
+
+  if (mimeType === "application/pdf") {
+    return {
+      canAnalyze: true,
+      classification: classifyQuality(72),
+      metrics: { contrast: 70, croppingQuality: 75, lighting: 74, sharpness: 70, signalVisibility: 68 },
+      score: 72,
+      warnings: ["PDF will be rasterized on the server for digitization."],
+    };
+  }
 
   const metrics = {
     contrast: clampMetric(contrast),

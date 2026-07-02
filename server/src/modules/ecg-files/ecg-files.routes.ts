@@ -29,14 +29,18 @@ const allowedMimeTypes = new Set([
   "application/octet-stream",
   "application/pdf",
   "application/xml",
+  "image/bmp",
   "image/jpeg",
   "image/jpg",
   "image/png",
+  "image/tiff",
+  "image/x-ms-bmp",
   "text/csv",
   "text/plain",
   "text/xml",
 ]);
 const allowedExtensions = new Set([
+  ".bmp",
   ".csv",
   ".dcm",
   ".dicom",
@@ -48,6 +52,8 @@ const allowedExtensions = new Set([
   ".pdf",
   ".png",
   ".scp",
+  ".tif",
+  ".tiff",
   ".txt",
   ".xml",
 ]);
@@ -238,6 +244,28 @@ ecgFilesRouter.get("/files/:ecgFileId/download", async (req, res, next) => {
   try {
     const file = await assertEcgFileAccess(String(req.params.ecgFileId), req.auth!);
     res.download(file.storagePath, file.originalName);
+  } catch (error) {
+    next(error);
+  }
+});
+
+ecgFilesRouter.get("/files/:ecgFileId/processed-image", async (req, res, next) => {
+  try {
+    const file = await assertEcgFileAccess(String(req.params.ecgFileId), req.auth!);
+    const metadata = file.metadataJson && typeof file.metadataJson === "object" ? file.metadataJson as Record<string, unknown> : {};
+    const digitization = metadata["digitization"] && typeof metadata["digitization"] === "object"
+      ? metadata["digitization"] as Record<string, unknown>
+      : {};
+    const processedPath = [
+      metadata["enhancedImagePath"],
+      digitization["enhancedImagePath"],
+      digitization["processedImagePath"],
+    ].find((value): value is string => typeof value === "string" && value.trim().length > 0);
+    if (!processedPath) {
+      res.download(file.storagePath, file.originalName);
+      return;
+    }
+    res.download(processedPath, `processed-${file.originalName.replace(/\.[^.]+$/, "")}.png`);
   } catch (error) {
     next(error);
   }
