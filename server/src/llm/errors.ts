@@ -1,8 +1,12 @@
 export function mapOllamaErrorToGracefulMessage(error: unknown, statusCode?: number): string {
+  const detail = error instanceof Error ? error.message.toLowerCase() : String(error).toLowerCase();
+
+  if (detail.includes("model") && (detail.includes("not found") || detail.includes("does not exist"))) {
+    return "Model is loading...";
+  }
   if (error instanceof Error) {
     if (error.name === "AbortError" || error.name === "TimeoutError") return "Model is loading...";
-    const message = error.message.toLowerCase();
-    if (message.includes("econnrefused") || message.includes("fetch failed") || message.includes("network")) {
+    if (detail.includes("econnrefused") || detail.includes("fetch failed") || detail.includes("network")) {
       return "Local Medical AI is starting...";
     }
   }

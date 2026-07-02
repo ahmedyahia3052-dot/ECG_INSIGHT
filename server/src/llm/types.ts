@@ -38,10 +38,19 @@ export type LlmGenerateInput = {
 };
 
 export type LlmHealthDTO = {
-  latency: number;
+  latency?: number;
   model: string;
-  online: boolean;
+  ollamaVersion?: string | null;
+  online?: boolean;
   provider: string;
+  status: "degraded" | "ok" | "offline";
+};
+
+export type LlmModelsDTO = {
+  connected: boolean;
+  installedModels: string[];
+  provider: string;
+  selectedModel: string;
 };
 
 export type LlmStreamCallbacks = {

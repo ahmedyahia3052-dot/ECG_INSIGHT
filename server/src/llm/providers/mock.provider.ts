@@ -154,6 +154,7 @@ export class MockProvider implements ILlmProvider {
       model: this.model,
       online: true,
       provider: this.providerName,
+      status: "degraded",
     };
   }
 

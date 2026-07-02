@@ -31,13 +31,7 @@ aiRouter.get("/health", async (_req, res, next) => {
 
 aiRouter.get("/models", async (_req, res, next) => {
   try {
-    const health = await AiChatService.getHealth();
-    if (!health.online) {
-      res.json({ models: [], online: false, provider: health.provider });
-      return;
-    }
-    const models = await AiChatService.listInstalledModels();
-    res.json({ models, online: true, provider: health.provider });
+    res.json(await AiChatService.getModels());
   } catch (error) {
     next(error);
   }

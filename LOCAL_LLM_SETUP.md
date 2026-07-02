@@ -118,10 +118,10 @@ Or run with `NODE_ENV=test` (mock is enabled automatically).
 
    ```json
    {
+     "status": "ok",
      "provider": "ollama",
-     "model": "qwen2.5:14b",
-     "online": true,
-     "latency": 12
+     "model": "llama3.2:1b",
+     "ollamaVersion": "0.31.1"
    }
    ```
 
@@ -129,6 +129,17 @@ Or run with `NODE_ENV=test` (mock is enabled automatically).
 
    ```bash
    curl http://localhost:3002/api/ai/models
+   ```
+
+   Example response:
+
+   ```json
+   {
+     "provider": "ollama",
+     "connected": true,
+     "selectedModel": "llama3.2:1b",
+     "installedModels": ["llama3.2:1b", "qwen2.5:7b"]
+   }
    ```
 
 ---

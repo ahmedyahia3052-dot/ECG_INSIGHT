@@ -1,5 +1,6 @@
 import { env } from "../../config/env";
 import { AppError } from "../../middleware/error";
+import { log } from "../../utils/logger";
 import { mapOllamaErrorToGracefulMessage } from "../errors";
 import type { LlmChatMessage, LlmCompletionDTO, LlmGenerateInput, LlmHealthDTO } from "../types";
 import type { ILlmProvider } from "./llm-provider.interface";
@@ -15,7 +16,7 @@ type OllamaChatResponse = {
 };
 
 type OllamaTagsResponse = {
-  models?: Array<{ name: string }>;
+  models?: Array<{ model?: string; name: string }>;
 };
 
 type OllamaVersionResponse = {
@@ -23,7 +24,14 @@ type OllamaVersionResponse = {
 };
 
 function normalizeBaseUrl(baseUrl: string) {
-  return baseUrl.trim().replace(/\/+$/, "");
+  const trimmed = baseUrl.trim().replace(/\/+$/, "");
+  try {
+    const url = new URL(trimmed);
+    if (url.hostname === "localhost") url.hostname = "127.0.0.1";
+    return url.toString().replace(/\/+$/, "");
+  } catch {
+    return trimmed.replace(/localhost/g, "127.0.0.1");
+  }
 }
 
 export class OllamaProvider implements ILlmProvider {
@@ -76,26 +84,31 @@ export class OllamaProvider implements ILlmProvider {
       const latency = Math.max(0, Math.round(performance.now() - started));
       if (versionRes.ok && tagsRes.ok) {
         const versionPayload = (await versionRes.json().catch(() => ({}))) as OllamaVersionResponse;
-        void versionPayload;
         return {
           latency,
           model: this.model,
+          ollamaVersion: versionPayload.version ?? null,
           online: true,
           provider: this.providerName,
+          status: "ok",
         };
       }
       return {
         latency,
         model: this.model,
+        ollamaVersion: null,
         online: false,
         provider: this.providerName,
+        status: "offline",
       };
     } catch {
       return {
         latency: Math.max(0, Math.round(performance.now() - started)),
         model: this.model,
+        ollamaVersion: null,
         online: false,
         provider: this.providerName,
+        status: "offline",
       };
     }
   }
@@ -111,7 +124,9 @@ export class OllamaProvider implements ILlmProvider {
       );
     }
     const payload = (await response.json()) as OllamaTagsResponse;
-    return (payload.models ?? []).map((item) => item.name).filter(Boolean);
+    return (payload.models ?? [])
+      .map((item) => item.name || item.model || "")
+      .filter(Boolean);
   }
 
   async generateChat(input: LlmGenerateInput): Promise<LlmCompletionDTO> {
@@ -129,6 +144,11 @@ export class OllamaProvider implements ILlmProvider {
 
     if (!response.ok) {
       const detail = await response.text().catch(() => "");
+      log("error", "Ollama chat request failed.", {
+        detail: detail.slice(0, 500),
+        model: this.model,
+        status: response.status,
+      });
       throw new AppError(
         response.status >= 500 ? 503 : response.status,
         mapOllamaErrorToGracefulMessage(new Error(detail), response.status),
@@ -165,6 +185,11 @@ export class OllamaProvider implements ILlmProvider {
 
     if (!response.ok || !response.body) {
       const detail = await response.text().catch(() => "");
+      log("error", "Ollama stream request failed.", {
+        detail: detail.slice(0, 500),
+        model: this.model,
+        status: response.status,
+      });
       throw new AppError(
         response.status >= 500 ? 503 : response.status,
         mapOllamaErrorToGracefulMessage(new Error(detail), response.status),

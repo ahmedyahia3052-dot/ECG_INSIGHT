@@ -1,13 +1,14 @@
 import { AppError } from "../middleware/error";
 import { log } from "../utils/logger";
 import { mapOllamaErrorToGracefulMessage } from "./errors";
-import { resolveLlmProvider } from "./llm-registry";
+import { getOllamaRuntimeState, resolveLlmProvider } from "./llm-registry";
 import type { ILlmProvider } from "./providers/llm-provider.interface";
 import type {
   CopilotApiMessage,
   LlmChatMessage,
   LlmCompletionDTO,
   LlmHealthDTO,
+  LlmModelsDTO,
   LlmStreamCallbacks,
 } from "./types";
 
@@ -28,7 +29,8 @@ function isRetryableError(error: unknown) {
       message.includes("econnrefused") ||
       message.includes("network") ||
       message.includes("abort") ||
-      message.includes("timeout");
+      message.includes("timeout") ||
+      message.includes("not found");
   }
   return false;
 }
@@ -99,8 +101,12 @@ export const LlmClient = {
     messages: CopilotApiMessage[],
     callbacks: LlmStreamCallbacks = {},
   ): Promise<LlmCompletionDTO> {
-    const provider = resolveLlmProvider();
+    const provider = await resolveLlmProvider();
     const chatMessages = mapApiMessagesToChatMessages(messages);
+    if (!chatMessages.length) {
+      throw new AppError(400, "No valid chat messages to send to the local model.", "LLM_EMPTY_MESSAGES");
+    }
+
     const result = await withRetry(
       () => provider.generateStream({
         messages: chatMessages,
@@ -113,16 +119,78 @@ export const LlmClient = {
   },
 
   async getHealth(): Promise<LlmHealthDTO> {
-    return resolveLlmProvider().healthCheck();
+    const provider = await resolveLlmProvider();
+    const runtime = getOllamaRuntimeState();
+    const health = await provider.healthCheck();
+
+    if (provider.providerName === "ollama" && runtime?.connected) {
+      return {
+        model: runtime.selectedModel,
+        ollamaVersion: runtime.ollamaVersion,
+        provider: "ollama",
+        status: "ok",
+      };
+    }
+
+    if (provider.providerName === "ollama") {
+      return {
+        latency: health.latency,
+        model: provider.model,
+        ollamaVersion: runtime?.ollamaVersion ?? null,
+        provider: "ollama",
+        status: health.online ? "ok" : "offline",
+      };
+    }
+
+    return {
+      model: provider.model,
+      provider: provider.providerName,
+      status: provider.providerName === "mock" ? "degraded" : "offline",
+    };
   },
 
-  async listModels(): Promise<string[]> {
-    const provider = resolveLlmProvider();
-    return withRetry(() => provider.listModels());
+  async getModels(): Promise<LlmModelsDTO> {
+    const provider = await resolveLlmProvider();
+    const runtime = getOllamaRuntimeState();
+
+    if (provider.providerName === "ollama" && runtime?.connected) {
+      return {
+        connected: true,
+        installedModels: runtime.installedModels,
+        provider: "ollama",
+        selectedModel: runtime.selectedModel,
+      };
+    }
+
+    if (provider.providerName === "ollama") {
+      try {
+        const installedModels = await provider.listModels();
+        return {
+          connected: installedModels.length > 0,
+          installedModels,
+          provider: "ollama",
+          selectedModel: provider.model,
+        };
+      } catch {
+        return {
+          connected: false,
+          installedModels: [],
+          provider: "ollama",
+          selectedModel: provider.model,
+        };
+      }
+    }
+
+    return {
+      connected: false,
+      installedModels: await provider.listModels().catch(() => []),
+      provider: provider.providerName,
+      selectedModel: provider.model,
+    };
   },
 
   getActiveProviderName() {
-    return resolveLlmProvider().providerName;
+    return getOllamaRuntimeState()?.connected ? "ollama" : "mock";
   },
 };
 

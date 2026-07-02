@@ -13,7 +13,7 @@ export type AiChatCompletionResult = {
 
 export const AiChatService = {
   async analyzeImage(input: { imageBase64: string; mimeType?: string; prompt: string }) {
-    const provider = resolveLlmProvider();
+    const provider = await resolveLlmProvider();
     if (provider.providerName !== "ollama") {
       return provider.generateChat({
         messages: [{ content: input.prompt, role: "user" }],
@@ -34,8 +34,13 @@ export const AiChatService = {
     return LlmClient.getHealth();
   },
 
+  async getModels() {
+    return LlmClient.getModels();
+  },
+
   async listInstalledModels() {
-    return LlmClient.listModels();
+    const payload = await LlmClient.getModels();
+    return payload.installedModels;
   },
 
   async streamChat(messages: CopilotApiMessage[], callbacks: LlmStreamCallbacks = {}): Promise<AiChatCompletionResult> {
