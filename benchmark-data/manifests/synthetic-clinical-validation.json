@@ -1,0 +1,9 @@
+{
+  "dataset": "custom",
+  "description": "Synthetic clinical validation manifest for Sprint 6.4 benchmark imports.",
+  "samples": [
+    { "externalId": "manifest-normal-001", "groundTruthLabels": ["Normal ECG"], "profile": "normal", "source": "custom" },
+    { "externalId": "manifest-afib-001", "groundTruthLabels": ["Atrial Fibrillation"], "profile": "afib", "source": "custom" },
+    { "externalId": "manifest-stemi-001", "groundTruthLabels": ["Anterior STEMI"], "profile": "stemi", "source": "custom" }
+  ]
+}

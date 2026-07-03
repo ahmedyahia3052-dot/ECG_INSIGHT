@@ -56,6 +56,7 @@ const NAV_ITEMS: NavItem[] = [
   { group: "WORKSPACE", href: "/settings", icon: "settings", title: "Settings" },
   { group: "WORKSPACE", href: "/profile", icon: "user", title: "Profile" },
   { group: "DEVELOPER", href: "/admin-dashboard", icon: "shield", minRole: "admin", title: "Admin Controls" },
+  { group: "DEVELOPER", href: "/ecg-benchmark", icon: "bar-chart", minRole: "admin", title: "ECG Benchmark" },
   { group: "DEVELOPER", href: "/billing-subscription", icon: "credit-card", minRole: "admin", title: "Subscription Controls" },
   { group: "DEVELOPER", href: "/owner/licenses", icon: "award", minRole: "super_admin", ownerOnly: true, title: "License Controls" },
 ];
@@ -63,6 +64,7 @@ const NAV_ITEMS: NavItem[] = [
 const PAGE_TITLES: Record<string, { subtitle: string; title: string }> = {
   "/analytics": { subtitle: "Enterprise BI, trends, workload, and quality signals.", title: "Analytics" },
   "/admin-dashboard": { subtitle: "Administrative overview, users, subscriptions, and platform health.", title: "Admin Dashboard" },
+  "/ecg-benchmark": { subtitle: "Clinical validation benchmark against PTB-XL, PhysioNet, and CPSC datasets.", title: "ECG Benchmark" },
   "/billing-subscription": { subtitle: "Subscription plan, quota, billing, and license status.", title: "Billing & Subscription" },
   "/copilot": { subtitle: "Enterprise medical AI chat workspace with real conversation persistence.", title: "AI Clinical Copilot" },
   "/support": { subtitle: "Contact support and submit operational requests.", title: "Support" },
