@@ -9,6 +9,7 @@ import { assertCanRunAnalysis, recordAnalysisUsage } from "../../subscriptions/m
 import { assertResourceAccess, canAccessCase, canAccessPatient } from "../../utils/resource-access";
 import { exportDigitalEcg, getDigitalEcg, getDigitizationQuality, reconstructCaseEcg } from "./ecg-digitization.service";
 import { measureCaseFromStoredLeads } from "../ecg-measurement";
+import { interpretMeasurementBundle } from "../ecg-interpretation";
 import { analyzeEcgImage, getEcgImageAnalysisResults } from "./ecg-image-analysis.service";
 import {
   getProcessedWaveform,
@@ -50,8 +51,27 @@ ecgProcessingRouter.post("/measure/:caseId", requireRole("DOCTOR"), async (req, 
     const digitalEcg = await getDigitalEcg(caseId);
     res.status(202).json({
       clinicalDisclaimer: "Automated ECG measurements require physician verification against source tracings.",
+      clinicalInterpretation: digitalEcg.interpretationEngine,
       clinicalMeasurements: digitalEcg.measurementEngine,
       digitalEcg,
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+ecgProcessingRouter.post("/interpret/:caseId", requireRole("DOCTOR"), async (req, res, next) => {
+  try {
+    const caseId = await resolveCaseId(String(req.params.caseId));
+    assertResourceAccess(await canAccessCase(caseId, req.auth!));
+    const digitalEcg = await getDigitalEcg(caseId);
+    const clinicalInterpretation = digitalEcg.interpretationEngine
+      ?? (digitalEcg.measurementEngine ? interpretMeasurementBundle(digitalEcg.measurementEngine) : null);
+    res.status(202).json({
+      clinicalDisclaimer: "Automated ECG interpretation supports clinical review and does not replace physician diagnosis.",
+      clinicalInterpretation,
+      digitalEcg,
+      markdownReport: clinicalInterpretation?.markdownReport ?? "",
     });
   } catch (error) {
     next(error);
@@ -187,6 +207,25 @@ ecgProcessingRouter.get("/digital/:caseId", async (req, res, next) => {
           fallbackReason: "Digital waveform reconstruction unavailable.",
           leadSegments: [],
           leads: [],
+          interpretationEngine: {
+            confidence: 0,
+            findings: [],
+            markdownReport: "# ECG Clinical Interpretation Report\n\nNo digitized waveform available.",
+            measurementsUsed: {},
+            primaryDiagnosis: "Interpretation unavailable",
+            recommendations: [],
+            report: {
+              confidence: 0,
+              evidence: [],
+              findings: [],
+              measurementsUsed: {},
+              recommendations: [],
+              summary: "Digital waveform reconstruction unavailable.",
+              urgency: "normal",
+            },
+            severity: "normal",
+            urgency: "normal",
+          },
           measurements: { prIntervalMs: 0, qrsDurationMs: 0, qtIntervalMs: 0, qtcBazettMs: 0, rrIntervalMs: 0, heartRate: 0 },
           measurementEngine: {
             amplitudes: { pWaveAmplitudeMv: 0, qrsAmplitudeMv: 0, rWaveProgression: "normal", stDeviationMm: 0, tWaveAmplitudeMv: 0 },

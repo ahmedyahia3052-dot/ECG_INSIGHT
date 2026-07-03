@@ -111,6 +111,9 @@ async function main() {
   assert(digital.measurementEngine.intervals.qtcBazettMs > 0, "Measurement engine should compute QTc.");
   assert(digital.measurementEngine.measurements.length >= 10, "Measurement engine should expose structured measurement list.");
   assert(digital.measurementEngine.confidence > 0, "Measurement engine should expose confidence score.");
+  assert(digital.interpretationEngine.primaryDiagnosis.length > 0, "Interpretation engine should provide primary diagnosis.");
+  assert(digital.interpretationEngine.findings.length > 0, "Interpretation engine should provide findings.");
+  assert(digital.interpretationEngine.markdownReport.includes("ECG Clinical Interpretation Report"), "Markdown report should be present.");
   assert(digital.leadSegments.length === 12, "Lead segmentation metadata should include all 12 leads.");
   assert(digital.quality.score >= 0 && digital.quality.score <= 100, "Digitization quality score should be normalized 0-100.");
   assert(digital.preprocessing?.croppingOptimization.widthPercent !== undefined, "Preprocessing metadata should include crop optimization.");
@@ -205,6 +208,12 @@ async function main() {
   const measurePayload = response.body as { clinicalMeasurements?: { heartRate?: number; measurements?: unknown[] } };
   assert(measurePayload.clinicalMeasurements?.heartRate > 0, "Measure endpoint must return clinical measurements.");
   assert(Array.isArray(measurePayload.clinicalMeasurements?.measurements), "Measure endpoint must return structured measurement list.");
+
+  response = await request(`/ecg/interpret/${ecgCase.id}`, { method: "POST", token });
+  expectStatus(response, 202, "POST /api/v1/ecg/interpret/:caseId");
+  const interpretPayload = response.body as { clinicalInterpretation?: { findings?: unknown[]; markdownReport?: string } };
+  assert(Array.isArray(interpretPayload.clinicalInterpretation?.findings), "Interpret endpoint must return findings.");
+  assert(typeof interpretPayload.clinicalInterpretation?.markdownReport === "string", "Interpret endpoint must return markdown report.");
   server.close();
 
   await prisma.eCGAnnotation.deleteMany({ where: { ecgFileId: file.id } });

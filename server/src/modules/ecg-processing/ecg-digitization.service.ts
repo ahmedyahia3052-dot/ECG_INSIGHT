@@ -5,6 +5,13 @@ import { detectGridCalibrationFromFile } from "../ecg-digitization/grid-detector
 import { runDigitizationPipeline } from "../ecg-digitization/digitizer";
 import { isPdfEcgFile, isRasterEcgFile } from "../ecg-digitization/image-processing";
 import {
+  interpretMeasurementBundle,
+  interpretationEngineJson,
+  interpretationFromMetadata,
+  persistCaseInterpretation,
+  type EcgClinicalInterpretation,
+} from "../ecg-interpretation";
+import {
   measureFromLeads,
   measurementEngineJson,
   measurementFromMetadata,
@@ -31,6 +38,7 @@ import {
 
 const DEFAULT_SAMPLING_RATE = 500;
 
+export type { EcgClinicalInterpretation } from "../ecg-interpretation";
 export type { EcgClinicalMeasurementResult } from "../ecg-measurement";
 
 export interface DigitalEcgPayload {
@@ -50,6 +58,7 @@ export interface DigitalEcgPayload {
   extractionTimestamp?: string;
   leadSegments: LeadSegment[];
   leads: DigitizedLead[];
+  interpretationEngine: EcgClinicalInterpretation;
   measurementEngine: EcgClinicalMeasurementResult;
   measurements: {
     heartRate: number;
@@ -181,6 +190,7 @@ function buildDigitalPayload(input: {
   ecgFileId: string;
   enhancedImageUrl?: string;
   extractionTimestamp?: string;
+  interpretationEngine: EcgClinicalInterpretation;
   leadSegments: LeadSegment[];
   leads: DigitizedLead[];
   measurementEngine: EcgClinicalMeasurementResult;
@@ -262,13 +272,15 @@ export async function reconstructCaseEcg(caseId: string, actorId: string, overri
     } = pipeline;
     const extractionTimestamp = new Date().toISOString();
     const measurementEngine = measureFromLeads({ calibration, leads });
+    const interpretationEngine = interpretMeasurementBundle(measurementEngine);
     const digitizationMetadata = {
       calibration,
       enhancedImagePath,
       extractionTimestamp,
+      interpretationEngine: interpretationEngineJson(interpretationEngine),
       leadSegments,
       measurementEngine: measurementEngineJson(measurementEngine, calibration),
-      pipelineVersion: "ecg-digitization-v6.1",
+      pipelineVersion: "ecg-digitization-v6.2",
       preprocessing,
       quality,
       source: {
@@ -356,6 +368,7 @@ export async function reconstructCaseEcg(caseId: string, actorId: string, overri
       },
     });
     await persistCaseMeasurement(caseId, leads, calibration);
+    await persistCaseInterpretation(caseId, actorId, interpretationEngine, measurementEngine);
     return getDigitalEcgForFile(file.id);
   } catch {
     return waveformFallback(file, "Digital waveform reconstruction unavailable.");
@@ -364,12 +377,14 @@ export async function reconstructCaseEcg(caseId: string, actorId: string, overri
 
 function waveformFallback(file: ECGFile, reason: string): DigitalEcgPayload {
   const emptyEngine = measureFromLeads({ calibration: detectGridCalibration(file), leads: [] });
+  const emptyInterpretationResult = interpretMeasurementBundle(emptyEngine);
   return {
     annotations: [],
     calibration: detectGridCalibration(file),
     durationSeconds: 0,
     ecgFileId: file.id,
     fallbackReason: reason,
+    interpretationEngine: { ...emptyInterpretationResult, confidence: 0, primaryDiagnosis: reason },
     leadSegments: [],
     leads: [],
     measurementEngine: { ...emptyEngine, confidence: 0, heartRate: 0 },
@@ -397,6 +412,8 @@ export async function getDigitalEcg(caseId: string): Promise<DigitalEcgPayload> 
   }));
   const measurementEngine = digitization.measurementEngine
     ?? measureFromLeads({ calibration, leads: mappedLeads });
+  const interpretationEngine = digitization.interpretationEngine
+    ?? interpretMeasurementBundle(measurementEngine);
   return buildDigitalPayload({
     annotations: annotations.map(serializeAnnotation),
     calibration: {
@@ -408,6 +425,7 @@ export async function getDigitalEcg(caseId: string): Promise<DigitalEcgPayload> 
     ecgFileId: file.id,
     enhancedImageUrl: processedImageUrl(file),
     extractionTimestamp: digitization.extractionTimestamp,
+    interpretationEngine,
     leadSegments: digitization.leadSegments,
     leads: mappedLeads,
     measurementEngine,
@@ -420,6 +438,7 @@ export async function getDigitalEcg(caseId: string): Promise<DigitalEcgPayload> 
 function digitizationMetadata(file: ECGFile): {
   calibration?: GridCalibration;
   extractionTimestamp?: string;
+  interpretationEngine?: EcgClinicalInterpretation;
   leadSegments: LeadSegment[];
   measurementEngine?: EcgClinicalMeasurementResult;
   preprocessing?: DigitizationPreprocessing;
@@ -433,6 +452,7 @@ function digitizationMetadata(file: ECGFile): {
   return {
     calibration: digitization["calibration"] as GridCalibration | undefined,
     extractionTimestamp: typeof digitization["extractionTimestamp"] === "string" ? digitization["extractionTimestamp"] : undefined,
+    interpretationEngine: interpretationFromMetadata(digitization["interpretationEngine"]),
     leadSegments: Array.isArray(digitization["leadSegments"]) ? digitization["leadSegments"] as LeadSegment[] : [],
     measurementEngine: measurementFromMetadata(digitization["measurementEngine"]),
     preprocessing: digitization["preprocessing"] as DigitizationPreprocessing | undefined,

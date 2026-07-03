@@ -85,6 +85,34 @@ export interface EcgClinicalMeasurements {
   stDeviation: number;
 }
 
+export interface EcgClinicalInterpretation {
+  confidence: number;
+  findings: Array<{
+    category: "axis" | "conduction" | "electrolyte" | "hypertrophy" | "ischemia" | "rhythm";
+    code: string;
+    confidence: number;
+    evidence: Array<{ feature: string; value: string }>;
+    label: string;
+    severity: "normal" | "minor" | "abnormal" | "urgent" | "critical";
+    triggeredBy: string[];
+  }>;
+  markdownReport: string;
+  measurementsUsed: Record<string, number | string>;
+  primaryDiagnosis: string;
+  recommendations: string[];
+  report: {
+    confidence: number;
+    evidence: Array<{ feature: string; value: string }>;
+    findings: string[];
+    measurementsUsed: Record<string, number | string>;
+    recommendations: string[];
+    summary: string;
+    urgency: "normal" | "minor" | "abnormal" | "urgent" | "critical";
+  };
+  severity: "normal" | "minor" | "abnormal" | "urgent" | "critical";
+  urgency: "normal" | "minor" | "abnormal" | "urgent" | "critical";
+}
+
 export interface DigitalEcg {
   annotations: DigitalEcgAnnotation[];
   calibration: {
@@ -107,6 +135,7 @@ export interface DigitalEcg {
     yPercent: number;
   }>;
   leads: DigitalEcgLead[];
+  interpretationEngine: EcgClinicalInterpretation;
   measurementEngine: EcgClinicalMeasurements;
   measurements: {
     heartRate: number;
@@ -143,7 +172,14 @@ export async function processECGCase(accessToken: string, caseId: string) {
 }
 
 export async function measureDigitalECG(accessToken: string, caseId: string) {
-  return apiRequest<{ clinicalDisclaimer: string; clinicalMeasurements: EcgClinicalMeasurements; digitalEcg: DigitalEcg }>(`/ecg/measure/${caseId}`, {
+  return apiRequest<{ clinicalDisclaimer: string; clinicalInterpretation: EcgClinicalInterpretation; clinicalMeasurements: EcgClinicalMeasurements; digitalEcg: DigitalEcg }>(`/ecg/measure/${caseId}`, {
+    accessToken,
+    method: "POST",
+  });
+}
+
+export async function interpretDigitalECG(accessToken: string, caseId: string) {
+  return apiRequest<{ clinicalDisclaimer: string; clinicalInterpretation: EcgClinicalInterpretation; digitalEcg: DigitalEcg; markdownReport: string }>(`/ecg/interpret/${caseId}`, {
     accessToken,
     method: "POST",
   });

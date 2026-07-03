@@ -4,6 +4,7 @@ import { Image, Pressable, ScrollView, StyleSheet, Text, View } from "react-nati
 import Svg, { Rect, Text as SvgText } from "react-native-svg";
 
 import { EcgDigitalCalipers } from "@/components/ecg/EcgDigitalCalipers";
+import { EcgInterpretationPanel } from "@/components/ecg/EcgInterpretationPanel";
 import { EcgMeasurementPanel } from "@/components/ecg/EcgMeasurementPanel";
 import { Badge, medicalTheme, PrimaryButton, SectionHeader } from "@/components/enterprise/EnterpriseUI";
 import { API_URL } from "@/services/api";
@@ -102,6 +103,7 @@ export function EcgWorkspaceViewer({ digitalEcg, originalUrl, processedUrl }: Pr
             onSelect={(item) => setSelectedMeasurement((current) => (current?.label === item.label ? null : item))}
             selectedLabel={selectedMeasurement?.label ?? null}
           />
+          <EcgInterpretationPanel interpretation={digitalEcg?.interpretationEngine} />
         </View>
       </View>
 
