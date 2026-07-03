@@ -107,6 +107,10 @@ async function main() {
   assert(digital.leads.length === 12, "Persisted digital ECG should include 12 leads.");
   assert(digital.annotations.length > 0, "Clinical annotations should be generated.");
   assert(digital.measurements.qrsDurationMs > 0, "Interactive measurement defaults should be present.");
+  assert(digital.measurementEngine.heartRate > 0, "Measurement engine should compute heart rate.");
+  assert(digital.measurementEngine.intervals.qtcBazettMs > 0, "Measurement engine should compute QTc.");
+  assert(digital.measurementEngine.measurements.length >= 10, "Measurement engine should expose structured measurement list.");
+  assert(digital.measurementEngine.confidence > 0, "Measurement engine should expose confidence score.");
   assert(digital.leadSegments.length === 12, "Lead segmentation metadata should include all 12 leads.");
   assert(digital.quality.score >= 0 && digital.quality.score <= 100, "Digitization quality score should be normalized 0-100.");
   assert(digital.preprocessing?.croppingOptimization.widthPercent !== undefined, "Preprocessing metadata should include crop optimization.");
@@ -182,6 +186,7 @@ async function main() {
   assert(apiDigital?.quality.score !== undefined, "Digitize API must return quality score.");
   assert(apiDigital.leadSegments.length === 12, "Digitize API must return 12 lead segments.");
   assert(apiDigital.preprocessing?.borderDetected !== undefined, "Digitize API must return preprocessing metadata.");
+  assert(apiDigital?.measurementEngine?.heartRate !== undefined && apiDigital.measurementEngine.heartRate > 0, "Digitize API must return computed clinical measurements.");
   assert((response.body as { clinicalDisclaimer?: string }).clinicalDisclaimer?.includes("physician review"), "Digitize API must return clinical disclaimer.");
 
   response = await request(`/ecg/${ecgCase.id}/digitized`, { token });
@@ -194,6 +199,12 @@ async function main() {
   assert(typeof quality?.quality?.score === "number", "Quality endpoint must return score.");
   assert(Array.isArray(quality.quality.warnings), "Quality endpoint must return warnings.");
   assert(quality.status === "available", "Quality endpoint must report available digitization.");
+
+  response = await request(`/ecg/measure/${ecgCase.id}`, { method: "POST", token });
+  expectStatus(response, 202, "POST /api/v1/ecg/measure/:caseId");
+  const measurePayload = response.body as { clinicalMeasurements?: { heartRate?: number; measurements?: unknown[] } };
+  assert(measurePayload.clinicalMeasurements?.heartRate > 0, "Measure endpoint must return clinical measurements.");
+  assert(Array.isArray(measurePayload.clinicalMeasurements?.measurements), "Measure endpoint must return structured measurement list.");
   server.close();
 
   await prisma.eCGAnnotation.deleteMany({ where: { ecgFileId: file.id } });

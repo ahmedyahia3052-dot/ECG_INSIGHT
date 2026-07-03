@@ -3,9 +3,11 @@ import React, { useMemo, useState } from "react";
 import { Image, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import Svg, { Rect, Text as SvgText } from "react-native-svg";
 
+import { EcgDigitalCalipers } from "@/components/ecg/EcgDigitalCalipers";
+import { EcgMeasurementPanel } from "@/components/ecg/EcgMeasurementPanel";
 import { Badge, medicalTheme, PrimaryButton, SectionHeader } from "@/components/enterprise/EnterpriseUI";
 import { API_URL } from "@/services/api";
-import type { DigitalEcg } from "@/services/ecgProcessing";
+import type { DigitalEcg, EcgMeasurementItem } from "@/services/ecgProcessing";
 
 type WorkspaceView = "comparison" | "original" | "processed";
 
@@ -23,9 +25,12 @@ export function EcgWorkspaceViewer({ digitalEcg, originalUrl, processedUrl }: Pr
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [focusedLead, setFocusedLead] = useState<string | null>(null);
   const [gridVisible, setGridVisible] = useState(true);
+  const [selectedMeasurement, setSelectedMeasurement] = useState<EcgMeasurementItem | null>(null);
 
   const quality = digitalEcg?.quality;
   const segments = useMemo(() => digitalEcg?.leadSegments ?? [], [digitalEcg]);
+  const leadII = useMemo(() => digitalEcg?.leads.find((lead) => lead.lead === "II") ?? digitalEcg?.leads[0], [digitalEcg]);
+  const highlight = selectedMeasurement?.highlight ?? null;
   const displayOriginal = absoluteUrl(originalUrl ?? digitalEcg?.originalImageUrl);
   const displayProcessed = absoluteUrl(processedUrl ?? digitalEcg?.enhancedImageUrl);
 
@@ -64,26 +69,40 @@ export function EcgWorkspaceViewer({ digitalEcg, originalUrl, processedUrl }: Pr
         </View>
       ) : null}
 
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.leadRail}>
-        {LEADS.map((lead) => {
-          const segment = segments.find((item) => item.lead === lead);
-          const active = focusedLead === lead;
-          return (
-            <Pressable key={lead} onPress={() => setFocusedLead(active ? null : lead)} style={[styles.leadChip, active && styles.leadChipActive]}>
-              <Text style={styles.leadChipText}>{lead}</Text>
-              {segment ? <Text style={styles.leadConfidence}>{Math.round(segment.confidence * 100)}%</Text> : null}
-            </Pressable>
-          );
-        })}
-      </ScrollView>
+      <View style={styles.workspaceGrid}>
+        <View style={styles.viewerColumn}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.leadRail}>
+            {LEADS.map((lead) => {
+              const segment = segments.find((item) => item.lead === lead);
+              const active = focusedLead === lead;
+              return (
+                <Pressable key={lead} onPress={() => setFocusedLead(active ? null : lead)} style={[styles.leadChip, active && styles.leadChipActive]}>
+                  <Text style={styles.leadChipText}>{lead}</Text>
+                  {segment ? <Text style={styles.leadConfidence}>{Math.round(segment.confidence * 100)}%</Text> : null}
+                </Pressable>
+              );
+            })}
+          </ScrollView>
 
-      <View style={styles.canvasRow}>
-        {(view === "original" || view === "comparison") && displayOriginal ? (
-          <ImagePanel gridVisible={gridVisible} label="Original" pan={pan} segments={focusedLead ? segments.filter((item) => item.lead === focusedLead) : segments} uri={displayOriginal} zoom={zoom} />
-        ) : null}
-        {(view === "processed" || view === "comparison") && displayProcessed ? (
-          <ImagePanel gridVisible={gridVisible} label="Processed" pan={pan} segments={focusedLead ? segments.filter((item) => item.lead === focusedLead) : segments} uri={displayProcessed} zoom={zoom} />
-        ) : null}
+          <View style={styles.canvasRow}>
+            {(view === "original" || view === "comparison") && displayOriginal ? (
+              <ImagePanel gridVisible={gridVisible} highlight={highlight} label="Original" pan={pan} segments={focusedLead ? segments.filter((item) => item.lead === focusedLead) : segments} uri={displayOriginal} zoom={zoom} />
+            ) : null}
+            {(view === "processed" || view === "comparison") && displayProcessed ? (
+              <ImagePanel gridVisible={gridVisible} highlight={highlight} label="Processed" pan={pan} segments={focusedLead ? segments.filter((item) => item.lead === focusedLead) : segments} uri={displayProcessed} zoom={zoom} />
+            ) : null}
+          </View>
+
+          <EcgDigitalCalipers calibration={digitalEcg?.calibration} highlight={highlight} lead={leadII ?? null} />
+        </View>
+
+        <View style={styles.measurementColumn}>
+          <EcgMeasurementPanel
+            measurements={digitalEcg?.measurementEngine}
+            onSelect={(item) => setSelectedMeasurement((current) => (current?.label === item.label ? null : item))}
+            selectedLabel={selectedMeasurement?.label ?? null}
+          />
+        </View>
       </View>
 
       {digitalEcg?.calibration ? (
@@ -97,6 +116,7 @@ export function EcgWorkspaceViewer({ digitalEcg, originalUrl, processedUrl }: Pr
 
 function ImagePanel({
   gridVisible,
+  highlight,
   label,
   pan,
   segments,
@@ -104,6 +124,7 @@ function ImagePanel({
   zoom,
 }: {
   gridVisible: boolean;
+  highlight?: { endMs: number; lead: string; startMs: number } | null;
   label: string;
   pan: { x: number; y: number };
   segments: DigitalEcg["leadSegments"];
@@ -120,6 +141,9 @@ function ImagePanel({
             {Array.from({ length: 20 }).map((_v, index) => (
               <Rect key={`grid-${index}`} fill="none" height="100%" stroke="rgba(248,113,113,0.25)" strokeWidth={index % 5 === 0 ? 1.2 : 0.5} width={`${(index + 1) * 5}%`} x="0" y="0" />
             ))}
+            {highlight ? (
+              <Rect fill="rgba(56,189,248,0.18)" height="100%" stroke="#38bdf8" strokeWidth={2} width="18%" x="28%" y="0" />
+            ) : null}
             {segments.map((segment) => (
               <Rect
                 fill="rgba(56,189,248,0.08)"
@@ -183,5 +207,8 @@ const styles = StyleSheet.create({
   qualityTitle: { color: medicalTheme.text, fontSize: 14, fontWeight: "900" },
   shell: { gap: 14 },
   toolbar: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+  viewerColumn: { flex: 1.4, gap: 14, minWidth: 320 },
   warningText: { color: "#fbbf24", fontSize: 12 },
+  workspaceGrid: { flexDirection: "row", flexWrap: "wrap", gap: 16 },
+  measurementColumn: { flex: 1, minWidth: 280 },
 });

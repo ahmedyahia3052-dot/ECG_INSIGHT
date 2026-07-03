@@ -8,6 +8,7 @@ import { ensureClinicalReportForCase, serializeReport } from "../reports/reports
 import { assertCanRunAnalysis, recordAnalysisUsage } from "../../subscriptions/monetization.service";
 import { assertResourceAccess, canAccessCase, canAccessPatient } from "../../utils/resource-access";
 import { exportDigitalEcg, getDigitalEcg, getDigitizationQuality, reconstructCaseEcg } from "./ecg-digitization.service";
+import { measureCaseFromStoredLeads } from "../ecg-measurement";
 import { analyzeEcgImage, getEcgImageAnalysisResults } from "./ecg-image-analysis.service";
 import {
   getProcessedWaveform,
@@ -32,7 +33,26 @@ ecgProcessingRouter.post("/process/:caseId", requireRole("DOCTOR"), async (req, 
 ecgProcessingRouter.get("/measurements/:caseId", async (req, res, next) => {
   try {
     const measurement = await latestMeasurement(String(req.params.caseId));
-    res.json({ measurement: measurement ? serializeMeasurement(measurement) : null });
+    const clinical = await measureCaseFromStoredLeads(String(req.params.caseId));
+    res.json({
+      clinicalMeasurements: clinical,
+      measurement: measurement ? serializeMeasurement(measurement) : null,
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+ecgProcessingRouter.post("/measure/:caseId", requireRole("DOCTOR"), async (req, res, next) => {
+  try {
+    const caseId = await resolveCaseId(String(req.params.caseId));
+    assertResourceAccess(await canAccessCase(caseId, req.auth!));
+    const digitalEcg = await getDigitalEcg(caseId);
+    res.status(202).json({
+      clinicalDisclaimer: "Automated ECG measurements require physician verification against source tracings.",
+      clinicalMeasurements: digitalEcg.measurementEngine,
+      digitalEcg,
+    });
   } catch (error) {
     next(error);
   }
@@ -167,7 +187,18 @@ ecgProcessingRouter.get("/digital/:caseId", async (req, res, next) => {
           fallbackReason: "Digital waveform reconstruction unavailable.",
           leadSegments: [],
           leads: [],
-          measurements: { prIntervalMs: 0, qrsDurationMs: 0, qtIntervalMs: 0, rrIntervalMs: 0 },
+          measurements: { prIntervalMs: 0, qrsDurationMs: 0, qtIntervalMs: 0, qtcBazettMs: 0, rrIntervalMs: 0, heartRate: 0 },
+          measurementEngine: {
+            amplitudes: { pWaveAmplitudeMv: 0, qrsAmplitudeMv: 0, rWaveProgression: "normal", stDeviationMm: 0, tWaveAmplitudeMv: 0 },
+            axis: { electricalAxisDeg: 0, frontalPlaneAxisDeg: 0, meanQrsAxisDeg: 0 },
+            confidence: 0,
+            heartRate: 0,
+            intervals: { pWaveDurationMs: 0, prIntervalMs: 0, qrsDurationMs: 0, qtIntervalMs: 0, qtcBazettMs: 0, qtcFridericiaMs: 0, rrIntervalMs: 0 },
+            measurements: [],
+            morphology: [],
+            rhythm: "regular",
+            stDeviation: 0,
+          },
           quality: { score: 0, warnings: ["Digital waveform reconstruction unavailable."] },
           status: "fallback",
         },

@@ -41,6 +41,50 @@ export interface DigitalEcgAnnotation {
   type: string;
 }
 
+export interface EcgMeasurementHighlight {
+  endMs: number;
+  lead: string;
+  peakMs?: number;
+  startMs: number;
+}
+
+export interface EcgMeasurementItem {
+  highlight?: EcgMeasurementHighlight;
+  label: string;
+  unit: "bpm" | "ms" | "mm" | "mV" | "deg";
+  value: number;
+}
+
+export interface EcgClinicalMeasurements {
+  amplitudes: {
+    pWaveAmplitudeMv: number;
+    qrsAmplitudeMv: number;
+    rWaveProgression: "normal" | "poor" | "reverse";
+    stDeviationMm: number;
+    tWaveAmplitudeMv: number;
+  };
+  axis: {
+    electricalAxisDeg: number;
+    frontalPlaneAxisDeg: number;
+    meanQrsAxisDeg: number;
+  };
+  confidence: number;
+  heartRate: number;
+  intervals: {
+    pWaveDurationMs: number;
+    prIntervalMs: number;
+    qrsDurationMs: number;
+    qtIntervalMs: number;
+    qtcBazettMs: number;
+    qtcFridericiaMs: number;
+    rrIntervalMs: number;
+  };
+  measurements: EcgMeasurementItem[];
+  morphology: string[];
+  rhythm: "regular" | "irregular" | "sinus_rhythm" | "sinus_tachycardia" | "sinus_bradycardia";
+  stDeviation: number;
+}
+
 export interface DigitalEcg {
   annotations: DigitalEcgAnnotation[];
   calibration: {
@@ -63,10 +107,13 @@ export interface DigitalEcg {
     yPercent: number;
   }>;
   leads: DigitalEcgLead[];
+  measurementEngine: EcgClinicalMeasurements;
   measurements: {
+    heartRate: number;
     prIntervalMs: number;
     qrsDurationMs: number;
     qtIntervalMs: number;
+    qtcBazettMs: number;
     rrIntervalMs: number;
   };
   originalImageUrl?: string;
@@ -95,8 +142,15 @@ export async function processECGCase(accessToken: string, caseId: string) {
   });
 }
 
+export async function measureDigitalECG(accessToken: string, caseId: string) {
+  return apiRequest<{ clinicalDisclaimer: string; clinicalMeasurements: EcgClinicalMeasurements; digitalEcg: DigitalEcg }>(`/ecg/measure/${caseId}`, {
+    accessToken,
+    method: "POST",
+  });
+}
+
 export async function getECGMeasurement(accessToken: string, caseId: string) {
-  return apiRequest<{ measurement: ECGMeasurement | null }>(`/ecg/measurements/${caseId}`, {
+  return apiRequest<{ clinicalMeasurements: EcgClinicalMeasurements | null; measurement: ECGMeasurement | null }>(`/ecg/measurements/${caseId}`, {
     accessToken,
   });
 }

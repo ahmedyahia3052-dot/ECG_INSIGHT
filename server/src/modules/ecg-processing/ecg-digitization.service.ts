@@ -4,6 +4,13 @@ import { AppError } from "../../middleware/error";
 import { detectGridCalibrationFromFile } from "../ecg-digitization/grid-detector";
 import { runDigitizationPipeline } from "../ecg-digitization/digitizer";
 import { isPdfEcgFile, isRasterEcgFile } from "../ecg-digitization/image-processing";
+import {
+  measureFromLeads,
+  measurementEngineJson,
+  measurementFromMetadata,
+  persistCaseMeasurement,
+  type EcgClinicalMeasurementResult,
+} from "../ecg-measurement";
 
 export type {
   DigitizationPreprocessing,
@@ -24,6 +31,8 @@ import {
 
 const DEFAULT_SAMPLING_RATE = 500;
 
+export type { EcgClinicalMeasurementResult } from "../ecg-measurement";
+
 export interface DigitalEcgPayload {
   annotations: Array<{
     endMs: number;
@@ -41,10 +50,13 @@ export interface DigitalEcgPayload {
   extractionTimestamp?: string;
   leadSegments: LeadSegment[];
   leads: DigitizedLead[];
+  measurementEngine: EcgClinicalMeasurementResult;
   measurements: {
+    heartRate: number;
     prIntervalMs: number;
     qrsDurationMs: number;
     qtIntervalMs: number;
+    qtcBazettMs: number;
     rrIntervalMs: number;
   };
   originalImageUrl?: string;
@@ -151,14 +163,35 @@ function annotationsFor(leads: DigitizedLead[]) {
   );
 }
 
-function measurementDefaults(leads: DigitizedLead[]) {
-  const leadII = leads.find((lead) => lead.lead === "II") ?? leads[0];
-  const rrIntervalMs = leadII.durationSeconds > 8 ? 760 : 820;
+function flatMeasurements(clinical: EcgClinicalMeasurementResult) {
   return {
-    prIntervalMs: 160,
-    qrsDurationMs: 92,
-    qtIntervalMs: 390,
-    rrIntervalMs,
+    heartRate: clinical.heartRate,
+    prIntervalMs: clinical.intervals.prIntervalMs,
+    qrsDurationMs: clinical.intervals.qrsDurationMs,
+    qtIntervalMs: clinical.intervals.qtIntervalMs,
+    qtcBazettMs: clinical.intervals.qtcBazettMs,
+    rrIntervalMs: clinical.intervals.rrIntervalMs,
+  };
+}
+
+function buildDigitalPayload(input: {
+  annotations: DigitalEcgPayload["annotations"];
+  calibration: GridCalibration;
+  durationSeconds: number;
+  ecgFileId: string;
+  enhancedImageUrl?: string;
+  extractionTimestamp?: string;
+  leadSegments: LeadSegment[];
+  leads: DigitizedLead[];
+  measurementEngine: EcgClinicalMeasurementResult;
+  originalImageUrl?: string;
+  preprocessing?: DigitizationPreprocessing;
+  quality: DigitizationQuality;
+}): DigitalEcgPayload {
+  return {
+    ...input,
+    measurements: flatMeasurements(input.measurementEngine),
+    status: "available",
   };
 }
 
@@ -228,12 +261,14 @@ export async function reconstructCaseEcg(caseId: string, actorId: string, overri
       quality,
     } = pipeline;
     const extractionTimestamp = new Date().toISOString();
+    const measurementEngine = measureFromLeads({ calibration, leads });
     const digitizationMetadata = {
       calibration,
       enhancedImagePath,
       extractionTimestamp,
       leadSegments,
-      pipelineVersion: "ecg-digitization-v6",
+      measurementEngine: measurementEngineJson(measurementEngine, calibration),
+      pipelineVersion: "ecg-digitization-v6.1",
       preprocessing,
       quality,
       source: {
@@ -304,19 +339,23 @@ export async function reconstructCaseEcg(caseId: string, actorId: string, overri
         action: "ECG_MEASURED",
         actorId,
         caseId,
-        message: `ECG waveform reconstructed into ${leads.length} digital leads.`,
+        message: `ECG waveform reconstructed into ${leads.length} digital leads with automated clinical measurements (HR ${measurementEngine.heartRate} bpm).`,
         metadata: {
           calibrationConfidence: calibration.confidence,
           ecgFileId: file.id,
           gainMmPerMv: calibration.gainMmPerMv,
           gridDetected: calibration.gridDetected,
+          heartRate: measurementEngine.heartRate,
+          measurementConfidence: measurementEngine.confidence,
           paperSpeedMmPerSec: calibration.paperSpeedMmPerSec,
           qualityScore: quality.score,
+          rhythm: measurementEngine.rhythm,
           warnings: quality.warnings,
         } as Prisma.InputJsonObject,
         patientId: ecgCase.patientId,
       },
     });
+    await persistCaseMeasurement(caseId, leads, calibration);
     return getDigitalEcgForFile(file.id);
   } catch {
     return waveformFallback(file, "Digital waveform reconstruction unavailable.");
@@ -324,6 +363,7 @@ export async function reconstructCaseEcg(caseId: string, actorId: string, overri
 }
 
 function waveformFallback(file: ECGFile, reason: string): DigitalEcgPayload {
+  const emptyEngine = measureFromLeads({ calibration: detectGridCalibration(file), leads: [] });
   return {
     annotations: [],
     calibration: detectGridCalibration(file),
@@ -332,7 +372,8 @@ function waveformFallback(file: ECGFile, reason: string): DigitalEcgPayload {
     fallbackReason: reason,
     leadSegments: [],
     leads: [],
-    measurements: { prIntervalMs: 0, qrsDurationMs: 0, qtIntervalMs: 0, rrIntervalMs: 0 },
+    measurementEngine: { ...emptyEngine, confidence: 0, heartRate: 0 },
+    measurements: flatMeasurements({ ...emptyEngine, confidence: 0, heartRate: 0 }),
     originalImageUrl: fileDownloadUrl(file.id),
     quality: { score: 0, warnings: [reason] },
     status: "fallback",
@@ -348,7 +389,15 @@ export async function getDigitalEcg(caseId: string): Promise<DigitalEcgPayload> 
   const digitization = digitizationMetadata(file);
   const calibration = digitization.calibration ?? detectGridCalibration(file);
   const durationSeconds = Math.max(...leads.map((lead) => lead.duration));
-  return {
+  const mappedLeads = leads.map((lead) => ({
+    durationSeconds: lead.duration,
+    lead: lead.leadName,
+    samples: lead.signalData.slice(0, Math.min(lead.signalData.length, lead.samplingRate * 10)),
+    samplingRate: lead.samplingRate,
+  }));
+  const measurementEngine = digitization.measurementEngine
+    ?? measureFromLeads({ calibration, leads: mappedLeads });
+  return buildDigitalPayload({
     annotations: annotations.map(serializeAnnotation),
     calibration: {
       ...calibration,
@@ -360,26 +409,19 @@ export async function getDigitalEcg(caseId: string): Promise<DigitalEcgPayload> 
     enhancedImageUrl: processedImageUrl(file),
     extractionTimestamp: digitization.extractionTimestamp,
     leadSegments: digitization.leadSegments,
-    leads: leads.map((lead) => ({
-      durationSeconds: lead.duration,
-      lead: lead.leadName,
-      samples: lead.signalData.slice(0, Math.min(lead.signalData.length, lead.samplingRate * 10)),
-      samplingRate: lead.samplingRate,
-    })),
-    measurements: measurementDefaults(
-      leads.map((lead) => ({ durationSeconds: lead.duration, lead: lead.leadName, samples: lead.signalData, samplingRate: lead.samplingRate })),
-    ),
+    leads: mappedLeads,
+    measurementEngine,
     originalImageUrl: fileDownloadUrl(file.id),
     preprocessing: digitization.preprocessing,
     quality: digitization.quality,
-    status: "available",
-  };
+  });
 }
 
 function digitizationMetadata(file: ECGFile): {
   calibration?: GridCalibration;
   extractionTimestamp?: string;
   leadSegments: LeadSegment[];
+  measurementEngine?: EcgClinicalMeasurementResult;
   preprocessing?: DigitizationPreprocessing;
   quality: DigitizationQuality;
 } {
@@ -392,6 +434,7 @@ function digitizationMetadata(file: ECGFile): {
     calibration: digitization["calibration"] as GridCalibration | undefined,
     extractionTimestamp: typeof digitization["extractionTimestamp"] === "string" ? digitization["extractionTimestamp"] : undefined,
     leadSegments: Array.isArray(digitization["leadSegments"]) ? digitization["leadSegments"] as LeadSegment[] : [],
+    measurementEngine: measurementFromMetadata(digitization["measurementEngine"]),
     preprocessing: digitization["preprocessing"] as DigitizationPreprocessing | undefined,
     quality: {
       score: typeof quality?.score === "number" ? quality.score : typeof metadata["qualityScore"] === "number" ? metadata["qualityScore"] : 0,
