@@ -12,6 +12,9 @@ function assert(condition: unknown, message: string): asserts condition {
 }
 
 const workspace = read("artifacts/ecg-insight/app/(protected)/copilot.tsx");
+const composer = read("artifacts/ecg-insight/components/copilot/CopilotComposer.tsx");
+const messageList = read("artifacts/ecg-insight/components/copilot/CopilotMessageList.tsx");
+const bundle = [workspace, composer, messageList].join("\n");
 const conversationRoute = read("artifacts/ecg-insight/app/(protected)/copilot/[conversationId].tsx");
 const service = read("artifacts/ecg-insight/services/copilot.ts");
 const routes = read("server/src/modules/copilot/copilot.routes.ts");
@@ -28,7 +31,7 @@ for (const marker of [
   "ConversationList",
   "lastMessagePreview",
   "startNewChat",
-  "messages.map",
+  "CopilotMessageList",
   "scrollToEnd",
   "WORKSPACE_STATE_KEY",
   "Voice",
@@ -38,7 +41,7 @@ for (const marker of [
   "attachmentPreviews",
   "sanitizeAssistantContent",
 ]) {
-  assert(workspace.includes(marker), `Workspace simplified-chat marker missing: ${marker}`);
+  assert(bundle.includes(marker), `Workspace simplified-chat marker missing: ${marker}`);
 }
 
 for (const removed of ["Rename", "Pin", "Favorite", "Archive", "Duplicate", "renameCopilotConversation", "pinCopilotConversation", "favoriteCopilotConversation", "archiveCopilotConversation", "duplicateCopilotConversation", "ConversationAction", "Interpret ECG", "Generate Impression", "Patient Summary", "Differential Diagnosis", "Follow-up Plan", "Generate Report", "autoExportPdf"]) {
@@ -62,9 +65,9 @@ for (const marker of [
   "orderBy: { updatedAt: \"desc\" }",
   "copilotRouter.post(\"/chat/stream\"",
   "copilotRouter.get(\"/conversations/:conversationId\"",
-  "analyzeUploadedAttachment",
-  "detectAttachmentDocumentType",
-  "readBestEffortOcrText",
+  "processCopilotAttachment",
+  "AttachmentContextBuilder",
+  "PromptBuilder",
   "medicalAnalysis",
   "retrieveConversationMemory",
   "runClinicalCopilotEngine",

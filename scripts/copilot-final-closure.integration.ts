@@ -12,6 +12,9 @@ function assert(condition: unknown, message: string): asserts condition {
 }
 
 const workspace = read("artifacts/ecg-insight/app/(protected)/copilot.tsx");
+const composer = read("artifacts/ecg-insight/components/copilot/CopilotComposer.tsx");
+const messageList = read("artifacts/ecg-insight/components/copilot/CopilotMessageList.tsx");
+const bundle = [workspace, composer, messageList].join("\n");
 const dashboard = read("artifacts/ecg-insight/app/(protected)/dashboard.tsx");
 const copilotService = read("artifacts/ecg-insight/services/copilot.ts");
 const copilotRoutes = read("server/src/modules/copilot/copilot.routes.ts");
@@ -40,14 +43,14 @@ for (const marker of [
   "sanitizeAssistantContent",
   "voiceMode",
 ]) {
-  assert(workspace.includes(marker), `Simplified Copilot workspace marker missing: ${marker}`);
+  assert(bundle.includes(marker), `Simplified Copilot workspace marker missing: ${marker}`);
 }
 
 for (const removed of ["Search Conversations", "Pinned Conversations", "Favorites", "Archived Conversations", "Rename", "Pin", "Favorite", "Archive", "Duplicate", "Interpret ECG", "Generate Impression", "Patient Summary", "Differential Diagnosis", "Follow-up Plan", "Generate Report", "autoExportPdf"]) {
   assert(!workspace.includes(removed), `Simplified Copilot workspace still contains removed management UI: ${removed}`);
 }
 
-for (const marker of ["retrieveClinicalContext", "runClinicalCopilotEngine", "LEGAL_DISCLAIMER", "responseTimeMs", "copilotUsageEvent", "/chat/stream", "/attachments", "automaticConversationTitle", "analyzeUploadedAttachment", "detectAttachmentDocumentType", "readBestEffortOcrText", "retrieveConversationMemory"]) {
+for (const marker of ["retrieveClinicalContext", "runClinicalCopilotEngine", "LEGAL_DISCLAIMER", "responseTimeMs", "copilotUsageEvent", "/chat/stream", "/attachments", "automaticConversationTitle", "processCopilotAttachment", "AttachmentContextBuilder", "PromptBuilder", "COPILOT_ATTACHMENT_ARCHITECTURE", "retrieveConversationMemory"]) {
   assert(copilotRoutes.includes(marker), `Copilot backend missing real chat/context marker: ${marker}`);
 }
 for (const removed of ["/rename", "/pin", "/favorite", "/archive", "/duplicate"]) {

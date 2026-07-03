@@ -3,6 +3,7 @@ import path from "node:path";
 import type { ClinicalDocument, DocumentCategory, Prisma } from "@prisma/client";
 import { prisma } from "../../config/prisma";
 import { AppError } from "../../middleware/error";
+import { extractClinicalText } from "../ocr/clinical-ocr.service";
 
 type DocumentWithPatient = ClinicalDocument & {
   patient: {
@@ -36,27 +37,13 @@ function textContains(text: string, terms: string[]) {
   return terms.some((term) => lower.includes(term.toLowerCase()));
 }
 
-async function readBestEffortText(filePath: string) {
-  const ext = path.extname(filePath).toLowerCase();
-  if ([".txt", ".csv", ".json"].includes(ext)) {
-    return fs.readFile(filePath, "utf8");
-  }
-  const buffer = await fs.readFile(filePath);
-  const printable = buffer
-    .toString("latin1")
-    .replace(/[^\x20-\x7E\r\n]+/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
-  return printable.length > 80 ? printable.slice(0, 12000) : "";
-}
-
 export class DocumentOCRService {
   async extractText(document: ClinicalDocument) {
-    const text = await readBestEffortText(document.storagePath);
-    if (text) return text;
+    const ocr = await extractClinicalText(document.storagePath, "application/octet-stream", document.originalName);
+    if (ocr.text.trim()) return ocr.text;
     return [
       `${documentTypeLabels[document.category]} uploaded as ${document.originalName}.`,
-      "OCR placeholder: scanned or binary document requires human review.",
+      "Clinical OCR could not extract readable text from this document.",
     ].join(" ");
   }
 

@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { apiLogin, API_URL, uiLogin } from "./utils/qa";
+import { apiLogin, API_URL, navigate, uiLogin } from "./utils/qa";
 
 test.describe("Sprint 37 release candidate validation", () => {
   test("release candidate dashboard API returns launch score and workflow checks", async ({ request }) => {
@@ -18,9 +18,13 @@ test.describe("Sprint 37 release candidate validation", () => {
 
   test("release candidate UI renders final release dashboard", async ({ page }) => {
     await uiLogin(page, "owner");
-    await page.goto("/release-candidate");
-    await expect(page.getByText("Final Release Dashboard")).toBeVisible({ timeout: 30_000 });
-    await expect(page.getByText("End-to-End Workflow Validation")).toBeVisible();
-    await expect(page.getByText("Performance and Load")).toBeVisible();
+    const dashboardResponse = page.waitForResponse(
+      (response) => response.url().includes("/release-candidate/dashboard") && response.ok(),
+      { timeout: 45_000 },
+    );
+    await navigate(page, "/release-candidate", "Final Release Dashboard");
+    await dashboardResponse;
+    await expect(page.getByText("End-to-End Workflow Validation")).toBeVisible({ timeout: 45_000 });
+    await expect(page.getByText("Performance and Load")).toBeVisible({ timeout: 45_000 });
   });
 });

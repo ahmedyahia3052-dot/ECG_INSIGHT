@@ -60,6 +60,7 @@ const NAV_ITEMS: NavItem[] = [
   { group: "DEVELOPER", href: "/audit-log", icon: "book-open", minRole: "admin", title: "Audit Trail" },
   { group: "DEVELOPER", href: "/billing-subscription", icon: "credit-card", minRole: "admin", title: "Subscription Controls" },
   { group: "DEVELOPER", href: "/owner/licenses", icon: "award", minRole: "super_admin", ownerOnly: true, title: "License Controls" },
+  { group: "DEVELOPER", href: "/release-candidate", icon: "flag", minRole: "super_admin", ownerOnly: true, title: "Release Candidate" },
 ];
 
 const PAGE_TITLES: Record<string, { subtitle: string; title: string }> = {
@@ -76,6 +77,7 @@ const PAGE_TITLES: Record<string, { subtitle: string; title: string }> = {
   "/ecg-cases": { subtitle: "Enterprise ECG case workflow, review, approval, and reports.", title: "ECG Cases" },
   "/notifications": { subtitle: "Clinical alerts, workflow events, and collaboration updates.", title: "Notifications" },
   "/owner/licenses": { subtitle: "Hidden owner-only license grants, subscription control, and lifetime access.", title: "License Management" },
+  "/release-candidate": { subtitle: "Launch readiness score, workflow validation, performance metrics, and defect summary.", title: "Release Candidate" },
   "/patients": { subtitle: "Enterprise patient registry, risk profile, and ECG history.", title: "Patients" },
   "/profile": { subtitle: "Account, role, institution, and secure session details.", title: "Profile" },
   "/reports": { subtitle: "Draft, review, finalize, sign, export, and email reports.", title: "Reports" },
@@ -152,6 +154,7 @@ export function EnterpriseShell({ children }: PropsWithChildren) {
   const isMobile = width < 860;
   const sidebarCompact = !isMobile && sidebarCollapsed;
   const meta = pageMeta(pathname);
+  const isCopilotWorkspace = pathname.startsWith("/copilot");
   const navItems = useMemo(() => NAV_ITEMS.filter((item) => {
     if (item.ownerOnly && user?.email?.toLowerCase() !== "ahmedyahia3052@gmail.com") return false;
     return !item.minRole || roleRank(user?.role) >= roleRank(item.minRole);
@@ -353,7 +356,9 @@ export function EnterpriseShell({ children }: PropsWithChildren) {
           {sidebar}
         </View>
       ) : null}
-      <View style={styles.contentRoot}>
+      <View style={[styles.contentRoot, isCopilotWorkspace && styles.contentRootFullBleed]}>
+        {!isCopilotWorkspace ? (
+          <>
         <View style={[styles.topbar, { paddingTop: isMobile ? insets.top + 12 : 18 }]}>
           {isMobile ? (
             <Pressable accessibilityRole="button" accessibilityLabel="Open navigation" onPress={openDrawer} style={styles.iconButton}>
@@ -433,6 +438,10 @@ export function EnterpriseShell({ children }: PropsWithChildren) {
         <ScrollView contentContainerStyle={styles.pageScroll} showsVerticalScrollIndicator={false}>
           {children}
         </ScrollView>
+          </>
+        ) : (
+          <View style={styles.fullBleedPage}>{children}</View>
+        )}
       </View>
       {notificationOpen ? (
         <View style={styles.notificationOverlay} pointerEvents="box-none">
@@ -722,13 +731,14 @@ export function EmptyState({ action, message, title }: { action?: ReactNode; mes
   );
 }
 
-export function PrimaryButton({ disabled, icon, label, onPress, variant = "primary" }: { disabled?: boolean; icon?: keyof typeof Feather.glyphMap; label: string; onPress: () => void; variant?: "danger" | "outline" | "primary" }) {
+export function PrimaryButton({ disabled, icon, label, onPress, testID, variant = "primary" }: { disabled?: boolean; icon?: keyof typeof Feather.glyphMap; label: string; onPress: () => void; testID?: string; variant?: "danger" | "outline" | "primary" }) {
   return (
     <Pressable
       accessibilityRole="button"
       disabled={disabled}
       onPress={onPress}
       style={[styles.button, variant === "outline" && styles.buttonOutline, variant === "danger" && styles.buttonDanger, disabled && styles.buttonDisabled]}
+      testID={testID}
     >
       {icon ? <Feather name={icon} size={16} color={variant === "outline" ? medicalTheme.primary : medicalTheme.background} /> : null}
       <Text style={[styles.buttonText, variant === "outline" && styles.buttonTextOutline]}>{label}</Text>
@@ -789,6 +799,8 @@ const styles = StyleSheet.create({
   buttonTextOutline: { color: medicalTheme.primary },
   card: { backgroundColor: medicalTheme.card, borderColor: medicalTheme.border, borderRadius: 18, borderWidth: 1, padding: 16 },
   contentRoot: { backgroundColor: medicalTheme.background, flex: 1, minWidth: 0 },
+  contentRootFullBleed: { overflow: "hidden" },
+  fullBleedPage: { flex: 1, minHeight: 0, overflow: "hidden" },
   countBadge: { alignItems: "center", backgroundColor: medicalTheme.critical, borderRadius: 999, minWidth: 18, paddingHorizontal: 4, position: "absolute", right: 5, top: 4 },
   countBadgeText: { color: "#FFFFFF", fontSize: 10, fontWeight: "900" },
   collapseButton: { alignItems: "center", alignSelf: "center", backgroundColor: "#0B2134", borderColor: "#1F7085", borderRadius: 999, borderWidth: 1, flexDirection: "row", gap: 8, minHeight: 38, paddingHorizontal: 12 },

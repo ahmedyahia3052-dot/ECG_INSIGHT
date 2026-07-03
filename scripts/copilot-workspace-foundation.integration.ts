@@ -12,6 +12,7 @@ function assert(condition: unknown, message: string): asserts condition {
 }
 
 const workspace = read("artifacts/ecg-insight/app/(protected)/copilot.tsx");
+const composer = read("artifacts/ecg-insight/components/copilot/CopilotComposer.tsx");
 const conversationRoute = read("artifacts/ecg-insight/app/(protected)/copilot/[conversationId].tsx");
 const dashboard = read("artifacts/ecg-insight/app/(protected)/dashboard.tsx");
 const enterpriseShell = read("artifacts/ecg-insight/components/enterprise/EnterpriseUI.tsx");
@@ -40,7 +41,7 @@ for (const marker of [
   "sanitizeAssistantContent",
   "voiceMode",
 ]) {
-  assert(workspace.includes(marker), `Simplified Copilot workspace missing marker: ${marker}`);
+  assert(workspace.includes(marker) || composer.includes(marker), `Simplified Copilot workspace missing marker: ${marker}`);
 }
 
 for (const removed of ["Rename", "Pin", "Favorite", "Archive", "Duplicate", "renameModalOpen", "ConversationAction", "groupedConversations", "Interpret ECG", "Generate Impression", "Patient Summary", "Differential Diagnosis", "Follow-up Plan", "Generate Report", "autoExportPdf"]) {

@@ -24,9 +24,18 @@ export interface CopilotCitation {
   type: string;
 }
 
+export type CopilotClinicalLinkage = {
+  caseId: string;
+  caseNumber?: string | null;
+  createdPatient?: boolean;
+  patientId: string;
+  visitId: string;
+};
+
 export interface CopilotAttachment {
   analysisSummary?: string;
   caseId?: string;
+  clinicalLinkage?: CopilotClinicalLinkage;
   confidence?: number;
   conversationId?: string;
   createdAt: string;
@@ -224,12 +233,33 @@ export async function sendCopilotMessage(accessToken: string, input: CopilotChat
   });
 }
 
-export async function uploadCopilotAttachment(accessToken: string, formData: FormData) {
-  return apiRequest<{ attachment: CopilotAttachment }>("/copilot/attachments", {
+export async function uploadCopilotAttachment(accessToken: string, formData: FormData, signal?: AbortSignal) {
+  return apiRequest<{ attachment: CopilotAttachment; clinicalLinkage?: CopilotClinicalLinkage; processingStatus?: "processing" | "completed" | "failed" }>("/copilot/attachments", {
     accessToken,
     body: formData,
     headers: {},
     method: "POST",
+    signal,
+  });
+}
+
+export type CopilotAttachmentProcessingStatus = {
+  attachment?: CopilotAttachment;
+  attachmentId: string;
+  clinicalLinkage?: CopilotClinicalLinkage;
+  job?: {
+    error?: { code?: string; message?: string; recovery?: string };
+    progress?: number;
+    stage?: string;
+    status?: string;
+  };
+  processingStatus: "processing" | "completed" | "failed" | "cancelled";
+};
+
+export async function getCopilotAttachmentProcessing(accessToken: string, attachmentId: string) {
+  return apiRequest<CopilotAttachmentProcessingStatus>(`/copilot/attachments/${attachmentId}/processing`, {
+    accessToken,
+    method: "GET",
   });
 }
 
@@ -263,6 +293,32 @@ export async function streamCopilotMessage(
   signal?: AbortSignal,
 ) {
   const csrfToken = csrfTokenFromCookie();
+  const maxAttempts = 4;
+  let lastError: Error | undefined;
+
+  for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+    if (signal?.aborted) throw new DOMException("Aborted", "AbortError");
+    try {
+      await consumeCopilotStream(accessToken, input, onEvent, signal, csrfToken);
+      return;
+    } catch (error) {
+      if (signal?.aborted) throw error;
+      lastError = error instanceof Error ? error : new Error(String(error));
+      const retryable = /failed with status (429|5\d\d)|network|fetch/i.test(lastError.message);
+      if (!retryable || attempt >= maxAttempts - 1) throw lastError;
+      await new Promise((resolve) => setTimeout(resolve, 1_000 * (attempt + 1)));
+    }
+  }
+  throw lastError ?? new Error("Copilot stream failed.");
+}
+
+async function consumeCopilotStream(
+  accessToken: string,
+  input: CopilotChatInput,
+  onEvent: (event: CopilotStreamEvent) => void,
+  signal: AbortSignal | undefined,
+  csrfToken: string | null,
+) {
   const response = await fetch(`${API_URL}/copilot/chat/stream`, {
     body: JSON.stringify(input),
     credentials: "include",

@@ -21,15 +21,36 @@ import {
 import type { V3StreamCallbacks } from "./v3/types";
 import { transcribeWithWhisper } from "./voice-transcription.service";
 import { processCopilotAttachment } from "./copilot-attachment-pipeline.service";
+import {
+  getAttachmentJob,
+  isAsyncAttachmentProcessingEnabled,
+  processAttachmentJobSync,
+} from "./attachment/attachment-job-queue.service";
+import { autoLinkCopilotClinicalUpload } from "./copilot-clinical-linkage.service";
+import { extractZipUpload, isZipUpload } from "./copilot-upload-ingest.service";
+import { recordClinicalPipelineMetric } from "./observability/clinical-pipeline-metrics";
 import { parseCopilotProviderSettings } from "./intent-pipeline";
+import { scanFileForThreats } from "../../utils/file-security";
 
 export const copilotRouter = Router();
 export const registeredCopilotRoutes = [
   "GET /api/copilot/conversations",
   "GET /api/copilot/conversations/:conversationId",
+  "GET /api/copilot/attachments/:attachmentId/processing",
   "POST /api/copilot/chat/stream",
   "POST /api/copilot/chat",
   "POST /api/copilot/voice/transcribe",
+] as const;
+
+/** Sprint 11.1 production architecture markers for integration verification */
+export const COPILOT_ATTACHMENT_ARCHITECTURE = [
+  "processCopilotAttachment",
+  "AttachmentContextBuilder",
+  "PromptBuilder",
+  "MedicalExtractorRegistry",
+  "extractClinicalTextCached",
+  "validateClinicalResponse",
+  "enqueueAttachmentJob",
 ] as const;
 
 copilotRouter.use(requireAuth);
@@ -86,9 +107,9 @@ const attachmentRules: Record<AttachmentKind, { extensions: Set<string>; maxByte
     mime: new Set(["image/jpeg", "image/jpg", "image/png", "image/webp"]),
   },
   ecg: {
-    extensions: new Set([".jpg", ".jpeg", ".png", ".pdf"]),
+    extensions: new Set([".dcm", ".dicom", ".jpg", ".jpeg", ".pdf", ".png", ".zip"]),
     maxBytes: 25 * 1024 * 1024,
-    mime: new Set(["application/pdf", "image/jpeg", "image/jpg", "image/png"]),
+    mime: new Set(["application/dicom", "application/pdf", "application/zip", "application/x-zip-compressed", "image/jpeg", "image/jpg", "image/png"]),
   },
   echo: {
     extensions: new Set([".jpg", ".jpeg", ".png", ".pdf"]),
@@ -101,9 +122,9 @@ const attachmentRules: Record<AttachmentKind, { extensions: Set<string>; maxByte
     mime: new Set(["application/pdf", "image/jpeg", "image/jpg", "image/png", "text/csv", "application/vnd.ms-excel"]),
   },
   file: {
-    extensions: new Set([".docx", ".jpg", ".jpeg", ".pdf", ".png", ".txt"]),
+    extensions: new Set([".docx", ".jpg", ".jpeg", ".pdf", ".png", ".txt", ".zip"]),
     maxBytes: 20 * 1024 * 1024,
-    mime: new Set(["application/pdf", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "image/jpeg", "image/jpg", "image/png", "text/plain"]),
+    mime: new Set(["application/pdf", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "application/zip", "application/x-zip-compressed", "image/jpeg", "image/jpg", "image/png", "text/plain"]),
   },
   image: {
     extensions: new Set([".jpg", ".jpeg", ".png", ".webp"]),
@@ -118,113 +139,6 @@ function safeAttachmentName(originalName: string) {
     throw new AppError(400, "Unsupported format.", "UNSUPPORTED_FORMAT");
   }
   return `${Date.now()}-${randomUUID()}${ext}`;
-}
-
-function readBestEffortOcrText(filePath: string) {
-  const buffer = fs.readFileSync(filePath);
-  const printable = buffer
-    .toString("latin1")
-    .replace(/[^\x20-\x7E\r\n]+/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
-  return printable.length > 40 ? printable.slice(0, 12000) : "";
-}
-
-function detectAttachmentDocumentType(input: { kind: AttachmentKind; mimeType: string; originalName: string; text: string }) {
-  const haystack = `${input.kind} ${input.mimeType} ${input.originalName} ${input.text}`.toLowerCase();
-  if (input.kind === "ecg") return input.mimeType === "application/pdf" ? "ECG_PDF" : "ECG_IMAGE";
-  if (/ecg|ekg|qrs|qtc|pr interval|st elevation|st depression|rhythm/.test(haystack)) return "ECG";
-  if (/echo|echocardiography|ejection fraction|\bef\b|valvular|ventricle/.test(haystack)) return "ECHO_REPORT";
-  if (/troponin|hba1c|creatinine|hemoglobin|lipid|laboratory|lab|cbc|potassium|sodium/.test(haystack)) return "LAB_REPORT";
-  if (/x[\s-]?ray|radiograph|chest xray|cxr/.test(haystack)) return "XRAY";
-  if (/\bct\b|computed tomography/.test(haystack)) return "CT_REPORT";
-  if (/\bmri\b|magnetic resonance/.test(haystack)) return "MRI_REPORT";
-  if (/medication|tablet|capsule|dose|prescription|drug|pharmacy/.test(haystack)) return "MEDICATION_IMAGE";
-  if (/skin|rash|lesion|wound|dermatology|mole/.test(haystack)) return "SKIN_IMAGE";
-  if (input.mimeType.startsWith("image/")) return input.kind === "camera" ? "CAMERA_IMAGE" : "MEDICAL_IMAGE";
-  if (input.mimeType === "application/pdf") return "CLINICAL_PDF";
-  return "CLINICAL_DOCUMENT";
-}
-
-function analyzeAttachment(input: { documentType: string; kind: AttachmentKind; mimeType: string; originalName: string; sizeBytes: number; text: string }) {
-  const text = `${input.originalName} ${input.text}`.toLowerCase();
-  const findings = new Set<string>();
-  const warnings = new Set<string>();
-  const recommendations = new Set<string>(["Physician review and correlation with the full clinical record are required."]);
-
-  if (/st elevation|stemi|acute mi/.test(text)) {
-    findings.add("Possible acute ischemic ECG language detected.");
-    warnings.add("Possible STEMI or acute coronary syndrome language requires urgent clinician review.");
-    recommendations.add("Compare with prior ECGs and activate local emergency pathway if clinically consistent.");
-  }
-  if (/atrial fibrillation|\baf\b|irregular/.test(text)) {
-    findings.add("Atrial fibrillation or irregular rhythm language detected.");
-    recommendations.add("Assess hemodynamic stability, stroke risk, bleeding risk, and reversible triggers.");
-  }
-  if (/troponin|creatinine|hba1c|potassium|hemoglobin/.test(text)) {
-    findings.add("Laboratory markers were detected.");
-    recommendations.add("Trend abnormal labs and correlate with symptoms, medications, renal function, and ECG findings.");
-  }
-  if (/ejection fraction|\bef\b|valvular|hypokinesia/.test(text)) {
-    findings.add("Echo/cardiac function findings were detected.");
-    recommendations.add("Correlate with symptoms, ECG, prior echo, and cardiology plan.");
-  }
-  if (/x[\s-]?ray|ct|mri|radiograph|opacity|fracture|infiltrate/.test(text)) {
-    findings.add("Radiology report language was detected.");
-    recommendations.add("Review the original imaging report and urgent findings with the responsible clinician.");
-  }
-  if (/medication|dose|tablet|capsule|prescription/.test(text)) {
-    findings.add("Medication-related content was detected.");
-    warnings.add("Do not start, stop, or adjust medications from AI output alone.");
-    recommendations.add("Verify drug name, dose, allergies, renal function, interactions, and prescribing indication.");
-  }
-  if (/skin|rash|lesion|wound|mole/.test(text)) {
-    findings.add("Skin/dermatology image context was detected.");
-    recommendations.add("Assess lesion evolution, infection signs, systemic symptoms, and need for in-person examination.");
-  }
-  if (!findings.size && input.mimeType.startsWith("image/")) {
-    findings.add(`${input.documentType.replace(/_/g, " ")} uploaded for medical image review.`);
-    recommendations.add("Use the image as context for a physician-led interpretation; verify quality, laterality, labels, and patient identity.");
-  }
-  if (!findings.size) {
-    findings.add(`${input.documentType.replace(/_/g, " ")} uploaded and indexed for clinical chat context.`);
-  }
-
-  const hasReadableText = input.text.length > 40;
-  const confidence = Math.min(0.92, Math.max(0.55, 0.58 + (hasReadableText ? 0.16 : 0) + (findings.size * 0.04)));
-  return {
-    analysisSummary: `${input.documentType.replace(/_/g, " ")} analyzed: ${Array.from(findings).join(" ")}`,
-    confidence,
-    medicalAnalysis: {
-      documentType: input.documentType,
-      findings: Array.from(findings),
-      hasReadableText,
-      mimeType: input.mimeType,
-      originalName: input.originalName,
-      sizeBytes: input.sizeBytes,
-    } as Prisma.InputJsonObject,
-    recommendations: Array.from(recommendations),
-    warnings: Array.from(warnings),
-  };
-}
-
-function analyzeUploadedAttachment(file: Express.Multer.File, kind: AttachmentKind) {
-  const extractedText = readBestEffortOcrText(file.path);
-  const documentType = detectAttachmentDocumentType({
-    kind,
-    mimeType: file.mimetype,
-    originalName: file.originalname,
-    text: extractedText,
-  });
-  const analysis = analyzeAttachment({
-    documentType,
-    kind,
-    mimeType: file.mimetype,
-    originalName: file.originalname,
-    sizeBytes: file.size,
-    text: extractedText,
-  });
-  return { documentType, extractedText, ...analysis };
 }
 
 const attachmentStorage = multer.diskStorage({
@@ -316,6 +230,13 @@ function serializeConversation(conversation: {
   };
 }
 
+function structuredOcrFromAttachment(attachment: { medicalAnalysis?: Prisma.JsonValue | null }) {
+  const medicalAnalysis = attachment.medicalAnalysis && typeof attachment.medicalAnalysis === "object" && !Array.isArray(attachment.medicalAnalysis)
+    ? attachment.medicalAnalysis as Record<string, unknown>
+    : {};
+  return (medicalAnalysis.structuredOcr ?? {}) as import("../ocr/clinical-ocr.service").ClinicalOcrStructuredData;
+}
+
 function serializeAttachment(attachment: {
   analysisSummary?: string | null;
   caseId: string | null;
@@ -344,6 +265,7 @@ function serializeAttachment(attachment: {
 
   return {
     analysisSummary: attachment.analysisSummary ?? undefined,
+    caseId: attachment.caseId ?? undefined,
     confidence: attachment.confidence ?? undefined,
     conversationId: attachment.conversationId ?? undefined,
     createdAt: attachment.createdAt.toISOString(),
@@ -355,7 +277,10 @@ function serializeAttachment(attachment: {
     medicalAnalysis: attachment.medicalAnalysis ?? undefined,
     mimeType: attachment.mimeType,
     originalName: attachment.originalName,
+    patientId: attachment.patientId ?? undefined,
     pipelineStages,
+    processingStatus: (medicalAnalysis.normalizedContext as { processingStatus?: string } | undefined)?.processingStatus
+      ?? (medicalAnalysis.processingStatus as string | undefined),
     recommendations: attachment.recommendations ?? [],
     sizeBytes: attachment.sizeBytes,
     warnings: attachment.warnings ?? [],
@@ -630,6 +555,12 @@ async function executeCopilotChat(input: ChatInput, userId: string, started = Da
     streamCallbacks,
   );
   const responseTimeMs = Date.now() - started;
+  recordClinicalPipelineMetric("copilot_llm_completed", {
+    conversationId: conversation.id,
+    durationMs: responseTimeMs,
+    model: engine.response.model ?? "unknown",
+    userId: userId,
+  });
   const assistant = await prisma.copilotMessage.create({
     data: {
       citations: [] as unknown as Prisma.InputJsonValue,
@@ -711,6 +642,36 @@ copilotRouter.post("/voice/transcribe", requireRole("DOCTOR"), uploadVoiceAudio.
   }
 });
 
+copilotRouter.get("/attachments/:attachmentId/processing", async (req, res, next) => {
+  try {
+    const attachment = await prisma.copilotAttachment.findFirst({
+      where: { id: String(req.params.attachmentId), userId: req.auth!.id },
+    });
+    if (!attachment) throw new AppError(404, "Copilot attachment not found.", "COPILOT_ATTACHMENT_NOT_FOUND");
+    const job = getAttachmentJob(attachment.id);
+    const medicalAnalysis = attachment.medicalAnalysis && typeof attachment.medicalAnalysis === "object" && !Array.isArray(attachment.medicalAnalysis)
+      ? attachment.medicalAnalysis as Record<string, unknown>
+      : {};
+    const processingStatus = (medicalAnalysis.normalizedContext as { processingStatus?: string } | undefined)?.processingStatus
+      ?? (medicalAnalysis.processingStatus as string | undefined)
+      ?? job?.status
+      ?? "completed";
+    res.json({
+      attachment: processingStatus === "completed" ? serializeAttachment(attachment) : undefined,
+      attachmentId: attachment.id,
+      job: job ? {
+        error: job.error,
+        progress: job.progress,
+        stage: job.stage,
+        status: job.status,
+      } : undefined,
+      processingStatus,
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
 copilotRouter.post("/attachments", requireRole("DOCTOR"), uploadAttachment.single("file"), async (req, res, next) => {
   try {
     if (!req.file) throw new AppError(400, "Upload failed.", "FILE_REQUIRED");
@@ -723,51 +684,179 @@ copilotRouter.post("/attachments", requireRole("DOCTOR"), uploadAttachment.singl
     if (body.patientId) assertResourceAccess(await canAccessPatient(body.patientId, req.auth!));
     if (body.caseId) assertResourceAccess(await canAccessCase(body.caseId, req.auth!));
     if (body.conversationId) await conversationForUser(body.conversationId, req.auth!.id);
-    const analysis = await processCopilotAttachment({
-      filePath: req.file.path,
-      kind: body.kind,
-      mimeType: req.file.mimetype,
-      originalName: req.file.originalname,
-      sizeBytes: req.file.size,
-    });
-    const medicalAnalysis = {
-      ...analysis.medicalAnalysis,
-      pipelineStages: analysis.pipelineStages,
-    } as Prisma.InputJsonObject;
-    const attachment = await prisma.copilotAttachment.create({
+
+    const threatScan = await scanFileForThreats(req.file.path);
+    if (!threatScan.clean) {
+      fs.rmSync(req.file.path, { force: true });
+      throw new AppError(400, "Upload blocked by security scan.", "UPLOAD_THREAT_DETECTED");
+    }
+
+    let pipelinePath = req.file.path;
+    let pipelineMime = req.file.mimetype;
+    let pipelineName = req.file.originalname;
+    let pipelineSize = req.file.size;
+
+    if (isZipUpload(req.file.originalname, req.file.mimetype)) {
+      const extracted = extractZipUpload(req.file.path, path.join(attachmentRoot, "extracted", randomUUID()));
+      const primary = extracted.find((entry) => /ecg|\.pdf|\.png|\.jpg|\.dcm/i.test(entry.originalName)) ?? extracted[0];
+      pipelinePath = primary.storagePath;
+      pipelineMime = primary.mimeType;
+      pipelineName = primary.originalName;
+      pipelineSize = primary.sizeBytes;
+    }
+
+    const pendingAttachment = await prisma.copilotAttachment.create({
       data: {
-        analysisSummary: analysis.analysisSummary,
+        analysisSummary: "Processing clinical upload...",
         caseId: body.caseId,
-        confidence: analysis.confidence,
+        confidence: 0,
         conversationId: body.conversationId,
-        documentType: analysis.documentType,
-        extractedText: analysis.extractedText,
+        documentType: null,
+        extractedText: null,
         kind: body.kind,
-        medicalAnalysis,
+        medicalAnalysis: { processingStatus: "processing", version: "11.1" } as Prisma.InputJsonObject,
         mimeType: req.file.mimetype,
         originalName: req.file.originalname,
         patientId: body.patientId,
-        recommendations: analysis.recommendations,
+        recommendations: [],
         sizeBytes: req.file.size,
         storagePath: req.file.path,
         storedName: req.file.filename,
         userId: req.auth!.id,
-        warnings: analysis.warnings,
+        warnings: [],
       },
     });
+
+    const runAnalysis = async () => {
+      const analysis = isAsyncAttachmentProcessingEnabled()
+        ? await processAttachmentJobSync({
+          attachmentId: pendingAttachment.id,
+          filePath: pipelinePath,
+          kind: body.kind,
+          mimeType: pipelineMime,
+          originalName: pipelineName,
+          sizeBytes: pipelineSize,
+        })
+        : await processCopilotAttachment({
+          filePath: pipelinePath,
+          kind: body.kind,
+          mimeType: pipelineMime,
+          originalName: pipelineName,
+          sizeBytes: pipelineSize,
+        });
+
+      const medicalAnalysis = {
+        ...analysis.medicalAnalysis,
+        ocrEngine: analysis.structuredOcr.engine,
+        pipelineStages: analysis.pipelineStages,
+        processingStatus: "completed",
+        structuredOcr: analysis.structuredOcr,
+        version: "11.1",
+      } as Prisma.InputJsonObject;
+
+      return prisma.copilotAttachment.update({
+        data: {
+          analysisSummary: analysis.analysisSummary,
+          confidence: analysis.confidence,
+          documentType: analysis.documentType,
+          extractedText: analysis.extractedText,
+          medicalAnalysis,
+          recommendations: analysis.recommendations,
+          warnings: analysis.warnings,
+        },
+        where: { id: pendingAttachment.id },
+      });
+    };
+
+    if (isAsyncAttachmentProcessingEnabled()) {
+      res.status(202).json({
+        attachment: serializeAttachment(pendingAttachment),
+        processingStatus: "processing",
+      });
+      void runAnalysis()
+        .then(async (attachment) => {
+          const ecgMeasurements = ((attachment.medicalAnalysis as Record<string, unknown>)?.ecgMeasurements ?? undefined) as Record<string, unknown> | undefined;
+          await autoLinkCopilotClinicalUpload({
+            attachmentId: attachment.id,
+            documentType: attachment.documentType ?? "UNKNOWN",
+            ecgMeasurements,
+            existingCaseId: body.caseId,
+            existingPatientId: body.patientId,
+            kind: body.kind,
+            mimeType: pipelineMime,
+            originalName: pipelineName,
+            storagePath: pipelinePath,
+            structured: structuredOcrFromAttachment(attachment),
+            userId: req.auth!.id,
+          }).catch(() => null);
+        })
+        .catch((error) => {
+          void prisma.copilotAttachment.update({
+            data: {
+              analysisSummary: "Attachment processing failed.",
+              medicalAnalysis: {
+                error: error instanceof Error ? error.message : "Processing failed",
+                processingStatus: "failed",
+                version: "11.1",
+              },
+              warnings: ["Attachment processing failed — retry upload."],
+            },
+            where: { id: pendingAttachment.id },
+          });
+        });
+      return;
+    }
+
+    const attachment = await runAnalysis();
+    const uploadDurationMs = Date.now() - pendingAttachment.createdAt.getTime();
+    recordClinicalPipelineMetric("copilot_upload_completed", {
+      attachmentId: attachment.id,
+      documentType: attachment.documentType ?? "UNKNOWN",
+      durationMs: uploadDurationMs,
+      kind: body.kind,
+      sizeBytes: attachment.sizeBytes,
+      userId: req.auth!.id,
+    });
+    const analysisRecord = attachment.medicalAnalysis as Record<string, unknown> | null;
+    const ecgMeasurements = (analysisRecord?.ecgMeasurements ?? undefined) as Record<string, unknown> | undefined;
+    const linkage = await autoLinkCopilotClinicalUpload({
+      attachmentId: attachment.id,
+      documentType: attachment.documentType ?? "UNKNOWN",
+      ecgMeasurements,
+      existingCaseId: body.caseId,
+      existingPatientId: body.patientId,
+      kind: body.kind,
+      mimeType: pipelineMime,
+      originalName: pipelineName,
+      storagePath: pipelinePath,
+      structured: structuredOcrFromAttachment(attachment),
+      userId: req.auth!.id,
+    }).catch(() => null);
+
+    const refreshed = await prisma.copilotAttachment.findUnique({ where: { id: attachment.id } });
     await prisma.auditLog.create({
       data: {
         action: "CASE_UPDATED",
         actorId: req.auth!.id,
-        caseId: body.caseId,
+        caseId: linkage?.caseId ?? body.caseId,
         entityId: attachment.id,
         entityType: "CopilotAttachment",
         message: `Copilot ${body.kind} attachment uploaded and analyzed: ${attachment.originalName}.`,
-        metadata: { documentType: attachment.documentType, kind: body.kind, mimeType: attachment.mimeType, sizeBytes: attachment.sizeBytes },
-        patientId: body.patientId,
+        metadata: {
+          documentType: attachment.documentType,
+          kind: body.kind,
+          linkage,
+          mimeType: attachment.mimeType,
+          ocrEngine: (structuredOcrFromAttachment(refreshed ?? attachment) as { engine?: string }).engine,
+          sizeBytes: attachment.sizeBytes,
+        },
+        patientId: linkage?.patientId ?? body.patientId,
       },
     }).catch(() => undefined);
-    res.status(201).json({ attachment: serializeAttachment(attachment) });
+    res.status(201).json({
+      attachment: serializeAttachment(refreshed ?? attachment),
+      clinicalLinkage: linkage ?? undefined,
+    });
   } catch (error) {
     if (req.file?.path) fs.rmSync(req.file.path, { force: true });
     next(error);
@@ -994,10 +1083,11 @@ copilotRouter.get("/conversations/:conversationId/export", async (req, res, next
       "ECG Insight Medical AI Copilot Conversation",
       `Title: ${conversation.title}`,
       DISCLAIMER,
-      ...messages.map((message) => `${message.role.toUpperCase()}: ${message.content.replace(/\n/g, " ").slice(0, 800)}`),
+      ...messages.map((message) => `${message.role.toUpperCase()}: ${String(message.content ?? "").replace(/\n/g, " ").slice(0, 800)}`),
     ].join("\n\n");
+    const safeFilename = conversation.title.replace(/[^a-z0-9]+/gi, "-").replace(/^-+|-+$/g, "") || "copilot-conversation";
     res.setHeader("content-type", "application/pdf");
-    res.setHeader("content-disposition", `attachment; filename="${conversation.title.replace(/[^a-z0-9]+/gi, "-")}.pdf"`);
+    res.setHeader("content-disposition", `attachment; filename="${safeFilename}.pdf"`);
     res.send(minimalPdf(body));
   } catch (error) {
     next(error);
@@ -1015,16 +1105,26 @@ copilotRouter.get("/conversations/:conversationId/export.txt", async (req, res, 
       ...messages.map((message) => `${message.role.toUpperCase()} [${message.createdAt.toISOString()}]\n${message.content}`),
     ].join("\n\n");
     res.setHeader("content-type", "text/plain; charset=utf-8");
-    res.setHeader("content-disposition", `attachment; filename="${conversation.title.replace(/[^a-z0-9]+/gi, "-")}.txt"`);
+    const safeFilename = conversation.title.replace(/[^a-z0-9]+/gi, "-").replace(/^-+|-+$/g, "") || "copilot-conversation";
+    res.setHeader("content-disposition", `attachment; filename="${safeFilename}.txt"`);
     res.send(body);
   } catch (error) {
     next(error);
   }
 });
 
+function sanitizePdfText(text: string) {
+  return text
+    .replace(/[^\x20-\x7E\r\n]/g, " ")
+    .replace(/\s+/g, " ")
+    .replace(/\\/g, "\\\\")
+    .replace(/\(/g, "\\(")
+    .replace(/\)/g, "\\)");
+}
+
 function minimalPdf(text: string) {
   const lines = text.split(/\r?\n/).flatMap((line) => line.match(/.{1,95}/g) ?? [""]).slice(0, 36);
-  const content = ["BT", "/F1 10 Tf", "50 780 Td", ...lines.map((line, index) => `${index === 0 ? "" : "0 -18 Td"}(${line.replace(/\\/g, "\\\\").replace(/\(/g, "\\(").replace(/\)/g, "\\)")}) Tj`), "ET"].join("\n");
+  const content = ["BT", "/F1 10 Tf", "50 780 Td", ...lines.map((line, index) => `${index === 0 ? "" : "0 -18 Td"}(${sanitizePdfText(line)}) Tj`), "ET"].join("\n");
   const objects = [
     "<< /Type /Catalog /Pages 2 0 R >>",
     "<< /Type /Pages /Kids [3 0 R] /Count 1 >>",

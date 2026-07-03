@@ -8,7 +8,7 @@ test.describe("accessibility regression", () => {
       ["/dashboard", /Enterprise Clinical Command Center|Dashboard/],
       ["/patients", "Patient Command Search"],
       ["/reports", "Reports Workflow"],
-      ["/notifications", "Notification Center"],
+      ["/notifications", /Alerts|Notifications/],
       ["/settings", "Workspace Settings"],
       ["/upload-ecg", "Upload ECG"],
     ];

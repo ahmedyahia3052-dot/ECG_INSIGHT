@@ -16,21 +16,58 @@ function assert(condition: unknown, message: string): asserts condition {
   if (!condition) throw new Error(message);
 }
 
+async function cleanupLinkedClinicalRecords(userIds: string[], caseIds: string[], patientIds: string[]) {
+  const linkedCases = await prisma.eCGCase.findMany({
+    select: { id: true, patientId: true },
+    where: { OR: [{ id: { in: caseIds } }, { uploadedById: { in: userIds } }] },
+  });
+  const allCaseIds = [...new Set(linkedCases.map((item) => item.id))];
+  const allPatientIds = [...new Set([...patientIds, ...linkedCases.map((item) => item.patientId).filter(Boolean)])] as string[];
+
+  if (allCaseIds.length) {
+    await prisma.notification.deleteMany({ where: { caseId: { in: allCaseIds } } });
+    await prisma.reportVersion.deleteMany({ where: { report: { caseId: { in: allCaseIds } } } });
+    await prisma.clinicalReport.deleteMany({ where: { caseId: { in: allCaseIds } } });
+    await prisma.aIAnalysis.deleteMany({ where: { caseId: { in: allCaseIds } } });
+    await prisma.eCGMeasurement.deleteMany({ where: { caseId: { in: allCaseIds } } });
+    await prisma.eCGFile.deleteMany({ where: { caseId: { in: allCaseIds } } });
+    await prisma.timelineEvent.deleteMany({ where: { caseId: { in: allCaseIds } } });
+    await prisma.auditLog.deleteMany({ where: { caseId: { in: allCaseIds } } });
+    await prisma.eCGCase.deleteMany({ where: { id: { in: allCaseIds } } });
+  }
+
+  if (allPatientIds.length) {
+    await prisma.timelineEvent.deleteMany({ where: { patientId: { in: allPatientIds } } });
+    await prisma.auditLog.deleteMany({ where: { patientId: { in: allPatientIds } } });
+    await prisma.patient.deleteMany({ where: { id: { in: allPatientIds } } });
+  }
+}
+
 async function cleanup(prefix: string) {
   const users = await prisma.user.findMany({
     select: { id: true },
     where: { email: { contains: prefix } },
   });
   const userIds = users.map((user) => user.id);
+  if (!userIds.length) return;
+
   const conversations = await prisma.copilotConversation.findMany({
     select: { id: true },
     where: { userId: { in: userIds } },
   });
   const conversationIds = conversations.map((conversation) => conversation.id);
+  const attachments = await prisma.copilotAttachment.findMany({
+    select: { caseId: true, patientId: true },
+    where: { OR: [{ userId: { in: userIds } }, { conversationId: { in: conversationIds } }] },
+  });
+  const caseIds = attachments.map((attachment) => attachment.caseId).filter((value): value is string => Boolean(value));
+  const patientIds = attachments.map((attachment) => attachment.patientId).filter((value): value is string => Boolean(value));
+
   await prisma.copilotUsageEvent.deleteMany({ where: { OR: [{ userId: { in: userIds } }, { conversationId: { in: conversationIds } }] } });
   await prisma.copilotAttachment.deleteMany({ where: { OR: [{ userId: { in: userIds } }, { conversationId: { in: conversationIds } }] } });
   await prisma.copilotMessage.deleteMany({ where: { conversationId: { in: conversationIds } } });
   await prisma.copilotConversation.deleteMany({ where: { id: { in: conversationIds } } });
+  await cleanupLinkedClinicalRecords(userIds, caseIds, patientIds);
   await prisma.userSession.deleteMany({ where: { userId: { in: userIds } } });
   await prisma.session.deleteMany({ where: { userId: { in: userIds } } });
   await prisma.subscription.deleteMany({ where: { userId: { in: userIds } } });
@@ -126,8 +163,10 @@ async function main() {
         kind: string;
         medicalAnalysis?: { findings?: string[] };
         recommendations?: string[];
+        sizeBytes?: number;
         warnings?: string[];
       };
+      clinicalLinkage?: { caseId: string; patientId: string; visitId: string };
     };
     return { body, status: response.status };
   }
@@ -155,6 +194,9 @@ async function main() {
     assert(emptyConversation.body.conversation.title === "New Clinical Conversation", "Empty new chat must use default title.");
 
     const ecgUpload = await uploadAttachment("ecg", "resting-ecg-upload.pdf", "application/pdf", "ECG rhythm strip PR interval QRS QTc ST depression", token);
+    assert(ecgUpload.status === 201 && Boolean(ecgUpload.body.clinicalLinkage?.caseId), "ECG upload must auto-link patient, visit, and ECG case.");
+    assert(Boolean(ecgUpload.body.clinicalLinkage?.patientId), "ECG upload must return linked patient id.");
+    assert(Boolean(ecgUpload.body.clinicalLinkage?.visitId), "ECG upload must return linked visit id.");
     const medicalImage = await uploadAttachment("image", "chest-xray-image.png", "image/png", "chest x-ray opacity radiograph follow up", token);
     const clinicalFile = await uploadAttachment("file", "lab-report.txt", "text/plain", "Troponin: 0.42 Creatinine: 1.4 Potassium: 5.7 ECG irregular rhythm", token);
     for (const upload of [ecgUpload, medicalImage, clinicalFile]) {
@@ -225,6 +267,7 @@ async function main() {
     assert(listed.status === 200, "Conversation list must load.");
     assert(listed.body.conversations.some((conversation) => conversation.id === firstConversation.id && Boolean(conversation.lastMessagePreview)), "Conversation list must include a latest message preview.");
     assert(listed.body.conversations.some((conversation) => conversation.id === secondConversation.id && conversation.title === secondConversation.title), "Conversation list must include second chat for switching.");
+    console.log("Copilot enterprise workspace integration checks passed.");
   } finally {
     await new Promise<void>((resolve) => server.close(() => resolve()));
     await cleanup("copilot-simple-");

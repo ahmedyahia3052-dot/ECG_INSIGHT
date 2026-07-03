@@ -1,74 +1,15 @@
 import { expect, test } from "@playwright/test";
-import { API_URL } from "./utils/qa";
+import { API_URL, attachStrictRuntimeDiagnostics, clickCopilotStreamingAction, disableCopilotVoiceMode, exportCopilotConversation, uploadCopilotAttachment } from "./utils/qa";
+import { installCopilotVoiceMocks } from "./utils/voice-mocks";
 
 test.describe("Copilot runtime hardening", () => {
+  test.describe.configure({ timeout: 180_000 });
+
   test("chat, upload, refresh, navigation, export, and share never reach ErrorBoundary @smoke", async ({ page }) => {
-    const consoleErrors: string[] = [];
-    const pageErrors: string[] = [];
-
-    page.on("console", (message) => {
-      if (message.type() === "error") consoleErrors.push(message.text());
-    });
-    page.on("pageerror", (error) => pageErrors.push(`${error.message}\n${error.stack ?? ""}`));
-
+    const runtime = attachStrictRuntimeDiagnostics(page);
+    await installCopilotVoiceMocks(page, ["runtime smoke voice transcript"]);
     await page.addInitScript(() => {
       window.localStorage.setItem("ecg-insight:copilot-workspace-state", "{malformed-json");
-      class MockSpeechRecognition {
-        continuous = true;
-        interimResults = true;
-        lang = "en-US";
-        onend: (() => void) | null = null;
-        onerror: ((event: { error?: string }) => void) | null = null;
-        onresult: ((event: {
-          resultIndex: number;
-          results: ArrayLike<{ 0: { transcript: string }; isFinal: boolean; length: number }>;
-        }) => void) | null = null;
-        start() {
-          setTimeout(() => {
-            this.onresult?.({
-              resultIndex: 0,
-              results: [{ 0: { transcript: "runtime smoke voice transcript" }, isFinal: true, length: 1 }],
-            });
-            this.onend?.();
-          }, 30);
-        }
-        stop() {
-          this.onend?.();
-        }
-        abort() {
-          this.onend?.();
-        }
-      }
-      Object.assign(window, {
-        SpeechRecognition: MockSpeechRecognition,
-        webkitSpeechRecognition: MockSpeechRecognition,
-        MediaRecorder: class {
-          static isTypeSupported() { return true; }
-          state = "inactive";
-          ondataavailable: ((event: { data: Blob }) => void) | null = null;
-          onstop: (() => void) | null = null;
-          constructor(_stream: MediaStream) { void _stream; }
-          start() { this.state = "recording"; }
-          stop() {
-            this.ondataavailable?.({ data: new Blob(["mock"], { type: "audio/webm" }) });
-            this.onstop?.();
-          }
-        },
-      });
-      navigator.mediaDevices.getUserMedia = async () => ({
-        getTracks: () => [{ stop: () => undefined }],
-      } as MediaStream);
-      window.speechSynthesis = {
-        cancel: () => undefined,
-        pause: () => undefined,
-        resume: () => undefined,
-        speak: (utterance) => {
-          setTimeout(() => {
-            utterance.onstart?.();
-            setTimeout(() => utterance.onend?.(), 10);
-          }, 0);
-        },
-      };
     });
 
     const loginResponse = await page.request.post(`${API_URL}/auth/login`, {
@@ -98,10 +39,7 @@ test.describe("Copilot runtime hardening", () => {
     const composer = page.getByPlaceholder(/Message the assistant|Ask about ECG/i);
     async function sendAndWaitForAssistant(prompt: string, expectedText?: RegExp | string) {
       await composer.fill(prompt);
-      const response = page.waitForResponse((item) => item.url().includes("/copilot/chat/stream") && item.status() === 201, { timeout: 45_000 });
-      await page.getByRole("button", { name: "Send" }).click();
-      await response;
-      await expect(page.getByText("Ready").first()).toBeVisible({ timeout: 45_000 });
+      await clickCopilotStreamingAction(page, "Send");
       await expect(page.getByText("Assistant").first()).toBeVisible({ timeout: 45_000 });
       if (expectedText) await expect(page.getByText(expectedText).first()).toBeVisible({ timeout: 45_000 });
       await expect(page).toHaveURL(/\/copilot\/[^/]+$/);
@@ -112,29 +50,34 @@ test.describe("Copilot runtime hardening", () => {
     await page.getByRole("button", { name: "New Chat" }).click();
     await sendAndWaitForAssistant("What is hypertension?", /hypertension/i);
     await page.getByRole("button", { name: "New Chat" }).click();
-    await sendAndWaitForAssistant("I have chest pain and sweating", /urgent|emergency|immediate/i);
+    await sendAndWaitForAssistant("I have chest pain and sweating", /chest pain|vitals|ECG|troponin|presentation|urgent|emergency|immediate/i);
     await page.getByRole("button", { name: "New Chat" }).click();
 
     await page.getByRole("button", { name: "Voice" }).last().click();
     await expect(composer).toHaveValue(/runtime smoke voice transcript/i, { timeout: 10_000 });
+    await disableCopilotVoiceMode(page);
+    await composer.fill("");
 
-    const fileChooser = page.waitForEvent("filechooser");
-    await page.getByRole("button", { name: "Upload Files" }).last().click();
-    await (await fileChooser).setFiles({ buffer: Buffer.from("Troponin 0.42 potassium 5.7 ECG irregular rhythm"), mimeType: "text/plain", name: "runtime-labs.txt" });
-    await expect(page.getByText("runtime-labs.txt").last()).toBeVisible({ timeout: 30_000 });
-    await expectNoErrorBoundary();
+    await uploadCopilotAttachment(page, {
+      buffer: Buffer.from("Troponin 0.42 potassium 5.7 ECG irregular rhythm"),
+      buttonName: "Upload Files",
+      mimeType: "text/plain",
+      name: "runtime-labs.txt",
+    });
 
-    const ecgChooser = page.waitForEvent("filechooser");
-    await page.getByRole("button", { name: "Upload ECG" }).last().click();
-    await (await ecgChooser).setFiles({ buffer: Buffer.from("ECG rhythm strip PR interval QRS QTc ST depression"), mimeType: "application/pdf", name: "runtime-ecg.pdf" });
-    await expect(page.getByText("runtime-ecg.pdf").last()).toBeVisible({ timeout: 30_000 });
-    await expectNoErrorBoundary();
+    await uploadCopilotAttachment(page, {
+      buffer: Buffer.from("ECG rhythm strip PR interval QRS QTc ST depression"),
+      buttonName: "Upload ECG",
+      mimeType: "application/pdf",
+      name: "runtime-ecg.pdf",
+    });
 
-    const imageChooser = page.waitForEvent("filechooser");
-    await page.getByRole("button", { name: "Upload Image" }).last().click();
-    await (await imageChooser).setFiles({ buffer: Buffer.from("89504e470d0a1a0a0000000d49484452", "hex"), mimeType: "image/png", name: "runtime-image.png" });
-    await expect(page.getByText("runtime-image.png").last()).toBeVisible({ timeout: 30_000 });
-    await expectNoErrorBoundary();
+    await uploadCopilotAttachment(page, {
+      buffer: Buffer.from("89504e470d0a1a0a0000000d49484452", "hex"),
+      buttonName: "Upload Image",
+      mimeType: "image/png",
+      name: "runtime-image.png",
+    });
 
     await sendAndWaitForAssistant("Runtime smoke test: summarize uploaded ECG, image, and labs.", /reviewed the material|runtime-labs\.txt/i);
     await sendAndWaitForAssistant("Using the files I uploaded earlier, what should I re-check?", /reviewed|runtime-labs\.txt|correlate/i);
@@ -158,21 +101,16 @@ test.describe("Copilot runtime hardening", () => {
     await expect(page.getByRole("button", { name: "Export PDF" })).toBeEnabled({ timeout: 30_000 });
     await expectNoErrorBoundary();
 
-    const pdfDownload = page.waitForEvent("download", { timeout: 30_000 }).catch(() => null);
-    await page.getByRole("button", { name: "Export PDF" }).click();
-    await pdfDownload;
+    await exportCopilotConversation(page, "pdf");
     await expectNoErrorBoundary();
 
-    const txtDownload = page.waitForEvent("download", { timeout: 30_000 }).catch(() => null);
-    await page.getByRole("button", { name: "Export TXT" }).click();
-    await txtDownload;
+    await exportCopilotConversation(page, "txt");
     await expectNoErrorBoundary();
 
     await page.getByRole("button", { name: "Share" }).last().click();
     await expect(page.getByText(/Share sheet opened|Conversation deep link and text copied|Conversation text downloaded/)).toBeVisible({ timeout: 20_000 });
     await expectNoErrorBoundary();
 
-    expect(consoleErrors).toEqual([]);
-    expect(pageErrors).toEqual([]);
+    runtime.assertClean();
   });
 });

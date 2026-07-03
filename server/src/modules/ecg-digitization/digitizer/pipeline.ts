@@ -28,9 +28,14 @@ export async function runDigitizationPipeline(
     ? file.metadataJson as Record<string, unknown>
     : {};
 
+  const detected = detectGrid(image.buffer, image.width, image.height, { metadata, originalName: file.originalName });
   const calibration = {
-    ...detectGrid(image.buffer, image.width, image.height, { metadata, originalName: file.originalName }),
-    ...override,
+    ...detected,
+    ...(override?.gainMmPerMv !== undefined ? { gainMmPerMv: override.gainMmPerMv } : {}),
+    ...(override?.paperSpeedMmPerSec !== undefined ? { paperSpeedMmPerSec: override.paperSpeedMmPerSec } : {}),
+    ...(override?.confidence !== undefined ? { confidence: override.confidence } : {}),
+    ...(override?.gridDetected !== undefined ? { gridDetected: override.gridDetected } : {}),
+    ...(override?.pixelsPerSmallSquare !== undefined ? { pixelsPerSmallSquare: override.pixelsPerSmallSquare } : {}),
   } as GridCalibration;
 
   const leadSegments = detectStandardLeadLayout(image.buffer, image.width, image.height, image.metrics);

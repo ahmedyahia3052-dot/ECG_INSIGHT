@@ -127,7 +127,7 @@ export type EngineResult = {
   medicalIntent: MedicalIntent;
   plan: ResponsePlan;
   requiresClarification: boolean;
-  response: { content: string };
+  response: { content: string; model?: string };
   sessionTurnCount: number;
   tag: string;
   toolPlan: ToolPlan;

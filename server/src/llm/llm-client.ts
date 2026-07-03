@@ -1,6 +1,7 @@
 import { AppError } from "../middleware/error";
 import { log } from "../utils/logger";
 import { mapOllamaErrorToGracefulMessage } from "./errors";
+import { llmInferenceQueue } from "./inference-queue";
 import { getOllamaRuntimeState, resolveLlmProvider } from "./llm-registry";
 import type { ILlmProvider } from "./providers/llm-provider.interface";
 import type {
@@ -82,7 +83,7 @@ async function withRetry<T>(
   let lastError: unknown;
   for (let attempt = 1; attempt <= LLM_MAX_RETRIES; attempt += 1) {
     try {
-      return await operation();
+      return await llmInferenceQueue.run(operation);
     } catch (error) {
       lastError = error;
       if (attempt >= LLM_MAX_RETRIES || !isRetryableError(error)) {

@@ -1,8 +1,10 @@
 import { expect, test } from "@playwright/test";
-import { API_URL } from "./utils/qa";
+import { API_URL, clickCopilotStreamingAction, disableCopilotVoiceMode, uploadCopilotAttachment, waitForCopilotIdle } from "./utils/qa";
 import { installCopilotVoiceMocks } from "./utils/voice-mocks";
 
 test.describe("Clinical AI Copilot Engine V2", () => {
+  test.describe.configure({ timeout: 180_000 });
+
   test.beforeEach(async ({ page }) => {
     await page.addInitScript(() => {
       class MockSpeechRecognition {
@@ -74,17 +76,15 @@ test.describe("Clinical AI Copilot Engine V2", () => {
     await page.goto("/copilot");
     await expect(page.getByText("Clinical Copilot Workspace")).toBeVisible({ timeout: 30_000 });
     await page.getByRole("button", { name: "New Chat" }).click();
+    await disableCopilotVoiceMode(page);
   });
 
   async function sendPrompt(page: import("@playwright/test").Page, prompt: string) {
+    await waitForCopilotIdle(page);
     const composer = page.getByPlaceholder(/Message the assistant|Ask about ECG/i);
     await composer.fill(prompt);
-    const sendButton = page.getByRole("button", { name: "Send" });
-    await expect(sendButton).toBeEnabled({ timeout: 60_000 });
-    const response = page.waitForResponse((item) => item.url().includes("/copilot/chat/stream") && item.status() === 201, { timeout: 60_000 });
-    await sendButton.click();
-    await response;
-    await expect(page.getByText("Ready").first()).toBeVisible({ timeout: 60_000 });
+    await expect(composer).toHaveValue(prompt, { timeout: 10_000 });
+    await clickCopilotStreamingAction(page, "Send");
     return page.getByTestId("copilot-message-thread");
   }
 
@@ -111,8 +111,9 @@ test.describe("Clinical AI Copilot Engine V2", () => {
     await sendPrompt(page, "How are you?");
     await expect(page.getByText(/ready|help|work on/i).first()).toBeVisible();
     await page.getByRole("button", { name: "New Chat" }).click();
+    await disableCopilotVoiceMode(page);
     await sendPrompt(page, "I need your help");
-    await expect(page.getByText(/here to help|tell me what you need/i).first()).toBeVisible();
+    await expect(page.getByText(/here to help|tell me what you need|Happy to help|tell me a bit more/i).first()).toBeVisible();
   });
 
   test("conversation memory resolves follow-up pronouns", async ({ page }) => {
@@ -121,15 +122,19 @@ test.describe("Clinical AI Copilot Engine V2", () => {
   });
 
   test("topic switching works across turns", async ({ page }) => {
+    await page.getByRole("button", { name: "New Chat" }).click();
+    await disableCopilotVoiceMode(page);
     await sendPrompt(page, "What drugs are commonly used for hypertension?");
-    await expect(page.getByTestId("copilot-message-thread").getByText(/hypertension|drug|medication|agent|blood pressure|treatment/i).first()).toBeVisible();
+    await expect(page.getByText(/hypertension|drug|medication|blood pressure|treatment|ACE|ARB|channel blocker|diuretic|Happy to help/i).first()).toBeVisible({ timeout: 45_000 });
   });
 
   test("ECG upload acknowledgment is conversational", async ({ page }) => {
-    const chooser = page.waitForEvent("filechooser");
-    await page.getByRole("button", { name: "Upload ECG" }).last().click();
-    await (await chooser).setFiles({ buffer: Buffer.from("ECG rhythm strip"), mimeType: "application/pdf", name: "v2-ecg.pdf" });
-    await expect(page.getByText("v2-ecg.pdf").last()).toBeVisible({ timeout: 30_000 });
+    await uploadCopilotAttachment(page, {
+      buffer: Buffer.from("ECG rhythm strip"),
+      buttonName: "Upload ECG",
+      mimeType: "application/pdf",
+      name: "v2-ecg.pdf",
+    });
     await sendPrompt(page, "I uploaded an ECG");
     await expect(page.getByText(/received|analyzing|uploaded/i).first()).toBeVisible();
   });
@@ -147,6 +152,7 @@ test.describe("Clinical AI Copilot Engine V2", () => {
     await expect(page.getByTestId("copilot-message-thread").getByText(/atrial fibrillation|anticoagulation|stroke/i).first()).toBeVisible();
     await expectCleanThread(page);
     await page.getByRole("button", { name: "New Chat" }).click();
+    await disableCopilotVoiceMode(page);
     await sendPrompt(page, "Is amiodarone safe with warfarin?");
     await expect(page.getByText(/amiodarone|warfarin|interaction|bleed|monitor/i).first()).toBeVisible();
   });

@@ -6,6 +6,8 @@ import { CoreConversationManager } from "./conversation-manager";
 import { IntentUnderstanding } from "./intent-understanding";
 import { MemoryManager } from "./memory-manager";
 import { ResponseOrchestrator } from "./response-orchestrator";
+import { AttachmentContextBuilder } from "../attachment/attachment-context-builder.service";
+import { applyClinicalValidation, validateClinicalResponse } from "../validation/clinical-validator";
 import type {
   CorePipelineDeps,
   CorePipelineInput,
@@ -73,6 +75,16 @@ export async function runClinicalAiCore(
   const llm = await ResponseOrchestrator.generate(turn, deps, callbacks);
   const communicationIntent = mapIntentToCommunication(intent.intent);
 
+  const attachmentContexts = turn.input.attachments
+    .map((attachment) => AttachmentContextBuilder.readStored(attachment))
+    .filter((context): context is NonNullable<typeof context> => Boolean(context));
+  const validation = validateClinicalResponse({
+    answer: llm.content,
+    attachmentContexts,
+    question: turn.input.question,
+  });
+  const validatedContent = applyClinicalValidation(llm.content.trim(), validation);
+
   const session = CoreConversationManager.completeTurn({
     communicationIntent,
     conversationId: input.conversationId,
@@ -87,7 +99,7 @@ export async function runClinicalAiCore(
     voiceMode: input.voiceMode,
   });
 
-  const content = appendClinicalSafetyDisclaimer(llm.content.trim());
+  const content = appendClinicalSafetyDisclaimer(validatedContent);
 
   return {
     communicationIntent,
@@ -159,7 +171,7 @@ export function toCoreEngineResult(
     medicalIntent: "general_medical_question",
     plan,
     requiresClarification: false,
-    response: { content: pipeline.content },
+    response: { content: pipeline.content, model: pipeline.model },
     sessionTurnCount: pipeline.memoryState.turnCount,
     tag: pipeline.intent.tutorMode || pipeline.intent.slashCommand === "teach" || pipeline.intent.slashCommand === "quiz"
       ? "Medical Education"

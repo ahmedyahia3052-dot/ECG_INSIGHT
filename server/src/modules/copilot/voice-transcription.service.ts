@@ -1,42 +1,53 @@
+import fs from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
 import { env } from "../../config/env";
 import { AppError } from "../../middleware/error";
+
+async function writeTempAudio(audio: Buffer, mimeType: string) {
+  const ext = mimeType.includes("wav") ? ".wav" : mimeType.includes("mp4") ? ".mp4" : ".webm";
+  const filePath = path.join(os.tmpdir(), `copilot-voice-${Date.now()}${ext}`);
+  await fs.writeFile(filePath, audio);
+  return filePath;
+}
 
 async function tryOllamaTranscribe(audio: Buffer, mimeType: string): Promise<string | null> {
   if (!env.OLLAMA_ENABLED) return null;
 
+  const tempPath = await writeTempAudio(audio, mimeType);
   try {
+    const fileBuffer = await fs.readFile(tempPath);
+    const form = new FormData();
+    form.append("file", new Blob([fileBuffer], { type: mimeType }), path.basename(tempPath));
+
     const response = await fetch(`${env.OLLAMA_BASE_URL.replace(/\/$/, "")}/api/transcribe`, {
+      body: form,
+      method: "POST",
+      signal: AbortSignal.timeout(60_000),
+    });
+
+    if (response.ok) {
+      const payload = await response.json() as { text?: string };
+      return payload.text?.trim() || null;
+    }
+
+    const generateResponse = await fetch(`${env.OLLAMA_BASE_URL.replace(/\/$/, "")}/api/generate`, {
       body: JSON.stringify({
         model: process.env.OLLAMA_WHISPER_MODEL ?? "whisper",
-        options: { temperature: 0 },
-        prompt: "",
+        prompt: "Transcribe the attached clinical voice note to plain text only.",
         stream: false,
       }),
       headers: { "Content-Type": "application/json" },
       method: "POST",
       signal: AbortSignal.timeout(45_000),
     });
-
-    if (!response.ok) {
-      const generateResponse = await fetch(`${env.OLLAMA_BASE_URL.replace(/\/$/, "")}/api/generate`, {
-        body: JSON.stringify({
-          model: process.env.OLLAMA_WHISPER_MODEL ?? "whisper",
-          prompt: `Transcribe this ${mimeType} clinical voice note to plain text only.`,
-          stream: false,
-        }),
-        headers: { "Content-Type": "application/json" },
-        method: "POST",
-        signal: AbortSignal.timeout(45_000),
-      });
-      if (!generateResponse.ok) return null;
-      const payload = await generateResponse.json() as { response?: string };
-      return payload.response?.trim() || null;
-    }
-
-    const payload = await response.json() as { text?: string };
-    return payload.text?.trim() || null;
+    if (!generateResponse.ok) return null;
+    const payload = await generateResponse.json() as { response?: string };
+    return payload.response?.trim() || null;
   } catch {
     return null;
+  } finally {
+    await fs.rm(tempPath, { force: true });
   }
 }
 

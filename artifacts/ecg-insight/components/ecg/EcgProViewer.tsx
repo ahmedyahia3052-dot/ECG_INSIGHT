@@ -1,5 +1,5 @@
 import { Feather } from "@expo/vector-icons";
-import React, { useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Image, Platform, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from "react-native";
 import { PanGestureHandler, PinchGestureHandler, State } from "react-native-gesture-handler";
 import Svg, { Circle, Line, Path, Rect, Text as SvgText } from "react-native-svg";
@@ -9,6 +9,7 @@ import { API_URL } from "@/services/api";
 import type { AIAnalysisResult, AIExplainability } from "@/services/ai";
 import type { ApiECGCase } from "@/services/clinical";
 import type { DigitalEcg, DigitalEcgLead } from "@/services/ecgProcessing";
+import { emitRuntimeEvent } from "@/services/runtimeEvents";
 import { safeArray } from "@/utils/collections";
 
 type GridColor = "gray" | "red";
@@ -77,8 +78,15 @@ export function EcgProViewer({
   const annotations = useMemo(() => buildAnnotations(aiFindings, analysis, ecgCase), [aiFindings, analysis, ecgCase]);
   const visibleAnnotations = selectedLead === "ALL" ? annotations : safeArray(annotations).filter((annotation) => annotation.lead === selectedLead);
 
+  useEffect(() => {
+    const frame = requestAnimationFrame(() => {
+      emitRuntimeEvent("ViewerReady", { caseId: ecgCase.id, mode });
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [ecgCase.id, leadData.length, mode, originalUrl]);
+
   return (
-    <View style={[styles.workstation, mobileMode && styles.mobileWorkstation, fullscreen && styles.fullscreen]}>
+    <View style={[styles.workstation, mobileMode && styles.mobileWorkstation, fullscreen && styles.fullscreen]} testID="ecg-viewer-ready">
       {criticalAlert ? (
         <View style={styles.criticalBanner}>
           <Feather name="alert-triangle" size={18} color="#fff" />

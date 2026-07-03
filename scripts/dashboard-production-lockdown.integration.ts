@@ -33,6 +33,10 @@ for (const legacyDir of [
 
 const enterpriseShell = read("artifacts/ecg-insight/components/enterprise/EnterpriseUI.tsx");
 const copilotWorkspace = read("artifacts/ecg-insight/app/(protected)/copilot.tsx");
+const copilotMessageCard = read("artifacts/ecg-insight/components/copilot/CopilotMessageCard.tsx");
+const copilotComposer = read("artifacts/ecg-insight/components/copilot/CopilotComposer.tsx");
+const copilotMessageList = read("artifacts/ecg-insight/components/copilot/CopilotMessageList.tsx");
+const copilotBundle = [copilotWorkspace, copilotMessageCard, copilotComposer, copilotMessageList].join("\n");
 const dashboard = read("artifacts/ecg-insight/app/(protected)/dashboard.tsx");
 const copilotService = read("artifacts/ecg-insight/services/copilot.ts");
 const dashboardStore = read("artifacts/ecg-insight/context/DashboardStore.ts");
@@ -68,13 +72,13 @@ for (const forbidden of ["\"ai\"] as const", "/(tabs)", "@/components/bolt", "@/
 }
 
 for (const marker of ["Clinical Copilot Workspace", "streamCopilotMessage", "listCopilotConversations", "getCopilotConversation", "ConversationList", "lastMessagePreview", "startNewChat", "Regenerate", "Continue", "RichMedicalText", "sanitizeAssistantContent", "voiceMode"]) {
-  assert(copilotWorkspace.includes(marker), `Full-page Copilot workspace is missing production marker: ${marker}`);
+  assert(copilotBundle.includes(marker), `Full-page Copilot workspace is missing production marker: ${marker}`);
 }
 for (const removedAutoContext of ["ContextLine", "listPatients", "Patient Profile", "Knowledge Tags", "Medical History"]) {
   assert(!copilotWorkspace.includes(removedAutoContext), `Copilot workspace must not auto-display clinical context marker: ${removedAutoContext}`);
 }
-for (const marker of ["sidebar", "groupTitle", "chatPanel", "messages", "messageList", "composer", "scrollToEnd", "Voice", "Upload ECG", "Upload Files", "Upload Image", "overflow: \"hidden\"", "mobileSidebarOpen"]) {
-  assert(copilotWorkspace.includes(marker), `Final enterprise copilot UI is missing anti-clipping/layout marker: ${marker}`);
+for (const marker of ["sidebar", "groupTitle", "chatPanel", "CopilotMessageList", "CopilotComposer", "scrollToEnd", "Voice", "Upload ECG", "Upload Files", "Upload Image", "overflow: \"hidden\"", "mobileSidebarOpen"]) {
+  assert(copilotBundle.includes(marker), `Final enterprise copilot UI is missing anti-clipping/layout marker: ${marker}`);
 }
 for (const removed of ["Interpret ECG", "Generate Impression", "Patient Summary", "Differential Diagnosis", "Follow-up Plan", "Generate Report", "autoExportPdf"]) {
   assert(!copilotWorkspace.includes(removed), `Conversational Copilot must not expose workflow generator marker: ${removed}`);
@@ -106,7 +110,7 @@ for (const forbidden of ["Normal: 8", "Abnormal: 3", "Math.random", "onPress={()
 assert(analyticsPage.includes("No analytics yet") && analyticsPage.includes("diagnosisDistribution ?? {}"), "Analytics charts must use real empty states instead of fake fallback values.");
 assert(patientProfilePage.includes("onOpen={(item)") && patientProfilePage.includes("metadata.caseId") && patientProfilePage.includes("metadata.reportId"), "Patient timeline actions must resolve to real routes or tabs.");
 
-for (const marker of ["retrieveClinicalContext", "retrieveConversationMemory", "runClinicalCopilotEngine", "buildEngineDebugPayload", "engine_debug", "./engine", "LEGAL_DISCLAIMER", "automaticConversationTitle", "lastMessagePreview", "analyzeUploadedAttachment", "detectAttachmentDocumentType", "readBestEffortOcrText", "/chat/stream", "writeSse", "export.txt", "auditCopilotError", "copilotUsageEvent"]) {
+for (const marker of ["retrieveClinicalContext", "retrieveConversationMemory", "runClinicalCopilotEngine", "buildEngineDebugPayload", "engine_debug", "./engine", "LEGAL_DISCLAIMER", "automaticConversationTitle", "lastMessagePreview", "processCopilotAttachment", "AttachmentContextBuilder", "PromptBuilder", "/chat/stream", "writeSse", "export.txt", "auditCopilotError", "copilotUsageEvent"]) {
   assert(copilotRoutes.includes(marker), `Copilot backend is missing context/RAG/persistence marker: ${marker}`);
 }
 for (const marker of ["classifyMedicalIntent", "shouldRetrieveClinicalContext", "shouldRetrieveKnowledge", "greetingResponse", "isFastPathIntent", "conversationTopic"]) {

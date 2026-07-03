@@ -1,40 +1,45 @@
-# Test Report — Sprint 11.0
+# Test Report — Sprint 11.1
 
-## Regression Tests Added
-
-### `scripts/sprint11-enterprise-stability.integration.ts`
+## New Regression Suite — `scripts/sprint11.1-enterprise-hardening.integration.ts`
 
 | Test | Validates |
 |------|-----------|
-| Attachment context injection | `buildAttachmentContextBlock` includes OCR, findings, file names |
-| Clinical context formatter | Patient/case data formatted for LLM |
-| Clinical safety disclaimer | Appended once, no duplicates |
-| Upload pipeline | OCR → classification → ECG digitization on synthetic grid PNG |
-| Attachment-aware LLM | Mock LLM response references uploaded ECG content |
-| Status callbacks | "Reviewing uploaded attachments" emitted |
+| Extractor registry | ECG plugin selected and findings extracted |
+| Attachment Context Builder SSOT | `normalizedContext` v11.1 stored at upload; prompt reads stored context |
+| OCR cache | Repeated processing of identical file uses cache path |
+| Clinical validator | Low-confidence + overconfident language flagged; review guidance appended |
+| PromptBuilder independence | Module exists; React UI does not build prompts |
 
-### Updated Tests
+## Updated Suites
 
-- `scripts/copilot-enterprise-workspace.integration.ts` — now requires analysis metadata in upload response (Sprint 11 behavior)
+- `scripts/sprint11-enterprise-stability.integration.ts` — attachment block text updated for SSOT wording
+- `scripts/copilot-final-closure.integration.ts` — architecture markers (replaces dead legacy OCR helpers)
+- `scripts/copilot-stabilization.integration.ts` — architecture markers
+- `scripts/dashboard-production-lockdown.integration.ts` — architecture markers
 
-## Commands Run
+## Key Modules Added
+
+### Attachment layer
+- `server/src/modules/copilot/attachment/attachment-context-builder.service.ts`
+- `server/src/modules/copilot/attachment/ocr-cache.service.ts`
+- `server/src/modules/copilot/attachment/attachment-job-queue.service.ts`
+
+### Extractor plugins
+- `server/src/modules/copilot/extractors/registry.ts`
+- `server/src/modules/copilot/extractors/modality-extractors.ts`
+- `server/src/modules/copilot/extractors/document-classifier.ts`
+
+### Prompt & validation
+- `server/src/modules/copilot/prompt/prompt-builder.ts`
+- `server/src/modules/copilot/validation/attachment-validator.ts`
+- `server/src/modules/copilot/validation/clinical-validator.ts`
+
+## Commands
 
 ```bash
-npm run lint          # Pass
-npm run build         # Pass (prisma generate + typecheck)
-npx tsx scripts/sprint11-enterprise-stability.integration.ts  # Pass
-npx tsx scripts/copilot-enterprise-workspace.integration.ts   # Pass
-npm run test          # Pass (full suite)
+npm run lint
+npm run typecheck
+npx tsx scripts/sprint11.1-enterprise-hardening.integration.ts
+npx tsx scripts/sprint11-enterprise-stability.integration.ts
+npx tsx scripts/copilot-enterprise-workspace.integration.ts
 ```
-
-## Key Files Changed
-
-- `server/src/modules/copilot/core/attachment-context.ts` (new)
-- `server/src/modules/copilot/copilot-attachment-pipeline.service.ts` (new)
-- `server/src/modules/copilot/core/response-orchestrator.ts`
-- `server/src/modules/copilot/core/clinical-context.ts`
-- `server/src/modules/copilot/core/pipeline.ts`
-- `server/src/modules/copilot/copilot.routes.ts`
-- `server/src/modules/copilot/voice-transcription.service.ts`
-- `artifacts/ecg-insight/services/voiceEngine.ts`
-- `artifacts/ecg-insight/app/(protected)/copilot.tsx`

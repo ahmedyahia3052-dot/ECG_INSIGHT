@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { apiLogin, createClinicalFixture, createPatient, expectPageReady, navigate, uiLogin } from "./utils/qa";
+import { createSyntheticEcgPngBuffer } from "./utils/ecg-fixture-image";
 
 test.describe("enterprise clinical workflows", () => {
   test("create patient form, filters, search, export and navigation work @smoke", async ({ page }) => {
@@ -29,7 +30,7 @@ test.describe("enterprise clinical workflows", () => {
 
   test("create ECG case form and ECG viewer route load with generated clinical data @smoke", async ({ page, request }) => {
     const session = await apiLogin(request, "doctor");
-    const patient = await createPatient(request, session.token);
+    const patient = await createPatient(request, session);
 
     await uiLogin(page, "doctor");
     await navigate(page, "/ecg-cases", "ECG Case Management");
@@ -47,14 +48,15 @@ test.describe("enterprise clinical workflows", () => {
     await inputs.nth(6).fill("420");
     await page.getByRole("button", { name: "abnormal" }).click();
     await page.getByRole("button", { name: /Create ECG Case/i }).click();
-
-    await expect(page.getByText(/ECG Case|ECG Measurements/).first()).toBeVisible({ timeout: 30_000 });
-    await expect(page.getByRole("button", { name: /Run AI|Process|Generate Report/i }).first()).toBeVisible();
+    await expect(page).toHaveURL(/\/ecg-cases\/[^/]+$/, { timeout: 45_000 });
+    await expect(page.getByText(/ECG Measurements/).first()).toBeVisible({ timeout: 45_000 });
+    await expect(page.getByRole("button", { name: "Run AI" })).toBeVisible({ timeout: 45_000 });
+    await expect(page.getByRole("button", { name: "Generate Report" })).toBeVisible({ timeout: 45_000 });
   });
 
   test("upload ECG, analyze, generate report, search reports, and export PDF", async ({ page, request }) => {
     const session = await apiLogin(request, "doctor");
-    const patient = await createPatient(request, session.token);
+    const patient = await createPatient(request, session);
 
     await uiLogin(page, "doctor");
     await navigate(page, "/upload-ecg", "Upload ECG");
@@ -64,16 +66,23 @@ test.describe("enterprise clinical workflows", () => {
     await page.getByRole("button", { name: /Select Images\/PDF/i }).click();
     const chooser = await chooserPromise;
     await chooser.setFiles({
-      buffer: Buffer.from("89504e470d0a1a0a0000000d49484452", "hex"),
+      buffer: await createSyntheticEcgPngBuffer(),
       mimeType: "image/png",
       name: `qa-upload-${Date.now()}-50mm-20mm-ecg.png`,
     });
 
     await page.getByPlaceholder(/Patient ID, employee ID/i).fill(patient.medicalRecordNumber);
     await expect(page.getByText(patient.medicalRecordNumber)).toBeVisible({ timeout: 30_000 });
-    await page.getByText("Select").last().click();
-    await page.getByRole("button", { name: /^Analyze ECG$/ }).click();
-    await expect(page.getByText(/AI Results|Enterprise report generated|Normal ECG|STEMI|Sinus/)).toBeVisible({ timeout: 60_000 });
+    await page.getByText(patient.medicalRecordNumber).click();
+    await expect(page.getByText("Selected")).toBeVisible({ timeout: 15_000 });
+
+    const analyzeResponse = page.waitForResponse(
+      (response) => /\/ecg\/(analyze|image\/analyze)/.test(response.url()) && response.status() >= 200 && response.status() < 300,
+      { timeout: 120_000 },
+    );
+    await page.getByRole("button", { name: /Analyze ECG/i }).click();
+    await analyzeResponse;
+    await expect(page.getByText("AI Results")).toBeVisible({ timeout: 30_000 });
 
     const fixture = await createClinicalFixture(request, { analyze: true, report: true });
     await navigate(page, "/reports", "Reports Workflow");

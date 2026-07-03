@@ -1,34 +1,63 @@
-# Known Limitations — Sprint 11.0
+# Known Limitations — Post Sprint 12
 
-## OCR
+Sprint 11.0 production-critical gaps resolved in Sprint 11.1. Sprint 12 delivered enterprise workspace UX (layout, virtualization, upload pipeline UI, voice hardening, resizable panels). Items below are **non-critical future enhancements** for Sprint 13+.
 
-- PDF and scanned images use best-effort printable-byte extraction, not Tesseract or cloud vision
-- Low-confidence OCR triggers UI warnings; clinician review required
-- DICOM and ZIP uploads are not yet fully parsed (architecture prepared via document classifier types)
+## Completed (Sprint 11.1)
 
-## ECG Digitization
+- Attachment Context Builder as single source of truth for uploaded file clinical context
+- Medical extractor plugin registry (ECG, lab, radiology, echo, cath, general)
+- Independent PromptBuilder (no prompt logic in React components)
+- Clinical validation layer (pre-prompt + post-LLM)
+- OCR result caching by file hash
+- Background attachment job queue (`COPILOT_ASYNC_ATTACHMENTS=true`)
 
-- Real-world clinical photos may fall back when grid/leads cannot be detected
-- Synthetic test grids digitize reliably; photo quality varies widely
-- Multi-page PDF ECG uses first decodable image path
+## Completed (Sprint 12)
 
-## Voice
+- Enterprise full-bleed copilot layout (fixed header, fixed composer, independent message scroll)
+- FlashList message virtualization with memoized cards
+- Upload pipeline 2.0 UI (stages, cancel, retry, polling)
+- Resizable three-panel workspace on web
+- Voice workflow hardening (waveform, extended lifecycle, capture-aware silence)
+- Enhanced OCR preprocessing (rotate, contrast, threshold)
+- Unified clinical/upload error normalization
+- Scoped message-list error boundary
 
-- Browser Web Speech API is primary STT (requires network on most browsers)
-- Server Whisper transcription requires Ollama with a Whisper model (`OLLAMA_WHISPER_MODEL`)
-- Arabic STT supported via `ClinicalVoiceEngine.setLanguage("ar-SA")` but not yet exposed in Copilot UI toggle
+## Future Enhancements (Sprint 13+)
 
-## Clinical AI
+### Workspace & Viewers
 
-- LLM tools remain disabled when Ollama is active (knowledge injected upstream)
-- Mock LLM used in CI; production requires Ollama or OpenAI configuration
-- AI_MODEL_API_KEY unset → rule-based / mock fallback for some paths
+- ECG Pro Viewer, measurements, and timeline embedded as dockable workspace panels (clinical context panel is summary-only today)
+- Code-split heavy viewers (PDF, ECG, charts) at route boundary
 
-## Mobile
+### State Management
 
-- Copilot file upload remains web-only (`Platform.OS !== "web"`)
+- Zustand normalized entity store for patient/case/attachment/conversation
 
-## Case Storage
+### OCR & Document Intelligence
 
-- Copilot attachments persist analysis in `CopilotAttachment` records
-- Automatic Patient → Visit → ECG Study linkage on copilot upload requires explicit `patientId` / `caseId` context
+- Multi-page scanned PDF ECG fusion across all pages
+- Handwritten clinical notes with dedicated HWR model beyond Tesseract
+- Cloud OCR fallback for extremely low-quality scans
+
+### ECG Digitization
+
+- Advanced deskew/perspective correction for phone photos at extreme angles
+- Pediatric and modified Mason-Likar lead layout benchmarks
+
+### Voice
+
+- Server-side Whisper quality depends on Ollama model; dedicated STT service integration planned
+- Native mobile TTS provider abstraction (browser speech synthesis on web today)
+
+### Clinical AI
+
+- Optional OpenAI tool-calling when not using Ollama
+- FDA/CE-oriented formal clinical validation harness beyond current rule-based validator
+
+### Platform & Ops
+
+- Redis-backed OCR cache and job queue for multi-instance deployments
+- Prometheus metrics export for copilot pipeline stages
+- Enterprise SSO (SAML/OIDC) for tier-2 enterprise customers
+- Production ClamAV adapter (`scanFileForThreats` hook exists; swap-in pending)
+- Expanded Playwright E2E for upload pipeline, streaming, and resizable panels

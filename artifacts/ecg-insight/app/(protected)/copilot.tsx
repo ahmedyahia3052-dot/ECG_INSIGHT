@@ -2,9 +2,17 @@ import { Feather } from "@expo/vector-icons";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Image, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, useWindowDimensions, View } from "react-native";
+import { Platform, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from "react-native";
 
 import { Badge, Card, EmptyState, medicalTheme, PrimaryButton } from "@/components/enterprise/EnterpriseUI";
+import { CopilotClinicalPanel } from "@/components/copilot/CopilotClinicalPanel";
+import { CopilotComposer } from "@/components/copilot/CopilotComposer";
+import { CopilotErrorBoundary } from "@/components/copilot/CopilotErrorBoundary";
+import { AttachmentChip, CopilotMessageCard, sanitizeAssistantContent } from "@/components/copilot/CopilotMessageCard";
+import { CopilotMessageList, type MessageListHandle } from "@/components/copilot/CopilotMessageList";
+import { CopilotResizableWorkspace, useClinicalPanelCollapse } from "@/components/copilot/CopilotResizableWorkspace";
+import type { SpeechControl, UploadPipelineJob } from "@/components/copilot/types";
+import { DEFAULT_UPLOAD_ANALYSIS_PROMPT } from "@/components/copilot/types";
 import { useAuth } from "@/context/AuthContext";
 import {
   downloadCopilotExport,
@@ -12,62 +20,39 @@ import {
   listCopilotConversations,
   streamCopilotMessage,
   transcribeVoiceAudio,
-  uploadCopilotAttachment,
   type CopilotAttachment,
+  type CopilotClinicalLinkage,
   type CopilotConversation,
   type CopilotMessage,
   type CopilotTag,
 } from "@/services/copilot";
+import {
+  buildCopilotUploadFormData,
+  captureCopilotCameraAsset,
+  formatUploadNotice,
+  pickCopilotUploadAssets,
+  validateUploadAsset,
+  type UploadableAsset,
+} from "@/services/copilotUpload";
+import { runUploadPipeline } from "@/services/uploadPipeline";
+import { friendlyUploadError } from "@/utils/clinicalErrors";
+import { canSendMessage, canStopStream, isComposerEditable, isConversationLocked, type ConversationPhase } from "@/services/conversationFsm";
+import { emitRuntimeEvent } from "@/services/runtimeEvents";
 import { ClinicalVoiceEngine, type VoiceStatus } from "@/services/voiceEngine";
+import { voiceLanguageLabel, type VoiceLanguageMode } from "@/services/voiceLanguage";
 import { safeArray } from "@/utils/collections";
 
 type AttachmentKind = "ecg" | "file" | "image";
 
-type SpeechControl = {
-  muted: boolean;
-  onMuteToggle: () => void;
-  onPauseResume: () => void;
-  onReplay: (content: string, id: string) => void;
-  onSpeak: (content: string, id: string) => void;
-  onStop: () => void;
-  paused: boolean;
-  speakingMessageId?: string;
-};
+export { CopilotMessageCard as MessageCard, AttachmentChip };
 
 const ATTACHMENT_RULES: Record<AttachmentKind, { accept: string; extensions: string[]; maxBytes: number; multiple: boolean }> = {
-  ecg: { accept: ".jpg,.jpeg,.png,.pdf,application/pdf,image/jpeg,image/png", extensions: [".jpg", ".jpeg", ".pdf", ".png"], maxBytes: 25 * 1024 * 1024, multiple: true },
-  file: { accept: ".pdf,.docx,.txt,.jpg,.jpeg,.png,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain,image/jpeg,image/png", extensions: [".docx", ".jpg", ".jpeg", ".pdf", ".png", ".txt"], maxBytes: 25 * 1024 * 1024, multiple: true },
+  ecg: { accept: ".jpg,.jpeg,.png,.pdf,.zip,.dcm,.dicom,application/pdf,image/jpeg,image/png,application/zip,application/dicom", extensions: [".jpg", ".jpeg", ".pdf", ".png", ".zip", ".dcm", ".dicom"], maxBytes: 25 * 1024 * 1024, multiple: true },
+  file: { accept: ".pdf,.docx,.txt,.jpg,.jpeg,.png,.zip,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain,image/jpeg,image/png,application/zip", extensions: [".docx", ".jpg", ".jpeg", ".pdf", ".png", ".txt", ".zip"], maxBytes: 25 * 1024 * 1024, multiple: true },
   image: { accept: "image/*,.jpg,.jpeg,.png,.webp", extensions: [".jpg", ".jpeg", ".png", ".webp"], maxBytes: 25 * 1024 * 1024, multiple: true },
 };
 
-const EMPTY_MESSAGES = [
-  "Start a natural conversation — say hello, ask a cardiology question, or upload an ECG when you're ready.",
-];
-
 const WORKSPACE_STATE_KEY = "ecg-insight:copilot-workspace-state";
-
-function sanitizeAssistantContent(content: string) {
-  return content
-    .replace(/^Short Answer\s*$/gim, "")
-    .replace(/^References:[\s\S]*$/im, "")
-    .replace(/\nConfidence Score:\s*\d+%/gi, "")
-    .replace(/\nCitations:\s*.+$/gim, "")
-    .replace(/Risk tier:\s*(HIGH|MODERATE|LOW)/gi, "")
-    .replace(/Knowledge Base|Retrieved Medical Knowledge|Conversation memory:|Previously uploaded files:|Uploaded Document Review|I can go deeper if you want\.?/gi, "")
-    .replace(/Continuing from our earlier discussion about .+?\./gi, "")
-    .replace(/I am using the earlier messages in this conversation for context\./gi, "")
-    .replace(/AI assistance only\. Clinical decisions remain the responsibility of the physician\./gi, "")
-    .replace(/\n{3,}/g, "\n\n")
-    .trim();
-}
-
-const TUTOR_COMMANDS = [
-  { command: "/teach", label: "Teach" },
-  { command: "/quiz", label: "Quiz" },
-  { command: "/case", label: "Case" },
-  { command: "/explain", label: "Explain" },
-  { command: "/summarize", label: "Summarize" },
-] as const;
 
 function safeString(value: unknown, fallback = "") {
   return typeof value === "string" ? value : fallback;
@@ -100,7 +85,9 @@ export function CopilotWorkspaceScreen({ routeConversationId }: { routeConversat
   const sendPromptRef = useRef<(prompt: string, tag: CopilotTag) => void>(() => undefined);
   const sendPendingRef = useRef(false);
   const conversationTagRef = useRef<CopilotTag>("Clinical Summary");
-  const scrollRef = useRef<ScrollView>(null);
+  const scrollRef = useRef<MessageListHandle>(null);
+  const userNearBottomRef = useRef(true);
+  const uploadAbortRef = useRef<AbortController | null>(null);
   const streamAbort = useRef<AbortController | null>(null);
   const { width } = useWindowDimensions();
   const { authToken, user } = useAuth();
@@ -121,6 +108,13 @@ export function CopilotWorkspaceScreen({ routeConversationId }: { routeConversat
   const [streamingMessage, setStreamingMessage] = useState("");
   const [status, setStatus] = useState("");
   const [uploadingFiles, setUploadingFiles] = useState<string[]>([]);
+  const [pipelineJobs, setPipelineJobs] = useState<UploadPipelineJob[]>([]);
+  const [waveformLevels, setWaveformLevels] = useState<number[]>([]);
+  const [showNewMessagesButton, setShowNewMessagesButton] = useState(false);
+  const [clinicalLinkage, setClinicalLinkage] = useState<CopilotClinicalLinkage | undefined>();
+  const { clinicalCollapsed, toggleClinicalCollapse } = useClinicalPanelCollapse();
+  const [voiceLanguageMode, setVoiceLanguageMode] = useState<VoiceLanguageMode>("auto");
+  const [conversationPhase, setConversationPhase] = useState<ConversationPhase>("idle");
 
   const isMobile = width < 760;
 
@@ -211,6 +205,7 @@ export function CopilotWorkspaceScreen({ routeConversationId }: { routeConversat
         setSpeechPaused(false);
       },
       onStatusChange: (status) => setVoiceStatus(status),
+      onAudioLevel: (levels) => setWaveformLevels(levels),
     }, async (audio, mimeType) => {
       const payload = await transcribeVoiceAudio(token, audio, mimeType);
       return payload.text;
@@ -218,72 +213,121 @@ export function CopilotWorkspaceScreen({ routeConversationId }: { routeConversat
     return () => voiceEngineRef.current?.dispose();
   }, [showActionNotice, token]);
 
-  const uploadComposerFile = useCallback(async (file: File, kind: AttachmentKind) => {
+  useEffect(() => {
+    voiceEngineRef.current?.setLanguage(voiceLanguageMode);
+  }, [voiceLanguageMode]);
+
+  const uploadComposerAsset = useCallback(async (asset: File | UploadableAsset, kind: AttachmentKind) => {
     if (!token) {
       showActionNotice("Upload failed.", "error");
       return;
     }
-    const rule = ATTACHMENT_RULES[kind];
-    const extension = file.name.slice(file.name.lastIndexOf(".")).toLowerCase();
-    if (!rule.extensions.includes(extension)) {
-      showActionNotice("Unsupported format.", "error");
-      return;
-    }
-    if (file.size > rule.maxBytes) {
-      showActionNotice("File too large.", "error");
-      return;
-    }
-    const formData = new FormData();
-    formData.append("file", file);
-    formData.append("kind", kind);
-    formData.append("contextType", explicitCaseId ? "case" : explicitPatientId ? "patient" : "global");
-    if (explicitPatientId) formData.append("patientId", explicitPatientId);
-    if (explicitCaseId) formData.append("caseId", explicitCaseId);
-    if (selectedId) formData.append("conversationId", selectedId);
+    const assetName = asset.name;
+    const assetMime = "uri" in asset ? asset.mimeType : asset.type;
     try {
-      setUploadingFiles((current) => current.concat(file.name));
-      const payload = await uploadCopilotAttachment(token, formData);
-      if (!payload?.attachment?.id) {
+      if (!("uri" in asset)) {
+        const rule = ATTACHMENT_RULES[kind];
+        const extension = asset.name.slice(asset.name.lastIndexOf(".")).toLowerCase();
+        if (!rule.extensions.includes(extension)) {
+          showActionNotice("Unsupported format.", "error");
+          return;
+        }
+        if (asset.size > rule.maxBytes) {
+          showActionNotice("File too large.", "error");
+          return;
+        }
+      } else {
+        validateUploadAsset(kind, asset);
+      }
+      const formData = buildCopilotUploadFormData(asset, kind, {
+        caseId: explicitCaseId,
+        conversationId: selectedId,
+        patientId: explicitPatientId,
+      });
+      setUploadingFiles((current) => current.concat(assetName));
+      setConversationPhase((current) => (current === "streaming" ? "streaming" : "uploading"));
+      const abort = new AbortController();
+      uploadAbortRef.current = abort;
+      const result = await runUploadPipeline(token, formData, assetName, (job) => {
+        setPipelineJobs((current) => current.filter((item) => item.fileName !== assetName).concat({ ...job, retry: () => { void uploadComposerAsset(asset, kind); } }));
+      }, abort.signal);
+      if (!result?.attachment?.id) {
         showActionNotice("Upload response was incomplete.", "error");
         return;
       }
-      if (file.type.startsWith("image/")) {
-        const previewUrl = URL.createObjectURL(file);
-        setAttachmentPreviews((current) => ({ ...current, [payload.attachment.id]: previewUrl }));
+      if (Platform.OS === "web" && "type" in asset && asset.type.startsWith("image/")) {
+        const previewUrl = URL.createObjectURL(asset);
+        setAttachmentPreviews((current) => ({ ...current, [result.attachment.id]: previewUrl }));
+      } else if ("uri" in asset && assetMime.startsWith("image/")) {
+        setAttachmentPreviews((current) => ({ ...current, [result.attachment.id]: asset.uri }));
       }
-      setAttachments((current) => current.concat(payload.attachment));
-      const stageSummary = payload.attachment.pipelineStages
-        ?.filter((item) => item.status === "completed" || item.status === "warning")
-        .map((item) => item.stage.replace(/_/g, " "))
-        .slice(-3)
-        .join(" → ");
-      const notice = payload.attachment.analysisSummary
-        ? `${payload.attachment.originalName}: ${payload.attachment.analysisSummary}${stageSummary ? ` (${stageSummary})` : ""}`
-        : `${payload.attachment.originalName} attached.`;
-      showActionNotice(notice);
+      setAttachments((current) => current.concat(result.attachment));
+      if (result.clinicalLinkage) setClinicalLinkage(result.clinicalLinkage);
+      showActionNotice(formatUploadNotice({ attachment: result.attachment, clinicalLinkage: result.clinicalLinkage }));
+      setPipelineJobs((current) => current.filter((item) => item.fileName !== assetName));
     } catch (error) {
-      showActionNotice(error instanceof Error ? error.message : "Upload failed.", "error");
+      showActionNotice(friendlyUploadError(error), "error");
+      setPipelineJobs((current) => current.filter((item) => item.fileName !== assetName));
     } finally {
-      setUploadingFiles((current) => safeArray(current).filter((item) => item !== file.name));
+      uploadAbortRef.current = null;
+      setUploadingFiles((current) => safeArray(current).filter((item) => item !== assetName));
+      setConversationPhase((current) => (current === "streaming" ? "streaming" : "idle"));
     }
   }, [explicitCaseId, explicitPatientId, selectedId, showActionNotice, token]);
 
+  const uploadComposerFile = useCallback(async (file: File, kind: AttachmentKind) => {
+    await uploadComposerAsset(file, kind);
+  }, [uploadComposerAsset]);
+
   const openFilePicker = useCallback((kind: AttachmentKind) => {
-    if (Platform.OS !== "web" || typeof document === "undefined") {
-      showActionNotice("Upload failed.", "error");
+    if (Platform.OS === "web" && typeof document !== "undefined") {
+      const input = document.createElement("input");
+      input.type = "file";
+      input.accept = ATTACHMENT_RULES[kind].accept;
+      input.multiple = ATTACHMENT_RULES[kind].multiple;
+      input.onchange = () => {
+        const files = Array.from(input.files ?? []);
+        if (!files.length) return;
+        void Promise.all(files.map((file) => uploadComposerFile(file, kind)));
+      };
+      input.click();
       return;
     }
-    const input = document.createElement("input");
-    input.type = "file";
-    input.accept = ATTACHMENT_RULES[kind].accept;
-    input.multiple = ATTACHMENT_RULES[kind].multiple;
-    input.onchange = () => {
-      const files = Array.from(input.files ?? []);
-      if (!files.length) return;
-      void Promise.all(files.map((file) => uploadComposerFile(file, kind)));
-    };
-    input.click();
-  }, [showActionNotice, uploadComposerFile]);
+    void (async () => {
+      try {
+        const assets = await pickCopilotUploadAssets(kind);
+        for (const asset of assets) {
+          await uploadComposerAsset(asset, kind);
+        }
+      } catch (error) {
+        showActionNotice(error instanceof Error ? error.message : "Upload failed.", "error");
+      }
+    })();
+  }, [showActionNotice, uploadComposerAsset, uploadComposerFile]);
+
+  const captureEcgFromCamera = useCallback(() => {
+    if (Platform.OS === "web") {
+      openFilePicker("image");
+      return;
+    }
+    void (async () => {
+      try {
+        const asset = await captureCopilotCameraAsset();
+        if (!asset) return;
+        await uploadComposerAsset(asset, "ecg");
+      } catch (error) {
+        showActionNotice(error instanceof Error ? error.message : "Camera capture failed.", "error");
+      }
+    })();
+  }, [openFilePicker, showActionNotice, uploadComposerAsset]);
+
+  const cycleVoiceLanguage = useCallback(() => {
+    setVoiceLanguageMode((current) => {
+      if (current === "auto") return "en-US";
+      if (current === "en-US") return "ar-SA";
+      return "auto";
+    });
+  }, []);
 
   const toggleVoiceInput = useCallback(() => {
     if (isRecording) {
@@ -331,8 +375,25 @@ export function CopilotWorkspaceScreen({ routeConversationId }: { routeConversat
     router.push(`/copilot/${conversationId}` as never);
   }, [router]);
 
+  const finalizeStream = useCallback((options: { preserveStatus?: boolean; willSpeak?: boolean } = {}) => {
+    if (!options.preserveStatus) setStatus("");
+    setStreamingMessage("");
+    streamAbort.current = null;
+    setConversationPhase("idle");
+    voiceEngineRef.current?.resetAfterStream(!!options.willSpeak);
+    emitRuntimeEvent("StreamingFinished");
+  }, []);
+
+  const stopActiveStream = useCallback(() => {
+    streamAbort.current?.abort();
+    finalizeStream();
+    voiceEngineRef.current?.returnToIdle();
+  }, [finalizeStream]);
+
   const sendMutation = useMutation({
     mutationFn: async (input: { attachmentIds: string[]; prompt: string; tag: CopilotTag }) => {
+      setConversationPhase("streaming");
+      emitRuntimeEvent("StreamingStarted");
       const controller = new AbortController();
       streamAbort.current = controller;
       setStatus("Thinking...");
@@ -361,6 +422,7 @@ export function CopilotWorkspaceScreen({ routeConversationId }: { routeConversat
           assistantContent += event.token;
           setStreamingMessage((current) => `${current}${event.token}`);
           if (voiceModeRef.current) {
+            voiceEngineRef.current?.markStreaming();
             voiceEngineRef.current?.feedSpeech(assistantContent, assistantMessageId);
           }
         }
@@ -376,19 +438,16 @@ export function CopilotWorkspaceScreen({ routeConversationId }: { routeConversat
       }, controller.signal);
       return { assistantContent, assistantMessageId, conversation: finalConversation };
     },
-    retry: 1,
-    retryDelay: 1200,
     onSuccess: (result) => {
       Object.values(attachmentPreviews).forEach((previewUrl) => URL.revokeObjectURL(previewUrl));
       setAttachments([]);
       setAttachmentPreviews({});
       setDraft("");
       setLiveTranscript("");
-      setStatus("");
-      setStreamingMessage("");
-      streamAbort.current = null;
       invalidate();
-      if (voiceModeRef.current && result?.assistantContent && voiceEngineRef.current?.getState().status !== "speaking") {
+      const willSpeak = !!(voiceModeRef.current && result?.assistantContent);
+      voiceEngineRef.current?.resetAfterStream(willSpeak);
+      if (willSpeak && voiceEngineRef.current?.getState().status !== "speaking") {
         voiceEngineRef.current?.speak(sanitizeAssistantContent(result.assistantContent), result.assistantMessageId);
       }
     },
@@ -397,11 +456,14 @@ export function CopilotWorkspaceScreen({ routeConversationId }: { routeConversat
         ? error.message
         : "Connection interrupted. Your conversation is saved; please retry when ready.";
       setStatus(message);
-      setStreamingMessage("");
-      streamAbort.current = null;
+      voiceEngineRef.current?.resetAfterStream(false);
       if (voiceModeRef.current) {
         void voiceEngineRef.current?.startRecording();
       }
+    },
+    onSettled: (result, error) => {
+      const willSpeak = !error && !!(voiceModeRef.current && result?.assistantContent);
+      finalizeStream({ preserveStatus: !!error, willSpeak });
     },
   });
 
@@ -411,13 +473,13 @@ export function CopilotWorkspaceScreen({ routeConversationId }: { routeConversat
 
   useEffect(() => {
     voiceEngineRef.current?.setVoiceMode(voiceMode);
-    if (voiceMode && !sendMutation.isPending && voiceStatus === "idle" && !isRecording) {
+    if (voiceMode && conversationPhase === "idle" && voiceStatus === "idle" && !isRecording) {
       void voiceEngineRef.current?.startRecording();
     }
     if (!voiceMode) {
       voiceEngineRef.current?.cancelRecording();
     }
-  }, [isRecording, sendMutation.isPending, voiceMode, voiceStatus]);
+  }, [conversationPhase, isRecording, voiceMode, voiceStatus]);
 
   useEffect(() => {
     if (routeConversationId && routeConversationId !== selectedId) setSelectedId(routeConversationId);
@@ -464,10 +526,15 @@ export function CopilotWorkspaceScreen({ routeConversationId }: { routeConversat
   }, [routeConversationId, router, selectedQuery.isError]);
 
   useEffect(() => {
+    if (!userNearBottomRef.current) {
+      setShowNewMessagesButton(true);
+      return;
+    }
+    setShowNewMessagesButton(false);
     if (typeof window !== "undefined" && selectedId && !streamingMessage) {
       const savedScroll = Number(window.localStorage.getItem(`${WORKSPACE_STATE_KEY}:scroll:${selectedId}`));
       if (Number.isFinite(savedScroll) && savedScroll > 0) {
-        scrollRef.current?.scrollTo({ animated: false, y: savedScroll });
+        scrollRef.current?.scrollToOffset({ animated: false, offset: savedScroll });
         return;
       }
     }
@@ -475,8 +542,8 @@ export function CopilotWorkspaceScreen({ routeConversationId }: { routeConversat
   }, [messages.length, selectedId, streamingMessage]);
 
   function sendPrompt(prompt: string, tag: CopilotTag) {
-    const trimmed = safeString(prompt).trim() || (attachments.length ? "Review the attached medical files, perform OCR-informed analysis, identify document or image type, explain findings, cite trusted medical knowledge, provide warnings, and suggest next steps." : "");
-    if (!trimmed || !token || sendMutation.isPending) return;
+    const trimmed = safeString(prompt).trim() || (attachments.length ? DEFAULT_UPLOAD_ANALYSIS_PROMPT : "");
+    if (!trimmed || !token || conversationPhase !== "idle") return;
     voiceEngineRef.current?.stopRecording();
     sendMutation.mutate({ attachmentIds: safeArray(attachments).map((attachment) => attachment?.id).filter(Boolean) as string[], prompt: trimmed, tag });
   }
@@ -486,13 +553,20 @@ export function CopilotWorkspaceScreen({ routeConversationId }: { routeConversat
   });
 
   function startNewChat() {
+    if (conversationPhase === "streaming") stopActiveStream();
+    setVoiceMode(false);
+    voiceEngineRef.current?.interrupt();
+    voiceEngineRef.current?.returnToIdle();
     setSelectedId(undefined);
     setAttachments([]);
+    setPipelineJobs([]);
+    setUploadingFiles([]);
     Object.values(attachmentPreviews).forEach((previewUrl) => URL.revokeObjectURL(previewUrl));
     setAttachmentPreviews({});
     setDraft("");
     setStatus("");
     setStreamingMessage("");
+    setConversationPhase("idle");
     setMobileSidebarOpen(false);
     router.replace("/copilot" as never);
   }
@@ -551,17 +625,45 @@ export function CopilotWorkspaceScreen({ routeConversationId }: { routeConversat
   }
 
   const sidebarVisible = !isMobile || mobileSidebarOpen;
-  const statusBadgeLabel = sendMutation.isPending
+  const attachmentsProcessing = pipelineJobs.some((job) => job.stage !== "completed" && job.stage !== "failed" && job.stage !== "cancelled");
+  const conversationLocked = isConversationLocked(conversationPhase) || attachmentsProcessing || uploadingFiles.length > 0;
+  const composerEditable = isComposerEditable(conversationPhase, attachmentsProcessing, uploadingFiles.length);
+  const sendDisabled = !canSendMessage({
+    attachmentsCount: attachments.length,
+    draftTrimmed: !!draft.trim(),
+    phase: conversationPhase,
+    pendingUploadCount: uploadingFiles.length,
+    pipelineBusy: attachmentsProcessing,
+  });
+  const stopDisabled = !canStopStream(conversationPhase);
+  const conversationReady = conversationPhase === "idle" && !attachmentsProcessing && uploadingFiles.length === 0;
+  const statusBadgeLabel = conversationPhase === "streaming"
     ? "Thinking"
-    : voiceStatus === "listening"
-      ? "Listening"
-      : voiceStatus === "transcribing"
-        ? "Transcribing"
-        : voiceStatus === "speaking"
-          ? "Speaking"
-          : voiceMode
-            ? "Voice mode"
-            : "Ready";
+    : voiceStatus === "error"
+      ? "Error"
+      : voiceStatus === "timeout"
+        ? "Timeout"
+        : voiceStatus === "cancelled"
+          ? "Cancelled"
+          : voiceStatus === "permission"
+            ? "Permission"
+            : voiceStatus === "uploading"
+              ? "Uploading audio"
+              : voiceStatus === "recording"
+                ? "Recording"
+                : voiceStatus === "listening"
+                  ? "Listening"
+                  : voiceStatus === "processing"
+                    ? "Processing"
+                    : voiceStatus === "streaming"
+                      ? "Streaming"
+                      : voiceStatus === "speaking"
+                        ? "Speaking"
+                        : voiceStatus === "completed"
+                          ? "Completed"
+                          : voiceMode
+                            ? "Voice mode"
+                            : "Ready";
   const speechControl: SpeechControl = {
     muted: speechMuted,
     onMuteToggle: toggleSpeechMute,
@@ -573,185 +675,154 @@ export function CopilotWorkspaceScreen({ routeConversationId }: { routeConversat
     speakingMessageId,
   };
 
-  return (
-    <View style={styles.shell}>
-      {sidebarVisible ? (
-        <Card style={[styles.sidebar, isMobile && styles.sidebarMobile]}>
-          <View style={styles.sidebarHeader}>
-            <View>
-              <Text style={styles.sidebarEyebrow}>ECG Insight</Text>
-              <Text style={styles.sidebarTitle}>AI Copilot</Text>
-            </View>
-            {isMobile ? (
-              <Pressable accessibilityRole="button" onPress={() => setMobileSidebarOpen(false)} style={styles.iconButton}>
-                <Feather name="x" size={18} color={medicalTheme.text} />
-              </Pressable>
-            ) : null}
+  const sidebarNode = sidebarVisible ? (
+    <Card style={[styles.sidebar, isMobile && styles.sidebarMobile]}>
+      <View style={styles.sidebarHeader}>
+        <View>
+          <Text style={styles.sidebarEyebrow}>ECG Insight</Text>
+          <Text style={styles.sidebarTitle}>AI Copilot</Text>
+        </View>
+        {isMobile ? (
+          <Pressable accessibilityRole="button" onPress={() => setMobileSidebarOpen(false)} style={styles.iconButton}>
+            <Feather name="x" size={18} color={medicalTheme.text} />
+          </Pressable>
+        ) : null}
+      </View>
+      <PrimaryButton icon="plus" label="New Chat" onPress={startNewChat} />
+      <ScrollView contentContainerStyle={styles.sidebarList} showsVerticalScrollIndicator={false}>
+        <ConversationList conversations={conversations} onSelect={navigateConversation} selectedId={selectedId} />
+      </ScrollView>
+    </Card>
+  ) : null;
+
+  const chatNode = (
+    <View style={styles.main}>
+      <View style={styles.topBar}>
+        <View style={styles.topTitleBlock}>
+          {isMobile ? (
+            <Pressable accessibilityRole="button" onPress={() => setMobileSidebarOpen(true)} style={styles.iconButton}>
+              <Feather name="menu" size={18} color={medicalTheme.text} />
+            </Pressable>
+          ) : null}
+          <View style={styles.titleStack}>
+            <Text style={styles.kicker}>Enterprise Medical AI</Text>
+            <Text style={styles.workspaceTitle}>Clinical Copilot Workspace</Text>
           </View>
-          <PrimaryButton icon="plus" label="New Chat" onPress={startNewChat} />
-          <ScrollView contentContainerStyle={styles.sidebarList} showsVerticalScrollIndicator={false}>
-            <ConversationList conversations={conversations} onSelect={navigateConversation} selectedId={selectedId} />
-          </ScrollView>
-        </Card>
+        </View>
+        <View style={styles.topButtons}>
+          <View testID="copilot-voice-status">
+            <Badge label={statusBadgeLabel} tone={conversationPhase === "streaming" || voiceStatus === "processing" || voiceStatus === "uploading" ? "warning" : voiceStatus === "listening" || voiceStatus === "speaking" || voiceStatus === "streaming" ? "primary" : "success"} />
+          </View>
+          {conversationReady ? <View testID="copilot-conversation-ready" /> : null}
+          <Pressable accessibilityRole="button" onPress={cycleVoiceLanguage} style={styles.contextToggle} testID="copilot-voice-language">
+            <Feather name="globe" size={16} color={medicalTheme.primary} />
+            <Text style={styles.contextToggleText}>{voiceLanguageLabel(voiceLanguageMode)}</Text>
+          </Pressable>
+          <Pressable accessibilityRole="button" onPress={() => setVoiceMode((current) => !current)} style={styles.contextToggle} testID="copilot-voice-mode-toggle">
+            <Feather name={voiceMode ? "headphones" : "mic"} size={16} color={medicalTheme.primary} />
+            <Text style={styles.contextToggleText}>{voiceMode ? "Voice mode on" : "Voice mode"}</Text>
+          </Pressable>
+        </View>
+      </View>
+
+      {actionNotice ? (
+        <View style={[styles.actionNotice, actionNotice.tone === "error" ? styles.actionNoticeError : styles.actionNoticeSuccess]}>
+          <Text style={styles.actionNoticeText}>{actionNotice.text}</Text>
+          <Pressable accessibilityLabel="Dismiss action message" accessibilityRole="button" onPress={() => setActionNotice(undefined)} style={styles.actionNoticeDismiss}>
+            <Feather name="x" size={13} color={medicalTheme.text} />
+          </Pressable>
+        </View>
       ) : null}
 
-      <View style={styles.main}>
-        <View style={styles.topBar}>
-          <View style={styles.topTitleBlock}>
-            {isMobile ? (
-              <Pressable accessibilityRole="button" onPress={() => setMobileSidebarOpen(true)} style={styles.iconButton}>
-                <Feather name="menu" size={18} color={medicalTheme.text} />
-              </Pressable>
-            ) : null}
-            <View style={styles.titleStack}>
-              <Text style={styles.kicker}>Enterprise Medical AI</Text>
-              <Text style={styles.workspaceTitle}>Clinical Copilot Workspace</Text>
+      <Card style={styles.chatPanel}>
+        <View style={styles.chatHeader}>
+          <View style={styles.chatIdentity}>
+            <View style={styles.avatarGlow}>
+              <Feather name="cpu" size={20} color={medicalTheme.primary} />
+            </View>
+            <View style={styles.chatHeaderMain}>
+              <Text style={styles.titleInput}>{chatTitle}</Text>
+              <Text style={styles.chatMeta}>
+                {selectedConversation?.tag ?? "Free medical conversation"} • {messages.length} messages
+              </Text>
             </View>
           </View>
-          <View style={styles.topButtons}>
-            <View testID="copilot-voice-status">
-              <Badge label={statusBadgeLabel} tone={sendMutation.isPending || voiceStatus === "transcribing" ? "warning" : voiceStatus === "listening" || voiceStatus === "speaking" ? "primary" : "success"} />
-            </View>
-            <Pressable accessibilityRole="button" onPress={() => setVoiceMode((current) => !current)} style={styles.contextToggle}>
-              <Feather name={voiceMode ? "headphones" : "mic"} size={16} color={medicalTheme.primary} />
-              <Text style={styles.contextToggleText}>{voiceMode ? "Voice mode on" : "Voice mode"}</Text>
-            </Pressable>
+          <View style={styles.chatTools}>
+            <HeaderTool disabled={!selectedId} icon="share-2" label="Share" onPress={shareConversation} />
+            <HeaderTool disabled={!selectedId} icon="download" label="Export PDF" onPress={() => exportConversation("pdf")} />
+            <HeaderTool disabled={!selectedId} icon="file" label="Export TXT" onPress={() => exportConversation("txt")} />
+            <HeaderTool disabled={!messages.length || conversationLocked} icon="refresh-cw" label="Regenerate" onPress={regenerateLastAnswer} />
+            <HeaderTool disabled={!selectedId || conversationLocked} icon="fast-forward" label="Continue" onPress={continueGeneration} />
           </View>
         </View>
 
-        {actionNotice ? (
-          <View style={[styles.actionNotice, actionNotice.tone === "error" ? styles.actionNoticeError : styles.actionNoticeSuccess]}>
-            <Text style={styles.actionNoticeText}>{actionNotice.text}</Text>
-            <Pressable accessibilityLabel="Dismiss action message" accessibilityRole="button" onPress={() => setActionNotice(undefined)} style={styles.actionNoticeDismiss}>
-              <Feather name="x" size={13} color={medicalTheme.text} />
-            </Pressable>
-          </View>
-        ) : null}
-
-        <Card style={styles.chatPanel}>
-          <View style={styles.chatHeader}>
-            <View style={styles.chatIdentity}>
-              <View style={styles.avatarGlow}>
-                <Feather name="cpu" size={20} color={medicalTheme.primary} />
-              </View>
-              <View style={styles.chatHeaderMain}>
-                <Text style={styles.titleInput}>{chatTitle}</Text>
-                <Text style={styles.chatMeta}>
-                  {selectedConversation?.tag ?? "Free medical conversation"} • {messages.length} messages
-                </Text>
-              </View>
-            </View>
-            <View style={styles.chatTools}>
-              <HeaderTool disabled={!selectedId} icon="share-2" label="Share" onPress={shareConversation} />
-              <HeaderTool disabled={!selectedId} icon="download" label="Export PDF" onPress={() => exportConversation("pdf")} />
-              <HeaderTool disabled={!selectedId} icon="file" label="Export TXT" onPress={() => exportConversation("txt")} />
-              <HeaderTool disabled={!messages.length || sendMutation.isPending} icon="refresh-cw" label="Regenerate" onPress={regenerateLastAnswer} />
-              <HeaderTool disabled={!selectedId || sendMutation.isPending} icon="fast-forward" label="Continue" onPress={continueGeneration} />
-            </View>
-          </View>
-
-          <ScrollView
-            contentContainerStyle={styles.messageList}
-            testID="copilot-message-thread"
-            onScroll={({ nativeEvent }) => {
-              if (typeof window !== "undefined") {
-                try {
-                  window.localStorage.setItem(`${WORKSPACE_STATE_KEY}:scroll:${selectedId ?? "new"}`, String(nativeEvent.contentOffset.y));
-                } catch {
-                  // Ignore browser storage failures; chat rendering must never depend on scroll persistence.
-                }
-              }
+        <CopilotErrorBoundary>
+          <CopilotMessageList
+            messages={messages}
+            onNotice={showActionNotice}
+            onScrollNearBottomChange={(nearBottom) => {
+              userNearBottomRef.current = nearBottom;
+              if (nearBottom) setShowNewMessagesButton(false);
             }}
+            onShowNewMessages={() => setShowNewMessagesButton(false)}
             ref={scrollRef}
-            scrollEventThrottle={400}
-            style={styles.messages}
-          >
-            {!messages.length && !streamingMessage ? (
-              <View style={styles.emptyChat}>
-                <Text style={styles.emptyTitle}>Start a clinical conversation</Text>
-                {EMPTY_MESSAGES.map((message) => <Text key={message} style={styles.emptyMessage}>{message}</Text>)}
-              </View>
-            ) : null}
-            {messages.map((message, index) => <MessageCard key={message?.id ?? `message-${index}`} message={message} onNotice={showActionNotice} speechControl={speechControl} />)}
-            {status && !streamingMessage ? <Text style={styles.statusText}>{status}</Text> : null}
-            {streamingMessage ? <MessageCard message={{ attachments: [], citations: [], content: streamingMessage, createdAt: new Date().toISOString(), id: "streaming", role: "assistant" }} onNotice={showActionNotice} speechControl={speechControl} /> : null}
-          </ScrollView>
+            showNewMessagesButton={showNewMessagesButton}
+            speechControl={speechControl}
+            status={status}
+            streamingMessage={streamingMessage}
+            voiceStatus={voiceStatus}
+          />
+        </CopilotErrorBoundary>
 
-          <View style={styles.composer}>
-            <View style={styles.attachmentRow}>
-              <ComposerTool active={isRecording} icon="mic" label={isRecording ? "Stop Voice" : "Voice"} onPress={toggleVoiceInput} />
-              <ComposerTool icon="activity" label="Upload ECG" onPress={() => openFilePicker("ecg")} />
-              <ComposerTool icon="paperclip" label="Upload Files" onPress={() => openFilePicker("file")} />
-              <ComposerTool icon="image" label="Upload Image" onPress={() => openFilePicker("image")} />
-            </View>
-            {attachments.length ? (
-              <View style={styles.attachmentPanel}>
-                {attachments.map((attachment, index) => (
-                  <AttachmentChip
-                    attachment={attachment}
-                    key={attachment?.id ?? `attachment-${index}`}
-                    onRemove={() => {
-                      const attachmentId = attachment?.id;
-                      if (!attachmentId) return;
-                      const previewUrl = attachmentPreviews[attachmentId];
-                      if (previewUrl) URL.revokeObjectURL(previewUrl);
-                      setAttachmentPreviews((current) => {
-                        const next = { ...current };
-                        delete next[attachmentId];
-                        return next;
-                      });
-                      setAttachments((current) => safeArray(current).filter((item) => item?.id !== attachmentId));
-                    }}
-                    previewUrl={attachment?.id ? attachmentPreviews[attachment.id] : undefined}
-                  />
-                ))}
-              </View>
-            ) : null}
-            {uploadingFiles.length ? (
-              <View style={styles.uploadProgress}>
-                <Feather name="loader" size={13} color={medicalTheme.primary} />
-                <Text style={styles.uploadProgressText}>
-                  Pipeline: Uploading → Validating → OCR → Classification → Analysis — {uploadingFiles.join(", ")}
-                </Text>
-              </View>
-            ) : null}
-            <View style={styles.commandRow}>
-              {TUTOR_COMMANDS.map(({ command, label }) => (
-                <Pressable
-                  accessibilityLabel={`Insert ${label} command`}
-                  accessibilityRole="button"
-                  key={command}
-                  onPress={() => setDraft((current) => (current.trim() ? `${current.trim()} ${command}` : `${command} `))}
-                  style={styles.commandChip}
-                >
-                  <Text style={styles.commandChipText}>{command}</Text>
-                </Pressable>
-              ))}
-            </View>
-            {liveTranscript && (isRecording || voiceStatus === "transcribing") ? (
-              <Text style={styles.liveTranscript} testID="copilot-live-transcript">{liveTranscript}</Text>
-            ) : null}
-            <View style={styles.inputRow}>
-              <TextInput
-                multiline
-                onChangeText={setDraft}
-                onKeyPress={({ nativeEvent }) => {
-                  if (Platform.OS !== "web") return;
-                  const event = nativeEvent as unknown as { key?: string; shiftKey?: boolean };
-                  if (event.key === "Enter" && !event.shiftKey) sendPrompt(draft, "Clinical Summary");
-                }}
-                placeholder="Message the assistant..."
-                placeholderTextColor={medicalTheme.muted}
-                style={styles.composerInput}
-                value={draft}
-              />
-              <PrimaryButton disabled={(!draft.trim() && !attachments.length) || sendMutation.isPending} icon="send" label="Send" onPress={() => sendPrompt(draft, "Clinical Summary")} />
-              <PrimaryButton disabled={!sendMutation.isPending} icon="square" label="Stop" onPress={() => { streamAbort.current?.abort(); setStatus(""); setStreamingMessage(""); }} variant="outline" />
-            </View>
-            <Text style={styles.counter}>{characterCount}/8000 • Enter sends • Shift+Enter creates a new line</Text>
-          </View>
-        </Card>
-      </View>
+        <CopilotComposer
+          attachments={attachments}
+          attachmentPreviews={attachmentPreviews}
+          characterCount={characterCount}
+          draft={draft}
+          isRecording={isRecording}
+          liveTranscript={liveTranscript}
+          onCaptureEcg={captureEcgFromCamera}
+          onDraftChange={setDraft}
+          onOpenFilePicker={openFilePicker}
+          onRemoveAttachment={(attachmentId) => {
+            const previewUrl = attachmentPreviews[attachmentId];
+            if (previewUrl) URL.revokeObjectURL(previewUrl);
+            setAttachmentPreviews((current) => {
+              const next = { ...current };
+              delete next[attachmentId];
+              return next;
+            });
+            setAttachments((current) => safeArray(current).filter((item) => item?.id !== attachmentId));
+          }}
+          onSend={() => sendPrompt(draft, "Clinical Summary")}
+          onStopStream={stopActiveStream}
+          onToggleVoice={toggleVoiceInput}
+          pipelineJobs={pipelineJobs}
+          composerEditable={composerEditable}
+          sendDisabled={sendDisabled}
+          showCamera={Platform.OS !== "web"}
+          stopDisabled={stopDisabled}
+          voiceStatus={voiceStatus}
+          waveformLevels={waveformLevels}
+        />
+      </Card>
+    </View>
+  );
+
+  return (
+    <View style={styles.shell}>
+      <CopilotResizableWorkspace
+        chat={chatNode}
+        clinicalPanel={(
+          <CopilotClinicalPanel
+            attachments={attachments}
+            clinicalLinkage={clinicalLinkage}
+            collapsed={clinicalCollapsed}
+            onToggleCollapse={toggleClinicalCollapse}
+          />
+        )}
+        sidebar={sidebarNode ?? <View />}
+      />
     </View>
   );
 }
@@ -787,83 +858,6 @@ function ConversationList({
   );
 }
 
-function MessageCard({ message, onNotice, speechControl }: { message: CopilotMessage; onNotice: (text: string, tone?: "error" | "success") => void; speechControl: SpeechControl }) {
-  const assistant = message?.role === "assistant";
-  const attachments = safeArray(message?.attachments);
-  const rawContent = safeString(message?.content);
-  const content = assistant ? sanitizeAssistantContent(rawContent) : rawContent;
-  const messageId = safeString(message?.id, "assistant-message");
-  const isSpeaking = assistant && speechControl.speakingMessageId === messageId;
-  return (
-    <View style={[styles.message, assistant ? styles.assistantMessage : styles.userMessage]}>
-      <View style={styles.messageTop}>
-        <Text style={styles.messageRole}>{assistant ? "Assistant" : "You"}</Text>
-        <Text style={styles.messageTime}>{safeTime(message?.createdAt)}</Text>
-      </View>
-      <RichMedicalText content={content} />
-      {attachments.length ? (
-        <View style={styles.messageAttachments}>
-          {attachments.map((attachment, index) => <AttachmentChip attachment={attachment} key={attachment?.id ?? `message-attachment-${index}`} />)}
-        </View>
-      ) : null}
-      {assistant ? (
-        <View style={styles.answerTools}>
-          <MiniAction icon="copy" label="Copy answer" onPress={() => copyText(content, onNotice)} />
-          <MiniAction icon="volume-2" label="Play answer" onPress={() => speechControl.onSpeak(content, messageId)} />
-          <MiniAction icon="repeat" label="Replay answer" onPress={() => speechControl.onReplay(content, messageId)} />
-          <MiniAction disabled={!isSpeaking} icon={speechControl.paused ? "play" : "pause"} label={speechControl.paused ? "Resume voice" : "Pause voice"} onPress={speechControl.onPauseResume} />
-          <MiniAction icon="square" label="Stop voice" onPress={speechControl.onStop} />
-          <MiniAction active={speechControl.muted} icon={speechControl.muted ? "volume-x" : "volume-1"} label={speechControl.muted ? "Unmute voice" : "Mute voice"} onPress={speechControl.onMuteToggle} />
-          {isSpeaking ? <Text style={styles.speakingState}>{speechControl.paused ? "Voice paused" : "Speaking..."}</Text> : null}
-        </View>
-      ) : null}
-    </View>
-  );
-}
-
-function RichMedicalText({ content }: { content: string }) {
-  const lines = safeString(content).split("\n");
-  let inCode = false;
-  return (
-    <View style={styles.richText}>
-      {lines.map((line, index) => {
-        if (line.trim().startsWith("```")) {
-          inCode = !inCode;
-          return <View key={`code-marker-${index}`} />;
-        }
-        if (inCode) return <Text key={index} style={styles.codeText}>{line || " "}</Text>;
-        if (!line.trim()) return <View key={`space-${index}`} style={styles.messageSpace} />;
-        if (line.startsWith("## ")) return <Text key={index} style={styles.messageHeading}><InlineMarkdown text={line.replace(/^##\s*/, "")} /></Text>;
-        if (line.startsWith("### ")) return <Text key={index} style={styles.messageSubheading}><InlineMarkdown text={line.replace(/^###\s*/, "")} /></Text>;
-        if (line.startsWith("- ")) return <Text key={index} style={styles.messageBullet}>• <InlineMarkdown text={line.slice(2)} /></Text>;
-        if (/^\d+\.\s/.test(line)) return <Text key={index} style={styles.messageText}><InlineMarkdown text={line} /></Text>;
-        if (line.includes("|")) return <Text key={index} style={styles.messageTable}>{line}</Text>;
-        return <Text key={index} style={styles.messageText}><InlineMarkdown text={line} /></Text>;
-      })}
-    </View>
-  );
-}
-
-function InlineMarkdown({ text }: { text: string }) {
-  const parts = text.split(/(\*\*.+?\*\*|\*.+?\*|`[^`]+`)/g);
-  return (
-    <Text>
-      {parts.map((part, index) => {
-        if (part.startsWith("**") && part.endsWith("**")) {
-          return <Text key={index} style={styles.inlineBold}>{part.slice(2, -2)}</Text>;
-        }
-        if (part.startsWith("*") && part.endsWith("*") && !part.startsWith("**")) {
-          return <Text key={index} style={styles.inlineItalic}>{part.slice(1, -1)}</Text>;
-        }
-        if (part.startsWith("`") && part.endsWith("`")) {
-          return <Text key={index} style={styles.inlineCode}>{part.slice(1, -1)}</Text>;
-        }
-        return part;
-      })}
-    </Text>
-  );
-}
-
 function HeaderTool({ disabled, icon, label, onPress }: { disabled?: boolean; icon: keyof typeof Feather.glyphMap; label: string; onPress: () => void }) {
   return (
     <Pressable accessibilityRole="button" disabled={disabled} onPress={onPress} style={[styles.headerTool, disabled && styles.disabled]}>
@@ -871,67 +865,6 @@ function HeaderTool({ disabled, icon, label, onPress }: { disabled?: boolean; ic
       <Text style={styles.headerToolText}>{label}</Text>
     </Pressable>
   );
-}
-
-function MiniAction({ active, disabled, icon, label, onPress, tone }: { active?: boolean; disabled?: boolean; icon: keyof typeof Feather.glyphMap; label: string; onPress: () => void; tone?: "danger" }) {
-  return (
-    <Pressable accessibilityLabel={label} accessibilityRole="button" disabled={disabled} onPress={onPress} style={[styles.miniAction, active && styles.miniActionActive, disabled && styles.disabled]}>
-      <Feather name={icon} size={12} color={tone === "danger" ? medicalTheme.critical : active ? medicalTheme.primary : medicalTheme.muted} />
-    </Pressable>
-  );
-}
-
-function AttachmentChip({ attachment, onRemove, previewUrl }: { attachment: CopilotAttachment; onRemove?: () => void; previewUrl?: string }) {
-  const originalName = safeString(attachment?.originalName, "Uploaded file");
-  const attachmentKind = safeString(attachment?.kind, "file");
-  const documentType = safeString(attachment?.documentType, "").replace(/_/g, " ");
-  const confidence = typeof attachment?.confidence === "number" ? `${Math.round(attachment.confidence * 100)}% confidence` : undefined;
-  const summary = attachment?.analysisSummary?.slice(0, 120);
-  return (
-    <View style={styles.attachmentChip}>
-      {previewUrl ? <Image accessibilityLabel={`${originalName} preview`} source={{ uri: previewUrl }} style={styles.attachmentPreview} /> : null}
-      <Feather name={attachmentKind === "camera" ? "camera" : attachmentKind === "image" ? "image" : attachmentKind === "ecg" ? "activity" : attachmentKind === "echo" ? "heart" : attachmentKind === "labs" ? "clipboard" : "paperclip"} size={13} color={medicalTheme.primary} />
-      <View style={styles.attachmentChipText}>
-        <Text numberOfLines={1} style={styles.attachmentName}>{originalName}</Text>
-        <Text style={styles.attachmentMeta}>
-          {[documentType, confidence, formatFileSize(attachment?.sizeBytes)].filter(Boolean).join(" • ")}
-        </Text>
-        {summary ? <Text numberOfLines={2} style={styles.attachmentSummary}>{summary}</Text> : null}
-      </View>
-      {onRemove ? (
-        <Pressable accessibilityLabel={`Remove ${originalName}`} accessibilityRole="button" onPress={onRemove} style={styles.attachmentRemove}>
-          <Feather name="x" size={12} color={medicalTheme.text} />
-        </Pressable>
-      ) : null}
-    </View>
-  );
-}
-
-function ComposerTool({ active, icon, label, onPress }: { active?: boolean; icon: keyof typeof Feather.glyphMap; label: string; onPress: () => void }) {
-  return (
-    <Pressable accessibilityRole="button" onPress={onPress} style={[styles.composerTool, active && styles.composerToolActive]}>
-      <Feather name={icon} size={13} color={medicalTheme.primary} />
-      <Text style={styles.composerToolText}>{label}</Text>
-    </Pressable>
-  );
-}
-
-function formatFileSize(sizeBytes: number | null | undefined) {
-  const safeSize = typeof sizeBytes === "number" && Number.isFinite(sizeBytes) && sizeBytes >= 0 ? sizeBytes : undefined;
-  if (safeSize === undefined) return "Unknown size";
-  if (safeSize < 1024) return `${safeSize} B`;
-  if (safeSize < 1024 * 1024) return `${Math.round(safeSize / 1024)} KB`;
-  return `${(safeSize / (1024 * 1024)).toFixed(1)} MB`;
-}
-
-function copyText(content: string, onNotice?: (text: string, tone?: "error" | "success") => void) {
-  if (typeof navigator !== "undefined" && "clipboard" in navigator) {
-    void navigator.clipboard.writeText(content)
-      .then(() => onNotice?.("Answer copied."))
-      .catch(() => onNotice?.("Copy failed.", "error"));
-    return;
-  }
-  onNotice?.("Copy is not available in this browser.", "error");
 }
 
 function downloadBlob(blob: Blob, filename: string) {
@@ -981,7 +914,7 @@ const styles = StyleSheet.create({
   chatHeaderMain: { flex: 1, minWidth: 0 },
   chatIdentity: { alignItems: "center", flex: 1, flexDirection: "row", gap: 12, minWidth: 280 },
   chatMeta: { color: medicalTheme.muted, fontSize: 12, fontWeight: "800", marginTop: 4 },
-  chatPanel: { backgroundColor: "rgba(2,6,23,0.82)", borderColor: glassBorder, flex: 1, gap: 12, minHeight: 0, minWidth: 320, padding: 16 },
+  chatPanel: { backgroundColor: "rgba(2,6,23,0.82)", borderColor: glassBorder, flex: 1, flexDirection: "column", gap: 8, minHeight: 0, minWidth: 320, padding: 16 },
   chatTools: { alignItems: "center", flexDirection: "row", flexWrap: "wrap", gap: 8 },
   citation: { alignItems: "center", backgroundColor: "rgba(20,221,230,0.08)", borderColor: glassBorder, borderRadius: 999, borderWidth: 1, flexDirection: "row", gap: 6, paddingHorizontal: 9, paddingVertical: 6 },
   citationText: { color: medicalTheme.text, fontSize: 11, fontWeight: "800" },
@@ -991,10 +924,11 @@ const styles = StyleSheet.create({
   inlineCode: { backgroundColor: "rgba(15,23,42,0.8)", color: "#D6E4FF", fontFamily: Platform.select({ web: "monospace", default: undefined }), fontSize: 12 },
   inlineItalic: { fontStyle: "italic" },
   composer: { backgroundColor: "rgba(15,23,42,0.92)", borderColor: glassBorder, borderRadius: 22, borderWidth: 1, gap: 10, padding: 12 },
+  composerDock: { flexShrink: 0 },
   commandChip: { backgroundColor: "rgba(30,41,59,0.85)", borderColor: glassBorder, borderRadius: 999, borderWidth: 1, paddingHorizontal: 10, paddingVertical: 6 },
   commandChipText: { color: medicalTheme.primary, fontSize: 11, fontWeight: "800" },
   commandRow: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
-  composerInput: { color: medicalTheme.text, flex: 1, fontSize: 14, lineHeight: 21, maxHeight: 150, minHeight: 54, minWidth: 240, padding: 10 },
+  composerInput: { color: medicalTheme.text, flex: 1, fontSize: 14, lineHeight: 21, maxHeight: 120, minHeight: 54, minWidth: 240, padding: 10 },
   composerTool: { alignItems: "center", backgroundColor: "rgba(20,221,230,0.08)", borderColor: glassBorder, borderRadius: 999, borderWidth: 1, flexDirection: "row", gap: 6, paddingHorizontal: 9, paddingVertical: 6 },
   composerToolActive: { backgroundColor: "rgba(239,68,68,0.16)", borderColor: "rgba(239,68,68,0.45)" },
   composerToolText: { color: medicalTheme.text, fontSize: 11, fontWeight: "900" },
@@ -1037,10 +971,10 @@ const styles = StyleSheet.create({
   kicker: { color: medicalTheme.primary, fontSize: 11, fontWeight: "900", letterSpacing: 1.2, textTransform: "uppercase" },
   liveTranscript: { color: medicalTheme.primary, fontSize: 13, fontWeight: "800", lineHeight: 20, paddingHorizontal: 4 },
   main: { flex: 1, gap: 12, minHeight: 0, minWidth: 0 },
-  message: { borderRadius: 20, borderWidth: 1, gap: 4, maxWidth: "86%", padding: 14 },
+  message: { borderRadius: 20, borderWidth: 1, gap: 4, maxWidth: "86%", padding: 12 },
   messageBullet: { color: medicalTheme.text, fontSize: 14, lineHeight: 22, paddingLeft: 8 },
   messageHeading: { color: medicalTheme.text, fontSize: 16, fontWeight: "900", marginTop: 8 },
-  messageList: { gap: 12, paddingBottom: 18 },
+  messageList: { gap: 8, paddingBottom: 12 },
   messageAttachments: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 8 },
   messageRole: { color: medicalTheme.primary, fontSize: 10, fontWeight: "900", textTransform: "uppercase" },
   messageSpace: { height: 5 },
@@ -1053,7 +987,7 @@ const styles = StyleSheet.create({
   miniAction: { alignItems: "center", backgroundColor: "rgba(2,6,23,0.34)", borderRadius: 999, height: 24, justifyContent: "center", width: 24 },
   miniActionActive: { backgroundColor: "rgba(20,221,230,0.16)" },
   richText: { gap: 2 },
-  shell: { backgroundColor: "#020617", flex: 1, flexDirection: "row", gap: 14, minHeight: Platform.OS === "web" ? "calc(100vh - 130px)" as unknown as number : 760, overflow: "hidden", padding: 2 },
+  shell: { backgroundColor: "#020617", flex: 1, flexDirection: "column", minHeight: 0, overflow: "hidden", width: "100%" },
   sidebar: { backgroundColor: "rgba(15,23,42,0.88)", borderColor: glassBorder, flexBasis: 320, gap: 12, padding: 14, width: 320 },
   sidebarEyebrow: { color: medicalTheme.primary, fontSize: 11, fontWeight: "900", letterSpacing: 1, textTransform: "uppercase" },
   sidebarHeader: { alignItems: "center", flexDirection: "row", justifyContent: "space-between" },

@@ -6,7 +6,7 @@ const nodeEnv = process.env["NODE_ENV"] ?? "development";
 const workspaceRoot = path.resolve(__dirname, "../../..");
 
 dotenv.config({ path: path.join(workspaceRoot, ".env") });
-dotenv.config({ path: path.join(workspaceRoot, `.env.${nodeEnv}`), override: nodeEnv !== "production" });
+dotenv.config({ path: path.join(workspaceRoot, `.env.${nodeEnv}`), override: false });
 
 const developmentDefaults = {
   AI_PROVIDER: "rule_based",

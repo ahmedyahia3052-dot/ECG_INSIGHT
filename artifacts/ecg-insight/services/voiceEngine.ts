@@ -1,3 +1,5 @@
+import { detectTextLanguage, resolveSpeechLanguage, type VoiceLanguageMode } from "./voiceLanguage";
+
 type SpeechRecognitionLike = {
   continuous: boolean;
   interimResults: boolean;
@@ -18,9 +20,23 @@ type SpeechWindow = Window & {
   webkitSpeechRecognition?: new () => SpeechRecognitionLike;
 };
 
-export type VoiceStatus = "idle" | "listening" | "transcribing" | "thinking" | "speaking";
+export type VoiceStatus =
+  | "idle"
+  | "permission"
+  | "listening"
+  | "recording"
+  | "uploading"
+  | "processing"
+  | "thinking"
+  | "speaking"
+  | "streaming"
+  | "completed"
+  | "cancelled"
+  | "error"
+  | "timeout";
 
 export type VoiceEngineCallbacks = {
+  onAudioLevel?: (levels: number[]) => void;
   onError: (message: string) => void;
   onFinalTranscript: (text: string) => void;
   onNetworkChange?: (online: boolean) => void;
@@ -78,6 +94,9 @@ export class ClinicalVoiceEngine {
   private mediaRecorder: MediaRecorder | null = null;
   private mediaStream: MediaStream | null = null;
   private audioChunks: Blob[] = [];
+  private capturedAudioBytes = 0;
+  private levelMonitorTimer: ReturnType<typeof setInterval> | null = null;
+  private audioContext: AudioContext | null = null;
   private recordingMimeType = "audio/webm";
   private finalTranscript = "";
   private latestPartial = "";
@@ -94,7 +113,8 @@ export class ClinicalVoiceEngine {
   private offlineHandler: (() => void) | null = null;
   private deviceChangeHandler: (() => void) | null = null;
   private recordingStartedAt = 0;
-  private preferredLang = "en-US";
+  private languageMode: VoiceLanguageMode = "auto";
+  private preferredLang: "en-US" | "ar-SA" = "en-US";
   private state: VoiceEngineState = {
     muted: false,
     online: typeof navigator !== "undefined" ? navigator.onLine : true,
@@ -105,8 +125,18 @@ export class ClinicalVoiceEngine {
     voiceMode: false,
   };
 
-  setLanguage(lang: "en-US" | "ar-SA") {
-    this.preferredLang = lang;
+  setLanguage(mode: VoiceLanguageMode) {
+    this.languageMode = mode;
+    this.preferredLang = resolveSpeechLanguage(mode);
+    if (this.recognition) this.recognition.lang = this.preferredLang;
+  }
+
+  private syncLanguageFromTranscript(text: string) {
+    if (this.languageMode !== "auto" || !text.trim()) return;
+    const detected = detectTextLanguage(text);
+    if (detected === this.preferredLang) return;
+    this.preferredLang = detected;
+    if (this.recognition) this.recognition.lang = detected;
   }
 
   constructor(callbacks: VoiceEngineCallbacks, whisperTranscriber?: WhisperTranscriber) {
@@ -137,15 +167,37 @@ export class ClinicalVoiceEngine {
     if (this.state.status === status) return;
     this.state.status = status;
     this.callbacks.onStatusChange(status);
+    void import("./runtimeEvents").then(({ emitRuntimeEvent, voiceStatusToRuntimeEvent }) => {
+      const event = voiceStatusToRuntimeEvent(status);
+      if (event) emitRuntimeEvent(event, { status });
+    });
+  }
+
+  resetAfterStream(willSpeak: boolean) {
+    if (willSpeak || this.state.status === "speaking") return;
+    if (this.state.status === "thinking" || this.state.status === "streaming") {
+      this.setStatus("idle");
+    }
+  }
+
+  returnToIdle() {
+    if (this.state.status === "speaking") return;
+    this.setStatus("idle");
+  }
+
+  private reportVoiceError(message: string) {
+    this.setStatus("error");
+    this.callbacks.onError(message);
   }
 
   async requestPermission() {
     if (typeof navigator === "undefined" || !navigator.mediaDevices?.getUserMedia) {
       this.state.permissionGranted = false;
-      this.callbacks.onError("Microphone is not available in this environment.");
+      this.reportVoiceError("Microphone is not available in this environment.");
       return false;
     }
     try {
+      this.setStatus("permission");
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       stream.getTracks().forEach((track) => track.stop());
       this.state.permissionGranted = true;
@@ -159,11 +211,11 @@ export class ClinicalVoiceEngine {
 
   async startRecording() {
     if (typeof window === "undefined") {
-      this.callbacks.onError("Voice input is not supported by this browser.");
+      this.reportVoiceError("Voice input is not supported by this browser.");
       return;
     }
     if (!this.state.online) {
-      this.callbacks.onError("Voice input requires an internet connection.");
+      this.reportVoiceError("Voice input requires an internet connection.");
       return;
     }
     if (this.state.status === "speaking") {
@@ -174,6 +226,7 @@ export class ClinicalVoiceEngine {
     this.finalTranscript = "";
     this.latestPartial = "";
     this.audioChunks = [];
+    this.capturedAudioBytes = 0;
     this.finishingRecording = false;
     this.utteranceFinalized = false;
     this.recordingStartedAt = Date.now();
@@ -222,6 +275,7 @@ export class ClinicalVoiceEngine {
     }
 
     this.state.recording = true;
+    this.setStatus("recording");
     this.callbacks.onRecordingStart();
     this.resetSilenceTimer();
     this.resetSpeechTimeout();
@@ -253,7 +307,7 @@ export class ClinicalVoiceEngine {
       this.mediaRecorder.stop();
     }
     this.releaseMediaStream();
-    this.setStatus("idle");
+    this.setStatus("cancelled");
     this.callbacks.onRecordingEnd();
     this.finishingRecording = false;
   }
@@ -270,6 +324,10 @@ export class ClinicalVoiceEngine {
 
   markThinking() {
     this.setStatus("thinking");
+  }
+
+  markStreaming() {
+    this.setStatus("streaming");
   }
 
   feedSpeech(content: string, messageId: string) {
@@ -324,7 +382,7 @@ export class ClinicalVoiceEngine {
   private beginSpeech(messageId: string) {
     if (!this.ttsQueue.length) return;
     if (typeof window === "undefined" || !("speechSynthesis" in window) || !("SpeechSynthesisUtterance" in window)) {
-      this.callbacks.onError("Voice playback is not supported by this browser.");
+      this.reportVoiceError("Voice playback is not supported by this browser.");
       return;
     }
     this.activeSpeechMessageId = messageId;
@@ -346,12 +404,14 @@ export class ClinicalVoiceEngine {
       return;
     }
     const utterance = new SpeechSynthesisUtterance(chunk);
+    utterance.lang = this.preferredLang;
     utterance.rate = 0.96;
     utterance.pitch = 1;
     utterance.onend = () => this.pumpSpeechQueue();
     utterance.onerror = () => {
-      this.finishSpeech();
-      this.callbacks.onError("Voice playback failed.");
+      this.ttsQueue = [];
+      this.state.speakingMessageId = undefined;
+      this.reportVoiceError("Voice playback failed.");
     };
     window.speechSynthesis.speak(utterance);
   }
@@ -359,8 +419,13 @@ export class ClinicalVoiceEngine {
   private finishSpeech() {
     this.state.speakingMessageId = undefined;
     this.state.paused = false;
-    this.setStatus("idle");
+    this.setStatus("completed");
     this.callbacks.onSpeakingEnd();
+    const resetIdle = () => {
+      if (this.state.status === "completed") this.setStatus("idle");
+    };
+    if (typeof window !== "undefined") window.setTimeout(resetIdle, 400);
+    else resetIdle();
   }
 
   private handleSpeechResult(event: {
@@ -380,9 +445,11 @@ export class ClinicalVoiceEngine {
     if (final) {
       this.finalTranscript = punctuate(`${this.finalTranscript} ${final}`.trim());
       this.latestPartial = this.finalTranscript;
+      this.syncLanguageFromTranscript(this.finalTranscript);
       this.callbacks.onPartialTranscript(this.finalTranscript);
     } else if (interim) {
       this.latestPartial = punctuate(`${this.finalTranscript} ${interim}`.trim());
+      this.syncLanguageFromTranscript(this.latestPartial);
       this.callbacks.onPartialTranscript(this.latestPartial);
     }
   }
@@ -407,9 +474,10 @@ export class ClinicalVoiceEngine {
     }
 
     if (this.audioChunks.length && this.whisperTranscriber) {
-      this.setStatus("transcribing");
+      this.setStatus("uploading");
       try {
         const blob = new Blob(this.audioChunks, { type: this.recordingMimeType });
+        this.setStatus("processing");
         const transcribed = punctuate((await this.whisperTranscriber(blob, this.recordingMimeType)).trim());
         if (transcribed) {
           this.utteranceFinalized = true;
@@ -423,7 +491,7 @@ export class ClinicalVoiceEngine {
       } catch (error) {
         const message = error instanceof Error ? error.message : "Server transcription failed.";
         if (!message.includes("503") && !message.includes("unavailable")) {
-          this.callbacks.onError(message);
+          this.reportVoiceError(message);
         }
       }
     }
@@ -437,9 +505,12 @@ export class ClinicalVoiceEngine {
     }
 
     if (reason === "speech-timeout") {
-      this.callbacks.onError("Speech timeout. Try speaking again.");
-    } else if (!liveTranscript && !this.state.voiceMode) {
-      this.callbacks.onError("No speech detected. Check microphone permissions and try again.");
+      this.setStatus("timeout");
+      this.reportVoiceError("Speech timeout. Try speaking again.");
+    } else if (!liveTranscript && !this.state.voiceMode && this.capturedAudioBytes > 0) {
+      this.reportVoiceError("No speech detected in the recording. Try speaking closer to the microphone.");
+    } else if (!liveTranscript && !this.state.voiceMode && this.capturedAudioBytes === 0) {
+      this.reportVoiceError("Microphone did not capture audio. Check permissions and input device.");
     }
     this.setStatus("idle");
     this.callbacks.onRecordingEnd();
@@ -451,18 +522,52 @@ export class ClinicalVoiceEngine {
     const mimeType = preferredTypes.find((type) => typeof MediaRecorder !== "undefined" && MediaRecorder.isTypeSupported(type)) ?? "audio/webm";
     this.recordingMimeType = mimeType;
     this.audioChunks = [];
+    this.capturedAudioBytes = 0;
     const recorder = new MediaRecorder(stream, { mimeType });
     recorder.ondataavailable = (event) => {
-      if (event.data.size > 0) this.audioChunks.push(event.data);
+      if (event.data.size > 0) {
+        this.audioChunks.push(event.data);
+        this.capturedAudioBytes += event.data.size;
+      }
     };
     recorder.onstop = () => {
+      this.stopLevelMonitor();
       void this.finishRecording("recorder-stop");
     };
     recorder.start(250);
     this.mediaRecorder = recorder;
+    this.startLevelMonitor(stream);
+  }
+
+  private startLevelMonitor(stream: MediaStream) {
+    if (typeof window === "undefined" || !this.callbacks.onAudioLevel) return;
+    try {
+      this.audioContext = new AudioContext();
+      const source = this.audioContext.createMediaStreamSource(stream);
+      const analyser = this.audioContext.createAnalyser();
+      analyser.fftSize = 64;
+      source.connect(analyser);
+      const buffer = new Uint8Array(analyser.frequencyBinCount);
+      this.levelMonitorTimer = setInterval(() => {
+        analyser.getByteFrequencyData(buffer);
+        const levels = Array.from(buffer.slice(0, 16)).map((value) => value / 255);
+        this.callbacks.onAudioLevel?.(levels);
+      }, 80);
+    } catch {
+      // Waveform is optional; recording must continue without it.
+    }
+  }
+
+  private stopLevelMonitor() {
+    if (this.levelMonitorTimer) clearInterval(this.levelMonitorTimer);
+    this.levelMonitorTimer = null;
+    void this.audioContext?.close();
+    this.audioContext = null;
+    this.callbacks.onAudioLevel?.([]);
   }
 
   private releaseMediaStream() {
+    this.stopLevelMonitor();
     this.mediaStream?.getTracks().forEach((track) => track.stop());
     this.mediaStream = null;
     this.mediaRecorder = null;
@@ -505,7 +610,7 @@ export class ClinicalVoiceEngine {
       this.state.online = false;
       this.callbacks.onNetworkChange?.(false);
       if (this.state.recording) this.cancelRecording();
-      this.callbacks.onError("Network connection lost.");
+      this.reportVoiceError("Network connection lost.");
     };
     this.visibilityHandler = () => {
       if (document.visibilityState === "hidden" && this.state.recording) {

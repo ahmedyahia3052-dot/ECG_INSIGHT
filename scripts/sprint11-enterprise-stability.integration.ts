@@ -12,9 +12,14 @@ import {
 import { ResponseOrchestrator } from "../server/src/modules/copilot/core/response-orchestrator";
 import { runClinicalAiCore } from "../server/src/modules/copilot/core/pipeline";
 import { processCopilotAttachment } from "../server/src/modules/copilot/copilot-attachment-pipeline.service";
+import { autoLinkCopilotClinicalUpload } from "../server/src/modules/copilot/copilot-clinical-linkage.service";
 import { emptyClinicalContext } from "../server/src/modules/copilot/intent-manager";
 import type { AttachmentForAnalysis, ClinicalContext, ConversationMemory } from "../server/src/modules/copilot/copilot-types";
 import { ConversationManager } from "../server/src/modules/copilot/engine";
+import { extractClinicalText, terminateClinicalOcrWorker } from "../server/src/modules/ocr/clinical-ocr.service";
+import { PrismaClient } from "@prisma/client";
+import { PrismaPg } from "@prisma/adapter-pg";
+import pg from "pg";
 
 function assert(condition: unknown, message: string): asserts condition {
   if (!condition) throw new Error(message);
@@ -160,7 +165,7 @@ async function testResponseOrchestratorInjectsBlocks() {
   let capturedMessages: Array<{ content: string; role: string }> = [];
 
   // Spy via runClinicalAiCore path is enough; direct unit on buildAttachmentContextBlock covers injection source.
-  assert(buildAttachmentContextBlock([sampleEcgAttachment])?.includes("Structured analysis"), "structured JSON in block");
+  assert(buildAttachmentContextBlock([sampleEcgAttachment])?.includes("Structured clinical context"), "structured JSON in block");
   assert(formatClinicalContextBlock({
     ...emptyClinicalContext(),
     patient: {
@@ -178,13 +183,114 @@ async function testResponseOrchestratorInjectsBlocks() {
   void capturedMessages;
 }
 
+async function testClinicalOcrEngine() {
+  const dir = path.resolve(process.cwd(), "uploads", "sprint11-tests");
+  await fs.mkdir(dir, { recursive: true });
+  const textPath = path.join(dir, "clinical-header.txt");
+  await fs.writeFile(textPath, "Patient Name: John Doe\nAge: 58\nHeart Rate: 88 bpm\nPR 160 ms\nQRS 90 ms\nQT 420 ms\nLead II ST elevation\nHospital: Metro Cardiology");
+  const textResult = await extractClinicalText(textPath, "text/plain", "clinical-header.txt");
+  assert(textResult.engine === "native", "native text OCR path");
+  assert(textResult.structured.patientName?.includes("John"), "patient name extracted");
+  assert(textResult.structured.measurements.heartRate === 88, "heart rate extracted");
+
+  const imagePath = path.join(dir, "ocr-label-ecg.png");
+  const svg = `<svg width="900" height="240" xmlns="http://www.w3.org/2000/svg">
+    <rect width="100%" height="100%" fill="white"/>
+    <text x="24" y="48" font-family="Arial" font-size="28" fill="black">Patient Name: Jane Smith</text>
+    <text x="24" y="92" font-family="Arial" font-size="28" fill="black">Age: 62 Heart Rate: 76 bpm</text>
+    <text x="24" y="136" font-family="Arial" font-size="28" fill="black">PR 180 ms QRS 92 ms QT 410 ms</text>
+    <text x="24" y="180" font-family="Arial" font-size="28" fill="black">Hospital: Central Heart Institute</text>
+  </svg>`;
+  await sharp(Buffer.from(svg)).png().toFile(imagePath);
+  const imageResult = await extractClinicalText(imagePath, "image/png", "ocr-label-ecg.png");
+  assert(["tesseract", "pdf-parse"].includes(imageResult.engine), `tesseract OCR expected, got ${imageResult.engine}`);
+  assert(imageResult.text.length > 20, "OCR text extracted from image");
+}
+
+async function testVoiceLanguageDetection() {
+  const { detectTextLanguage, resolveSpeechLanguage } = await import("../artifacts/ecg-insight/services/voiceLanguage");
+  assert(detectTextLanguage("مرحبا كيف حالك") === "ar-SA", "Arabic detection");
+  assert(detectTextLanguage("Review the ECG rhythm strip") === "en-US", "English detection");
+  assert(resolveSpeechLanguage("auto", "Patient has chest pain") === "en-US", "auto resolves English");
+  assert(resolveSpeechLanguage("ar-SA") === "ar-SA", "explicit Arabic");
+}
+
+async function testMobileUploadService() {
+  const source = await fs.readFile(path.resolve(process.cwd(), "artifacts/ecg-insight/services/copilotUpload.ts"), "utf8");
+  assert(source.includes("pickCopilotUploadAssets"), "mobile document picker wired");
+  assert(source.includes("captureCopilotCameraAsset"), "mobile camera capture wired");
+  assert(source.includes("buildCopilotUploadFormData"), "native FormData builder wired");
+  const ui = await fs.readFile(path.resolve(process.cwd(), "artifacts/ecg-insight/app/(protected)/copilot.tsx"), "utf8");
+  assert(!ui.includes('Platform.OS !== "web" || typeof document === "undefined"'), "web-only upload guard removed");
+  assert(ui.includes("pickCopilotUploadAssets"), "copilot UI uses mobile upload service");
+}
+
+async function testClinicalAutoLinkage() {
+  if (!process.env.DATABASE_URL) {
+    console.log("Skipping auto-linkage DB test (DATABASE_URL not set).");
+    return;
+  }
+  const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL });
+  const prisma = new PrismaClient({ adapter: new PrismaPg(pool) });
+  const user = await prisma.user.findFirst({ where: { role: "DOCTOR" } });
+  assert(user, "doctor user required for linkage test");
+
+  const dir = path.resolve(process.cwd(), "uploads", "sprint11-tests");
+  await fs.mkdir(dir, { recursive: true });
+  const imagePath = path.join(dir, "linkage-ecg.png");
+  await createSyntheticEcgGridImage(imagePath);
+
+  const attachment = await prisma.copilotAttachment.create({
+    data: {
+      analysisSummary: "Synthetic ECG for linkage test",
+      documentType: "12_LEAD_ECG",
+      kind: "ecg",
+      mimeType: "image/png",
+      originalName: "linkage-ecg.png",
+      sizeBytes: (await fs.stat(imagePath)).size,
+      storagePath: imagePath,
+      storedName: path.basename(imagePath),
+      userId: user.id,
+    },
+  });
+
+  const linkage = await autoLinkCopilotClinicalUpload({
+    attachmentId: attachment.id,
+    documentType: "12_LEAD_ECG",
+    kind: "ecg",
+    mimeType: "image/png",
+    originalName: "linkage-ecg.png",
+    storagePath: imagePath,
+    structured: { confidence: 0.9, engine: "tesseract", leadLabels: ["II"], measurements: {}, patientName: "Linkage Test Patient" },
+    userId: user.id,
+  });
+  assert(linkage?.patientId, "patient linked");
+  assert(linkage?.visitId, "visit linked");
+  assert(linkage?.caseId, "ECG case linked");
+
+  await prisma.copilotAttachment.delete({ where: { id: attachment.id } }).catch(() => undefined);
+  if (linkage?.caseId) {
+    await prisma.eCGFile.deleteMany({ where: { caseId: linkage.caseId } });
+    await prisma.eCGCase.delete({ where: { id: linkage.caseId } }).catch(() => undefined);
+  }
+  if (linkage?.visitId) await prisma.timelineEvent.delete({ where: { id: linkage.visitId } }).catch(() => undefined);
+  if (linkage?.createdPatient && linkage?.patientId) await prisma.patient.delete({ where: { id: linkage.patientId } }).catch(() => undefined);
+  await prisma.$disconnect();
+  await pool.end();
+}
+
 async function main() {
   await testAttachmentContextInjection();
   await testClinicalContextFormatter();
   await testClinicalSafetyDisclaimer();
   await testUploadPipeline();
+  await testClinicalOcrEngine();
+  await testVoiceLanguageDetection();
+  await testMobileUploadService();
+  await testClinicalAutoLinkage();
   await testAttachmentAwareLlmPipeline();
   await testResponseOrchestratorInjectsBlocks();
+  await terminateClinicalOcrWorker();
   console.log("Sprint 11 enterprise stability regression suite passed.");
 }
 

@@ -1,5 +1,6 @@
 import type { AttachmentForAnalysis, ClinicalContext } from "../copilot-types";
-import { analyzeAttachmentsStructured } from "../v3/tools/document-analyzer";
+import { AttachmentContextBuilder } from "../attachment/attachment-context-builder.service";
+import { validateAttachmentsForPrompt } from "../validation/attachment-validator";
 
 export const CLINICAL_SAFETY_DISCLAIMER =
   "This AI interpretation is an assistive clinical tool and must be reviewed by a qualified physician.";
@@ -7,30 +8,53 @@ export const CLINICAL_SAFETY_DISCLAIMER =
 export function buildAttachmentContextBlock(attachments: AttachmentForAnalysis[]): string | null {
   if (!attachments.length) return null;
 
-  const structured = analyzeAttachmentsStructured(attachments);
+  const normalizedContexts = attachments.map((attachment) => {
+    const stored = AttachmentContextBuilder.readStored(attachment);
+    if (stored) return stored;
+    return AttachmentContextBuilder.build({
+      documentType: attachment.documentType ?? attachment.kind,
+      extractedText: attachment.extractedText ?? "",
+      kind: attachment.kind,
+      mimeType: attachment.mimeType,
+      originalName: attachment.originalName,
+      sizeBytes: attachment.sizeBytes,
+    });
+  });
+
+  const validation = validateAttachmentsForPrompt(attachments);
+  const serialized = normalizedContexts.map((context) => AttachmentContextBuilder.serializeForPrompt(context));
   const lines = [
-    "UPLOADED ATTACHMENTS — The user has attached clinical files for this message.",
+    "UPLOADED ATTACHMENTS — Structured clinical context only (no raw files).",
     "You MUST review every attachment below and reference relevant findings in your response.",
     "Never ignore uploaded files. Never fabricate measurements not present in the analysis.",
     "If OCR confidence is low or text is limited, state that explicitly.",
-    `Structured analysis (${attachments.length} file(s)):\n${JSON.stringify(structured, null, 2)}`,
+    `Structured clinical context (${attachments.length} file(s)):\n${JSON.stringify(serialized, null, 2)}`,
   ];
 
+  if (validation.flags.length) {
+    lines.push(`Clinical validation flags:\n${validation.flags.map((flag) => `- ${flag}`).join("\n")}`);
+  }
+  if (validation.requiresPhysicianReview) {
+    lines.push("Physician review is required before acting on low-confidence or flagged attachment findings.");
+  }
+
   for (const attachment of attachments) {
-    if (attachment.analysisSummary) {
+    const context = AttachmentContextBuilder.readStored(attachment);
+    if (context?.summary) {
+      lines.push(`Summary (${attachment.originalName}): ${context.summary}`);
+    } else if (attachment.analysisSummary) {
       lines.push(`Summary (${attachment.originalName}): ${attachment.analysisSummary}`);
     }
-    if (attachment.extractedText?.trim()) {
-      lines.push(`OCR text (${attachment.originalName}):\n${attachment.extractedText.slice(0, 2500)}`);
+    if (context?.extractedTextPreview?.trim()) {
+      lines.push(`OCR preview (${attachment.originalName}):\n${context.extractedTextPreview.slice(0, 2500)}`);
     }
-    if (attachment.warnings?.length) {
-      lines.push(`Warnings (${attachment.originalName}): ${attachment.warnings.join("; ")}`);
+    const warnings = context?.warnings?.length ? context.warnings : attachment.warnings;
+    if (warnings?.length) {
+      lines.push(`Warnings (${attachment.originalName}): ${warnings.join("; ")}`);
     }
-    if (attachment.recommendations?.length) {
-      lines.push(`Recommendations (${attachment.originalName}): ${attachment.recommendations.join("; ")}`);
-    }
-    if (typeof attachment.confidence === "number" && attachment.confidence < 0.65) {
-      lines.push(`Low confidence (${Math.round(attachment.confidence * 100)}%) for ${attachment.originalName} — interpret cautiously.`);
+    const recommendations = context?.recommendations?.length ? context.recommendations : attachment.recommendations;
+    if (recommendations?.length) {
+      lines.push(`Recommendations (${attachment.originalName}): ${recommendations.join("; ")}`);
     }
   }
 

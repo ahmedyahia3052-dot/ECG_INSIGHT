@@ -218,21 +218,32 @@ export async function apiRequest<T>(
 }
 
 export async function checkBackendHealth() {
-  try {
-    const response = await apiClient.get<{ ok: boolean; service?: string }>("/health", {
-      timeout: 5_000,
-    });
-    return {
-      ok: response.data.ok === true,
-      message: response.data.ok === true ? "Backend service online." : "Backend service unavailable.",
-      service: response.data.service,
-    };
-  } catch (error) {
-    const normalized = normalizeApiError(error);
-    return {
-      ok: false,
-      message: normalized.message,
-      service: "ecg-insight-api",
-    };
+  const livenessUrl = `${API_URL.replace(/\/api\/?$/, "")}/liveness`;
+  let lastMessage = "Backend service unavailable.";
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    try {
+      const response = await fetch(livenessUrl, { signal: AbortSignal.timeout(8_000) });
+      if (!response.ok) {
+        lastMessage = `Backend liveness returned ${response.status}.`;
+      } else {
+        const payload = (await response.json()) as { ok?: boolean };
+        if (payload.ok === true) {
+          return {
+            ok: true,
+            message: "Backend service online.",
+            service: "ecg-insight-api",
+          };
+        }
+        lastMessage = "Backend service unavailable.";
+      }
+    } catch (error) {
+      lastMessage = error instanceof Error ? error.message : "Backend service unavailable.";
+    }
+    await new Promise((resolve) => setTimeout(resolve, 750 * (attempt + 1)));
   }
+  return {
+    ok: false,
+    message: lastMessage,
+    service: "ecg-insight-api",
+  };
 }

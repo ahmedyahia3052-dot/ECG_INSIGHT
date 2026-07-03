@@ -269,17 +269,29 @@ export async function reconstructCaseEcg(caseId: string, actorId: string, overri
     return await waveformFallback(file, "Digital waveform reconstruction unavailable for this ECG file format.");
   }
 
+  let pipeline;
   try {
-    const pipeline = await runDigitizationPipeline(file, override);
-    const {
-      calibration,
-      durationSeconds,
-      enhancedImagePath,
-      leadSegments,
-      leads,
-      preprocessing,
-      quality,
-    } = pipeline;
+    pipeline = await runDigitizationPipeline(file, override);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Digital waveform reconstruction unavailable.";
+    return await waveformFallback(file, message);
+  }
+
+  const {
+    calibration,
+    durationSeconds,
+    enhancedImagePath,
+    leadSegments,
+    leads,
+    preprocessing,
+    quality,
+  } = pipeline;
+
+  if (leads.length === 0) {
+    return await waveformFallback(file, "No ECG leads could be digitized from the uploaded image.");
+  }
+
+  try {
     const extractionTimestamp = new Date().toISOString();
     const measurementEngine = measureFromLeads({ calibration, leads });
     const interpretationEngine = interpretMeasurementBundle(measurementEngine);
@@ -338,7 +350,7 @@ export async function reconstructCaseEcg(caseId: string, actorId: string, overri
             metadataJson: { digitizedFromImage: isImage(file), extractionTimestamp, leadSegment: leadSegments.find((segment) => segment.lead === lead.lead), paperSpeedMmPerSec: calibration.paperSpeedMmPerSec } as Prisma.InputJsonObject,
             paperSpeed: calibration.paperSpeedMmPerSec,
             samplingRate: lead.samplingRate,
-            signalData: lead.samples,
+            signalData: lead.samples.map((sample) => (Number.isFinite(sample) ? sample : 0)),
           },
           update: {
             duration: lead.durationSeconds,
@@ -346,7 +358,7 @@ export async function reconstructCaseEcg(caseId: string, actorId: string, overri
             metadataJson: { digitizedFromImage: isImage(file), extractionTimestamp, leadSegment: leadSegments.find((segment) => segment.lead === lead.lead), paperSpeedMmPerSec: calibration.paperSpeedMmPerSec } as Prisma.InputJsonObject,
             paperSpeed: calibration.paperSpeedMmPerSec,
             samplingRate: lead.samplingRate,
-            signalData: lead.samples,
+            signalData: lead.samples.map((sample) => (Number.isFinite(sample) ? sample : 0)),
           },
           where: { ecgFileId_leadName: { ecgFileId: file.id, leadName: lead.lead } },
         }),
@@ -389,8 +401,9 @@ export async function reconstructCaseEcg(caseId: string, actorId: string, overri
     await persistCaseInterpretation(caseId, actorId, interpretationEngine, measurementEngine);
     await persistAiDiagnosis(caseId, actorId, aiDiagnosis, measurementEngine.heartRate);
     return getDigitalEcgForFile(file.id);
-  } catch {
-    return await waveformFallback(file, "Digital waveform reconstruction unavailable.");
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Clinical persistence failed after digitization.";
+    return await waveformFallback(file, message);
   }
 }
 

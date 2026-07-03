@@ -20,8 +20,8 @@ test.describe("LoginScreen stability", () => {
     await expect(page.getByText(/Welcome Back/i)).toBeVisible();
 
     for (let index = 0; index < 20; index += 1) {
-      await page.reload();
-      await expect(page.getByText(/Welcome Back/i)).toBeVisible({ timeout: 15_000 });
+      await page.reload({ waitUntil: "domcontentloaded" });
+      await expect(page.getByRole("button", { name: /sign in/i })).toBeVisible({ timeout: 15_000 });
     }
 
     await page.evaluate(async () => {

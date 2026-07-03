@@ -68,7 +68,11 @@ export function digitizeLeadsFromImage(input: {
     const samples = segment
       ? extractLeadTrace(input.data, input.width, input.height, segment, sampleCount)
       : Array.from({ length: sampleCount }, () => 0);
-    const scaled = samples.map((sample) => Number((sample * (10 / input.calibration.gainMmPerMv)).toFixed(5)));
+    const scaled = samples.map((sample) => {
+      const gain = input.calibration.gainMmPerMv ?? 10;
+      const value = Number((sample * (10 / gain)).toFixed(5));
+      return Number.isFinite(value) ? value : 0;
+    });
     return {
       durationSeconds: input.durationSeconds,
       lead,

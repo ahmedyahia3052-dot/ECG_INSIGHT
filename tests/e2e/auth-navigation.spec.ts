@@ -6,13 +6,13 @@ test.describe("enterprise authentication and navigation", () => {
     await uiLogin(page, "owner");
     await attachA11yScan(page, testInfo, "dashboard");
 
-    await page.getByRole("button", { name: /upload ecg/i }).first().click();
+    await page.getByRole("button", { name: /Upload ECG/i }).first().click();
     await expectPageReady(page, "Upload ECG");
-    await page.getByRole("button", { name: /open dashboard|dashboard/i }).first().click();
+    await page.getByRole("button", { name: /Open Dashboard|Dashboard/i }).first().click();
     await expectPageReady(page, /Enterprise Clinical Command Center|Dashboard/);
 
     await navigate(page, "/patients", "Patient Command Search");
-    await expect(page.getByRole("button", { name: /add patient|new patient/i }).first()).toBeVisible();
+    await expect(page.getByRole("button", { name: /Create Patient/i }).first()).toBeVisible();
 
     await navigate(page, "/ecg-cases", "ECG Case Management");
     await expect(page.getByRole("button", { name: /new ecg case/i }).first()).toBeVisible();
@@ -20,7 +20,7 @@ test.describe("enterprise authentication and navigation", () => {
     await navigate(page, "/reports", "Reports Workflow");
     await expect(page.getByRole("button", { name: /create report/i }).first()).toBeVisible();
 
-    await navigate(page, "/notifications", "Notification Center");
+    await navigate(page, "/notifications", /Alerts|Notifications/);
     await expect(page.getByPlaceholder("Search notifications...")).toBeVisible();
 
     await navigate(page, "/settings", "Workspace Settings");
@@ -30,7 +30,7 @@ test.describe("enterprise authentication and navigation", () => {
     await expect(page.getByRole("button", { name: /grant license/i })).toBeVisible();
 
     await page.getByRole("button", { name: "Notifications", exact: true }).click();
-    await expect(page.getByText("Notification Center").first()).toBeVisible();
+    await expect(page.getByText(/Alerts/i).first()).toBeVisible();
     await page.keyboard.press("Escape");
 
     await logout(page);
@@ -40,7 +40,7 @@ test.describe("enterprise authentication and navigation", () => {
     await uiLogin(page, "doctor");
     await page.evaluate(() => window.history.pushState({}, "", "/owner/licenses"));
     await page.reload();
-    await expect(page.getByText(/Welcome back|Owner access required|License Management/).first()).toBeVisible();
+    await expect(page.getByText(/Welcome Back|Owner access required|License Management/).first()).toBeVisible();
     await expect(page.getByRole("button", { name: /grant license/i })).toHaveCount(0);
   });
 });
