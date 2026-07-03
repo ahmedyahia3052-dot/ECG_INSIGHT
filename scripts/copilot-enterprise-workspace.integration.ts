@@ -162,8 +162,8 @@ async function main() {
       assert(Boolean(upload.body.attachment.documentType), "Upload must detect document type.");
       assert(Boolean(upload.body.attachment.originalName), "Upload must return the original filename.");
       assert((upload.body.attachment.sizeBytes ?? 0) > 0, "Upload must return file size.");
-      assert(!("analysisSummary" in upload.body.attachment), "Upload API must not expose internal analysis metadata.");
-      assert(!("confidence" in upload.body.attachment), "Upload API must not expose confidence metadata.");
+      assert(Boolean(upload.body.attachment.analysisSummary), "Upload must expose analysis summary for clinical pipeline UI.");
+      assert(typeof upload.body.attachment.confidence === "number", "Upload must expose confidence for low-OCR warnings.");
     }
 
     const firstQuestion = "Interpret this ECG showing irregular rhythm and AF";

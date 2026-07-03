@@ -1,6 +1,7 @@
 import type { EngineInput, EngineResult } from "../engine/types";
 import { CLINICAL_AI_ENGINE_VERSION } from "../engine/types";
 import type { ConversationIntent } from "../engine/v2/conversation-intent";
+import { appendClinicalSafetyDisclaimer } from "./attachment-context";
 import { CoreConversationManager } from "./conversation-manager";
 import { IntentUnderstanding } from "./intent-understanding";
 import { MemoryManager } from "./memory-manager";
@@ -86,9 +87,11 @@ export async function runClinicalAiCore(
     voiceMode: input.voiceMode,
   });
 
+  const content = appendClinicalSafetyDisclaimer(llm.content.trim());
+
   return {
     communicationIntent,
-    content: llm.content.trim(),
+    content,
     contextState: snapshot.contextState,
     intent,
     knowledgeHits: llm.knowledgeHits,
@@ -129,9 +132,9 @@ export function toCoreEngineResult(
       entityMemory: pipeline.contextState.entityMemory,
       hasActiveCase: Boolean(input.chatInput.caseId),
       hasActivePatient: Boolean(input.chatInput.patientId),
-      hasUploadedEcg: false,
-      hasUploadedFiles: pipeline.memoryState.hasUploadedFiles,
-      hasUploadedImages: false,
+      hasUploadedEcg: input.attachments.some((item) => item.kind === "ecg" || /ecg|ekg|rhythm|holter|stress/i.test(item.documentType ?? "")),
+      hasUploadedFiles: input.attachments.length > 0 || pipeline.memoryState.hasUploadedFiles,
+      hasUploadedImages: input.attachments.some((item) => item.kind === "image" || item.kind === "camera"),
       resolvedQuestion: pipeline.intent.resolvedQuestion,
       topicStack: pipeline.memoryState.topicStack,
     },

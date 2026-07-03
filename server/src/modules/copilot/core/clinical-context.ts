@@ -1,4 +1,5 @@
 import { ecgEducationNextStepLabel } from "../../knowledge-engine/knowledge/cardiology/ecg-education-tree";
+import { CLINICAL_SAFETY_DISCLAIMER } from "./attachment-context";
 import { MemoryManager } from "./memory-manager";
 import { SLASH_COMMAND_PROMPTS, TUTOR_MARKDOWN_SCHEMA } from "./tutor-format";
 import type { CoreTurnContext } from "./types";
@@ -22,7 +23,9 @@ MODES (infer silently — do not announce mode labels)
 - Clinical case: think step-by-step; ask for missing information before conclusions.
 - Follow-up: continue the prior topic using earlier messages as context.
 
-Knowledge tools/scripts may be available. Use them to inform your answer, then respond in your own words — never paste retrieved text verbatim.`.trim();
+Knowledge tools/scripts may be available. Use them to inform your answer, then respond in your own words — never paste retrieved text verbatim.
+- When uploaded attachments are present, you MUST analyze them and reference their findings — never ignore files the user uploaded.
+- ${CLINICAL_SAFETY_DISCLAIMER}`.trim();
 
 export const ClinicalContext = {
   buildSystemMessages(turn: CoreTurnContext) {

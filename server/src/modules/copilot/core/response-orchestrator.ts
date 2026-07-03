@@ -3,6 +3,7 @@ import type { ApiMessage } from "../v3/llm-provider";
 import { runLlmWithTools } from "../v3/llm-provider";
 import { KnowledgeService } from "../../knowledge-engine";
 import { ecgEducationNextStepLabel } from "../../knowledge-engine/knowledge/cardiology/ecg-education-tree";
+import { buildAttachmentContextBlock, formatClinicalContextBlock } from "./attachment-context";
 import { ClinicalContext } from "./clinical-context";
 import type { CorePipelineDeps, CoreStreamCallbacks, CoreTurnContext } from "./types";
 
@@ -82,12 +83,34 @@ async function resolveKnowledgeContext(turn: CoreTurnContext): Promise<{ block: 
 export const ResponseOrchestrator = {
   async generate(
     turn: CoreTurnContext,
-    _deps: CorePipelineDeps,
+    deps: CorePipelineDeps,
     callbacks: CoreStreamCallbacks = {},
   ) {
     const systemMessages = ClinicalContext.buildSystemMessages(turn);
     const historyMessages = buildConversationMessages(turn.input.memory, turn.input.question);
     const messages: ApiMessage[] = [...systemMessages, ...historyMessages];
+
+    if (turn.input.attachments.length) {
+      callbacks.onStatus?.("Reviewing uploaded attachments...");
+      const attachmentBlock = buildAttachmentContextBlock(turn.input.attachments);
+      if (attachmentBlock) {
+        messages.push({ content: attachmentBlock, role: "system" });
+      }
+    }
+
+    const needsClinicalContext = Boolean(
+      turn.input.chatInput.patientId
+      || turn.input.chatInput.caseId
+      || turn.intent.allowPatientTools,
+    );
+    if (needsClinicalContext) {
+      callbacks.onStatus?.("Loading patient context...");
+      const clinical = await deps.retrieveClinicalContext(turn.input.chatInput);
+      const clinicalBlock = formatClinicalContextBlock(clinical);
+      if (clinicalBlock) {
+        messages.push({ content: clinicalBlock, role: "system" });
+      }
+    }
 
     if (turn.intent.allowKnowledgeTools || turn.intent.tutorMode || turn.memoryState.educationalMode || turn.intent.slashCommand) {
       callbacks.onStatus?.("Reviewing clinical information...");

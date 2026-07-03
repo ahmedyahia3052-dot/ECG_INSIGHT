@@ -47,6 +47,7 @@ export interface CopilotAttachment {
   mimeType: string;
   originalName: string;
   patientId?: string;
+  pipelineStages?: Array<{ durationMs?: number; message?: string; stage: string; status: string }>;
   recommendations?: string[];
   sizeBytes: number;
   storedName: string;

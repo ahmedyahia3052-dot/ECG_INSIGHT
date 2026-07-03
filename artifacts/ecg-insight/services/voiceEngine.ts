@@ -47,8 +47,9 @@ export type VoiceEngineState = {
 
 export type WhisperTranscriber = (audio: Blob, mimeType: string) => Promise<string>;
 
-const SILENCE_MS = 1800;
+const SILENCE_MS = 2400;
 const SPEECH_TIMEOUT_MS = 30_000;
+const MIN_RECORDING_MS = 900;
 
 function punctuate(text: string) {
   const cleaned = text.replace(/\s+/g, " ").trim();
@@ -92,6 +93,8 @@ export class ClinicalVoiceEngine {
   private onlineHandler: (() => void) | null = null;
   private offlineHandler: (() => void) | null = null;
   private deviceChangeHandler: (() => void) | null = null;
+  private recordingStartedAt = 0;
+  private preferredLang = "en-US";
   private state: VoiceEngineState = {
     muted: false,
     online: typeof navigator !== "undefined" ? navigator.onLine : true,
@@ -101,6 +104,10 @@ export class ClinicalVoiceEngine {
     status: "idle",
     voiceMode: false,
   };
+
+  setLanguage(lang: "en-US" | "ar-SA") {
+    this.preferredLang = lang;
+  }
 
   constructor(callbacks: VoiceEngineCallbacks, whisperTranscriber?: WhisperTranscriber) {
     this.callbacks = callbacks;
@@ -169,6 +176,7 @@ export class ClinicalVoiceEngine {
     this.audioChunks = [];
     this.finishingRecording = false;
     this.utteranceFinalized = false;
+    this.recordingStartedAt = Date.now();
     this.setStatus("listening");
 
     const granted = await this.requestPermission();
@@ -190,12 +198,14 @@ export class ClinicalVoiceEngine {
         const recognition = new Recognition();
         recognition.continuous = true;
         recognition.interimResults = true;
-        recognition.lang = "en-US";
+        recognition.lang = this.preferredLang;
         recognition.onresult = (event) => this.handleSpeechResult(event);
         recognition.onerror = (event) => {
           if (event.error === "not-allowed") {
             this.callbacks.onPermissionDenied();
-          } else if (event.error !== "aborted" && event.error !== "no-speech") {
+          } else if (event.error === "no-speech") {
+            // Wait for MediaRecorder fallback instead of surfacing immediately.
+          } else if (event.error !== "aborted") {
             this.callbacks.onError("Live speech recognition interrupted. Falling back to server transcription.");
           }
         };
@@ -411,14 +421,25 @@ export class ClinicalVoiceEngine {
           return;
         }
       } catch (error) {
-        this.callbacks.onError(error instanceof Error ? error.message : "Server transcription failed.");
+        const message = error instanceof Error ? error.message : "Server transcription failed.";
+        if (!message.includes("503") && !message.includes("unavailable")) {
+          this.callbacks.onError(message);
+        }
       }
+    }
+
+    const recordingDuration = Date.now() - this.recordingStartedAt;
+    if (recordingDuration < MIN_RECORDING_MS && this.state.voiceMode) {
+      this.setStatus("idle");
+      this.callbacks.onRecordingEnd();
+      this.finishingRecording = false;
+      return;
     }
 
     if (reason === "speech-timeout") {
       this.callbacks.onError("Speech timeout. Try speaking again.");
-    } else if (!liveTranscript) {
-      this.callbacks.onError("No speech detected.");
+    } else if (!liveTranscript && !this.state.voiceMode) {
+      this.callbacks.onError("No speech detected. Check microphone permissions and try again.");
     }
     this.setStatus("idle");
     this.callbacks.onRecordingEnd();

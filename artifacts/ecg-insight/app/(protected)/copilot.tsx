@@ -252,7 +252,15 @@ export function CopilotWorkspaceScreen({ routeConversationId }: { routeConversat
         setAttachmentPreviews((current) => ({ ...current, [payload.attachment.id]: previewUrl }));
       }
       setAttachments((current) => current.concat(payload.attachment));
-      showActionNotice(`${payload.attachment.originalName} attached.`);
+      const stageSummary = payload.attachment.pipelineStages
+        ?.filter((item) => item.status === "completed" || item.status === "warning")
+        .map((item) => item.stage.replace(/_/g, " "))
+        .slice(-3)
+        .join(" → ");
+      const notice = payload.attachment.analysisSummary
+        ? `${payload.attachment.originalName}: ${payload.attachment.analysisSummary}${stageSummary ? ` (${stageSummary})` : ""}`
+        : `${payload.attachment.originalName} attached.`;
+      showActionNotice(notice);
     } catch (error) {
       showActionNotice(error instanceof Error ? error.message : "Upload failed.", "error");
     } finally {
@@ -702,7 +710,9 @@ export function CopilotWorkspaceScreen({ routeConversationId }: { routeConversat
             {uploadingFiles.length ? (
               <View style={styles.uploadProgress}>
                 <Feather name="loader" size={13} color={medicalTheme.primary} />
-                <Text style={styles.uploadProgressText}>Uploading {uploadingFiles.join(", ")}...</Text>
+                <Text style={styles.uploadProgressText}>
+                  Pipeline: Uploading → Validating → OCR → Classification → Analysis — {uploadingFiles.join(", ")}
+                </Text>
               </View>
             ) : null}
             <View style={styles.commandRow}>
@@ -874,13 +884,19 @@ function MiniAction({ active, disabled, icon, label, onPress, tone }: { active?:
 function AttachmentChip({ attachment, onRemove, previewUrl }: { attachment: CopilotAttachment; onRemove?: () => void; previewUrl?: string }) {
   const originalName = safeString(attachment?.originalName, "Uploaded file");
   const attachmentKind = safeString(attachment?.kind, "file");
+  const documentType = safeString(attachment?.documentType, "").replace(/_/g, " ");
+  const confidence = typeof attachment?.confidence === "number" ? `${Math.round(attachment.confidence * 100)}% confidence` : undefined;
+  const summary = attachment?.analysisSummary?.slice(0, 120);
   return (
     <View style={styles.attachmentChip}>
       {previewUrl ? <Image accessibilityLabel={`${originalName} preview`} source={{ uri: previewUrl }} style={styles.attachmentPreview} /> : null}
       <Feather name={attachmentKind === "camera" ? "camera" : attachmentKind === "image" ? "image" : attachmentKind === "ecg" ? "activity" : attachmentKind === "echo" ? "heart" : attachmentKind === "labs" ? "clipboard" : "paperclip"} size={13} color={medicalTheme.primary} />
       <View style={styles.attachmentChipText}>
         <Text numberOfLines={1} style={styles.attachmentName}>{originalName}</Text>
-        <Text style={styles.attachmentMeta}>{formatFileSize(attachment?.sizeBytes)}</Text>
+        <Text style={styles.attachmentMeta}>
+          {[documentType, confidence, formatFileSize(attachment?.sizeBytes)].filter(Boolean).join(" • ")}
+        </Text>
+        {summary ? <Text numberOfLines={2} style={styles.attachmentSummary}>{summary}</Text> : null}
       </View>
       {onRemove ? (
         <Pressable accessibilityLabel={`Remove ${originalName}`} accessibilityRole="button" onPress={onRemove} style={styles.attachmentRemove}>

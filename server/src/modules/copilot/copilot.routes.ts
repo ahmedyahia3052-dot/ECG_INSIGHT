@@ -20,6 +20,7 @@ import {
 } from "./engine";
 import type { V3StreamCallbacks } from "./v3/types";
 import { transcribeWithWhisper } from "./voice-transcription.service";
+import { processCopilotAttachment } from "./copilot-attachment-pipeline.service";
 import { parseCopilotProviderSettings } from "./intent-pipeline";
 
 export const copilotRouter = Router();
@@ -330,21 +331,34 @@ function serializeAttachment(attachment: {
   mimeType: string;
   originalName: string;
   patientId: string | null;
+  pipelineStages?: Prisma.JsonValue | null;
   recommendations?: string[];
   sizeBytes: number;
   storedName: string;
   warnings?: string[];
 }) {
+  const medicalAnalysis = attachment.medicalAnalysis && typeof attachment.medicalAnalysis === "object" && !Array.isArray(attachment.medicalAnalysis)
+    ? attachment.medicalAnalysis as Record<string, unknown>
+    : {};
+  const pipelineStages = medicalAnalysis.pipelineStages ?? attachment.pipelineStages ?? undefined;
+
   return {
+    analysisSummary: attachment.analysisSummary ?? undefined,
+    confidence: attachment.confidence ?? undefined,
     conversationId: attachment.conversationId ?? undefined,
     createdAt: attachment.createdAt.toISOString(),
     documentType: attachment.documentType ?? undefined,
     downloadUrl: `/api/copilot/attachments/${attachment.id}/download`,
+    extractedText: attachment.extractedText?.slice(0, 1200) ?? undefined,
     id: attachment.id,
     kind: attachment.kind,
+    medicalAnalysis: attachment.medicalAnalysis ?? undefined,
     mimeType: attachment.mimeType,
     originalName: attachment.originalName,
+    pipelineStages,
+    recommendations: attachment.recommendations ?? [],
     sizeBytes: attachment.sizeBytes,
+    warnings: attachment.warnings ?? [],
   };
 }
 
@@ -709,7 +723,17 @@ copilotRouter.post("/attachments", requireRole("DOCTOR"), uploadAttachment.singl
     if (body.patientId) assertResourceAccess(await canAccessPatient(body.patientId, req.auth!));
     if (body.caseId) assertResourceAccess(await canAccessCase(body.caseId, req.auth!));
     if (body.conversationId) await conversationForUser(body.conversationId, req.auth!.id);
-    const analysis = analyzeUploadedAttachment(req.file, body.kind);
+    const analysis = await processCopilotAttachment({
+      filePath: req.file.path,
+      kind: body.kind,
+      mimeType: req.file.mimetype,
+      originalName: req.file.originalname,
+      sizeBytes: req.file.size,
+    });
+    const medicalAnalysis = {
+      ...analysis.medicalAnalysis,
+      pipelineStages: analysis.pipelineStages,
+    } as Prisma.InputJsonObject;
     const attachment = await prisma.copilotAttachment.create({
       data: {
         analysisSummary: analysis.analysisSummary,
@@ -719,7 +743,7 @@ copilotRouter.post("/attachments", requireRole("DOCTOR"), uploadAttachment.singl
         documentType: analysis.documentType,
         extractedText: analysis.extractedText,
         kind: body.kind,
-        medicalAnalysis: analysis.medicalAnalysis,
+        medicalAnalysis,
         mimeType: req.file.mimetype,
         originalName: req.file.originalname,
         patientId: body.patientId,
