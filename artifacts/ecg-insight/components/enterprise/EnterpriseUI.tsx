@@ -57,6 +57,7 @@ const NAV_ITEMS: NavItem[] = [
   { group: "WORKSPACE", href: "/profile", icon: "user", title: "Profile" },
   { group: "DEVELOPER", href: "/admin-dashboard", icon: "shield", minRole: "admin", title: "Admin Controls" },
   { group: "DEVELOPER", href: "/ecg-benchmark", icon: "bar-chart", minRole: "admin", title: "ECG Benchmark" },
+  { group: "DEVELOPER", href: "/audit-log", icon: "book-open", minRole: "admin", title: "Audit Trail" },
   { group: "DEVELOPER", href: "/billing-subscription", icon: "credit-card", minRole: "admin", title: "Subscription Controls" },
   { group: "DEVELOPER", href: "/owner/licenses", icon: "award", minRole: "super_admin", ownerOnly: true, title: "License Controls" },
 ];
@@ -65,6 +66,8 @@ const PAGE_TITLES: Record<string, { subtitle: string; title: string }> = {
   "/analytics": { subtitle: "Enterprise BI, trends, workload, and quality signals.", title: "Analytics" },
   "/admin-dashboard": { subtitle: "Administrative overview, users, subscriptions, and platform health.", title: "Admin Dashboard" },
   "/ecg-benchmark": { subtitle: "Clinical validation benchmark against PTB-XL, PhysioNet, and CPSC datasets.", title: "ECG Benchmark" },
+  "/audit-log": { subtitle: "Enterprise audit trail with actor, action, and old/new clinical values.", title: "Audit Trail" },
+  "/clinical-workspace/[caseId]": { subtitle: "Unified split-screen patient, ECG viewer, AI findings, measurements, notes, and timeline.", title: "Clinical Workspace" },
   "/billing-subscription": { subtitle: "Subscription plan, quota, billing, and license status.", title: "Billing & Subscription" },
   "/copilot": { subtitle: "Enterprise medical AI chat workspace with real conversation persistence.", title: "AI Clinical Copilot" },
   "/support": { subtitle: "Contact support and submit operational requests.", title: "Support" },

@@ -55,6 +55,9 @@ export default function EditPatientScreen() {
       notes: patient.notes,
       passportNumber: patient.passportNumber,
       phone: patient.phone,
+      previousCABG: patient.previousCABG,
+      previousMI: patient.previousMI,
+      previousPCI: patient.previousPCI,
       smokingStatus: patient.smokingStatus,
       status: patient.status,
       weightKg: patient.weightKg,
@@ -104,6 +107,11 @@ export default function EditPatientScreen() {
           <PatientField label="Cardiovascular History" name="cardiovascularHistory" setForm={setForm} value={form.cardiovascularHistory} />
           <PatientField label="Medications" name="medications" setForm={setForm} value={form.medications} />
           <PatientField label="Notes" name="notes" setForm={setForm} value={form.notes} />
+          <ToggleField label="Hypertension" name="hypertension" setForm={setForm} value={form.hypertension} />
+          <ToggleField label="Diabetes" name="diabetes" setForm={setForm} value={form.diabetes} />
+          <ToggleField label="Previous MI" name="previousMI" setForm={setForm} value={form.previousMI} />
+          <ToggleField label="Previous PCI" name="previousPCI" setForm={setForm} value={form.previousPCI} />
+          <ToggleField label="Previous CABG" name="previousCABG" setForm={setForm} value={form.previousCABG} />
         </View>
         <View style={styles.actions}>
           <PrimaryButton label="Cancel" onPress={() => router.back()} variant="outline" />
@@ -136,10 +144,35 @@ function PatientField({
   );
 }
 
+function ToggleField({
+  label,
+  name,
+  setForm,
+  value,
+}: {
+  label: string;
+  name: keyof Pick<PatientInput, "diabetes" | "hypertension" | "previousCABG" | "previousMI" | "previousPCI">;
+  setForm: React.Dispatch<React.SetStateAction<Partial<PatientInput>>>;
+  value?: boolean;
+}) {
+  return (
+    <View style={styles.toggleRow}>
+      <Text style={styles.toggleLabel}>{label}</Text>
+      <View style={styles.toggleActions}>
+        <PrimaryButton label="Yes" onPress={() => setForm((current) => ({ ...current, [name]: true }))} variant={value ? "primary" : "outline"} />
+        <PrimaryButton label="No" onPress={() => setForm((current) => ({ ...current, [name]: false }))} variant={value === false ? "primary" : "outline"} />
+      </View>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   actions: { flexDirection: "row", flexWrap: "wrap", gap: 10, justifyContent: "flex-end" },
   error: { color: medicalTheme.critical, fontSize: 13, fontWeight: "800" },
   form: { gap: 16 },
   grid: { flexDirection: "row", flexWrap: "wrap", gap: 12 },
   muted: { color: medicalTheme.muted, fontSize: 13, fontWeight: "700" },
+  toggleActions: { flexDirection: "row", gap: 8 },
+  toggleLabel: { color: medicalTheme.text, fontSize: 13, fontWeight: "800", marginBottom: 6 },
+  toggleRow: { minWidth: 220 },
 });

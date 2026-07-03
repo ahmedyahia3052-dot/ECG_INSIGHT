@@ -69,10 +69,12 @@ export interface ApiECGCase {
   aiDiagnosis?: string;
   aiStatus: string;
   aiModelVersion?: string;
+  assignedDoctor?: { email: string; id: string; name: string; role: string } | null;
   assignedDoctorId?: string;
   caseId: string;
   caseNumber?: string;
   clinicalComments?: string;
+  clinicalIndication?: string;
   clinicalNotes?: string;
   confidence?: number;
   confidenceScore?: number;
@@ -85,11 +87,13 @@ export interface ApiECGCase {
   explainabilityData?: unknown;
   finalizedAt?: string;
   heartRate?: number;
+  hospitalName?: string;
   id: string;
   imagePath?: string;
   interpretation?: string;
   originalFileUrl?: string;
   patient: ApiPatient;
+  patientId: string;
   pdfPath?: string;
   preprocessedImagePath?: string;
   prInterval?: number;
@@ -100,6 +104,7 @@ export interface ApiECGCase {
   recommendations?: string;
   reportCount?: number;
   reviewedAt?: string;
+  reviewedBy?: { email: string; id: string; name: string; role: string } | null;
   reviewedById?: string;
   rhythm?: string;
   severity?: "normal" | "abnormal" | "critical";
@@ -347,6 +352,7 @@ export async function createCaseRevision(accessToken: string, caseId: string) {
 }
 
 export async function reviewCase(accessToken: string, caseId: string, input: {
+  aiReviewAction?: "accept_ai" | "modify" | "reject_ai";
   clinicalComments?: string;
   doctorDiagnosis?: string;
   recommendations?: string;

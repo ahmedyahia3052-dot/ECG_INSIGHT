@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import React from "react";
+import React, { useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
 
 import { Badge, Card, EmptyState, formatDate, medicalTheme, PageSection, patientDisplayName, PrimaryButton, SectionHeader } from "@/components/enterprise/EnterpriseUI";
@@ -10,9 +10,10 @@ import { LongitudinalECGPanel } from "@/components/clinical/LongitudinalECGPanel
 import { EcgProViewer } from "@/components/ecg/EcgProViewer";
 import { useAuth } from "@/context/AuthContext";
 import { analyzeCase, getAIExplainability, getAIResult } from "@/services/ai";
-import { approveCase, createCaseRevision, getCase, rejectCase, updateCaseStatus } from "@/services/clinical";
+import { approveCase, createCaseRevision, getCase, getPatientEcgHistory, rejectCase, updateCaseStatus } from "@/services/clinical";
 import { getDigitalECG } from "@/services/ecgProcessing";
 import { generateReport } from "@/services/reports";
+import { API_URL } from "@/services/api";
 
 export default function EcgCaseDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -61,7 +62,21 @@ export default function EcgCaseDetailScreen() {
     onSuccess: (payload) => router.push(`/ecg-cases/${payload.case.id}` as never),
   });
 
+  const [showAdvancedPanels, setShowAdvancedPanels] = useState(false);
   const ecgCase = caseQuery.data?.case;
+  const historyQuery = useQuery({
+    enabled: !!token && !!ecgCase?.patientId,
+    queryFn: () => getPatientEcgHistory(token!, ecgCase!.patientId),
+    queryKey: ["enterprise-ecg-case-history", token, ecgCase?.patientId],
+    retry: false,
+  });
+  const previousImageUrl = React.useMemo(() => {
+    const cases = historyQuery.data?.cases ?? [];
+    const prior = cases.find((item) => item.id !== ecgCase?.id);
+    const path = prior?.imagePath ?? prior?.ecgImage;
+    if (!path) return undefined;
+    return path.startsWith("http") ? path : `${API_URL.replace(/\/api$/, "")}${path}`;
+  }, [ecgCase?.id, historyQuery.data?.cases]);
   const analysis = analysisQuery.data?.analysis;
   const explainability = explainabilityQuery.data?.explainability;
   const digitalEcg = digitalEcgQuery.data?.digitalEcg;
@@ -95,15 +110,17 @@ export default function EcgCaseDetailScreen() {
           <PrimaryButton disabled={!canApproveReject} label="Reject" onPress={() => rejectMutation.mutate()} variant="danger" />
           <PrimaryButton disabled={!canFinalize} label="Finalize" onPress={() => finalizeMutation.mutate()} variant="outline" />
           <PrimaryButton disabled={readOnly} label="Generate Report" onPress={() => reportMutation.mutate()} variant="outline" />
+          <PrimaryButton label="Clinical Workspace" onPress={() => router.push(`/clinical-workspace/${ecgCase.id}` as never)} />
+          <PrimaryButton label={showAdvancedPanels ? "Hide Advanced Panels" : "Load Advanced Panels"} onPress={() => setShowAdvancedPanels((value) => !value)} variant="outline" />
           {readOnly || ecgCase.status === "approved" || ecgCase.status === "rejected" ? <PrimaryButton label="Create New Revision" onPress={() => revisionMutation.mutate()} variant="outline" /> : null}
         </View>
       </Card>
 
-      <EcgProViewer analysis={analysis} digitalEcg={digitalEcg} ecgCase={ecgCase} explainability={explainability} />
+      <EcgProViewer analysis={analysis} digitalEcg={digitalEcg} ecgCase={ecgCase} explainability={explainability} previousImageUrl={previousImageUrl} />
 
-      {token ? <CDSSDecisionPanel accessToken={token} caseId={ecgCase.id} /> : null}
+      {showAdvancedPanels && token ? <CDSSDecisionPanel accessToken={token} caseId={ecgCase.id} /> : null}
 
-      {token ? <LongitudinalECGPanel accessToken={token} caseId={ecgCase.id} patientId={ecgCase.patient.id} /> : null}
+      {showAdvancedPanels && token ? <LongitudinalECGPanel accessToken={token} caseId={ecgCase.id} patientId={ecgCase.patient.id} /> : null}
 
       {token ? <CaseCollaborationPanel accessToken={token} caseId={ecgCase.id} defaultAssigneeId={ecgCase.assignedDoctorId} /> : null}
 

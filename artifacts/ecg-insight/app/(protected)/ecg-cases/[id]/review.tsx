@@ -159,6 +159,32 @@ export default function EcgCaseReviewScreen() {
           {severities.map((item) => <PrimaryButton disabled={readOnly} key={item} label={item} onPress={() => setSeverity(item)} variant={severity === item ? "primary" : "outline"} />)}
         </View>
         <View style={styles.actions}>
+          <PrimaryButton
+            disabled={readOnly}
+            label="Accept AI Diagnosis"
+            onPress={() => reviewCase(token!, id, {
+              aiReviewAction: "accept_ai",
+              clinicalComments,
+              doctorDiagnosis: ecgCase.aiDiagnosis ?? doctorDiagnosis,
+              recommendations,
+              severity,
+            }).then(async () => { setMessage("AI diagnosis accepted."); await invalidate(); })}
+            variant="outline"
+          />
+          <PrimaryButton
+            disabled={readOnly}
+            label="Modify Diagnosis"
+            onPress={() => reviewCase(token!, id, { aiReviewAction: "modify", clinicalComments, doctorDiagnosis, recommendations, severity }).then(async () => { setMessage("Diagnosis modified."); await invalidate(); })}
+            variant="outline"
+          />
+          <PrimaryButton
+            disabled={readOnly}
+            label="Reject AI Diagnosis"
+            onPress={() => reviewCase(token!, id, { aiReviewAction: "reject_ai", clinicalComments, doctorDiagnosis, recommendations, severity }).then(async () => { setMessage("AI diagnosis rejected."); await invalidate(); })}
+            variant="danger"
+          />
+        </View>
+        <View style={styles.actions}>
           <PrimaryButton disabled={readOnly || saveMutation.isPending} label="Save Review" onPress={() => saveMutation.mutate()} variant="outline" />
           <PrimaryButton disabled={readOnly || approveMutation.isPending} label="Approve" onPress={() => approveMutation.mutate()} />
           <PrimaryButton disabled={readOnly || rejectMutation.isPending} label="Reject" onPress={() => rejectMutation.mutate()} variant="danger" />

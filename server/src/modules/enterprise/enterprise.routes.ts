@@ -5,6 +5,7 @@ import { requireAuth, requireRole } from "../../middleware/auth";
 import { AppError } from "../../middleware/error";
 import { validateBody } from "../../middleware/validate";
 import { serializePatient } from "../../utils/clinical";
+import { enterpriseClinicalDashboard } from "./enterprise-dashboard.service";
 import {
   cardiacHistorySchema,
   childUnitSchema,
@@ -19,6 +20,14 @@ import {
 export const enterpriseRouter = Router();
 
 enterpriseRouter.use(requireAuth);
+
+enterpriseRouter.get("/clinical-dashboard", async (req, res, next) => {
+  try {
+    res.json({ dashboard: await enterpriseClinicalDashboard(req.auth!.id) });
+  } catch (error) {
+    next(error);
+  }
+});
 
 const procedureTypeMap = {
   ablation: "ABLATION",

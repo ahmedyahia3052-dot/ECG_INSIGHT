@@ -8,6 +8,7 @@ import { Badge, Card, EmptyState, formatDate, medicalTheme, PageSection, patient
 import { useAuth } from "@/context/AuthContext";
 import { listNotifications } from "@/services/collaboration";
 import { listCases, listPatients } from "@/services/clinical";
+import { getEnterpriseClinicalDashboard } from "@/services/enterpriseClinical";
 import { listReports } from "@/services/reports";
 import { getMySubscription } from "@/services/subscriptions";
 import { safeArray } from "@/utils/collections";
@@ -62,6 +63,13 @@ export default function DashboardScreen() {
     retry: false,
   });
 
+  const enterpriseQuery = useQuery({
+    enabled: !!token,
+    queryFn: () => getEnterpriseClinicalDashboard(token!),
+    queryKey: ["enterprise-clinical-dashboard", token],
+    retry: false,
+  });
+
   const cases = safeArray(casesQuery.data?.cases);
   const patients = safeArray(patientsQuery.data?.patients);
   const reports = safeArray(reportsQuery.data?.reports);
@@ -69,7 +77,9 @@ export default function DashboardScreen() {
   const criticalCases = cases.filter((item) => item.priority === "critical").length;
   const abnormalCases = cases.filter((item) => item.finalDiagnosis || item.priority === "high").length;
   const pendingReports = reports.filter((item) => item.status === "draft" || item.status === "under_review").length;
-  const loadingKpis = casesQuery.isLoading || patientsQuery.isLoading || reportsQuery.isLoading;
+  const enterprise = enterpriseQuery.data?.dashboard;
+  const pendingReviews = enterprise?.pendingReviews ?? cases.filter((item) => item.status === "ai_completed" || item.status === "under_review").length;
+  const loadingKpis = casesQuery.isLoading || patientsQuery.isLoading || reportsQuery.isLoading || enterpriseQuery.isLoading;
   const subscriptionLabel = subscriptionQuery.data?.lifetimeAccess.granted
     ? "Lifetime Premium"
     : subscriptionQuery.data?.plan.name ?? "Subscription Active";
@@ -107,7 +117,7 @@ export default function DashboardScreen() {
         <KpiCard icon="activity" label="Total ECG Analyses" loading={loadingKpis} spark={[3, 5, 4, 8, 7, 10]} trend="+12%" value={String(casesQuery.data?.total ?? cases.length)} />
         <KpiCard icon="alert-triangle" label="Critical Cases" loading={loadingKpis} spark={[1, 2, 1, 3, 2, criticalCases + 1]} tone="critical" trend="-4%" value={String(criticalCases)} />
         <KpiCard icon="trending-up" label="Abnormal ECGs" loading={loadingKpis} spark={[2, 3, 5, 4, 6, abnormalCases + 1]} tone="warning" trend="+8%" value={String(abnormalCases)} />
-        <KpiCard icon="file-text" label="Pending Reports" loading={loadingKpis} spark={[4, 3, 4, 2, 3, pendingReports + 1]} tone="warning" trend="+3%" value={String(pendingReports)} />
+        <KpiCard icon="file-text" label="Pending Reviews" loading={loadingKpis} spark={[4, 3, 4, 2, 3, pendingReviews + 1]} tone="warning" trend="+3%" value={String(pendingReviews)} />
         <KpiCard icon="users" label="Active Patients" loading={loadingKpis} spark={[6, 7, 8, 8, 9, patients.length + 1]} tone="success" trend="+15%" value={String(patientsQuery.data?.total ?? patients.length)} />
         <KpiCard icon="bar-chart-2" label="Monthly Growth" loading={loadingKpis} spark={[2, 4, 5, 7, 9, 12]} tone="success" trend="+12%" value="+12%" />
       </View>
@@ -154,11 +164,13 @@ export default function DashboardScreen() {
         </Card>
 
         <Card style={styles.panel}>
-          <SectionHeader title="AI Performance" subtitle="Clinical AI quality indicators." />
+          <SectionHeader title="AI Performance" subtitle="Live metrics from clinical validation benchmark runs." />
           <View style={styles.metricList}>
-            <Metric label="Accuracy" value="95%" />
-            <Metric label="Sensitivity" value="97%" />
-            <Metric label="Specificity" value="93%" />
+            <Metric label="Accuracy" value={enterprise?.aiMetrics.accuracy === null || enterprise?.aiMetrics.accuracy === undefined ? "Pending validation" : `${Math.round((enterprise.aiMetrics.accuracy ?? 0) * 100)}%`} />
+            <Metric label="Precision" value={enterprise?.aiMetrics.precision === null || enterprise?.aiMetrics.precision === undefined ? "Pending validation" : `${Math.round((enterprise.aiMetrics.precision ?? 0) * 100)}%`} />
+            <Metric label="Recall" value={enterprise?.aiMetrics.recall === null || enterprise?.aiMetrics.recall === undefined ? "Pending validation" : `${Math.round((enterprise.aiMetrics.recall ?? 0) * 100)}%`} />
+            <Metric label="Avg Processing" value={`${enterprise?.avgProcessingTimeMs ?? 0} ms`} />
+            <Metric label="AI Engine" value={enterprise?.modelOnline ? "Online" : "Offline"} />
           </View>
         </Card>
 
@@ -172,10 +184,10 @@ export default function DashboardScreen() {
         <Card style={styles.panel}>
           <SectionHeader title="Today's Clinical Summary" subtitle="Operational snapshot for clinical leadership." />
           <View style={styles.summaryGrid}>
-            <Metric label="Cases Reviewed" value={String(cases.filter((item) => item.status === "reviewed" || item.status === "finalized").length)} />
-            <Metric label="Critical Findings" value={String(criticalCases)} />
-            <Metric label="Reports Signed" value={String(reports.filter((item) => item.status === "signed").length)} />
-            <Metric label="Active Patients" value={String(patients.length)} />
+            <Metric label="Today's ECGs" value={String(enterprise?.todaysEcgs ?? cases.length)} />
+            <Metric label="Critical Findings" value={String(enterprise?.criticalEcgs ?? criticalCases)} />
+            <Metric label="Pending Reviews" value={String(pendingReviews)} />
+            <Metric label="Reports Pending" value={String(pendingReports)} />
           </View>
         </Card>
       </View>

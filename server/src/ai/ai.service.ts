@@ -245,6 +245,13 @@ async function completeAnalysis(analysisId: string, actorId: string) {
         patientId: queued.case.patientId,
       },
     });
+    await createNotification({
+      caseId: queued.caseId,
+      message: `AI analysis failed for case ${queued.case.caseId}. Manual review or reprocessing required.`,
+      targetRole: "DOCTOR",
+      title: "ECG Processing Failed",
+      type: "CRITICAL",
+    });
     return failed;
   } finally {
     activeJobs.delete(analysisId);

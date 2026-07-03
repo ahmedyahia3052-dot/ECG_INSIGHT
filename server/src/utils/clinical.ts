@@ -289,6 +289,8 @@ export function serializeCase(
     reportCount: ecgCase.reports?.length ?? 0,
     updatedAt: ecgCase.updatedAt.toISOString(),
     uploadDate: ecgCase.uploadDate.toISOString(),
+    hospitalName: ecgCase.patient.company ?? undefined,
+    clinicalIndication: ecgCase.clinicalNotes ?? ecgCase.clinicalComments ?? undefined,
     uploadedBy: ecgCase.uploadedBy
       ? {
           email: ecgCase.uploadedBy.email,
@@ -324,6 +326,8 @@ export function serializeAuditLog(log: AuditLog) {
     id: log.id,
     message: log.message,
     metadata: log.metadata,
+    newValue: log.newValue ?? undefined,
+    oldValue: log.oldValue ?? undefined,
     patientId: log.patientId ?? undefined,
   };
 }

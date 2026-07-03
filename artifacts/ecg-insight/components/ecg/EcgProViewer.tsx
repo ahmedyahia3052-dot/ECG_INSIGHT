@@ -35,11 +35,13 @@ export function EcgProViewer({
   digitalEcg,
   ecgCase,
   explainability,
+  previousImageUrl,
 }: {
   analysis?: AIAnalysisResult | null;
   digitalEcg?: DigitalEcg | null;
   ecgCase: ApiECGCase;
   explainability?: AIExplainability | null;
+  previousImageUrl?: string;
 }) {
   const [mode, setMode] = useState<ViewerMode>("original");
   const [zoom, setZoom] = useState(1);
@@ -175,7 +177,7 @@ export function EcgProViewer({
           <SectionHeader title="ECG Comparison Mode" subtitle="Current ECG versus previous ECG side-by-side with clinical change highlights." />
           <View style={styles.comparisonGrid}>
             <ComparisonPane title="Current ECG" url={originalUrl} />
-            <ComparisonPane title="Previous ECG" url={undefined} />
+            <ComparisonPane title="Previous ECG" url={previousImageUrl} />
           </View>
           <View style={styles.changePanel}>
             <Badge label="Change Review" tone="warning" />

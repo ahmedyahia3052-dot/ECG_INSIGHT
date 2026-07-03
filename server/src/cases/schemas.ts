@@ -93,6 +93,7 @@ export const updateStatusSchema = z.object({
 });
 
 export const reviewCaseSchema = z.object({
+  aiReviewAction: z.enum(["accept_ai", "modify", "reject_ai"]).optional(),
   clinicalComments: z.string().trim().max(3000).optional(),
   doctorDiagnosis: z.string().trim().max(500).optional(),
   recommendations: z.string().trim().max(3000).optional(),

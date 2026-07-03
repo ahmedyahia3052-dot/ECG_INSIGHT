@@ -11,12 +11,28 @@ auditRouter.get("/", requireRole("ADMIN"), async (req, res, next) => {
   try {
     const entityType = typeof req.query.entityType === "string" ? req.query.entityType : undefined;
     const patientId = typeof req.query.patientId === "string" ? req.query.patientId : undefined;
+    const caseId = typeof req.query.caseId === "string" ? req.query.caseId : undefined;
     const logs = await prisma.auditLog.findMany({
+      include: { actor: { select: { email: true, id: true, name: true, role: true } } },
       orderBy: { createdAt: "desc" },
       take: 200,
-      where: { entityType, patientId },
+      where: { caseId, entityType, patientId },
     });
-    res.json({ logs });
+    res.json({
+      logs: logs.map((log) => ({
+        action: log.action,
+        actor: log.actor ? { email: log.actor.email, id: log.actor.id, name: log.actor.name, role: log.actor.role } : null,
+        actorId: log.actorId,
+        caseId: log.caseId ?? undefined,
+        createdAt: log.createdAt.toISOString(),
+        id: log.id,
+        message: log.message,
+        metadata: log.metadata,
+        newValue: log.newValue ?? undefined,
+        oldValue: log.oldValue ?? undefined,
+        patientId: log.patientId ?? undefined,
+      })),
+    });
   } catch (error) {
     next(error);
   }

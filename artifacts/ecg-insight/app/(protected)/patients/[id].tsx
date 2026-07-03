@@ -223,7 +223,7 @@ function OverviewTab({ abnormalCases, cases, criticalCases, patient, pendingRevi
 }
 
 function EcgCasesTab({ cases, onGenerateReport, onNew, onOpen, onReview }: {
-  cases: Array<{ aiDiagnosis?: string; aiModelVersion?: string; aiSeverity?: string; caseId: string; caseNumber?: string; confidenceScore?: number; explainabilityData?: unknown; finalDiagnosis?: string; heartRate?: number; id: string; priority: string; rhythm?: string; severity?: string; status: string; uploadDate: string }>;
+  cases: Array<{ aiDiagnosis?: string; aiModelVersion?: string; aiSeverity?: string; assignedDoctor?: { name?: string } | null; caseId: string; caseNumber?: string; clinicalIndication?: string; confidenceScore?: number; doctorDiagnosis?: string; ecgType?: string; explainabilityData?: unknown; finalDiagnosis?: string; heartRate?: number; hospitalName?: string; id: string; priority: string; reviewedBy?: { name?: string } | null; rhythm?: string; severity?: string; status: string; uploadDate: string }>;
   onGenerateReport: (caseId: string) => void;
   onNew: () => void;
   onOpen: (caseId: string) => void;
@@ -236,7 +236,12 @@ function EcgCasesTab({ cases, onGenerateReport, onNew, onOpen, onReview }: {
         <View key={item.id} style={styles.tableRow}>
           <Info label="Case ID" value={item.caseNumber ?? item.caseId} />
           <Info label="Date" value={formatDate(item.uploadDate)} />
-          <Info label="AI Diagnosis" value={item.aiDiagnosis ?? item.finalDiagnosis ?? "Pending"} />
+          <Info label="Hospital" value={item.hospitalName ?? "Not recorded"} />
+          <Info label="Doctor" value={item.reviewedBy?.name ?? item.assignedDoctor?.name ?? "Unassigned"} />
+          <Info label="Reason" value={item.clinicalIndication ?? item.ecgType ?? "Not recorded"} />
+          <Info label="AI Diagnosis" value={item.aiDiagnosis ?? "Pending"} />
+          <Info label="Final Diagnosis" value={item.finalDiagnosis ?? item.doctorDiagnosis ?? "Pending"} />
+          <Info label="Severity" value={item.severity ?? item.aiSeverity ?? item.priority} />
           <Info label="Confidence" value={confidenceLabel(item.confidenceScore)} />
           <Info label="Model" value={item.aiModelVersion ?? "Pending"} />
           <Info label="Measurements" value={`HR ${item.heartRate ?? "N/A"} • ${item.rhythm ?? "Rhythm pending"}`} />

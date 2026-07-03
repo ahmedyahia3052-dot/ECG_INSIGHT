@@ -73,6 +73,8 @@ async function audit(input: {
   caseId?: string;
   message: string;
   metadata?: Prisma.InputJsonValue;
+  newValue?: Prisma.InputJsonValue;
+  oldValue?: Prisma.InputJsonValue;
   patientId?: string;
 }) {
   await prisma.auditLog.create({
@@ -82,6 +84,8 @@ async function audit(input: {
       case: input.caseId ? { connect: { id: input.caseId } } : undefined,
       message: input.message,
       metadata: input.metadata,
+      newValue: input.newValue,
+      oldValue: input.oldValue,
       patient: input.patientId ? { connect: { id: input.patientId } } : undefined,
     },
   });
@@ -476,12 +480,17 @@ casesRouter.post("/:caseId/review", requireRole("DOCTOR"), validateBody(reviewCa
     if (!current) throw new AppError(404, "ECG case not found.", "CASE_NOT_FOUND");
     assertResourceAccess(await canAccessCase(current.id, req.auth!));
     assertCaseStatusTransition(current.status, "UNDER_REVIEW");
+    const resolvedDiagnosis = req.body.aiReviewAction === "accept_ai"
+      ? (current.aiDiagnosis ?? req.body.doctorDiagnosis)
+      : req.body.aiReviewAction === "reject_ai"
+        ? req.body.doctorDiagnosis
+        : req.body.doctorDiagnosis;
     const ecgCase = await prisma.eCGCase.update({
       data: {
         clinicalComments: req.body.clinicalComments,
         clinicalNotes: req.body.clinicalComments,
-        doctorDiagnosis: req.body.doctorDiagnosis,
-        finalDiagnosis: req.body.doctorDiagnosis,
+        doctorDiagnosis: resolvedDiagnosis,
+        finalDiagnosis: resolvedDiagnosis,
         recommendations: req.body.recommendations,
         reviewedAt: new Date(),
         reviewedById: req.auth!.id,
@@ -495,8 +504,24 @@ casesRouter.post("/:caseId/review", requireRole("DOCTOR"), validateBody(reviewCa
       action: "CASE_STATUS_CHANGED",
       actorId: req.auth!.id,
       caseId: ecgCase.id,
-      message: `ECG case ${ecgCase.caseNumber ?? ecgCase.caseId} moved to under review.`,
-      metadata: { previousStatus: current.status, status: ecgCase.status },
+      message: `Doctor review recorded for ECG case ${ecgCase.caseNumber ?? ecgCase.caseId}.`,
+      metadata: {
+        aiReviewAction: req.body.aiReviewAction ?? "modify",
+        previousStatus: current.status,
+        status: ecgCase.status,
+      },
+      newValue: {
+        aiReviewAction: req.body.aiReviewAction ?? "modify",
+        clinicalComments: ecgCase.clinicalComments,
+        doctorDiagnosis: ecgCase.doctorDiagnosis,
+        severity: ecgCase.severity,
+      },
+      oldValue: {
+        aiDiagnosis: current.aiDiagnosis,
+        clinicalComments: current.clinicalComments,
+        doctorDiagnosis: current.doctorDiagnosis,
+        severity: current.severity,
+      },
       patientId: ecgCase.patientId,
     });
     await prisma.timelineEvent.create({
