@@ -114,6 +114,9 @@ async function main() {
   assert(digital.interpretationEngine.primaryDiagnosis.length > 0, "Interpretation engine should provide primary diagnosis.");
   assert(digital.interpretationEngine.findings.length > 0, "Interpretation engine should provide findings.");
   assert(digital.interpretationEngine.markdownReport.includes("ECG Clinical Interpretation Report"), "Markdown report should be present.");
+  assert(digital.aiDiagnosis.primaryDiagnosis.length > 0, "AI diagnosis ensemble should provide primary diagnosis.");
+  assert(digital.aiDiagnosis.topDiagnoses.length >= 1, "AI diagnosis should provide ranked alternatives.");
+  assert(digital.aiDiagnosis.clinicalReasoning.length > 0, "AI diagnosis should provide clinical reasoning.");
   assert(digital.leadSegments.length === 12, "Lead segmentation metadata should include all 12 leads.");
   assert(digital.quality.score >= 0 && digital.quality.score <= 100, "Digitization quality score should be normalized 0-100.");
   assert(digital.preprocessing?.croppingOptimization.widthPercent !== undefined, "Preprocessing metadata should include crop optimization.");
@@ -214,6 +217,12 @@ async function main() {
   const interpretPayload = response.body as { clinicalInterpretation?: { findings?: unknown[]; markdownReport?: string } };
   assert(Array.isArray(interpretPayload.clinicalInterpretation?.findings), "Interpret endpoint must return findings.");
   assert(typeof interpretPayload.clinicalInterpretation?.markdownReport === "string", "Interpret endpoint must return markdown report.");
+
+  response = await request(`/ecg/diagnose/${ecgCase.id}`, { method: "POST", token });
+  expectStatus(response, 202, "POST /api/v1/ecg/diagnose/:caseId");
+  const diagnosePayload = response.body as { aiDiagnosis?: { topDiagnoses?: unknown[]; primaryDiagnosis?: string } };
+  assert(typeof diagnosePayload.aiDiagnosis?.primaryDiagnosis === "string", "Diagnose endpoint must return primary diagnosis.");
+  assert(Array.isArray(diagnosePayload.aiDiagnosis?.topDiagnoses), "Diagnose endpoint must return top diagnoses.");
   server.close();
 
   await prisma.eCGAnnotation.deleteMany({ where: { ecgFileId: file.id } });

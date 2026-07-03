@@ -12,6 +12,19 @@ interface Props {
 
 function waveformToDigital(waveform: ProcessedWaveform): DigitalEcg {
   return {
+    aiDiagnosis: {
+      agreementWithRules: 0,
+      clinicalReasoning: "",
+      confidence: 0,
+      disagreementExplanation: "",
+      ensembleSources: [],
+      evidence: [],
+      markdownReport: "",
+      primaryDiagnosis: "Normal ECG",
+      recommendations: [],
+      topDiagnoses: [],
+      urgency: "normal",
+    },
     annotations: [],
     calibration: { confidence: 0.7, gainMmPerMv: 10, gridDetected: true, paperSpeedMmPerSec: 25 },
     durationSeconds: waveform.durationSeconds,

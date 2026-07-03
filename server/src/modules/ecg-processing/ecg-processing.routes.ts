@@ -78,6 +78,22 @@ ecgProcessingRouter.post("/interpret/:caseId", requireRole("DOCTOR"), async (req
   }
 });
 
+ecgProcessingRouter.post("/diagnose/:caseId", requireRole("DOCTOR"), async (req, res, next) => {
+  try {
+    const caseId = await resolveCaseId(String(req.params.caseId));
+    assertResourceAccess(await canAccessCase(caseId, req.auth!));
+    const digitalEcg = await getDigitalEcg(caseId);
+    res.status(202).json({
+      aiDiagnosis: digitalEcg.aiDiagnosis,
+      clinicalDisclaimer: "AI-assisted ECG diagnosis supports physician review and must not be used as a standalone clinical decision.",
+      digitalEcg,
+      markdownReport: digitalEcg.aiDiagnosis.markdownReport,
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
 ecgProcessingRouter.get("/waveform/:caseId", async (req, res, next) => {
   try {
     res.json({ waveform: await getProcessedWaveform(String(req.params.caseId)) });
@@ -201,6 +217,19 @@ ecgProcessingRouter.get("/digital/:caseId", async (req, res, next) => {
     if (error instanceof AppError && error.code === "ECG_FILE_NOT_FOUND") {
       res.json({
         digitalEcg: {
+          aiDiagnosis: {
+            agreementWithRules: 0,
+            clinicalReasoning: "",
+            confidence: 0,
+            disagreementExplanation: "",
+            ensembleSources: [],
+            evidence: [],
+            markdownReport: "",
+            primaryDiagnosis: "Normal ECG",
+            recommendations: [],
+            topDiagnoses: [],
+            urgency: "normal",
+          },
           annotations: [],
           calibration: { confidence: 0, gainMmPerMv: 10, gridDetected: false, paperSpeedMmPerSec: 25 },
           durationSeconds: 0,

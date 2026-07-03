@@ -113,7 +113,29 @@ export interface EcgClinicalInterpretation {
   urgency: "normal" | "minor" | "abnormal" | "urgent" | "critical";
 }
 
+export interface EcgAiDiagnosis {
+  agreementWithRules: number;
+  clinicalReasoning: string;
+  confidence: number;
+  disagreementExplanation: string;
+  ensembleSources: string[];
+  evidence: string[];
+  markdownReport: string;
+  primaryDiagnosis: string;
+  recommendations: string[];
+  topDiagnoses: Array<{
+    agreementWithRules: number;
+    confidence: number;
+    evidence: string[];
+    label: string;
+    probability: number;
+    source: "deep_learning" | "measurement" | "rules";
+  }>;
+  urgency: "normal" | "minor" | "abnormal" | "urgent" | "critical";
+}
+
 export interface DigitalEcg {
+  aiDiagnosis: EcgAiDiagnosis;
   annotations: DigitalEcgAnnotation[];
   calibration: {
     confidence: number;
@@ -173,6 +195,13 @@ export async function processECGCase(accessToken: string, caseId: string) {
 
 export async function measureDigitalECG(accessToken: string, caseId: string) {
   return apiRequest<{ clinicalDisclaimer: string; clinicalInterpretation: EcgClinicalInterpretation; clinicalMeasurements: EcgClinicalMeasurements; digitalEcg: DigitalEcg }>(`/ecg/measure/${caseId}`, {
+    accessToken,
+    method: "POST",
+  });
+}
+
+export async function diagnoseDigitalECG(accessToken: string, caseId: string) {
+  return apiRequest<{ aiDiagnosis: EcgAiDiagnosis; clinicalDisclaimer: string; digitalEcg: DigitalEcg; markdownReport: string }>(`/ecg/diagnose/${caseId}`, {
     accessToken,
     method: "POST",
   });

@@ -3,6 +3,7 @@ import React, { useMemo, useState } from "react";
 import { Image, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import Svg, { Rect, Text as SvgText } from "react-native-svg";
 
+import { EcgAiDiagnosisPanel } from "@/components/ecg/EcgAiDiagnosisPanel";
 import { EcgDigitalCalipers } from "@/components/ecg/EcgDigitalCalipers";
 import { EcgInterpretationPanel } from "@/components/ecg/EcgInterpretationPanel";
 import { EcgMeasurementPanel } from "@/components/ecg/EcgMeasurementPanel";
@@ -104,6 +105,7 @@ export function EcgWorkspaceViewer({ digitalEcg, originalUrl, processedUrl }: Pr
             selectedLabel={selectedMeasurement?.label ?? null}
           />
           <EcgInterpretationPanel interpretation={digitalEcg?.interpretationEngine} />
+          <EcgAiDiagnosisPanel diagnosis={digitalEcg?.aiDiagnosis} />
         </View>
       </View>
 
