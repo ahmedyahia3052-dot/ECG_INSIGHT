@@ -4,6 +4,35 @@ All notable changes to this project are documented in this file.
 
 ---
 
+## [Sprint13-Phase2] — 2026-07-04
+
+### Added
+
+- Sprint 13 Phase 2 clinical measurement workspace: calipers, derived measurements, annotations, undo/redo
+- `EcgMeasurementOverlay`, `EcgMeasurementsPanel`, `useEcgMeasurementWorkspace`, `ecgCalibrationMath`
+- Server persistence: `GET/PUT /api/cases/:caseId/ecg-viewer-workspace`
+- Measurement PDF export: `POST /api/cases/:caseId/ecg-viewer-workspace/export`
+- Client service `ecgViewerWorkspace.ts` with local AsyncStorage + server sync
+- Tests: `ecg-calibration-math.test.ts`, `sprint13-ecg-measurement-workspace.integration.ts`
+- Playwright Phase 2 spec for measurement panel and tools
+- `SPRINT13_PHASE2_REPORT.md`
+
+### Changed
+
+- `EcgMonitorViewerFoundation` wires measurement workspace and persistence
+- `EcgViewerToolbar` enables Measure, Caliper, Annotation, Undo/Redo; Export generates measurement PDF
+- `EcgViewerRightRail` renders live measurements panel (AI Findings remains placeholder)
+- `EcgImageCanvas` renders measurement overlay with image-space coordinates
+- Integration pipeline registers Phase 2 scripts (57 total)
+
+### Preserved
+
+- Sprint 12 Copilot and `EcgProViewer` unchanged
+- Sprint 13 Phase 1 viewer foundation tests still pass
+- Compare and AI Overlay remain disabled
+
+---
+
 ## [Sprint-12-Stable] — 2026-07-04
 
 ### Added

@@ -1,12 +1,13 @@
 import React, { useCallback, useEffect, useState } from "react";
-import { ActivityIndicator, Image, Platform, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Image, LayoutChangeEvent, Platform, StyleSheet, Text, View } from "react-native";
 import { PanGestureHandler, PinchGestureHandler, State } from "react-native-gesture-handler";
 
 import { EmptyState, medicalTheme } from "@/components/enterprise/EnterpriseUI";
 import { emitRuntimeEvent } from "@/services/runtimeEvents";
-
 import { buildImageFilterStyle, buildTransformStyle, cacheImageDimensions, detectImageFormat, readCachedImageDimensions } from "./ecgImageEngine";
+import { EcgMeasurementOverlay } from "./EcgMeasurementOverlay";
 import { EcgPaperGrid } from "./EcgPaperGrid";
+import type { EcgMeasurementWorkspace } from "./useEcgMeasurementWorkspace";
 import type { EcgViewerControls } from "./useEcgViewerControls";
 
 type Props = {
@@ -14,10 +15,13 @@ type Props = {
   imageUrl?: string;
   pdfUrl?: string;
   testID?: string;
+  workspace?: EcgMeasurementWorkspace;
 };
 
-export function EcgImageCanvas({ controls, imageUrl, pdfUrl, testID = "sprint13-ecg-image-canvas" }: Props) {
+export function EcgImageCanvas({ controls, imageUrl, pdfUrl, testID = "sprint13-ecg-image-canvas", workspace }: Props) {
   const [loading, setLoading] = useState(true);
+  const [layout, setLayout] = useState({ height: 480, width: 720 });
+  const [imageSize, setImageSize] = useState({ height: 1200, width: 1600 });
   const pinchBase = React.useRef(controls.transform.zoom);
   const panBase = React.useRef({ x: controls.transform.panX, y: controls.transform.panY });
   const format = detectImageFormat(imageUrl ?? pdfUrl ?? "");
@@ -62,17 +66,23 @@ export function EcgImageCanvas({ controls, imageUrl, pdfUrl, testID = "sprint13-
     (event: { nativeEvent: { source: { height: number; width: number } } }) => {
       const { height, width } = event.nativeEvent.source;
       if (imageUrl) cacheImageDimensions(imageUrl, width, height);
+      setImageSize({ height, width });
       setLoading(false);
       emitRuntimeEvent("ViewerReady", { source: "sprint13-ecg-monitor", url: imageUrl });
     },
     [imageUrl],
   );
 
+  const onLayout = useCallback((event: LayoutChangeEvent) => {
+    const { height, width } = event.nativeEvent.layout;
+    if (height > 0 && width > 0) setLayout({ height, width });
+  }, []);
+
   const filterStyle = Platform.OS === "web" ? buildImageFilterStyle(controls.adjustments) : undefined;
   const transformStyle = buildTransformStyle(controls.transform, controls.adjustments);
 
   const canvasBody = (
-    <View nativeID={testID} style={[styles.canvas, controls.fullscreen && styles.fullscreenCanvas]} testID={testID}>
+    <View nativeID={testID} onLayout={onLayout} style={[styles.canvas, controls.fullscreen && styles.fullscreenCanvas]} testID={testID}>
       <EcgPaperGrid grid={controls.grid} />
       {loading && imageUrl ? (
         <View style={styles.loadingOverlay}>
@@ -103,6 +113,16 @@ export function EcgImageCanvas({ controls, imageUrl, pdfUrl, testID = "sprint13-
       ) : (
         <EmptyState message="Open or upload an ECG image to begin review." title="No ECG loaded" />
       )}
+      {workspace && imageUrl ? (
+        <EcgMeasurementOverlay
+          containerHeight={layout.height}
+          containerWidth={layout.width}
+          controls={controls}
+          imageHeight={imageSize.height}
+          imageWidth={imageSize.width}
+          workspace={workspace}
+        />
+      ) : null}
     </View>
   );
 

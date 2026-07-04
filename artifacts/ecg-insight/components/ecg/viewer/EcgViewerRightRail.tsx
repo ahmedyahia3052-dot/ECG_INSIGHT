@@ -3,7 +3,16 @@ import { ScrollView, StyleSheet, Text, View } from "react-native";
 
 import { Card, medicalTheme, SectionHeader } from "@/components/enterprise/EnterpriseUI";
 
-export function EcgViewerRightRail() {
+import { EcgMeasurementsPanel } from "./EcgMeasurementsPanel";
+import type { EcgMeasurementWorkspace } from "./useEcgMeasurementWorkspace";
+
+type Props = {
+  workspace?: EcgMeasurementWorkspace;
+};
+
+export function EcgViewerRightRail({ workspace }: Props) {
+  if (workspace) return <EcgMeasurementsPanel workspace={workspace} />;
+
   return (
     <ScrollView contentContainerStyle={styles.scroll} style={styles.fill}>
       <Card style={styles.card}>

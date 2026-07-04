@@ -45,11 +45,15 @@ export function EcgViewerStatusBar({
   fileType,
   gridVisible,
   imageResolution,
+  measurementCount,
+  toolMode,
   zoom,
 }: {
   fileType?: string;
   gridVisible: boolean;
   imageResolution?: string;
+  measurementCount?: number;
+  toolMode?: string;
   zoom: number;
 }) {
   return (
@@ -58,6 +62,8 @@ export function EcgViewerStatusBar({
       <Text style={styles.statusText}>Grid {gridVisible ? "ON" : "OFF"}</Text>
       <Text style={styles.statusText}>Type {fileType ?? "N/A"}</Text>
       <Text style={styles.statusText}>Resolution {imageResolution ?? "Pending"}</Text>
+      {typeof measurementCount === "number" ? <Text style={styles.statusText}>Measurements {measurementCount}</Text> : null}
+      {toolMode ? <Text style={styles.statusText}>Tool {toolMode}</Text> : null}
       <Text style={styles.statusText}>Ready</Text>
     </View>
   );

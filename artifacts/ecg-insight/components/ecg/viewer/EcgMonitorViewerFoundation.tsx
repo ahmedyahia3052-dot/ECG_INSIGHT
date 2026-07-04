@@ -1,10 +1,11 @@
-import React, { useMemo } from "react";
+import React, { useEffect, useMemo, useRef } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import { useRouter } from "expo-router";
 
 import { medicalTheme, patientDisplayName, SectionHeader } from "@/components/enterprise/EnterpriseUI";
 import { API_URL } from "@/services/api";
 import type { ApiECGCase } from "@/services/clinical";
+import { useAuth } from "@/context/AuthContext";
 
 import { detectImageFormat } from "./ecgImageEngine";
 import { EcgImageCanvas } from "./EcgImageCanvas";
@@ -14,7 +15,9 @@ import { EcgViewerRightRail } from "./EcgViewerRightRail";
 import { EcgViewerStatusBar, EcgViewerTimeline } from "./EcgViewerTimeline";
 import { EcgViewerToolbar } from "./EcgViewerToolbar";
 import type { EcgViewerPreviousStudy } from "./types";
+import { useEcgMeasurementWorkspace } from "./useEcgMeasurementWorkspace";
 import { useEcgViewerControls } from "./useEcgViewerControls";
+import { useEcgViewerPersistence } from "./useEcgViewerPersistence";
 
 function absoluteUrl(path?: string | null) {
   if (!path) return undefined;
@@ -31,9 +34,26 @@ export function EcgMonitorViewerFoundation({
   patient: { age?: number; company?: string | null; firstName: string; gender?: string; id: string; lastName: string };
 }) {
   const router = useRouter();
+  const { authToken, user } = useAuth();
   const imageUrl = absoluteUrl(ecgCase.imagePath ?? ecgCase.originalFileUrl ?? ecgCase.files.find((file) => file.mimeType.startsWith("image/"))?.downloadUrl);
   const pdfUrl = absoluteUrl(ecgCase.pdfPath ?? ecgCase.files.find((file) => file.mimeType.includes("pdf"))?.downloadUrl);
   const controls = useEcgViewerControls({});
+  const operatorName = user?.name ?? user?.email ?? "Clinician";
+  const scheduleSaveRef = useRef<() => void>(() => undefined);
+  const workspace = useEcgMeasurementWorkspace({
+    controls,
+    onPersist: () => scheduleSaveRef.current(),
+    operatorName,
+  });
+  const { scheduleSave } = useEcgViewerPersistence({
+    accessToken: authToken?.token,
+    caseId: ecgCase.id,
+    enabled: true,
+    onHydrate: workspace.hydrate,
+    patientId: patient.id,
+    snapshot: () => workspace.exportState(),
+  });
+  scheduleSaveRef.current = scheduleSave;
 
   const previousStudies: EcgViewerPreviousStudy[] = useMemo(
     () =>
@@ -63,23 +83,30 @@ export function EcgMonitorViewerFoundation({
 
   const openStudy = (caseId: string) => router.push(`/ecg-monitor/${caseId}` as never);
 
+  useEffect(() => {
+    scheduleSave();
+  }, [controls.adjustments, controls.grid, controls.transform, scheduleSave, workspace.present]);
+
   return (
     <View style={[styles.root, controls.fullscreen && styles.fullscreenRoot]} testID="sprint13-ecg-monitor-ready">
       <View style={styles.header}>
         <SectionHeader
-          subtitle="Enterprise PACS-style ECG image review with grid, transforms, and dockable panels."
+          subtitle="Enterprise clinical measurement workstation with calipers, annotations, and persistent workspace state."
           title="ECG Pro Viewer & Monitor Workspace"
         />
         <Text style={styles.caseLabel}>{ecgCase.caseNumber ?? ecgCase.caseId}</Text>
       </View>
 
       <EcgViewerToolbar
+        accessToken={authToken?.token}
+        caseId={ecgCase.id}
         controls={controls}
         imageUrl={imageUrl}
+        onCapture={() => router.push("/upload-ecg" as never)}
         onOpen={() => openStudy(ecgCase.id)}
         onUpload={() => router.push("/upload-ecg" as never)}
-        onCapture={() => router.push("/upload-ecg" as never)}
         pdfUrl={pdfUrl}
+        workspace={workspace}
       />
 
       <View style={styles.workspace}>
@@ -91,11 +118,13 @@ export function EcgMonitorViewerFoundation({
                 fileType={study.fileType}
                 gridVisible={controls.grid.visible}
                 imageResolution={undefined}
+                measurementCount={workspace.present.measurements.filter((item) => !item.hidden).length}
+                toolMode={workspace.present.toolMode}
                 zoom={controls.transform.zoom}
               />
             </View>
           }
-          center={<EcgImageCanvas controls={controls} imageUrl={imageUrl} pdfUrl={pdfUrl} />}
+          center={<EcgImageCanvas controls={controls} imageUrl={imageUrl} pdfUrl={pdfUrl} workspace={workspace} />}
           left={
             <EcgViewerLeftRail
               onSelectPrevious={openStudy}
@@ -104,7 +133,7 @@ export function EcgMonitorViewerFoundation({
               study={study}
             />
           }
-          right={<EcgViewerRightRail />}
+          right={<EcgViewerRightRail workspace={workspace} />}
         />
       </View>
     </View>

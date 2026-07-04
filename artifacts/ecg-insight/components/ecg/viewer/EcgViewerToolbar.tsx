@@ -1,21 +1,37 @@
-import React from "react";
+import React, { useCallback } from "react";
 import { Linking, Platform, ScrollView, StyleSheet, View } from "react-native";
 
 import { PrimaryButton, medicalTheme } from "@/components/enterprise/EnterpriseUI";
+import { downloadEcgViewerWorkspacePdf } from "@/services/ecgViewerWorkspace";
 
+import type { EcgMeasurementWorkspace } from "./useEcgMeasurementWorkspace";
 import type { EcgViewerControls } from "./useEcgViewerControls";
 
 type Props = {
+  accessToken?: string;
+  caseId?: string;
   controls: EcgViewerControls;
   imageUrl?: string;
   onCapture?: () => void;
   onOpen?: () => void;
   onUpload?: () => void;
   pdfUrl?: string;
+  workspace?: EcgMeasurementWorkspace;
 };
 
-export function EcgViewerToolbar({ controls, imageUrl, pdfUrl, onOpen, onUpload, onCapture }: Props) {
+export function EcgViewerToolbar({ accessToken, caseId, controls, imageUrl, pdfUrl, onOpen, onUpload, onCapture, workspace }: Props) {
   const exportTarget = imageUrl ?? pdfUrl;
+  const measureActive = workspace?.present.toolMode === "caliper" || workspace?.present.toolMode === "measurement";
+
+  const exportPdf = useCallback(async () => {
+    if (accessToken && caseId && Platform.OS === "web" && typeof window !== "undefined") {
+      const blob = await downloadEcgViewerWorkspacePdf(accessToken, caseId);
+      const url = URL.createObjectURL(blob);
+      window.open(url, "_blank");
+      return;
+    }
+    if (exportTarget) void Linking.openURL(exportTarget);
+  }, [accessToken, caseId, exportTarget]);
 
   return (
     <View style={styles.toolbar} testID="sprint13-ecg-viewer-toolbar">
@@ -30,16 +46,18 @@ export function EcgViewerToolbar({ controls, imageUrl, pdfUrl, onOpen, onUpload,
         <PrimaryButton label="100%" onPress={() => controls.applyFit("100")} variant="outline" />
         <PrimaryButton label="Reset View" onPress={controls.resetView} variant="outline" />
         <PrimaryButton label="Rotate" onPress={controls.rotate} variant="outline" />
-        <PrimaryButton disabled label="Measure" onPress={() => undefined} variant="outline" />
+        <PrimaryButton
+          label="Measure"
+          onPress={() => workspace?.setToolMode(measureActive ? "select" : "measurement")}
+          variant={measureActive ? "primary" : "outline"}
+        />
         <PrimaryButton disabled label="Compare" onPress={() => undefined} variant="outline" />
         <PrimaryButton disabled label="AI Overlay" onPress={() => undefined} variant="outline" />
-        <PrimaryButton
-          label="Export"
-          onPress={() => {
-            if (exportTarget) void Linking.openURL(exportTarget);
-          }}
-          variant="outline"
-        />
+        <PrimaryButton label="Caliper" onPress={() => workspace?.setToolMode("caliper")} variant={workspace?.present.toolMode === "caliper" ? "primary" : "outline"} />
+        <PrimaryButton label="Annotation" onPress={() => workspace?.setToolMode("annotation")} variant={workspace?.present.toolMode === "annotation" ? "primary" : "outline"} />
+        <PrimaryButton disabled={!workspace?.canUndo} label="Undo" onPress={() => workspace?.undo()} variant="outline" />
+        <PrimaryButton disabled={!workspace?.canRedo} label="Redo" onPress={() => workspace?.redo()} variant="outline" />
+        <PrimaryButton label="Export" onPress={() => void exportPdf()} variant="outline" />
         <PrimaryButton
           label="Print"
           onPress={() => {

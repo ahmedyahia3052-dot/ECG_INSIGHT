@@ -1,4 +1,6 @@
 export { EcgImageCanvas } from "./EcgImageCanvas";
+export { EcgMeasurementsPanel } from "./EcgMeasurementsPanel";
+export { EcgMeasurementOverlay } from "./EcgMeasurementOverlay";
 export { EcgMonitorViewerFoundation } from "./EcgMonitorViewerFoundation";
 export { EcgPaperGrid } from "./EcgPaperGrid";
 export { EcgViewerLeftRail } from "./EcgViewerLeftRail";
@@ -6,6 +8,10 @@ export { EcgViewerResizableWorkspace } from "./EcgViewerResizableWorkspace";
 export { EcgViewerRightRail } from "./EcgViewerRightRail";
 export { EcgViewerStatusBar, EcgViewerTimeline } from "./EcgViewerTimeline";
 export { EcgViewerToolbar } from "./EcgViewerToolbar";
+export * from "./ecgCalibrationMath";
 export * from "./ecgImageEngine";
+export * from "./measurementTypes";
 export * from "./types";
+export { useEcgMeasurementWorkspace } from "./useEcgMeasurementWorkspace";
 export { useEcgViewerControls } from "./useEcgViewerControls";
+export { useEcgViewerPersistence } from "./useEcgViewerPersistence";

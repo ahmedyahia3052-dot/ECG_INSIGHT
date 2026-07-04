@@ -19,6 +19,11 @@ import {
   statusTimestampPatch,
 } from "./state-machine";
 import {
+  buildMeasurementWorkspacePdf,
+  loadEcgViewerWorkspace,
+  persistEcgViewerWorkspace,
+} from "./ecg-viewer-workspace.service";
+import {
   assignDoctorSchema,
   caseCreateSchema,
   caseListSchema,
@@ -627,6 +632,59 @@ casesRouter.delete("/:caseId", requireRole("DOCTOR"), async (req, res, next) => 
       patientId: ecgCase.patientId,
     });
     res.status(204).send();
+  } catch (error) {
+    next(error);
+  }
+});
+
+casesRouter.get("/:caseId/ecg-viewer-workspace", async (req, res, next) => {
+  try {
+    const ecgCase = await prisma.eCGCase.findUnique({ where: { id: String(req.params.caseId) } })
+      ?? await findCaseForRoute(String(req.params.caseId));
+    if (!ecgCase) throw new AppError(404, "ECG case not found.", "CASE_NOT_FOUND");
+    assertResourceAccess(await canAccessCase(ecgCase.id, req.auth!));
+    const workspace = await loadEcgViewerWorkspace(ecgCase.id);
+    res.json({ workspace });
+  } catch (error) {
+    next(error);
+  }
+});
+
+casesRouter.put("/:caseId/ecg-viewer-workspace", requireRole("DOCTOR"), async (req, res, next) => {
+  try {
+    const ecgCase = await prisma.eCGCase.findUnique({ where: { id: String(req.params.caseId) } })
+      ?? await findCaseForRoute(String(req.params.caseId));
+    if (!ecgCase) throw new AppError(404, "ECG case not found.", "CASE_NOT_FOUND");
+    assertResourceAccess(await canAccessCase(ecgCase.id, req.auth!));
+    await persistEcgViewerWorkspace(ecgCase.id, req.auth!.id, req.body.workspace as Prisma.InputJsonValue);
+    res.json({ ok: true });
+  } catch (error) {
+    next(error);
+  }
+});
+
+casesRouter.post("/:caseId/ecg-viewer-workspace/export", requireRole("DOCTOR"), async (req, res, next) => {
+  try {
+    const ecgCase = await prisma.eCGCase.findUnique({
+      include: { patient: true, reviewedBy: { select: { name: true } } },
+      where: { id: String(req.params.caseId) },
+    }) ?? await findCaseForRoute(String(req.params.caseId));
+    if (!ecgCase) throw new AppError(404, "ECG case not found.", "CASE_NOT_FOUND");
+    assertResourceAccess(await canAccessCase(ecgCase.id, req.auth!));
+    const workspace = await loadEcgViewerWorkspace(ecgCase.id);
+    const measurements = Array.isArray((workspace as { measurements?: Array<{ lead?: string; name: string; unit: string; value: number }> } | null)?.measurements)
+      ? (workspace as { measurements: Array<{ lead?: string; name: string; unit: string; value: number }> }).measurements
+      : [];
+    const pdf = buildMeasurementWorkspacePdf({
+      caseNumber: ecgCase.caseNumber ?? ecgCase.caseId,
+      doctorName: ecgCase.reviewedBy?.name ?? "Clinician",
+      measurements,
+      patientName: `${ecgCase.patient.firstName} ${ecgCase.patient.lastName}`.trim(),
+      studyDate: ecgCase.acquisitionDate?.toISOString(),
+    });
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", `attachment; filename="${ecgCase.caseNumber ?? ecgCase.caseId}-measurements.pdf"`);
+    res.send(pdf);
   } catch (error) {
     next(error);
   }
