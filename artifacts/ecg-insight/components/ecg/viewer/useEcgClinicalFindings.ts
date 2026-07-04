@@ -1,7 +1,9 @@
 import { useMemo } from "react";
 
+import type { AIAnalysisResult, AIExplainability } from "@/services/ai";
 import type { ApiECGCase } from "@/services/clinical";
 
+import { confidencePercent } from "./ecgAiOverlayEngine";
 import type { EcgClinicalFindingsModel, EcgClinicalFindingField } from "./types";
 import type { EcgMeasurementWorkspace } from "./useEcgMeasurementWorkspace";
 
@@ -19,7 +21,19 @@ function measurementValue(workspace: EcgMeasurementWorkspace | undefined, kinds:
   return match ? { unit: match.unit, value: match.value } : null;
 }
 
-export function buildEcgClinicalFindings(ecgCase: ApiECGCase, workspace?: EcgMeasurementWorkspace): EcgClinicalFindingsModel {
+function extractAxis(explainability?: AIExplainability | null, ecgCase?: ApiECGCase) {
+  const panelValue = explainability?.panel.find((item) => item.label.toLowerCase().includes("axis"))?.value;
+  if (panelValue) return panelValue;
+  const metadata = ecgCase?.explainabilityData as { panel?: Array<{ label: string; value: string }> } | undefined;
+  return metadata?.panel?.find((item) => item.label.toLowerCase().includes("axis"))?.value;
+}
+
+export function buildEcgClinicalFindings(
+  ecgCase: ApiECGCase,
+  workspace?: EcgMeasurementWorkspace,
+  analysis?: AIAnalysisResult | null,
+  explainability?: AIExplainability | null,
+): EcgClinicalFindingsModel {
   const hrMeasurement = measurementValue(workspace, ["heart_rate", "rr_interval"]);
   const prMeasurement = measurementValue(workspace, ["pr_interval"]);
   const qrsMeasurement = measurementValue(workspace, ["qrs_duration"]);
@@ -28,20 +42,17 @@ export function buildEcgClinicalFindings(ecgCase: ApiECGCase, workspace?: EcgMea
 
   const heartRate = hrMeasurement
     ? field("Heart Rate", hrMeasurement.value, hrMeasurement.unit, "measurement")
-    : field("Heart Rate", ecgCase.heartRate, "bpm");
+    : field("Heart Rate", ecgCase.heartRate ?? analysis?.heartRate, "bpm");
+
+  const confidenceScore = confidencePercent(ecgCase.confidenceScore ?? ecgCase.confidence ?? analysis?.confidenceScore);
 
   return {
-    axis: field("Axis", ecgCase.explainabilityData ? undefined : undefined),
-    confidence: field(
-      "Confidence",
-      ecgCase.confidenceScore ?? ecgCase.confidence,
-      "%",
-      ecgCase.confidenceScore || ecgCase.confidence ? "case" : "pending",
-    ),
+    axis: field("Axis", extractAxis(explainability, ecgCase)),
+    confidence: field("Confidence", confidenceScore || undefined, "%", confidenceScore ? "case" : "pending"),
     heartRate,
     interpretation: field(
       "Interpretation",
-      ecgCase.finalDiagnosis ?? ecgCase.doctorDiagnosis ?? ecgCase.aiDiagnosis ?? ecgCase.diagnosis,
+      ecgCase.finalDiagnosis ?? ecgCase.doctorDiagnosis ?? ecgCase.aiDiagnosis ?? ecgCase.diagnosis ?? analysis?.interpretation,
     ),
     prInterval: prMeasurement
       ? field("PR Interval", prMeasurement.value, prMeasurement.unit, "measurement")
@@ -55,10 +66,18 @@ export function buildEcgClinicalFindings(ecgCase: ApiECGCase, workspace?: EcgMea
     qtcInterval: qtcMeasurement
       ? field("QTc Interval", qtcMeasurement.value, qtcMeasurement.unit, "measurement")
       : field("QTc Interval", ecgCase.qtcInterval, "ms"),
-    rhythm: field("Rhythm", ecgCase.rhythm),
+    rhythm: field("Rhythm", ecgCase.rhythm ?? analysis?.rhythm),
   };
 }
 
-export function useEcgClinicalFindings(ecgCase: ApiECGCase, workspace?: EcgMeasurementWorkspace) {
-  return useMemo(() => buildEcgClinicalFindings(ecgCase, workspace), [ecgCase, workspace?.present.measurements]);
+export function useEcgClinicalFindings(
+  ecgCase: ApiECGCase,
+  workspace?: EcgMeasurementWorkspace,
+  analysis?: AIAnalysisResult | null,
+  explainability?: AIExplainability | null,
+) {
+  return useMemo(
+    () => buildEcgClinicalFindings(ecgCase, workspace, analysis, explainability),
+    [analysis, ecgCase, explainability, workspace?.present.measurements],
+  );
 }

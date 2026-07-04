@@ -232,7 +232,7 @@ export function exportMeasurements(
     format,
     measurements,
     schemaVersion: 3,
-    workspaceVersion: 3,
+    workspaceVersion: 4,
   };
   if (format === "json") return bundle;
   if (format === "fhir") {

@@ -42,6 +42,8 @@ export function EcgViewerTimeline({
 }
 
 export function EcgViewerStatusBar({
+  aiOverlayEnabled,
+  annotationCount,
   fileType,
   fitMode,
   gridOpacity,
@@ -51,6 +53,8 @@ export function EcgViewerStatusBar({
   toolMode,
   zoom,
 }: {
+  aiOverlayEnabled?: boolean;
+  annotationCount?: number;
   fileType?: string;
   fitMode?: string;
   gridOpacity?: number;
@@ -69,6 +73,8 @@ export function EcgViewerStatusBar({
       <Text style={styles.statusText}>Type {fileType ?? "N/A"}</Text>
       <Text style={styles.statusText}>Resolution {imageResolution ?? "Pending"}</Text>
       {typeof measurementCount === "number" ? <Text style={styles.statusText}>Measurements {measurementCount}</Text> : null}
+      {typeof annotationCount === "number" ? <Text style={styles.statusText}>AI Annotations {annotationCount}</Text> : null}
+      {typeof aiOverlayEnabled === "boolean" ? <Text style={styles.statusText}>AI Overlay {aiOverlayEnabled ? "ON" : "OFF"}</Text> : null}
       {toolMode ? <Text style={styles.statusText}>Tool {toolMode}</Text> : null}
       <Text style={styles.statusText}>Ready</Text>
     </View>

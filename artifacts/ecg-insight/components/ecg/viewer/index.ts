@@ -1,3 +1,8 @@
+export * from "./aiOverlayTypes";
+export { EcgAiAnnotationInspector } from "./EcgAiAnnotationInspector";
+export { EcgAiClinicalOverlay } from "./EcgAiClinicalOverlay";
+export * from "./ecgAiOverlayEngine";
+export { useEcgAiOverlayWorkspace } from "./useEcgAiOverlayWorkspace";
 export { EcgAiOverlayLayer } from "./EcgAiOverlayLayer";
 export { EcgClinicalFindingsPanel } from "./EcgClinicalFindingsPanel";
 export { EcgDigitizedWaveformLayer } from "./EcgDigitizedWaveformLayer";

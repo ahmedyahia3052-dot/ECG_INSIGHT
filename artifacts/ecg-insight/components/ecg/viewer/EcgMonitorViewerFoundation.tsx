@@ -1,11 +1,13 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
+import { useQuery } from "@tanstack/react-query";
 import { useRouter } from "expo-router";
 
 import { medicalTheme, patientDisplayName, SectionHeader } from "@/components/enterprise/EnterpriseUI";
+import { useAuth } from "@/context/AuthContext";
+import { getAIExplainability, getAIResult, type AIAnalysisResult, type AIExplainability } from "@/services/ai";
 import { API_URL } from "@/services/api";
 import type { ApiECGCase } from "@/services/clinical";
-import { useAuth } from "@/context/AuthContext";
 
 import { detectImageFormat } from "./ecgImageEngine";
 import { formatImageResolution } from "./ecgViewerEngine";
@@ -17,6 +19,7 @@ import { EcgViewerRightRail } from "./EcgViewerRightRail";
 import { EcgViewerStatusBar, EcgViewerTimeline } from "./EcgViewerTimeline";
 import { EcgViewerToolbar } from "./EcgViewerToolbar";
 import type { EcgLeadId, EcgViewerPreviousStudy } from "./types";
+import { useEcgAiOverlayWorkspace } from "./useEcgAiOverlayWorkspace";
 import { useEcgClinicalFindings } from "./useEcgClinicalFindings";
 import { useEcgMeasurementWorkspace } from "./useEcgMeasurementWorkspace";
 import { useEcgViewerControls } from "./useEcgViewerControls";
@@ -38,25 +41,66 @@ export function EcgMonitorViewerFoundation({
 }) {
   const router = useRouter();
   const { authToken, user } = useAuth();
+  const token = authToken?.token;
   const [selectedLead, setSelectedLead] = useState<EcgLeadId>("II");
   const imageUrl = absoluteUrl(ecgCase.imagePath ?? ecgCase.originalFileUrl ?? ecgCase.files.find((file) => file.mimeType.startsWith("image/"))?.downloadUrl);
   const pdfUrl = absoluteUrl(ecgCase.pdfPath ?? ecgCase.files.find((file) => file.mimeType.includes("pdf"))?.downloadUrl);
   const controls = useEcgViewerControls();
   const operatorName = user?.name ?? user?.email ?? "Clinician";
   const scheduleSaveRef = useRef<() => void>(() => undefined);
+
+  const analysisQuery = useQuery({
+    enabled: !!token && !!ecgCase.id,
+    queryFn: () => getAIResult(token!, ecgCase.id),
+    queryKey: ["ecg-monitor-ai-result", token, ecgCase.id],
+    retry: false,
+  });
+  const explainabilityQuery = useQuery({
+    enabled: !!token && !!ecgCase.id,
+    queryFn: () => getAIExplainability(token!, ecgCase.id),
+    queryKey: ["ecg-monitor-ai-explainability", token, ecgCase.id],
+    retry: false,
+  });
+
+  const analysis = analysisQuery.data?.analysis ?? null;
+  const explainability =
+    explainabilityQuery.data?.explainability ?? (ecgCase.explainabilityData as AIExplainability | null | undefined) ?? null;
+
   const workspace = useEcgMeasurementWorkspace({
     controls,
     onPersist: () => scheduleSaveRef.current(),
     operatorName,
   });
-  const findings = useEcgClinicalFindings(ecgCase, workspace);
+  const aiOverlay = useEcgAiOverlayWorkspace({
+    activeLead: selectedLead,
+    analysis,
+    controls,
+    ecgCase,
+    explainability,
+    onPersist: () => scheduleSaveRef.current(),
+    operatorName,
+  });
+  const findings = useEcgClinicalFindings(ecgCase, workspace, analysis, explainability);
+
+  const hydrateWorkspace = useCallback(
+    (state: Parameters<typeof workspace.hydrate>[0]) => {
+      workspace.hydrate(state);
+      if (state.aiOverlay) aiOverlay.hydrate(state.aiOverlay);
+    },
+    [aiOverlay, workspace],
+  );
+
   const { scheduleSave } = useEcgViewerPersistence({
-    accessToken: authToken?.token,
+    accessToken: token,
     caseId: ecgCase.id,
     enabled: true,
-    onHydrate: workspace.hydrate,
+    onHydrate: hydrateWorkspace,
     patientId: patient.id,
-    snapshot: () => workspace.exportState(),
+    snapshot: () => ({
+      ...workspace.exportState(),
+      aiOverlay: aiOverlay.exportState(),
+      version: 4 as const,
+    }),
   });
   scheduleSaveRef.current = scheduleSave;
 
@@ -95,20 +139,21 @@ export function EcgMonitorViewerFoundation({
 
   useEffect(() => {
     scheduleSave();
-  }, [controls.adjustments, controls.grid, controls.transform, scheduleSave, workspace.present]);
+  }, [aiOverlay.present, controls.adjustments, controls.grid, controls.transform, scheduleSave, workspace.present]);
 
   return (
     <View style={[styles.root, controls.fullscreen && styles.fullscreenRoot]} testID="sprint13-ecg-monitor-ready">
       <View style={styles.header}>
         <SectionHeader
-          subtitle="Production ECG Pro Viewer Engine with layered rendering, clinical findings, and rhythm strip architecture."
+          subtitle="Production ECG Pro Viewer Engine with AI clinical overlay, clinical findings, and rhythm strip architecture."
           title="ECG Pro Viewer & Monitor Workspace"
         />
         <Text style={styles.caseLabel}>{ecgCase.caseNumber ?? ecgCase.caseId}</Text>
       </View>
 
       <EcgViewerToolbar
-        accessToken={authToken?.token}
+        accessToken={token}
+        aiOverlay={aiOverlay}
         caseId={ecgCase.id}
         controls={controls}
         imageUrl={imageUrl}
@@ -126,6 +171,8 @@ export function EcgMonitorViewerFoundation({
               <EcgRhythmStripPanel controls={controls} onLeadChange={setSelectedLead} selectedLead={selectedLead} />
               <EcgViewerTimeline currentStudy={study} onSelect={openStudy} studies={previousStudies} />
               <EcgViewerStatusBar
+                aiOverlayEnabled={aiOverlay.present.settings.enabled}
+                annotationCount={aiOverlay.present.annotations.filter((item) => item.visible).length}
                 fileType={study.fileType}
                 fitMode={controls.fitMode}
                 gridOpacity={controls.grid.opacity}
@@ -137,7 +184,18 @@ export function EcgMonitorViewerFoundation({
               />
             </View>
           }
-          center={<EcgImageCanvas accessToken={authToken?.token} controls={controls} imageUrl={imageUrl} pdfUrl={pdfUrl} workspace={workspace} />}
+          center={
+            <EcgImageCanvas
+              accessToken={token}
+              activeLead={selectedLead}
+              aiOverlay={aiOverlay}
+              controls={controls}
+              explainability={explainability}
+              imageUrl={imageUrl}
+              pdfUrl={pdfUrl}
+              workspace={workspace}
+            />
+          }
           left={
             <EcgViewerLeftRail
               onSelectPrevious={openStudy}
@@ -146,7 +204,7 @@ export function EcgMonitorViewerFoundation({
               study={study}
             />
           }
-          right={<EcgViewerRightRail findings={findings} workspace={workspace} />}
+          right={<EcgViewerRightRail aiOverlay={aiOverlay} findings={findings} workspace={workspace} />}
         />
       </View>
     </View>

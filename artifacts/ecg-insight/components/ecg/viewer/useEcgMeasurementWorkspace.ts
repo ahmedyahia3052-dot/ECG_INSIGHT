@@ -437,6 +437,7 @@ export function useEcgMeasurementWorkspace(options: {
       adjustments: controlsRef.current.adjustments,
       grid: controlsRef.current.grid,
       transform: controlsRef.current.transform,
+      version: 4,
     };
   }, [present]);
 

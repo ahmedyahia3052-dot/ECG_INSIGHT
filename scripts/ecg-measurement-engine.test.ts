@@ -86,7 +86,7 @@ const qtcReadouts = buildReadouts({
 assert.equal(qtcReadouts.milliseconds, Number(computeQtc(400, 800).toFixed(1)));
 
 const migrated = migrateWorkspaceState({ ...workspace, version: 2 as never });
-assert.equal(migrated.version, 3);
+assert.equal(migrated.version, 4);
 assert.equal(migrated.activeLead, "II");
 
 const jsonExport = exportMeasurements(synced, "json") as { schemaVersion: number };

@@ -63,7 +63,7 @@ for (const marker of capabilityMarkers) {
 }
 
 assert(foundation.includes("EcgProViewerEngine") || foundation.includes("EcgImageCanvas"), "Foundation must render production viewer engine.");
-assert(toolbar.includes('label="AI Overlay"') && toolbar.includes("disabled"), "AI Overlay must remain disabled until Sprint 14.");
+assert(toolbar.includes('"AI Overlay"') && toolbar.includes("toggleOverlay") && !toolbar.includes('disabled label="AI Overlay"'), "AI Overlay must be enabled in Sprint 14 Phase 2.");
 assert(toolbar.includes('label="Compare"') && toolbar.includes("disabled"), "Compare must remain disabled.");
 assert(pipeline.includes("sprint13-ecg-pro-viewer-engine.integration.ts"), "Integration pipeline must register Phase 3 test.");
 assert(!engine.includes("TODO"), "Production engine must not contain TODO markers.");

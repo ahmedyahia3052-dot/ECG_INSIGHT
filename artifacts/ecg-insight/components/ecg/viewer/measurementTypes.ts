@@ -1,3 +1,4 @@
+import type { EcgAiOverlayState } from "./aiOverlayTypes";
 import type { EcgGridGain, EcgImageAdjustments, EcgPaperSpeed, EcgViewerGridSettings, EcgViewerTransform } from "./types";
 
 export type EcgViewerToolMode = "select" | "pan" | "caliper" | "measurement" | "annotation";
@@ -98,6 +99,7 @@ export type EcgViewerAnnotation = {
 export type EcgViewerWorkspaceState = {
   activeLead?: string;
   activeMeasurementKind?: EcgMeasurementKind;
+  aiOverlay?: EcgAiOverlayState;
   annotations: EcgViewerAnnotation[];
   calipers: EcgCaliper[];
   grid: EcgViewerGridSettings;
@@ -108,7 +110,7 @@ export type EcgViewerWorkspaceState = {
   toolMode: EcgViewerToolMode;
   transform: EcgViewerTransform;
   adjustments: EcgImageAdjustments;
-  version: 3;
+  version: 4;
 };
 
 export const MEASUREMENT_KIND_LABELS: Record<EcgMeasurementKind, string> = {
@@ -144,13 +146,14 @@ export function migrateWorkspaceState(raw: Partial<EcgViewerWorkspaceState> & { 
     start: item.start ?? { x: 0, y: 0 },
     updatedAt: item.updatedAt ?? item.timestamp,
   }));
-  return createWorkspaceState({ ...raw, calipers, measurements, version: 3 });
+  return createWorkspaceState({ ...raw, aiOverlay: raw.aiOverlay, calipers, measurements, version: 4 });
 }
 
 export function createWorkspaceState(partial?: Partial<EcgViewerWorkspaceState>): EcgViewerWorkspaceState {
   return {
     activeLead: partial?.activeLead ?? "II",
     activeMeasurementKind: partial?.activeMeasurementKind ?? "rr_interval",
+    aiOverlay: partial?.aiOverlay,
     adjustments: partial?.adjustments ?? {
       brightness: 100,
       contrast: 100,
@@ -169,7 +172,7 @@ export function createWorkspaceState(partial?: Partial<EcgViewerWorkspaceState>)
     selectedMeasurementId: partial?.selectedMeasurementId ?? null,
     toolMode: partial?.toolMode ?? "select",
     transform: partial?.transform ?? { panX: 0, panY: 0, rotation: 0, zoom: 1 },
-    version: 3,
+    version: 4,
   };
 }
 

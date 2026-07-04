@@ -5,12 +5,13 @@ import { PrimaryButton, medicalTheme } from "@/components/enterprise/EnterpriseU
 import { downloadEcgViewerWorkspacePdf, downloadEcgViewerWorkspaceJson } from "@/services/ecgViewerWorkspace";
 
 import { exportMeasurements } from "./ecgMeasurementEngine";
-
+import type { EcgAiOverlayWorkspace } from "./useEcgAiOverlayWorkspace";
 import type { EcgMeasurementWorkspace } from "./useEcgMeasurementWorkspace";
 import type { EcgViewerControls } from "./useEcgViewerControls";
 
 type Props = {
   accessToken?: string;
+  aiOverlay?: EcgAiOverlayWorkspace;
   caseId?: string;
   controls: EcgViewerControls;
   imageUrl?: string;
@@ -21,9 +22,11 @@ type Props = {
   workspace?: EcgMeasurementWorkspace;
 };
 
-export function EcgViewerToolbar({ accessToken, caseId, controls, imageUrl, pdfUrl, onOpen, onUpload, onCapture, workspace }: Props) {
+export function EcgViewerToolbar({ accessToken, aiOverlay, caseId, controls, imageUrl, pdfUrl, onOpen, onUpload, onCapture, workspace }: Props) {
   const exportTarget = imageUrl ?? pdfUrl;
   const measureActive = workspace?.present.toolMode === "caliper" || workspace?.present.toolMode === "measurement";
+  const overlaySettings = aiOverlay?.present.settings;
+  const overlayEnabled = overlaySettings?.enabled ?? false;
 
   const exportPdf = useCallback(async () => {
     if (accessToken && caseId && Platform.OS === "web" && typeof window !== "undefined") {
@@ -52,6 +55,41 @@ export function EcgViewerToolbar({ accessToken, caseId, controls, imageUrl, pdfU
     }
   }, [accessToken, caseId, workspace]);
 
+  const exportOverlay = useCallback(() => {
+    if (!aiOverlay || Platform.OS !== "web" || typeof window === "undefined") return;
+    const bundle = aiOverlay.exportOverlay();
+    const blob = new Blob([JSON.stringify(bundle, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = `ecg-ai-overlay-${caseId ?? "workspace"}.json`;
+    anchor.click();
+    URL.revokeObjectURL(url);
+  }, [aiOverlay, caseId]);
+
+  const printOverlay = useCallback(() => {
+    if (Platform.OS !== "web" || typeof window === "undefined") return;
+    window.print();
+  }, []);
+
+  const cycleTheme = useCallback(() => {
+    if (!aiOverlay) return;
+    const next = overlaySettings?.theme === "clinical" ? "dark" : overlaySettings?.theme === "dark" ? "light" : "clinical";
+    aiOverlay.setSettings({ theme: next });
+  }, [aiOverlay, overlaySettings?.theme]);
+
+  const cycleOpacity = useCallback(() => {
+    if (!aiOverlay) return;
+    const current = overlaySettings?.opacity ?? 0.82;
+    aiOverlay.setSettings({ opacity: current >= 1 ? 0.55 : Math.min(Number((current + 0.15).toFixed(2)), 1) });
+  }, [aiOverlay, overlaySettings?.opacity]);
+
+  const cycleFontScale = useCallback(() => {
+    if (!aiOverlay) return;
+    const current = overlaySettings?.fontScale ?? 1;
+    aiOverlay.setSettings({ fontScale: current >= 1.4 ? 0.85 : Number((current + 0.15).toFixed(2)) });
+  }, [aiOverlay, overlaySettings?.fontScale]);
+
   return (
     <View style={styles.toolbar} testID="sprint13-ecg-viewer-toolbar">
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.row}>
@@ -72,20 +110,18 @@ export function EcgViewerToolbar({ accessToken, caseId, controls, imageUrl, pdfU
           variant={measureActive ? "primary" : "outline"}
         />
         <PrimaryButton disabled label="Compare" onPress={() => undefined} variant="outline" />
-        <PrimaryButton disabled label="AI Overlay" onPress={() => undefined} variant="outline" />
+        <PrimaryButton
+          label={overlayEnabled ? "AI Overlay On" : "AI Overlay"}
+          onPress={() => aiOverlay?.toggleOverlay()}
+          variant={overlayEnabled ? "primary" : "outline"}
+        />
         <PrimaryButton label="Caliper" onPress={() => workspace?.setToolMode("caliper")} variant={workspace?.present.toolMode === "caliper" ? "primary" : "outline"} />
         <PrimaryButton label="Annotation" onPress={() => workspace?.setToolMode("annotation")} variant={workspace?.present.toolMode === "annotation" ? "primary" : "outline"} />
         <PrimaryButton disabled={!workspace?.canUndo} label="Undo" onPress={() => workspace?.undo()} variant="outline" />
         <PrimaryButton disabled={!workspace?.canRedo} label="Redo" onPress={() => workspace?.redo()} variant="outline" />
         <PrimaryButton label="Export PDF" onPress={() => void exportPdf()} variant="outline" />
         <PrimaryButton label="Export JSON" onPress={() => void exportJson()} variant="outline" />
-        <PrimaryButton
-          label="Print"
-          onPress={() => {
-            if (Platform.OS === "web" && typeof window !== "undefined" && exportTarget) window.open(exportTarget, "_blank");
-          }}
-          variant="outline"
-        />
+        <PrimaryButton label="Print" onPress={printOverlay} variant="outline" />
         <PrimaryButton label={controls.fullscreen ? "Exit Fullscreen" : "Fullscreen"} onPress={controls.toggleFullscreen} variant="outline" />
         <PrimaryButton label={controls.grid.visible ? "Grid On" : "Grid Off"} onPress={controls.toggleGrid} variant={controls.grid.visible ? "primary" : "outline"} />
         <PrimaryButton label={`Grid ${Math.round(controls.grid.opacity * 100)}%`} onPress={controls.cycleGridOpacity} variant="outline" />
@@ -101,6 +137,32 @@ export function EcgViewerToolbar({ accessToken, caseId, controls, imageUrl, pdfU
         <PrimaryButton label="More Contrast" onPress={() => controls.setAdjustments((value) => ({ ...value, contrast: Math.min(value.contrast + 10, 180) }))} variant="outline" />
         <PrimaryButton label="Less Contrast" onPress={() => controls.setAdjustments((value) => ({ ...value, contrast: Math.max(value.contrast - 10, 40) }))} variant="outline" />
         <PrimaryButton label="Image Reset" onPress={controls.resetAdjustments} variant="outline" />
+        {aiOverlay ? (
+          <>
+            <PrimaryButton
+              label={overlaySettings?.showAnnotations ? "Annotations On" : "Annotations Off"}
+              onPress={() => aiOverlay.setSettings({ showAnnotations: !overlaySettings?.showAnnotations })}
+              variant={overlaySettings?.showAnnotations ? "primary" : "outline"}
+            />
+            <PrimaryButton
+              label={overlaySettings?.showLabels ? "Labels On" : "Labels Off"}
+              onPress={() => aiOverlay.setSettings({ showLabels: !overlaySettings?.showLabels })}
+              variant={overlaySettings?.showLabels ? "primary" : "outline"}
+            />
+            <PrimaryButton
+              label={overlaySettings?.showConfidence ? "Confidence On" : "Confidence Off"}
+              onPress={() => aiOverlay.setSettings({ showConfidence: !overlaySettings?.showConfidence })}
+              variant={overlaySettings?.showConfidence ? "primary" : "outline"}
+            />
+            <PrimaryButton label={`Overlay ${Math.round((overlaySettings?.opacity ?? 0.82) * 100)}%`} onPress={cycleOpacity} variant="outline" />
+            <PrimaryButton label={`Font ${Math.round((overlaySettings?.fontScale ?? 1) * 100)}%`} onPress={cycleFontScale} variant="outline" />
+            <PrimaryButton label={`Theme ${overlaySettings?.theme ?? "clinical"}`} onPress={cycleTheme} variant="outline" />
+            <PrimaryButton label="Reset Overlay" onPress={() => aiOverlay.resetOverlay()} variant="outline" />
+            <PrimaryButton label="Export Overlay" onPress={exportOverlay} variant="outline" />
+            <PrimaryButton disabled={!aiOverlay.canUndo} label="Overlay Undo" onPress={() => aiOverlay.undo()} variant="outline" />
+            <PrimaryButton disabled={!aiOverlay.canRedo} label="Overlay Redo" onPress={() => aiOverlay.redo()} variant="outline" />
+          </>
+        ) : null}
       </ScrollView>
     </View>
   );

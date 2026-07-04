@@ -54,7 +54,7 @@ const capabilityMarkers = [
   "STANDARD_ECG_LEADS",
   "Export JSON",
   "confidence",
-  "version: 3",
+  "version: 4",
 ];
 
 for (const marker of capabilityMarkers) {

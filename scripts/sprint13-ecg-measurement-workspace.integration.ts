@@ -71,7 +71,7 @@ for (const marker of capabilityMarkers) {
 
 assert(toolbar.includes('label="Measure"') && !toolbar.includes('disabled label="Measure"'), "Measure tool must be enabled in Phase 2.");
 assert(toolbar.includes('label="Compare"') && toolbar.includes("disabled"), "Compare must remain disabled.");
-assert(toolbar.includes('label="AI Overlay"') && toolbar.includes("disabled"), "AI Overlay must remain disabled.");
+assert(toolbar.includes('"AI Overlay"') && toolbar.includes("toggleOverlay") && !toolbar.includes('disabled label="AI Overlay"'), "AI Overlay must be enabled in Sprint 14 Phase 2.");
 assert(foundation.includes("useEcgMeasurementWorkspace"), "Foundation must wire measurement workspace.");
 assert(routes.includes("ecg-viewer-workspace/export"), "Server must expose measurement PDF export.");
 assert(pipeline.includes("sprint13-ecg-measurement-workspace.integration.ts"), "Integration pipeline must register Phase 2 test.");

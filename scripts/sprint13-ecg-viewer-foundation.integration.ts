@@ -81,9 +81,9 @@ assert(route.includes("patient-loading"), "ecg-monitor route must wait for patie
 assert(enterpriseUi.includes("/ecg-monitor"), "Enterprise shell must register ecg-monitor workspace route.");
 assert(pipeline.includes("sprint13-ecg-viewer-foundation.integration.ts"), "Integration pipeline must register Sprint 13 viewer foundation test.");
 assert(toolbar.includes('label="Compare"') && toolbar.includes("disabled"), "Compare tool must remain disabled in Phase 1.");
-assert(toolbar.includes('label="AI Overlay"') && toolbar.includes("disabled"), "AI Overlay must remain disabled in Phase 1.");
+assert(toolbar.includes('"AI Overlay"') && toolbar.includes("toggleOverlay") && !toolbar.includes('disabled label="AI Overlay"'), "AI Overlay must be enabled in Sprint 14 Phase 2.");
 assert(toolbar.includes('label="Measure"'), "Measure tool must exist in viewer toolbar.");
-assert(!foundation.includes("AnnotationLayer"), "Phase 1 foundation must not include AI annotation overlays.");
+assert(foundation.includes("useEcgAiOverlayWorkspace"), "Foundation must wire AI clinical overlay workspace.");
 assert(!foundation.includes("WaveformGrid"), "Phase 1 foundation must not include waveform digitization UI.");
 
 console.log("sprint13-ecg-viewer-foundation.integration.ts: all Sprint 13 Phase 1 checks passed");
