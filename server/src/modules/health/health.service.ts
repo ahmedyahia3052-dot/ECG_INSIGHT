@@ -1,10 +1,12 @@
 import fs from "node:fs";
 import fsp from "node:fs/promises";
+import net from "node:net";
 import path from "node:path";
 import { env } from "../../config/env";
 import { prisma } from "../../config/prisma";
 import { metricsSnapshot } from "../../middleware/observability";
 import { hasLocalOnnxModel, resolveOnnxModelPath } from "../../ai/onnx-runtime.service";
+import { probeOllama } from "../../llm/ollama-runtime";
 
 const workspaceRoot = path.resolve(__dirname, "../../../..");
 
@@ -108,6 +110,116 @@ export async function auditPipelineHealth() {
 function componentStatus(result: { ok: boolean }, degraded = false): HealthStatus {
   if (result.ok) return degraded ? "degraded" : "healthy";
   return "down";
+}
+
+async function pingRedis(url: string) {
+  const parsed = new URL(url);
+  const port = parsed.port ? Number(parsed.port) : 6379;
+  return new Promise<void>((resolve, reject) => {
+    const socket = net.createConnection({ host: parsed.hostname, port });
+    socket.setTimeout(4_000);
+    socket.once("connect", () => {
+      socket.end();
+      resolve();
+    });
+    socket.once("error", reject);
+    socket.once("timeout", () => {
+      socket.destroy();
+      reject(new Error("Redis connection timed out."));
+    });
+  });
+}
+
+export async function ollamaReadinessHealth() {
+  const required = env.OLLAMA_ENABLED && env.LLM_PROVIDER === "ollama" && !env.COPILOT_LLM_MOCK;
+  if (!required) {
+    return {
+      details: { connected: false, mockMode: env.COPILOT_LLM_MOCK, provider: env.LLM_PROVIDER, required: false, skipped: true },
+      durationMs: 0,
+      ok: true,
+    };
+  }
+  const start = Date.now();
+  try {
+    const runtime = await probeOllama(env.OLLAMA_BASE_URL);
+    return {
+      details: {
+        baseUrl: runtime.baseUrl,
+        connected: runtime.connected,
+        ollamaVersion: runtime.ollamaVersion,
+        required: true,
+        selectedModel: runtime.selectedModel,
+        skipped: false,
+      },
+      durationMs: Date.now() - start,
+      ok: runtime.connected,
+    };
+  } catch (error) {
+    return {
+      details: {
+        error: error instanceof Error ? error.message : String(error),
+        required: true,
+        skipped: false,
+      },
+      durationMs: Date.now() - start,
+      ok: false,
+    };
+  }
+}
+
+export async function redisReadinessHealth() {
+  const required = Boolean(env.REDIS_URL);
+  if (!required) {
+    return { details: { connected: false, required: false, skipped: true }, durationMs: 0, ok: true };
+  }
+  const start = Date.now();
+  try {
+    await pingRedis(env.REDIS_URL!);
+    return {
+      details: { connected: true, required: true, skipped: false, url: env.REDIS_URL },
+      durationMs: Date.now() - start,
+      ok: true,
+    };
+  } catch (error) {
+    return {
+      details: {
+        error: error instanceof Error ? error.message : String(error),
+        required: true,
+        skipped: false,
+        url: env.REDIS_URL,
+      },
+      durationMs: Date.now() - start,
+      ok: false,
+    };
+  }
+}
+
+export async function dependencyReadinessSnapshot() {
+  const started = Date.now();
+  const [database, ollama, redis, storage] = await Promise.all([
+    databaseHealth(),
+    ollamaReadinessHealth(),
+    redisReadinessHealth(),
+    storageHealth(),
+  ]);
+
+  const ollamaOk = ollama.ok;
+  const redisOk = redis.ok;
+  const ok = database.ok && storage.ok && ollamaOk && redisOk;
+
+  return {
+    checks: {
+      database: { ...database, status: componentStatus(database) },
+      ollama: { ...ollama, status: ollamaOk ? "healthy" : "down" },
+      redis: { ...redis, status: redisOk ? (redis.details?.skipped ? "skipped" : "healthy") : "down" },
+      storage: { ...storage, status: componentStatus(storage) },
+    },
+    durationMs: Date.now() - started,
+    environment: env.NODE_ENV,
+    ok,
+    service: "ecg-insight-api",
+    timestamp: new Date().toISOString(),
+  };
 }
 
 export async function productionReadinessSnapshot() {

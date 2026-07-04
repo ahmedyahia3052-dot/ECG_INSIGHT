@@ -1,5 +1,5 @@
-import { expect, test } from "@playwright/test";
-import { API_URL, apiLogin, attachStrictRuntimeDiagnostics, authHeaders, clickCopilotStreamingAction, createClinicalFixture, disableCopilotVoiceMode, expectPageReady, exportCopilotConversation, navigate, uiLogin, uploadCopilotAttachment, waitForCopilotIdle } from "./utils/qa";
+import { expect, test } from "./test";
+import { API_URL, apiLogin, attachStrictRuntimeDiagnostics, authHeaders, bootstrapAuthenticatedPage, clickCopilotStreamingAction, createClinicalFixture, disableCopilotVoiceMode, expectPageReady, exportCopilotConversation, navigate, uiLogin, uploadCopilotAttachment, waitForCopilotIdle } from "./utils/qa";
 import { installCopilotVoiceMocks } from "./utils/voice-mocks";
 
 test.describe("owner controls, copilot, ECG viewer, search, notifications, and exports", () => {
@@ -106,12 +106,10 @@ test.describe("owner controls, copilot, ECG viewer, search, notifications, and e
   });
 
   test("ECG Pro Viewer exposes viewer controls, annotations, AI explainability, and report actions", async ({ page, request }) => {
-    const fixture = await createClinicalFixture(request, { analyze: true, report: true });
-    await uiLogin(page, "doctor");
-    await navigate(page, "/ecg-cases", "ECG Case Management");
-    await page.getByPlaceholder(/Search case/i).fill(fixture.caseNumber ?? fixture.caseId);
-    await expect(page.getByText(fixture.caseNumber ?? fixture.caseId)).toBeVisible({ timeout: 30_000 });
-    await page.getByRole("button", { name: "Open" }).first().click();
+    const fixture = await createClinicalFixture(request, { analyze: true, report: false });
+    await bootstrapAuthenticatedPage(page, "doctor");
+    await page.goto(`/ecg-cases/${fixture.caseId}`, { timeout: 30_000, waitUntil: "domcontentloaded" });
+    await expect(page.getByText(/Loading ECG case/i)).toHaveCount(0, { timeout: 45_000 });
     await expect(page.getByText(/ECG Measurements|AI Findings|Explainability|ECG Case/).first()).toBeVisible({ timeout: 60_000 });
     await expect(page.getByRole("button", { name: /Run AI|Generate Report|Review|Process/i }).first()).toBeVisible();
     await page.getByRole("button", { name: /Generate Report/i }).first().click();

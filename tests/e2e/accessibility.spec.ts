@@ -1,4 +1,4 @@
-import { test } from "@playwright/test";
+import { expect, test } from "./test";
 import { attachA11yScan, navigate, uiLogin } from "./utils/qa";
 
 test.describe("accessibility regression", () => {

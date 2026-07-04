@@ -1,4 +1,5 @@
 import { createServer } from "node:http";
+import { runIntegrationMain } from "./finish-integration";
 import { PrismaClient } from "@prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { createApp } from "../server/src/app";
@@ -139,8 +140,4 @@ async function main() {
   }
 }
 
-main().catch(async (error) => {
-  console.error(error);
-  await prisma.$disconnect();
-  process.exit(1);
-});
+runIntegrationMain(main, "enterprise-auth.integration.ts");

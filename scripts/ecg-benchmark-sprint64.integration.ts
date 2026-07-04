@@ -1,4 +1,5 @@
 import { computeBenchmarkMetrics } from "../server/src/modules/ecg-benchmark/metrics";
+import { runIntegrationMain } from "./finish-integration";
 import { runClinicalBenchmark } from "../server/src/modules/ecg-benchmark/benchmark-engine";
 import { BUILTIN_BENCHMARK_MANIFESTS } from "../server/src/modules/ecg-benchmark/datasets";
 import { runBenchmarkPipelineCase } from "../server/src/modules/ecg-benchmark/pipeline-runner";
@@ -48,7 +49,4 @@ async function main() {
   console.log("ecg-benchmark-sprint64.integration.ts: all tests passed");
 }
 
-main().catch((error) => {
-  console.error(error);
-  process.exit(1);
-});
+runIntegrationMain(main, "ecg-benchmark-sprint64.integration.ts: all tests passed");

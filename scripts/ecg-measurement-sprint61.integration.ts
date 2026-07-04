@@ -1,4 +1,5 @@
 import fs from "node:fs/promises";
+import { runIntegrationMain } from "./finish-integration";
 import path from "node:path";
 import sharp from "sharp";
 import { measureFromLeads } from "../server/src/modules/ecg-measurement";
@@ -79,7 +80,4 @@ async function main() {
   console.log("ecg-measurement-sprint61.integration.ts: all tests passed");
 }
 
-main().catch((error) => {
-  console.error(error);
-  process.exit(1);
-});
+runIntegrationMain(main, "ecg-measurement-sprint61.integration.ts: all tests passed");

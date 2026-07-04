@@ -1,4 +1,5 @@
 import { readFileSync, readdirSync, statSync } from "node:fs";
+import { runIntegrationMain } from "./finish-integration";
 import path from "node:path";
 import { createServer } from "node:http";
 import { createApp } from "../server/src/app";
@@ -89,7 +90,4 @@ async function main() {
   console.log(`Sprint 4.2 passed (ollamaConnected=${runtime.connected}, model=${result.model}, noApiKeyGuards=true).`);
 }
 
-main().catch((error) => {
-  console.error(error instanceof Error ? error.message : error);
-  process.exit(1);
-});
+runIntegrationMain(main, "Sprint 4.2 passed (ollamaConnected=${runtime.connected}, model=${result.model}, noApiKeyGuards=true)");

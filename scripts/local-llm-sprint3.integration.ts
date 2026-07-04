@@ -1,4 +1,5 @@
 import { createServer } from "node:http";
+import { runIntegrationMain } from "./finish-integration";
 import { createApp } from "../server/src/app";
 import { initializeLlmProvider } from "../server/src/llm/llm-registry";
 
@@ -37,7 +38,4 @@ async function main() {
   console.log(`Local LLM API checks passed (provider=${health.provider}, status=${health.status}, model=${health.model}).`);
 }
 
-main().catch((error) => {
-  console.error(error instanceof Error ? error.message : error);
-  process.exit(1);
-});
+runIntegrationMain(main, "Local LLM API checks passed (provider=${health.provider}, status=${health.status}, model=${health.model})");

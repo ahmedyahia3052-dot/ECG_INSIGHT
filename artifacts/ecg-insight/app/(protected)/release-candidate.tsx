@@ -10,13 +10,13 @@ import { safeArray } from "@/utils/collections";
 export default function ReleaseCandidateScreen() {
   const { authToken, user } = useAuth();
   const token = authToken?.token;
-  const isOwner = user?.email?.toLowerCase() === "ahmedyahia3052@gmail.com";
+  const isOwner = user?.isOwner === true || user?.email?.toLowerCase() === "ahmedyahia3052@gmail.com";
 
   const dashboardQuery = useQuery({
     enabled: !!token && isOwner,
     queryFn: () => getReleaseCandidateDashboard(token!),
     queryKey: ["release-candidate-dashboard", token],
-    retry: false,
+    retry: 1,
   });
 
   if (!isOwner) {
@@ -43,7 +43,7 @@ export default function ReleaseCandidateScreen() {
       ) : null}
 
       {release ? (
-        <>
+        <View testID="release-candidate-ready">
           <View style={styles.stats}>
             <StatCard icon="target" label="Release Readiness" value={`${release.releaseReadinessScore}%`} />
             <StatCard icon="check-circle" label="Launch Decision" tone={release.launchDecision === "GO" ? "success" : "critical"} value={release.launchDecision} />
@@ -74,7 +74,7 @@ export default function ReleaseCandidateScreen() {
               Regression status: {release.bugBash.regressionStatus}
             </Text>
           </Card>
-        </>
+        </View>
       ) : dashboardQuery.isError ? (
         <EmptyState message="Unable to load release candidate dashboard from the API." title="Dashboard unavailable" />
       ) : null}

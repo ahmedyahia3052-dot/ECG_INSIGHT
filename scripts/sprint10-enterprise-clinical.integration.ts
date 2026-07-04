@@ -1,4 +1,5 @@
 import { createServer } from "node:http";
+import { runIntegrationMain } from "./finish-integration";
 import bcrypt from "bcryptjs";
 import { PrismaClient } from "@prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
@@ -69,9 +70,4 @@ async function main() {
   console.log("sprint10-enterprise-clinical.integration.ts: all tests passed");
 }
 
-main().catch((error) => {
-  console.error(error);
-  process.exit(1);
-}).finally(async () => {
-  await prisma.$disconnect();
-});
+runIntegrationMain(main, "sprint10-enterprise-clinical.integration.ts: all tests passed");

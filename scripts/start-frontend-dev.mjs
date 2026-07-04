@@ -1,4 +1,5 @@
 import { spawn } from "node:child_process";
+import { openSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -16,12 +17,26 @@ const env = {
 };
 
 const mode = process.argv.includes("--mobile") ? "" : "--web ";
+function resolveStdio() {
+  const logPath = process.env.STARTUP_LOG_PATH;
+  if (!logPath) return "inherit";
+  const logFd = openSync(logPath, "a");
+  return ["ignore", logFd, logFd];
+}
+
+const detached = process.env.E2E_DETACHED === "1";
 const child = spawn(`npx expo start ${mode}--localhost --port 8081`, {
   cwd: frontendDir,
-  env,
+  detached,
+  env: { ...env, EXPO_PUBLIC_API_URL: process.env.EXPO_PUBLIC_API_URL ?? env.EXPO_PUBLIC_API_URL },
   shell: true,
-  stdio: "inherit",
+  stdio: resolveStdio(),
 });
+
+if (detached) {
+  child.unref();
+  process.exit(0);
+}
 
 child.on("exit", (code, signal) => {
   if (signal) {

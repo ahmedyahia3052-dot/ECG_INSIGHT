@@ -1,5 +1,6 @@
 process.env.COPILOT_LLM_MOCK = "true";
 
+import { runIntegrationMain } from "./finish-integration";
 import {
   KnowledgeRouter,
   StreamingRenderer,
@@ -78,7 +79,4 @@ async function main() {
   console.log("Clinical AI Copilot Engine integration checks passed (V3).");
 }
 
-main().catch((error) => {
-  console.error(error);
-  process.exit(1);
-});
+runIntegrationMain(main, "Clinical AI Copilot Engine integration checks passed (V3)");

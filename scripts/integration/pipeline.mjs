@@ -1,0 +1,75 @@
+/** Single source of truth for the integration test pipeline. */
+export const INTEGRATION_ENTRYPOINT = "scripts/run-integration-suite.mjs";
+export const NPM_TEST_INTEGRATION_COMMAND = "node scripts/run-integration-suite.mjs";
+
+export const integrationScripts = [
+  "scripts/ecg-acquisition.test.ts",
+  "scripts/ecg-digitization.integration.ts",
+  "scripts/ecg-image-pipeline-sprint6.integration.ts",
+  "scripts/ecg-measurement-sprint61.integration.ts",
+  "scripts/ecg-interpretation-sprint62.integration.ts",
+  "scripts/ecg-ai-diagnosis-sprint63.integration.ts",
+  "scripts/ecg-benchmark-sprint64.integration.ts",
+  "scripts/sprint10-enterprise-clinical.integration.ts",
+  "scripts/ecg-end-to-end-analysis.integration.ts",
+  "scripts/patient-case-management.integration.ts",
+  "scripts/sprint27-occupational-cardiology.integration.ts",
+  "scripts/sprint28-subscription-platform.integration.ts",
+  "scripts/sprint29-production-infrastructure.integration.ts",
+  "scripts/sprint30-mobile-pwa.integration.ts",
+  "scripts/sprint31-payment-platform.integration.ts",
+  "scripts/sprint32-notification-center.integration.ts",
+  "scripts/sprint33-collaboration-platform.integration.ts",
+  "scripts/sprint34-cdss.integration.ts",
+  "scripts/sprint35-longitudinal-ecg.integration.ts",
+  "scripts/sprint36-security-hardening.integration.ts",
+  "scripts/sprint37-release-candidate.integration.ts",
+  "scripts/auth-session-hardening.integration.ts",
+  "scripts/dashboard-production-lockdown.integration.ts",
+  "scripts/copilot-conversation-pipeline.integration.ts",
+  "scripts/copilot-intent-classifier.integration.ts",
+  "scripts/copilot-clinical-ai-core-sprint1.integration.ts",
+  "scripts/copilot-medical-knowledge-engine-sprint2.integration.ts",
+  "scripts/local-llm-sprint3.integration.ts",
+  "scripts/local-llm-sprint41.integration.ts",
+  "scripts/local-llm-sprint42.integration.ts",
+  "scripts/copilot-clinical-ai-sprint5.integration.ts",
+  "scripts/copilot-clinical-ai-v3.integration.ts",
+  "scripts/copilot-clinical-engine-v2.integration.ts",
+  "scripts/copilot-clinical-ai-core-v1.integration.ts",
+  "scripts/copilot-clinical-ai-core-v2.integration.ts",
+  "scripts/copilot-clinical-education.integration.ts",
+  "scripts/copilot-clinical-reasoning.integration.ts",
+  "scripts/copilot-final-closure.integration.ts",
+  "scripts/sprint11-enterprise-stability.integration.ts",
+  "scripts/sprint11.1-enterprise-hardening.integration.ts",
+  "scripts/sprint12-enterprise-workspace.integration.ts",
+  "scripts/copilot-workspace-foundation.integration.ts",
+  "scripts/copilot-stabilization.integration.ts",
+  "scripts/copilot-medical-knowledge-rag.integration.ts",
+  "scripts/copilot-enterprise-workspace.integration.ts",
+  "scripts/ecg-medical-report-system.integration.ts",
+  "scripts/ecg-pro-viewer-workspace.test.ts",
+  "scripts/monetization.integration.ts",
+  "scripts/super-admin.integration.ts",
+  "scripts/owner-security.integration.ts",
+  "scripts/enterprise-auth.integration.ts",
+  "scripts/auth-production-stabilization.integration.ts",
+  "scripts/clinical-workflow.integration.ts",
+];
+
+export const releaseE2eSpecs = [
+  "tests/e2e/auth-navigation.spec.ts",
+  "tests/e2e/clinical-workflows.spec.ts",
+  "tests/e2e/mobile-responsive.spec.ts",
+  "tests/e2e/production-smoke.spec.ts",
+  "tests/e2e/release-candidate.spec.ts",
+];
+
+export const releaseDocs = [
+  "SPRINT_37_RELEASE_CANDIDATE_REPORT.md",
+  "PRODUCTION_DEPLOYMENT_GUIDE.md",
+  "LAUNCH_CHECKLIST.md",
+];
+
+export const releaseLoadScript = "scripts/release-candidate-load.ts";

@@ -1,4 +1,5 @@
 import { createServer } from "node:http";
+import { runIntegrationMain } from "./finish-integration";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { PrismaClient } from "@prisma/client";
@@ -295,8 +296,4 @@ async function main() {
   }
 }
 
-main().catch(async (error) => {
-  console.error(error);
-  await prisma.$disconnect();
-  process.exit(1);
-});
+runIntegrationMain(main, "auth-production-stabilization.integration.ts");

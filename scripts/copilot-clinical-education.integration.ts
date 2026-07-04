@@ -1,5 +1,6 @@
 process.env.COPILOT_LLM_MOCK = "true";
 
+import { runIntegrationMain } from "./finish-integration";
 import {
   ClinicalKnowledgeRouter,
   runClinicalCopilotEngine,
@@ -80,7 +81,4 @@ async function main() {
   console.log("copilot-clinical-education.integration.ts: all tests passed");
 }
 
-main().catch((error) => {
-  console.error(error);
-  process.exit(1);
-});
+runIntegrationMain(main, "copilot-clinical-education.integration.ts: all tests passed");

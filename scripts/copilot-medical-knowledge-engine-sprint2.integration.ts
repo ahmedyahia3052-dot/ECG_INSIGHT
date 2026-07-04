@@ -1,6 +1,7 @@
 /**
  * Sprint 2 — Medical Knowledge Engine V1
  */
+import { runIntegrationMain } from "./finish-integration";
 process.env.COPILOT_LLM_MOCK = "true";
 
 import fs from "node:fs";
@@ -93,7 +94,4 @@ async function main() {
   console.log("Sprint 2 Medical Knowledge Engine integration passed.");
 }
 
-main().catch((error) => {
-  console.error(error);
-  process.exit(1);
-});
+runIntegrationMain(main, "Sprint 2 Medical Knowledge Engine integration passed");

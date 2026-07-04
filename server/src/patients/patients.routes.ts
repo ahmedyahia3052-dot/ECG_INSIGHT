@@ -17,8 +17,25 @@ function fullNameFor(input: { firstName?: string; lastName?: string; middleName?
 }
 
 async function nextPatientCode() {
-  const total = await prisma.patient.count();
-  return `ECG-${String(total + 1).padStart(6, "0")}`;
+  const rows = await prisma.$queryRaw<Array<{ max: number | null }>>`
+    SELECT MAX(CAST(SUBSTRING("patientCode" FROM 5) AS INTEGER)) AS max
+    FROM "Patient"
+    WHERE "patientCode" ~ '^ECG-[0-9]+$'
+  `;
+  const next = Number(rows[0]?.max ?? 0) + 1;
+  return `ECG-${String(next).padStart(6, "0")}`;
+}
+
+function isPatientCodeConflict(error: unknown) {
+  return (
+    typeof error === "object"
+    && error !== null
+    && "code" in error
+    && (error as { code?: string }).code === "P2002"
+    && "meta" in error
+    && Array.isArray((error as { meta?: { target?: unknown } }).meta?.target)
+    && ((error as { meta: { target: string[] } }).meta.target).includes("patientCode")
+  );
 }
 
 function patientData(body: Record<string, unknown>, actorId: string, create = false): Prisma.PatientUncheckedCreateInput | Prisma.PatientUncheckedUpdateInput {
@@ -162,12 +179,23 @@ patientsRouter.get("/export/:format", requireRole("ADMIN"), async (req, res, nex
 
 patientsRouter.post("/", requireRole("DOCTOR"), validateBody(patientBodySchema), async (req, res, next) => {
   try {
-    const patient = await prisma.patient.create({
-      data: {
-        ...(patientData(req.body, req.auth!.id, true) as Prisma.PatientUncheckedCreateInput),
-        patientCode: await nextPatientCode(),
-      },
-    });
+    const baseData = patientData(req.body, req.auth!.id, true) as Prisma.PatientUncheckedCreateInput;
+    let patient = null;
+    for (let attempt = 0; attempt < 8; attempt += 1) {
+      try {
+        patient = await prisma.patient.create({
+          data: {
+            ...baseData,
+            patientCode: await nextPatientCode(),
+          },
+        });
+        break;
+      } catch (error) {
+        if (isPatientCodeConflict(error) && attempt < 7) continue;
+        throw error;
+      }
+    }
+    if (!patient) throw new AppError(500, "Unable to allocate a unique patient code.", "PATIENT_CODE_ALLOCATION_FAILED");
     await prisma.auditLog.create({
       data: {
         action: "PATIENT_CREATED",

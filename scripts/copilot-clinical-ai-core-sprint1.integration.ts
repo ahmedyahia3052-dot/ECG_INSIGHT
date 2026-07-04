@@ -1,6 +1,7 @@
 /**
  * Sprint 1 — Clinical AI Core Foundation integration scenarios.
  */
+import { runIntegrationMain } from "./finish-integration";
 process.env.COPILOT_LLM_MOCK = "true";
 
 import { CLINICAL_AI_ENGINE_VERSION } from "../server/src/modules/copilot/engine/types";
@@ -97,7 +98,4 @@ async function main() {
   console.log("Clinical AI Core Sprint 1 integration passed (13 conversational scenarios).");
 }
 
-main().catch((error) => {
-  console.error(error instanceof Error ? error.message : error);
-  process.exit(1);
-});
+runIntegrationMain(main, "Clinical AI Core Sprint 1 integration passed (13 conversational scenarios)");

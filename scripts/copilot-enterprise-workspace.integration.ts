@@ -1,5 +1,6 @@
 process.env.COPILOT_LLM_MOCK = "true";
 
+import { runIntegrationMain } from "./finish-integration";
 import { createServer } from "node:http";
 import { PrismaClient } from "@prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
@@ -275,8 +276,4 @@ async function main() {
   }
 }
 
-main().catch(async (error) => {
-  console.error(error);
-  await prisma.$disconnect();
-  process.exit(1);
-});
+runIntegrationMain(main, "Copilot enterprise workspace integration checks passed");

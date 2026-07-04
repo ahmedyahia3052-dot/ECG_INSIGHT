@@ -7,6 +7,7 @@ import {
   type EcgAcquisitionAsset,
 } from "../artifacts/ecg-insight/services/ecgImageProcessor";
 
+import { runIntegrationMain } from "./finish-integration";
 function assert(condition: unknown, message: string): asserts condition {
   if (!condition) throw new Error(message);
 }
@@ -59,7 +60,4 @@ async function main() {
   console.log("ECG acquisition processor tests passed.");
 }
 
-main().catch((error) => {
-  console.error(error);
-  process.exitCode = 1;
-});
+runIntegrationMain(main, "ECG acquisition processor tests passed");

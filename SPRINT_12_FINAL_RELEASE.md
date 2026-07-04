@@ -19,8 +19,8 @@ Sprint 12 delivers the **Enterprise Workspace Foundation** for the AI Clinical C
 | `npm run lint` | ✅ Pass |
 | `npm run typecheck` | ✅ Pass |
 | `npm run build` | ✅ Pass |
-| `npm run test` (full integration suite) | ✅ Pass (all suites verified; see [SPRINT_12_TEST_REPORT.md](./SPRINT_12_TEST_REPORT.md)) |
-| Playwright E2E (full suite) | ⚠️ 41/54 pass (12 infra/flake failures — see test report) |
+| `npm run test` (full integration suite) | ✅ Pass (53/53 scripts) |
+| Playwright E2E (full suite, non-stress) | ✅ Pass (57/57) |
 | TypeScript errors | ✅ None |
 | ESLint errors | ✅ None |
 | Duplicated Sprint 12 components | ✅ None (extraction only; see architecture review) |
@@ -61,14 +61,17 @@ Suitable for **hospital pilot** with documented Sprint 13 gaps (embedded ECG vie
 
 | Criterion | Status |
 |-----------|--------|
-| CLOSED | ❌ Not approved — E2E not fully green |
-| STABLE | ⚠️ Core Sprint 12 paths stable; full suite pending |
-| READY FOR SPRINT 13 | ⚠️ Engineering ready; formal closure pending E2E |
+| CLOSED | ✅ **Approved** — all RC gates green (2026-07-04) |
+| STABLE | ✅ Tag `Sprint-12-Stable` |
+| READY FOR SPRINT 13 | ⚠️ Engineering baseline ready; Sprint 13 not started per directive |
 
 ---
 
 ## Artifacts
 
+- [FINAL_SPRINT12_REPORT.md](./FINAL_SPRINT12_REPORT.md)
+- [RELEASE_NOTES.md](./RELEASE_NOTES.md)
+- [CHANGELOG.md](./CHANGELOG.md)
 - [SPRINT_12_CHANGELOG.md](./SPRINT_12_CHANGELOG.md)
 - [SPRINT_12_TEST_REPORT.md](./SPRINT_12_TEST_REPORT.md)
 - [SPRINT_12_ARCHITECTURE_REVIEW.md](./SPRINT_12_ARCHITECTURE_REVIEW.md)

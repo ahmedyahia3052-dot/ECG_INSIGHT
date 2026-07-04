@@ -1,4 +1,5 @@
 import fs from "node:fs/promises";
+import { runIntegrationMain } from "./finish-integration";
 import path from "node:path";
 import sharp from "sharp";
 import { runDigitizationPipeline } from "../server/src/modules/ecg-digitization/digitizer";
@@ -67,7 +68,4 @@ async function main() {
   console.log("ecg-ai-diagnosis-sprint63.integration.ts: all tests passed");
 }
 
-main().catch((error) => {
-  console.error(error);
-  process.exit(1);
-});
+runIntegrationMain(main, "ecg-ai-diagnosis-sprint63.integration.ts: all tests passed");

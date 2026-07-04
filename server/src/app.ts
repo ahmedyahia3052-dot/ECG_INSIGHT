@@ -5,7 +5,6 @@ import rateLimit from "express-rate-limit";
 import helmet from "helmet";
 import passport from "passport";
 import { env } from "./config/env";
-import { prisma } from "./config/prisma";
 import { configureOAuthPassport } from "./auth/oauth-passport";
 import { errorHandler, notFoundHandler } from "./middleware/error";
 import { apiSecurityMiddleware } from "./middleware/api-security";
@@ -14,7 +13,7 @@ import { metricsSnapshot, requestMetrics } from "./middleware/observability";
 import { requestContext } from "./middleware/request-context";
 import { modulesRouter } from "./modules";
 import { registeredCopilotRoutes } from "./modules/copilot/copilot.routes";
-import { productionReadinessSnapshot } from "./modules/health/health.service";
+import { dependencyReadinessSnapshot, productionReadinessSnapshot } from "./modules/health/health.service";
 import { log } from "./utils/logger";
 
 const developmentOrigins = ["http://localhost:8082", "http://localhost:8081", "http://localhost:5173", "http://localhost:3000"];
@@ -37,6 +36,12 @@ function allowedOrigins() {
   return env.NODE_ENV === "development"
     ? Array.from(new Set([...configuredOrigins, ...developmentOrigins]))
     : configuredOrigins;
+}
+
+function isLocalAutomationRequest(req: express.Request) {
+  if (env.NODE_ENV !== "development") return false;
+  const ip = req.ip ?? "";
+  return ip === "127.0.0.1" || ip === "::1" || ip === "::ffff:127.0.0.1" || ip.endsWith("127.0.0.1");
 }
 
 export function createApp() {
@@ -74,6 +79,7 @@ export function createApp() {
     rateLimit({
       legacyHeaders: false,
       limit: env.RATE_LIMIT_MAX,
+      skip: (req) => isLocalAutomationRequest(req),
       standardHeaders: "draft-8",
       windowMs: env.RATE_LIMIT_WINDOW_MS,
     }),
@@ -100,24 +106,27 @@ export function createApp() {
       next(error);
     }
   });
-  app.get("/liveness", (req, res) => {
-    res.json({ ok: true, requestId: req.requestId, uptimeSeconds: Math.round(process.uptime()) });
-  });
-  app.get("/readiness", async (req, res, next) => {
+  const liveHandler = (req: express.Request, res: express.Response) => {
+    res.json({ ok: true, requestId: req.requestId, service: "ecg-insight-api", uptimeSeconds: Math.round(process.uptime()) });
+  };
+
+  const readyHandler = async (req: express.Request, res: express.Response, next: express.NextFunction) => {
     try {
-      await prisma.$queryRaw`SELECT 1`;
-      res.json({
-        checks: {
-          database: "ready",
-          environment: "ready",
-        },
-        ok: true,
+      const snapshot = await dependencyReadinessSnapshot();
+      res.status(snapshot.ok ? 200 : 503).json({
+        ...snapshot,
         requestId: req.requestId,
+        status: snapshot.ok ? "ready" : "not_ready",
       });
     } catch (error) {
       next(error);
     }
-  });
+  };
+
+  app.get("/live", liveHandler);
+  app.get("/liveness", liveHandler);
+  app.get("/ready", readyHandler);
+  app.get("/readiness", readyHandler);
   app.get("/metrics", (_req, res) => {
     res.json(metricsSnapshot());
   });

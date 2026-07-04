@@ -1,19 +1,10 @@
 # RC Flaky Analysis
 
-Generated: 2026-07-03T21:52:58.319Z
+Generated: 2026-07-03T22:49:50.531Z
 
-Intermittent failures are treated as incorrect state transitions. Instrumentation uses runtime events:
-StreamingStarted, StreamingFinished, VoiceIdle, UploadFinished, ViewerReady.
+Intermittent failures are treated as incorrect state transitions. Waits use runtime events:
+StreamingFinished, VoiceIdle, UploadFinished, ViewerReady, copilot-conversation-ready.
 
-## Latest gate outcome
+## Gate outcome
 
-Gate failed on run(s): 1. Review Playwright HTML report and test-results/playwright-junit.xml.
-
-## Root-cause categories addressed in this RC
-
-- race condition: conversation FSM + StreamingFinished event
-- async timing: event-based Playwright waits (no UI assertion retries)
-- voice initialization: VoiceIdle event + disable voice on New Chat
-- stale element: copilot-conversation-ready marker
-- network retry: streamCopilotMessage network-only retry; mutation retry removed
-- React rendering: explicit post-stream finalizeStream/onSettled
+Gate failed on run(s): 1. Review playwright-report/ and test-results/playwright-junit.xml.

@@ -1,5 +1,5 @@
 import { Feather } from "@expo/vector-icons";
-import { Link, useRouter } from "expo-router";
+import { Link, useLocalSearchParams, useRouter } from "expo-router";
 import React, { useEffect, useState } from "react";
 import { Linking, Pressable, StyleSheet, Text, View } from "react-native";
 import { z } from "zod";
@@ -17,6 +17,8 @@ const loginSchema = z.object({
 
 export default function LoginScreen() {
   const router = useRouter();
+  const { force } = useLocalSearchParams<{ force?: string }>();
+  const forceLogin = force === "1";
   const { isAuthenticated, isLoading, login } = useAuth();
   const { configuredProviders: rawConfiguredProviders, serverUnavailable } = useAuthOAuthProviders();
   const configuredProviders = safeArray(rawConfiguredProviders);
@@ -29,16 +31,11 @@ export default function LoginScreen() {
   const [oauthLoading, setOauthLoading] = useState<OAuthProvider | null>(null);
 
   useEffect(() => {
-    if (!isLoading && isAuthenticated) router.replace("/dashboard" as never);
-  }, [isAuthenticated, isLoading, router]);
+    if (!isLoading && isAuthenticated && !forceLogin) router.replace("/dashboard" as never);
+  }, [forceLogin, isAuthenticated, isLoading, router]);
 
   const submit = async () => {
     setError("");
-
-    if (serverUnavailable) {
-      setError("Server unavailable");
-      return;
-    }
 
     const parsed = loginSchema.safeParse({ email, password });
     if (!parsed.success) {
@@ -129,7 +126,7 @@ export default function LoginScreen() {
 
         {error ? <AuthMessage message={error} tone="error" /> : null}
 
-        <AuthPrimaryButton disabled={submitting || serverUnavailable} icon="log-in" label={submitting ? "Signing in..." : "Sign In"} onPress={submit} />
+        <AuthPrimaryButton disabled={submitting} icon="log-in" label={submitting ? "Signing in..." : "Sign In"} onPress={submit} />
 
         {configuredProviders.length ? (
           <View style={styles.oauthGrid}>

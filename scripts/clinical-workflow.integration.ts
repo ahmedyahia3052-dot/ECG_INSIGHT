@@ -1,4 +1,6 @@
 import { createServer } from "node:http";
+import { runIntegrationMain } from "./finish-integration";
+import { integrationStamp, deletePatientsByIds, deleteCasesByIds } from "./integration/test-isolation";
 import bcrypt from "bcryptjs";
 import { PrismaClient } from "@prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
@@ -104,8 +106,15 @@ async function main() {
   const admin = await login("admin@ecginsight.com");
   const doctor = await login("doctor@ecginsight.com");
   const other = await login("workflow-other@ecginsight.com");
-  const stamp = Date.now();
+  const stamp = integrationStamp("workflow");
+  const createdPatientIds: string[] = [];
+  const createdCaseIds: string[] = [];
+  let organizationId: string | null = null;
+  let departmentId: string | null = null;
+  let contractorId: string | null = null;
+  let employeeId: string | null = null;
 
+  try {
   let response = await request("/organizations", {
     body: { name: `Workflow Org ${stamp}`, status: "active", type: "company" },
     method: "POST",
@@ -113,6 +122,7 @@ async function main() {
   });
   expectStatus(response, 201, "organization create");
   const organization = (response.body as { organization: { id: string } }).organization;
+  organizationId = organization.id;
 
   response = await request("/departments", {
     body: { name: `Workflow Dept ${stamp}`, organizationId: organization.id },
@@ -121,6 +131,7 @@ async function main() {
   });
   expectStatus(response, 201, "department create");
   const department = (response.body as { department: { id: string } }).department;
+  departmentId = department.id;
 
   response = await request("/contractors", {
     body: { name: `Workflow Contractor ${stamp}`, organizationId: organization.id, status: "active" },
@@ -129,6 +140,7 @@ async function main() {
   });
   expectStatus(response, 201, "contractor create");
   const contractor = (response.body as { contractor: { id: string } }).contractor;
+  contractorId = contractor.id;
 
   response = await request("/employees", {
     body: {
@@ -149,6 +161,7 @@ async function main() {
   });
   expectStatus(response, 201, "employee create");
   const employee = (response.body as { employee: { id: string } }).employee;
+  employeeId = employee.id;
 
   response = await request("/patients", {
     body: {
@@ -180,6 +193,7 @@ async function main() {
   });
   expectStatus(response, 201, "patient create");
   const patient = (response.body as { patient: { cardiovascularHistory?: string; company?: string; contractor?: string; department?: string; employeeId?: string; gender: string; id: string; jobTitle?: string; medicalHistory?: string; medications?: string; nationalId?: string; phone?: string; smokingStatus?: string } }).patient;
+  createdPatientIds.push(patient.id);
   assert(patient.gender === "male", "Created patient gender must persist as male in API response.");
   assert(patient.employeeId === `WF-PAT-${stamp}`, "Patient employee ID must persist.");
   assert(patient.company === "Workflow Company", "Patient company must persist.");
@@ -209,6 +223,7 @@ async function main() {
   });
   expectStatus(response, 201, "case create");
   const ecgCase = (response.body as { case: { id: string; patientId?: string; status?: string; uploadedByDoctorId?: string } }).case;
+  createdCaseIds.push(ecgCase.id);
   assert(ecgCase.patientId === patient.id, "ECG case must link to the patient record.");
   assert(ecgCase.uploadedByDoctorId === doctor.user.id, "ECG case must expose uploadedByDoctorId.");
   assert(ecgCase.status === "uploaded", "Pending case creation should normalize to uploaded.");
@@ -359,16 +374,16 @@ async function main() {
   expectStatus(await request(`/messages/${conversation.id}`, { method: "DELETE", token: doctor.token }), 204, "conversation delete");
   expectStatus(await request(`/patients/${patient.id}`, { method: "DELETE", token: doctor.token }), 200, "patient delete/archive");
 
+  } finally {
+    if (createdCaseIds.length) await deleteCasesByIds(prisma, createdCaseIds);
+    if (createdPatientIds.length) await deletePatientsByIds(prisma, createdPatientIds);
+    if (employeeId) await prisma.employee.deleteMany({ where: { id: employeeId } }).catch(() => undefined);
+    if (contractorId) await prisma.contractor.deleteMany({ where: { id: contractorId } }).catch(() => undefined);
+    if (departmentId) await prisma.department.deleteMany({ where: { id: departmentId } }).catch(() => undefined);
+    if (organizationId) await prisma.organization.deleteMany({ where: { id: organizationId } }).catch(() => undefined);
+  }
+
   await new Promise<void>((resolve, reject) => server.close((error) => (error ? reject(error) : resolve())));
 }
 
-main()
-  .then(async () => {
-    await prisma.$disconnect();
-    console.log("Clinical workflow integration test passed.");
-  })
-  .catch(async (error) => {
-    await prisma.$disconnect();
-    console.error(error);
-    process.exitCode = 1;
-  });
+runIntegrationMain(main, "Clinical workflow integration test passed");

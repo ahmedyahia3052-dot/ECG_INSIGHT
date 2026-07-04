@@ -1,4 +1,5 @@
 import { enterpriseKnowledgeSeed, ensureEnterpriseKnowledgeSeeded, semanticSearchKnowledge } from "../server/src/modules/copilot/medical-knowledge";
+import { runIntegrationMain } from "./finish-integration";
 import { prisma } from "../server/src/config/prisma";
 
 function assert(condition: unknown, message: string): asserts condition {
@@ -69,10 +70,4 @@ async function main() {
   console.log(`Enterprise medical knowledge RAG quality passed: ${questions.length} questions, domain ${Math.round(domainAccuracy * 100)}%, citation ${Math.round(citationAccuracy * 100)}%, mean score ${meanTopScore.toFixed(3)}.`);
 }
 
-main()
-  .then(async () => prisma.$disconnect())
-  .catch(async (error) => {
-    console.error(error);
-    await prisma.$disconnect();
-    process.exit(1);
-  });
+runIntegrationMain(main, "Enterprise medical knowledge RAG quality passed");

@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./test";
 import { logout, uiLogin } from "./utils/qa";
 
 test.describe("LoginScreen stability", () => {
@@ -32,8 +32,9 @@ test.describe("LoginScreen stability", () => {
         await Promise.all(keys.map((key) => caches.delete(key)));
       }
     });
+    await page.context().clearCookies();
 
-    await page.goto("/login");
+    await page.goto("/login?force=1");
     await expect(page.getByText(/Welcome Back/i)).toBeVisible();
 
     for (let cycle = 0; cycle < 3; cycle += 1) {

@@ -18,6 +18,15 @@ let activeAccessToken: string | null = null;
 let onTokenRefresh: ((accessToken: string) => void) | null = null;
 let onAuthFailure: (() => void) | null = null;
 let refreshPromise: Promise<string> | null = null;
+let sessionRefreshSuppressed = false;
+
+export function setSessionRefreshSuppressed(suppressed: boolean) {
+  sessionRefreshSuppressed = suppressed;
+}
+
+export function isSessionRefreshSuppressed() {
+  return sessionRefreshSuppressed;
+}
 
 export function apiFileUrl(path: string): string {
   if (/^https?:\/\//i.test(path)) return path;
@@ -54,7 +63,7 @@ export function setApiAuthFailureHandler(handler: (() => void) | null) {
 }
 
 function isAuthEndpoint(url?: string) {
-  return !!url && /^\/?auth\/(login|register|phone|oauth|refresh)/.test(url.replace(API_URL, "").replace(/^\/+/, ""));
+  return !!url && /^\/?auth\/(login|register|phone|oauth|refresh|logout)/.test(url.replace(API_URL, "").replace(/^\/+/, ""));
 }
 
 function csrfTokenFromCookie() {
@@ -68,6 +77,7 @@ function csrfTokenFromCookie() {
 export function clearAuthState() {
   setApiAccessToken(null);
   refreshPromise = null;
+  sessionRefreshSuppressed = true;
   if (typeof window === "undefined") return;
   for (const storage of [window.localStorage, window.sessionStorage]) {
     for (const key of Object.keys(storage)) {
@@ -84,11 +94,15 @@ export function logoutAndRedirect() {
 }
 
 function shouldRefresh(error: AxiosError) {
+  if (sessionRefreshSuppressed) return false;
   const config = error.config as RetryableAxiosRequestConfig | undefined;
   return !!config && !config._retry && !isAuthEndpoint(config.url) && error.response?.status === 401;
 }
 
 async function refreshAccessToken() {
+  if (sessionRefreshSuppressed) {
+    throw new Error("Session refresh suppressed");
+  }
   if (!refreshPromise) {
     refreshPromise = apiClient
       .post<AuthRefreshPayload>("/auth/refresh", undefined, { _retry: true } as RetryableAxiosRequestConfig)

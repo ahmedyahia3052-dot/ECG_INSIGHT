@@ -1,4 +1,5 @@
 import { createServer } from "node:http";
+import { runIntegrationMain } from "./finish-integration";
 import { createApp } from "../server/src/app";
 import { initializeLlmProvider } from "../server/src/llm/llm-registry";
 import { LlmClient } from "../server/src/llm/llm-client";
@@ -57,7 +58,4 @@ async function main() {
   console.log(`Sprint 4.1 Ollama runtime checks passed (connected=${runtime.connected}, selectedModel=${modelsBody.selectedModel}).`);
 }
 
-main().catch((error) => {
-  console.error(error instanceof Error ? error.message : error);
-  process.exit(1);
-});
+runIntegrationMain(main, "Ollama offline — skipped live chat verification");

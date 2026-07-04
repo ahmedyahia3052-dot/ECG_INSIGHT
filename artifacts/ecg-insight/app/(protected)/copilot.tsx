@@ -473,7 +473,12 @@ export function CopilotWorkspaceScreen({ routeConversationId }: { routeConversat
 
   useEffect(() => {
     voiceEngineRef.current?.setVoiceMode(voiceMode);
-    if (voiceMode && conversationPhase === "idle" && voiceStatus === "idle" && !isRecording) {
+    const voiceReadyForCapture =
+      voiceStatus === "idle" ||
+      voiceStatus === "cancelled" ||
+      voiceStatus === "completed" ||
+      voiceStatus === "error";
+    if (voiceMode && conversationPhase === "idle" && voiceReadyForCapture && !isRecording) {
       void voiceEngineRef.current?.startRecording();
     }
     if (!voiceMode) {
@@ -713,7 +718,13 @@ export function CopilotWorkspaceScreen({ routeConversationId }: { routeConversat
           <View testID="copilot-voice-status">
             <Badge label={statusBadgeLabel} tone={conversationPhase === "streaming" || voiceStatus === "processing" || voiceStatus === "uploading" ? "warning" : voiceStatus === "listening" || voiceStatus === "speaking" || voiceStatus === "streaming" ? "primary" : "success"} />
           </View>
-          {conversationReady ? <View testID="copilot-conversation-ready" /> : null}
+          <View
+            accessibilityElementsHidden
+            importantForAccessibility="no-hide-descendants"
+            pointerEvents="none"
+            style={styles.conversationReadyMarker}
+            testID={conversationReady ? "copilot-conversation-ready" : "copilot-conversation-busy"}
+          />
           <Pressable accessibilityRole="button" onPress={cycleVoiceLanguage} style={styles.contextToggle} testID="copilot-voice-language">
             <Feather name="globe" size={16} color={medicalTheme.primary} />
             <Text style={styles.contextToggleText}>{voiceLanguageLabel(voiceLanguageMode)}</Text>
@@ -916,6 +927,7 @@ const styles = StyleSheet.create({
   chatMeta: { color: medicalTheme.muted, fontSize: 12, fontWeight: "800", marginTop: 4 },
   chatPanel: { backgroundColor: "rgba(2,6,23,0.82)", borderColor: glassBorder, flex: 1, flexDirection: "column", gap: 8, minHeight: 0, minWidth: 320, padding: 16 },
   chatTools: { alignItems: "center", flexDirection: "row", flexWrap: "wrap", gap: 8 },
+  conversationReadyMarker: { height: 1, opacity: 0, position: "absolute", width: 1 },
   citation: { alignItems: "center", backgroundColor: "rgba(20,221,230,0.08)", borderColor: glassBorder, borderRadius: 999, borderWidth: 1, flexDirection: "row", gap: 6, paddingHorizontal: 9, paddingVertical: 6 },
   citationText: { color: medicalTheme.text, fontSize: 11, fontWeight: "800" },
   citations: { flexDirection: "row", flexWrap: "wrap", gap: 6, marginTop: 8 },

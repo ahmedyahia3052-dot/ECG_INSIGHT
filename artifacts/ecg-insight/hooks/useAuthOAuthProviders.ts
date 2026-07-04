@@ -53,7 +53,8 @@ export function useAuthOAuthProviders(options: { requireHealthyBackend?: boolean
         if (cancelled) return;
         dispatch({ type: "ready", providers: providers ?? EMPTY_OAUTH_PROVIDERS });
       } catch {
-        if (!cancelled) dispatch({ type: "offline" });
+        // OAuth provider discovery is optional; password login must remain available.
+        if (!cancelled) dispatch({ type: "ready", providers: EMPTY_OAUTH_PROVIDERS });
       }
     })();
 

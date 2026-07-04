@@ -1,6 +1,7 @@
 /**
  * Clinical AI Assistant V3 — architecture and conversational validation examples.
  */
+import { runIntegrationMain } from "./finish-integration";
 import fs from "node:fs";
 import path from "node:path";
 
@@ -140,7 +141,4 @@ async function main() {
   console.log(`Clinical AI Core integration passed (${scenarios.length} conversational scenarios).`);
 }
 
-main().catch((error) => {
-  console.error(error);
-  process.exit(1);
-});
+runIntegrationMain(main, "Clinical AI Core integration passed (${scenarios.length} conversational scenarios)");

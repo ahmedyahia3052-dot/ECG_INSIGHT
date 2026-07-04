@@ -1,24 +1,21 @@
-import { execSync } from "node:child_process";
-
-function killPort(port) {
-  try {
-    const output = execSync(`netstat -ano | findstr :${port}`, { encoding: "utf8", shell: true });
-    const pids = new Set();
-    for (const line of output.split(/\r?\n/)) {
-      const match = line.trim().match(/\s(\d+)\s*$/);
-      const pid = match ? Number(match[1]) : 0;
-      if (pid > 4) pids.add(pid);
-    }
-    for (const pid of pids) {
-      execSync(`taskkill /F /PID ${pid}`, { stdio: "ignore", shell: true });
-    }
-  } catch {
-    // Port already free.
-  }
-}
+import { shouldReuseExistingServer } from "../../scripts/infrastructure/process-manager.mjs";
 
 export default async function globalTeardown() {
-  if (process.env["PLAYWRIGHT_REUSE_SERVER"] === "1") return;
-  killPort(3002);
-  killPort(8081);
+  if (shouldReuseExistingServer()) {
+    console.log("[global-teardown] reuseExistingServer=true — leaving shared servers running.");
+    return;
+  }
+
+  const manager = globalThis.__ECG_STARTUP_HEALTH_MANAGER__;
+  if (!manager) {
+    console.log("[global-teardown] No managed session found; skipping shutdown.");
+    return;
+  }
+
+  console.log("[global-teardown] Shutting down managed session services...");
+  await manager.teardown({
+    reason: "playwright-global-teardown",
+    stoppedBy: "global-teardown.mjs",
+  });
+  manager.writeReport();
 }

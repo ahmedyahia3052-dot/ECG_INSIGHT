@@ -1,4 +1,5 @@
 import { createServer } from "node:http";
+import { runIntegrationMain } from "./finish-integration";
 import { readFileSync } from "node:fs";
 import bcrypt from "bcryptjs";
 import { PrismaClient } from "@prisma/client";
@@ -151,11 +152,4 @@ async function main() {
   console.log("Owner security integration test passed.");
 }
 
-main()
-  .catch((error) => {
-    console.error(error);
-    process.exitCode = 1;
-  })
-  .finally(async () => {
-    await prisma.$disconnect();
-  });
+runIntegrationMain(main, "Owner security integration test passed");

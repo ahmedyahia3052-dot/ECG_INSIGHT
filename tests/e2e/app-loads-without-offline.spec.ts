@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./test";
 import { API_URL } from "./utils/qa";
 
 test.describe("Application loads without offline mode", () => {

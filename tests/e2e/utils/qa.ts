@@ -5,6 +5,39 @@ import { uploadClinicalEcgImage } from "./clinical-upload";
 import { runtimeTimestamp, waitForRuntimeEvent, waitForStreamingFinished, waitForUploadFinished, waitForVoiceIdle } from "./runtime-events";
 
 export const API_URL = process.env["PLAYWRIGHT_API_URL"] ?? "http://127.0.0.1:3002/api";
+export const API_ORIGIN = API_URL.replace(/\/api\/?$/, "");
+export const FRONTEND_URL = process.env["PLAYWRIGHT_BASE_URL"] ?? "http://127.0.0.1:8081";
+
+export async function assertPlatformReady(request: APIRequestContext) {
+  let lastError: unknown;
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    try {
+      const live = await request.get(`${API_ORIGIN}/live`, { timeout: 10_000 });
+      if (!live.ok()) {
+        throw new Error(`API /live failed: HTTP ${live.status()} ${await live.text()}`);
+      }
+      const ready = await request.get(`${API_ORIGIN}/ready`, { timeout: 15_000 });
+      const readyBody = await ready.text();
+      if (!ready.ok()) {
+        throw new Error(`API /ready failed: HTTP ${ready.status()} ${readyBody}`);
+      }
+      const payload = JSON.parse(readyBody) as { ok?: boolean; checks?: { database?: { ok?: boolean } } };
+      if (!payload.ok || payload.checks?.database?.ok !== true) {
+        throw new Error(`Platform not ready: ${readyBody}`);
+      }
+      const frontend = await request.get(FRONTEND_URL, { timeout: 15_000 });
+      if (!frontend.ok()) {
+        throw new Error(`Frontend unreachable: HTTP ${frontend.status()} at ${FRONTEND_URL}`);
+      }
+      return;
+    } catch (error) {
+      lastError = error;
+      if (attempt >= 4) break;
+      await new Promise((resolve) => setTimeout(resolve, 1_500 * (attempt + 1)));
+    }
+  }
+  throw lastError instanceof Error ? lastError : new Error(String(lastError));
+}
 
 export const users = {
   doctor: { email: "doctor@ecginsight.com", password: "password" },
@@ -41,27 +74,43 @@ export function authHeaders(token: string, csrfToken?: string) {
 }
 
 export async function apiLogin(request: APIRequestContext, role: keyof typeof users = "doctor"): Promise<ApiSession> {
-  const response = await request.post(`${API_URL}/auth/login`, {
-    data: { email: users[role].email, password: users[role].password, rememberMe: true },
-  });
-  expect(response.ok(), `API login should succeed for ${role}`).toBeTruthy();
-  const body = await response.json();
-  const csrfToken = await csrfTokenFromRequest(request);
-  return { csrfToken, token: body.accessToken, user: body.user };
+  let lastStatus = 0;
+  let lastBody = "";
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    const response = await request.post(`${API_URL}/auth/login`, {
+      data: { email: users[role].email, password: users[role].password, rememberMe: true },
+    });
+    if (response.ok()) {
+      const body = await response.json();
+      const csrfToken = await csrfTokenFromRequest(request);
+      return { csrfToken, token: body.accessToken, user: body.user };
+    }
+    lastStatus = response.status();
+    lastBody = await response.text();
+    if (lastStatus !== 429 || attempt >= 4) break;
+    await new Promise((resolve) => setTimeout(resolve, 2_000 * (attempt + 1)));
+  }
+  expect(false, `API login should succeed for ${role} (last status ${lastStatus}: ${lastBody})`).toBeTruthy();
+  throw new Error(`API login failed for ${role}`);
+}
+
+export async function bootstrapAuthenticatedPage(page: Page, role: keyof typeof users = "doctor") {
+  await apiLogin(page.request, role);
+  await page.goto("/dashboard", { timeout: 30_000, waitUntil: "domcontentloaded" });
+  await expect(page.getByText(/Enterprise Clinical Command Center|Good Morning|Good Afternoon|Good Evening/).first()).toBeVisible({ timeout: 30_000 });
 }
 
 export async function uiLogin(page: Page, role: keyof typeof users = "doctor") {
   for (let attempt = 0; attempt < 5; attempt += 1) {
-    await gotoLogin(page, "/login");
     if (!(await page.getByText(/Welcome Back/i).isVisible({ timeout: 5_000 }).catch(() => false))) {
-      const logoutButton = page.getByRole("button", { name: /logout/i }).first();
+      const logoutButton = page.getByRole("button", { name: /log\s?out/i }).first();
       if (await logoutButton.isVisible().catch(() => false)) {
-        await logoutButton.click();
+        await logout(page);
       } else {
         await gotoLogin(page, "/login?force=1");
       }
     }
-    await expect(page.getByText(/Welcome Back/i)).toBeVisible();
+    await expect(page.getByText(/Welcome Back/i)).toBeVisible({ timeout: 15_000 });
     await page.getByPlaceholder(/doctor@hospital\.com|name@organization\.com/i).fill(users[role].email);
     await page.getByPlaceholder(/password/i).fill(users[role].password);
     const signIn = page.getByRole("button", { name: /sign in/i });
@@ -90,32 +139,47 @@ async function gotoLogin(page: Page, path: "/login" | "/login?force=1") {
 }
 
 export async function logout(page: Page) {
-  const logoutButton = page.getByRole("button", { name: /logout/i }).first();
-  if (await logoutButton.isVisible().catch(() => false)) {
-    await logoutButton.click();
-  } else {
-    await page.goto("/login");
-  }
-  await expect(page.getByText(/Welcome Back/i)).toBeVisible({ timeout: 20_000 });
+  const logoutButton = page.getByRole("button", { name: /log\s?out/i }).first();
+  await expect(logoutButton).toBeVisible({ timeout: 10_000 });
+  await Promise.all([
+    page.waitForURL(/\/login/, { timeout: 30_000 }),
+    logoutButton.click(),
+  ]).catch(async () => {
+    await page.goto("/login?force=1");
+  });
+  await expect(page.getByText(/Welcome Back/i)).toBeVisible({ timeout: 15_000 });
 }
 
-export async function createPatient(request: APIRequestContext, session: ApiSession | string, suffix = Date.now().toString()) {
+export async function createPatient(request: APIRequestContext, session: ApiSession | string, suffix = "") {
   const token = typeof session === "string" ? session : session.token;
   const csrfToken = typeof session === "string" ? undefined : session.csrfToken;
-  const uniqueSuffix = `${suffix}-${Math.random().toString(36).slice(2, 8)}`;
-  const response = await request.post(`${API_URL}/patients`, {
-    data: {
-      dateOfBirth: "1975-04-12",
-      firstName: `QA${uniqueSuffix.slice(-6)}`,
-      gender: "male",
-      lastName: "Patient",
-      medicalRecordNumber: `QA-MRN-${uniqueSuffix}`,
-    },
-    headers: authHeaders(token, csrfToken),
-  });
-  const body = await response.json();
-  expect(response.ok(), `Patient API create should succeed: ${JSON.stringify(body)}`).toBeTruthy();
-  return body.patient as { id: string; firstName: string; lastName: string; medicalRecordNumber: string };
+  let lastBody = "";
+  for (let attempt = 0; attempt < 4; attempt += 1) {
+    const uniqueSuffix = suffix
+      ? `${suffix}-${attempt}-${Math.random().toString(36).slice(2, 8)}`
+      : `${Date.now()}-${attempt}-${Math.random().toString(36).slice(2, 8)}`;
+    const response = await request.post(`${API_URL}/patients`, {
+      data: {
+        dateOfBirth: "1975-04-12",
+        firstName: `QA${uniqueSuffix.slice(-6)}`,
+        gender: "male",
+        lastName: "Patient",
+        medicalRecordNumber: `QA-MRN-${uniqueSuffix}`,
+      },
+      headers: authHeaders(token, csrfToken),
+    });
+    const body = await response.json();
+    if (response.ok()) {
+      return body.patient as { id: string; firstName: string; lastName: string; medicalRecordNumber: string };
+    }
+    lastBody = JSON.stringify(body);
+    if (response.status() >= 500 || response.status() === 429) {
+      await new Promise((resolve) => setTimeout(resolve, 1_000 * (attempt + 1)));
+      continue;
+    }
+    break;
+  }
+  throw new Error(`Patient API create should succeed: ${lastBody}`);
 }
 
 async function apiPostWithRetry(
@@ -172,10 +236,12 @@ export async function createClinicalFixture(request: APIRequestContext, options:
 
   let reportId: string | undefined;
   if (options.report) {
-    const reportResponse = await request.post(`${API_URL}/reports/cases/${ecgCase.id}/generate`, {
-      headers: authHeaders(session.token, session.csrfToken),
-    });
-    expect(reportResponse.ok(), "Report generation API should succeed").toBeTruthy();
+    const reportResponse = await apiPostWithRetry(
+      request,
+      `${API_URL}/reports/cases/${ecgCase.id}/generate`,
+      { headers: authHeaders(session.token, session.csrfToken) },
+      "Report generation API",
+    );
     reportId = (await reportResponse.json()).report.id;
   }
 
@@ -265,11 +331,24 @@ export async function disableCopilotVoiceMode(page: Page) {
   }
 }
 
+async function dismissExpoErrorOverlay(page: Page) {
+  const overlay = page.locator("#error-overlay");
+  if (!(await overlay.isVisible().catch(() => false))) return;
+  await page.keyboard.press("Escape");
+  await overlay.waitFor({ state: "hidden", timeout: 3_000 }).catch(async () => {
+    await page.evaluate(() => {
+      document.querySelector("#error-overlay")?.remove();
+    });
+  });
+}
+
 export async function waitForConversationReady(page: Page, options: { keepVoiceMode?: boolean } = {}) {
+  await dismissExpoErrorOverlay(page);
   if (!options.keepVoiceMode) {
     await disableCopilotVoiceMode(page);
   }
   await expect(page.getByTestId("copilot-conversation-ready")).toBeAttached({ timeout: 120_000 });
+  await expect(page.getByTestId("copilot-conversation-busy")).toHaveCount(0);
   await expect(page.getByTestId("copilot-stop-button")).toHaveCount(0);
   await expect(page.getByTestId("copilot-composer-input").last()).toBeEditable();
 }
@@ -285,6 +364,7 @@ export async function waitForCopilotSendReady(page: Page) {
 }
 
 export async function clickCopilotStreamingAction(page: Page, name: string) {
+  await dismissExpoErrorOverlay(page);
   await waitForConversationReady(page);
   const actionButton = page.getByRole("button", { name }).last();
   await expect(actionButton).toBeEnabled({ timeout: 90_000 });

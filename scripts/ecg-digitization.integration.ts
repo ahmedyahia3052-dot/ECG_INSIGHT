@@ -1,4 +1,5 @@
 import fs from "node:fs/promises";
+import { runIntegrationMain } from "./finish-integration";
 import { createServer } from "node:http";
 import path from "node:path";
 import bcrypt from "bcryptjs";
@@ -237,11 +238,4 @@ async function main() {
   console.log("ECG digitization integration test passed.");
 }
 
-main()
-  .catch((error) => {
-    console.error(error);
-    process.exitCode = 1;
-  })
-  .finally(async () => {
-    await prisma.$disconnect();
-  });
+runIntegrationMain(main, "ECG digitization integration test passed");

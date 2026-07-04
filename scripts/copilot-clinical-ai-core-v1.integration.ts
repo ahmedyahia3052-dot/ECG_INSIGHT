@@ -1,5 +1,6 @@
 process.env.COPILOT_LLM_MOCK = "true";
 
+import { runIntegrationMain } from "./finish-integration";
 import {
   ConversationManager,
   ResponseGenerator,
@@ -431,7 +432,4 @@ async function main() {
   console.log(`Clinical AI Core v1 conversational suite passed (${passed} cases).`);
 }
 
-main().catch((error) => {
-  console.error(error);
-  process.exit(1);
-});
+runIntegrationMain(main, "Clinical AI Core v1 conversational suite passed (${passed} cases)");

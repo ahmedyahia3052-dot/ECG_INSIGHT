@@ -1,4 +1,6 @@
 import { createServer } from "node:http";
+import { runIntegrationMain } from "./finish-integration";
+import { integrationStamp } from "./integration/test-isolation";
 import bcrypt from "bcryptjs";
 import { PrismaClient } from "@prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
@@ -100,7 +102,7 @@ async function main() {
   try {
     const doctor = await login("patient-case-doctor@ecginsight.test");
     const other = await login("patient-case-other@ecginsight.test");
-    const stamp = Date.now();
+    const stamp = integrationStamp("pcm");
 
     let response = await request("/patients", {
       body: {
@@ -207,11 +209,4 @@ async function main() {
   console.log("Patient and ECG case management integration test passed.");
 }
 
-main()
-  .catch((error) => {
-    console.error(error);
-    process.exitCode = 1;
-  })
-  .finally(async () => {
-    await prisma.$disconnect();
-  });
+runIntegrationMain(main, "Patient and ECG case management integration test passed");

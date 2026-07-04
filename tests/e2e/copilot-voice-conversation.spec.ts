@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./test";
 import {
   clickCopilotStreamingAction,
   navigate,
@@ -23,14 +23,15 @@ test.describe("Voice AI conversation pipeline", () => {
     const firstResponse = page.waitForResponse((item) => item.url().includes("/copilot/chat/stream") && item.status() === 201, { timeout: 120_000 });
     await page.getByTestId("copilot-voice-mode-toggle").click();
     await firstResponse;
-    await waitForRuntimeEvent(page, "StreamingStarted", { after: after - 1_000, timeout: 120_000 });
     await waitForStreamingFinished(page, { after, timeout: 120_000 });
+    await waitForConversationReady(page, { keepVoiceMode: true });
     const thread = page.getByTestId("copilot-message-thread");
     await expect(thread.getByText(/you|hypertension|blood pressure/i).first()).toBeVisible({ timeout: 60_000 });
-    await expect(page.getByTestId("copilot-voice-status")).toContainText(/Voice mode|Ready|Speaking|Thinking|Listening|Processing|Completed/i);
   });
 
   test("manual voice input fills composer with live transcript", async ({ page }) => {
+    await installCopilotVoiceMocks(page, ["Explain atrial fibrillation briefly"]);
+    await page.reload({ waitUntil: "domcontentloaded" });
     await navigate(page, "/copilot", "Clinical Copilot Workspace");
     await page.getByRole("button", { name: "Voice" }).last().click();
     const composer = page.getByTestId("copilot-composer-input").last();

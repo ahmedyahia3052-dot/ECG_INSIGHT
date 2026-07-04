@@ -22,7 +22,7 @@ export default function ProfileScreen() {
             {isImpersonating ? <Badge label="Impersonating" tone="warning" /> : null}
           </View>
         </View>
-        <PrimaryButton icon="log-out" label="Logout" onPress={() => void logout().then(() => router.replace("/login" as never))} variant="danger" />
+        <PrimaryButton icon="log-out" label="Logout" onPress={() => void logout().then(() => router.replace("/login?force=1" as never))} variant="danger" />
       </Card>
 
       <View style={styles.grid}>

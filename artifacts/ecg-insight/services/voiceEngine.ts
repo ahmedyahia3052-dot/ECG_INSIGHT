@@ -143,6 +143,9 @@ export class ClinicalVoiceEngine {
     this.callbacks = callbacks;
     this.whisperTranscriber = whisperTranscriber;
     this.bindEnvironmentListeners();
+    void import("./runtimeEvents").then(({ emitRuntimeEvent }) => {
+      emitRuntimeEvent("VoiceIdle", { initial: true, status: "idle" });
+    });
   }
 
   dispose() {
@@ -174,8 +177,8 @@ export class ClinicalVoiceEngine {
   }
 
   resetAfterStream(willSpeak: boolean) {
-    if (willSpeak || this.state.status === "speaking") return;
-    if (this.state.status === "thinking" || this.state.status === "streaming") {
+    if (willSpeak && this.state.status === "speaking") return;
+    if (this.state.status === "thinking" || this.state.status === "streaming" || this.state.status === "cancelled") {
       this.setStatus("idle");
     }
   }

@@ -6,6 +6,15 @@ import { metricsSnapshot } from "../../middleware/observability";
 import { productionReadinessSnapshot } from "../health/health.service";
 
 const workspaceRoot = path.resolve(__dirname, "../../../..");
+const INTEGRATION_ENTRYPOINT = "scripts/run-integration-suite.mjs";
+const INTEGRATION_REGISTRY = "scripts/integration/pipeline.mjs";
+const RELEASE_E2E_SPECS = [
+  "tests/e2e/auth-navigation.spec.ts",
+  "tests/e2e/clinical-workflows.spec.ts",
+  "tests/e2e/mobile-responsive.spec.ts",
+  "tests/e2e/production-smoke.spec.ts",
+  "tests/e2e/release-candidate.spec.ts",
+] as const;
 
 type ValidationStatus = "blocked" | "failed" | "passed" | "warning";
 type Severity = "CRITICAL" | "HIGH" | "MEDIUM" | "LOW";
@@ -102,6 +111,8 @@ function artifactChecks(): ReleaseCheck[] {
     "nginx.conf",
     "scripts/backup-now.ts",
     "scripts/restore-backup.ts",
+    INTEGRATION_REGISTRY,
+    INTEGRATION_ENTRYPOINT,
     "scripts/release-candidate-regression.ts",
     "scripts/release-candidate-load.ts",
     "SPRINT_37_RELEASE_CANDIDATE_REPORT.md",
@@ -118,17 +129,19 @@ function artifactChecks(): ReleaseCheck[] {
 
 function qaChecks(): ReleaseCheck[] {
   return [
-    "tests/e2e/auth-navigation.spec.ts",
-    "tests/e2e/clinical-workflows.spec.ts",
-    "tests/e2e/mobile-responsive.spec.ts",
-    "tests/e2e/production-smoke.spec.ts",
-    "scripts/sprint37-release-candidate.integration.ts",
-  ].map((artifact) => ({
-    category: "Automated QA",
-    description: artifact,
-    name: `Regression coverage: ${artifact}`,
-    status: status(exists(artifact)),
-  }));
+    ...RELEASE_E2E_SPECS.map((artifact) => ({
+      category: "Automated QA",
+      description: artifact,
+      name: `Regression coverage: ${artifact}`,
+      status: status(exists(artifact)),
+    })),
+    {
+      category: "Automated QA",
+      description: INTEGRATION_ENTRYPOINT,
+      name: "Integration pipeline entrypoint",
+      status: status(exists(INTEGRATION_ENTRYPOINT)),
+    },
+  ];
 }
 
 export async function releaseCandidateDashboard() {

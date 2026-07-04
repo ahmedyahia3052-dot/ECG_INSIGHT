@@ -3,6 +3,7 @@ process.env.COPILOT_LLM_MOCK = "true";
 import fs from "node:fs/promises";
 import path from "node:path";
 import sharp from "sharp";
+import { runIntegrationMain } from "./finish-integration";
 import { AttachmentContextBuilder } from "../server/src/modules/copilot/attachment/attachment-context-builder.service";
 import { clearClinicalOcrCacheForTests } from "../server/src/modules/copilot/attachment/ocr-cache.service";
 import { resetAttachmentJobsForTests } from "../server/src/modules/copilot/attachment/attachment-job-queue.service";
@@ -171,10 +172,6 @@ async function main() {
   await testClinicalValidator();
   await testPromptBuilderIndependence();
   await testThreatScanHook();
-  console.log("Sprint 11.1 enterprise production hardening regression suite passed.");
 }
 
-main().catch(async (error) => {
-  console.error(error);
-  process.exit(1);
-});
+runIntegrationMain(main, "Sprint 11.1 enterprise production hardening regression suite");

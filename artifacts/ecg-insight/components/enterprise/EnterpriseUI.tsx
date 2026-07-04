@@ -338,7 +338,7 @@ export function EnterpriseShell({ children }: PropsWithChildren) {
       <Pressable
         accessibilityRole="button"
         accessibilityLabel="Log out"
-        onPress={() => void logout().then(() => router.replace("/login" as never))}
+        onPress={() => void logout().then(() => router.replace("/login?force=1" as never))}
         style={[styles.logoutButton, sidebarCompact && styles.logoutButtonCollapsed]}
       >
         <Feather name="log-out" size={18} color={medicalTheme.critical} />

@@ -1,4 +1,5 @@
 import { existsSync, readFileSync } from "node:fs";
+import { runIntegrationMain } from "./finish-integration";
 import { join } from "node:path";
 
 const root = process.cwd();
@@ -80,7 +81,4 @@ async function main() {
   console.log("Sprint 30 mobile PWA integration test passed.");
 }
 
-main().catch((error) => {
-  console.error(error);
-  process.exitCode = 1;
-});
+runIntegrationMain(main, "Sprint 30 mobile PWA integration test passed");

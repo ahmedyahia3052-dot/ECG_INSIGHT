@@ -1,4 +1,5 @@
 import fs from "node:fs/promises";
+import { runIntegrationMain } from "./finish-integration";
 import { createServer } from "node:http";
 import bcrypt from "bcryptjs";
 import { PrismaClient } from "@prisma/client";
@@ -217,11 +218,4 @@ async function main() {
   console.log("ECG medical report system integration test passed.");
 }
 
-main()
-  .catch((error) => {
-    console.error(error);
-    process.exitCode = 1;
-  })
-  .finally(async () => {
-    await prisma.$disconnect();
-  });
+runIntegrationMain(main, "ECG medical report system integration test passed");

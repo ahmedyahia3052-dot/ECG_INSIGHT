@@ -10,6 +10,14 @@ const mutatingMethods = new Set(["POST", "PUT", "PATCH", "DELETE"]);
 const ipHits = new Map<string, { count: number; resetAt: number }>();
 const userHits = new Map<string, { count: number; resetAt: number }>();
 
+function isProbeRequest(req: Request) {
+  return /^\/(live|liveness|ready|readiness|health|metrics)\/?$/i.test(req.path);
+}
+
+function securityLimits() {
+  return { ipMax: env.API_SECURITY_IP_MAX, userMax: env.API_SECURITY_USER_MAX, windowMs: env.API_SECURITY_WINDOW_MS };
+}
+
 function hitCounter(key: string, store: Map<string, { count: number; resetAt: number }>, windowMs: number) {
   const now = Date.now();
   const existing = store.get(key);
@@ -70,18 +78,26 @@ function validCsrf(req: Request) {
 
 export async function apiSecurityMiddleware(req: Request, _res: Response, next: NextFunction) {
   try {
-    const ipBudget = hitCounter(req.ip ?? "unknown", ipHits, 60_000);
-    if (ipBudget.count > 180) {
-      await recordSecurityEvent(req, "BRUTE_FORCE_ATTEMPT", "Per-IP throttle limit exceeded.");
-      throw new AppError(429, "Too many requests from this network.", "IP_RATE_LIMITED");
+    if (isProbeRequest(req)) {
+      next();
+      return;
     }
 
-    const userKey = req.get("authorization")?.slice(0, 40);
-    if (userKey) {
-      const userBudget = hitCounter(userKey, userHits, 60_000);
-      if (userBudget.count > 240) {
-        await recordSecurityEvent(req, "BRUTE_FORCE_ATTEMPT", "Per-user throttle limit exceeded.");
-        throw new AppError(429, "Too many requests for this user.", "USER_RATE_LIMITED");
+    if (!isProbeRequest(req) && env.NODE_ENV === "production") {
+      const { ipMax, userMax, windowMs } = securityLimits();
+      const ipBudget = hitCounter(req.ip ?? "unknown", ipHits, windowMs);
+      if (ipBudget.count > ipMax) {
+        await recordSecurityEvent(req, "BRUTE_FORCE_ATTEMPT", "Per-IP throttle limit exceeded.");
+        throw new AppError(429, "Too many requests from this network.", "IP_RATE_LIMITED");
+      }
+
+      const userKey = req.get("authorization")?.slice(0, 40);
+      if (userKey) {
+        const userBudget = hitCounter(userKey, userHits, windowMs);
+        if (userBudget.count > userMax) {
+          await recordSecurityEvent(req, "BRUTE_FORCE_ATTEMPT", "Per-user throttle limit exceeded.");
+          throw new AppError(429, "Too many requests for this user.", "USER_RATE_LIMITED");
+        }
       }
     }
 

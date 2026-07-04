@@ -1,5 +1,5 @@
-import { expect, test } from "@playwright/test";
-import { API_URL, apiLogin, authHeaders, attachA11yScan, createClinicalFixture, expectPageReady, navigate, uiLogin } from "./utils/qa";
+import { expect, test } from "./test";
+import { API_URL, apiLogin, authHeaders, attachA11yScan, bootstrapAuthenticatedPage, createClinicalFixture, expectPageReady, navigate, uiLogin, uploadCopilotAttachment } from "./utils/qa";
 import { createPipelineFixture, validateCopilotStream, validateEcgPipeline, validatePdfParse } from "./utils/enterprise-pipeline";
 import { createSyntheticEcgPngBuffer } from "./utils/ecg-fixture-image";
 import { installCopilotVoiceMocks } from "./utils/voice-mocks";
@@ -37,6 +37,14 @@ test.describe("ECG Insight Enterprise — Full Validation @enterprise @e2e", () 
       },
     });
     expect([400, 415, 422, 500]).toContain(response.status());
+  });
+
+  test("API: regression — clinical fixture creation is not IP rate limited under E2E", async ({ request }) => {
+    for (let index = 0; index < 3; index += 1) {
+      const fixture = await createClinicalFixture(request);
+      expect(fixture.caseId).toBeTruthy();
+      expect(fixture.patientId).toBeTruthy();
+    }
   });
 
   test("API: empty copilot message rejected", async ({ request }) => {
@@ -102,26 +110,34 @@ test.describe("ECG Insight Enterprise — Full Validation @enterprise @e2e", () 
     await page.goto("/copilot");
     await expect(page.getByText("Clinical Copilot Workspace")).toBeVisible({ timeout: 30_000 });
 
-    const filesChooser = page.waitForEvent("filechooser");
-    await page.getByRole("button", { name: "Upload Files" }).last().click();
-    await (await filesChooser).setFiles({ buffer: Buffer.from("lab results"), mimeType: "text/plain", name: "enterprise-labs.txt" });
-    await expect(page.getByText("enterprise-labs.txt").last()).toBeVisible({ timeout: 20_000 });
+    await uploadCopilotAttachment(page, {
+      buffer: Buffer.from("lab results"),
+      buttonName: "Upload Files",
+      mimeType: "text/plain",
+      name: "enterprise-labs.txt",
+    });
 
-    const imageChooser = page.waitForEvent("filechooser");
-    await page.getByRole("button", { name: "Upload Image" }).last().click();
-    await (await imageChooser).setFiles({ buffer: Buffer.from("89504e470d0a1a0a0000000d49484452", "hex"), mimeType: "image/png", name: "enterprise-image.png" });
-    await expect(page.getByText("enterprise-image.png").last()).toBeVisible({ timeout: 20_000 });
+    await uploadCopilotAttachment(page, {
+      buffer: Buffer.from("89504e470d0a1a0a0000000d49484452", "hex"),
+      buttonName: "Upload Image",
+      mimeType: "image/png",
+      name: "enterprise-image.png",
+    });
 
-    const ecgChooser = page.waitForEvent("filechooser");
-    await page.getByRole("button", { name: "Upload ECG" }).last().click();
-    await (await ecgChooser).setFiles({ buffer: Buffer.from("%PDF-1.4"), mimeType: "application/pdf", name: "enterprise-ecg.pdf" });
-    await expect(page.getByText("enterprise-ecg.pdf").last()).toBeVisible({ timeout: 20_000 });
+    await uploadCopilotAttachment(page, {
+      buffer: Buffer.from("%PDF-1.4"),
+      buttonName: "Upload ECG",
+      mimeType: "application/pdf",
+      name: "enterprise-ecg.pdf",
+    });
   });
 
   test("UI: network failure on copilot stream shows graceful error without crash", async ({ page }) => {
+    await bootstrapAuthenticatedPage(page, "doctor");
     const loginResponse = await page.request.post(`${API_URL}/auth/login`, {
       data: { email: "doctor@ecginsight.com", password: "password", rememberMe: true },
     });
+    expect(loginResponse.ok()).toBeTruthy();
     const loginPayload = await loginResponse.json();
     await page.route("**/api/auth/refresh", async (route) => {
       await route.fulfill({ contentType: "application/json", json: loginPayload, status: 200 });
@@ -130,7 +146,7 @@ test.describe("ECG Insight Enterprise — Full Validation @enterprise @e2e", () 
       await route.abort("failed");
     });
     await page.goto("/copilot");
-    await expect(page.getByText("Clinical Copilot Workspace")).toBeVisible({ timeout: 30_000 });
+    await expectPageReady(page, "Clinical Copilot Workspace");
     await page.getByRole("button", { name: "New Chat" }).click();
     const composer = page.getByPlaceholder(/Message the assistant|Ask about ECG/i);
     await composer.fill("Network failure test");

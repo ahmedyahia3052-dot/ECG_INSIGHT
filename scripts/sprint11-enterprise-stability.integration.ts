@@ -1,5 +1,6 @@
 process.env.COPILOT_LLM_MOCK = "true";
 
+import { runIntegrationMain } from "./finish-integration";
 import fs from "node:fs/promises";
 import path from "node:path";
 import sharp from "sharp";
@@ -290,11 +291,6 @@ async function main() {
   await testClinicalAutoLinkage();
   await testAttachmentAwareLlmPipeline();
   await testResponseOrchestratorInjectsBlocks();
-  await terminateClinicalOcrWorker();
-  console.log("Sprint 11 enterprise stability regression suite passed.");
 }
 
-main().catch((error) => {
-  console.error(error);
-  process.exit(1);
-});
+runIntegrationMain(main, "Sprint 11 enterprise stability regression suite");

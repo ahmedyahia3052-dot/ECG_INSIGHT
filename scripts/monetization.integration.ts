@@ -1,4 +1,5 @@
 import bcrypt from "bcryptjs";
+import { runIntegrationMain } from "./finish-integration";
 import { PrismaClient, type Role } from "@prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
 import {
@@ -120,11 +121,4 @@ async function main() {
   console.log("Monetization integration test passed.");
 }
 
-main()
-  .catch((error) => {
-    console.error(error);
-    process.exitCode = 1;
-  })
-  .finally(async () => {
-    await prisma.$disconnect();
-  });
+runIntegrationMain(main, "Monetization integration test passed");

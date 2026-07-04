@@ -42,6 +42,8 @@ const requiredFiles = [
   "scripts/backup-now.ts",
   "scripts/backup-service.ts",
   "scripts/restore-backup.ts",
+  "scripts/integration/pipeline.mjs",
+  "scripts/run-integration-suite.mjs",
   "scripts/release-candidate-regression.ts",
   "scripts/release-candidate-load.ts",
   "RELEASE_CHECKLIST.md",

@@ -1,5 +1,6 @@
 process.env.COPILOT_LLM_MOCK = "true";
 
+import { runIntegrationMain } from "./finish-integration";
 import { runClinicalCopilotEngine } from "../server/src/modules/copilot/engine";
 import { emptyClinicalContext } from "../server/src/modules/copilot/intent-manager";
 import type { ConversationMemory } from "../server/src/modules/copilot/copilot-types";
@@ -90,7 +91,4 @@ async function main() {
   console.log("copilot-clinical-ai-sprint5.integration.ts: all tests passed");
 }
 
-main().catch((error) => {
-  console.error(error);
-  process.exit(1);
-});
+runIntegrationMain(main, "copilot-clinical-ai-sprint5.integration.ts: all tests passed");

@@ -1,5 +1,6 @@
 process.env.COPILOT_LLM_MOCK = "true";
 
+import { runIntegrationMain } from "./finish-integration";
 import {
   CLINICAL_AI_ENGINE_VERSION,
   ECG_LEARNING_PATH,
@@ -80,7 +81,4 @@ async function main() {
   console.log("copilot-clinical-ai-core-v2.integration.ts: all tests passed (Clinical AI Core)");
 }
 
-main().catch((error) => {
-  console.error(error);
-  process.exit(1);
-});
+runIntegrationMain(main, "copilot-clinical-ai-core-v2.integration.ts: all tests passed (Clinical AI Core)");

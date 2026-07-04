@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./test";
 import { API_URL, clickCopilotStreamingAction, disableCopilotVoiceMode, uploadCopilotAttachment, waitForCopilotIdle } from "./utils/qa";
 import { installCopilotVoiceMocks } from "./utils/voice-mocks";
 
@@ -65,11 +65,18 @@ test.describe("Clinical AI Copilot Engine V2", () => {
       };
     });
 
-    const loginResponse = await page.request.post(`${API_URL}/auth/login`, {
-      data: { email: "doctor@ecginsight.com", password: "password", rememberMe: true },
-    });
-    expect(loginResponse.ok()).toBeTruthy();
-    const loginPayload = await loginResponse.json();
+    const loginPayload = await (async () => {
+      let lastStatus = 0;
+      for (let attempt = 0; attempt < 5; attempt += 1) {
+        const loginResponse = await page.request.post(`${API_URL}/auth/login`, {
+          data: { email: "doctor@ecginsight.com", password: "password", rememberMe: true },
+        });
+        if (loginResponse.ok()) return loginResponse.json();
+        lastStatus = loginResponse.status();
+        await page.waitForTimeout(1_000 * (attempt + 1));
+      }
+      throw new Error(`Copilot login failed after retries (last status ${lastStatus}).`);
+    })();
     await page.route("**/api/auth/refresh", async (route) => {
       await route.fulfill({ contentType: "application/json", json: loginPayload, status: 200 });
     });
@@ -169,6 +176,14 @@ test.describe("Clinical AI Copilot Engine V2", () => {
     await page.getByRole("button", { name: "Voice" }).last().click();
     const composer = page.getByPlaceholder(/Message the assistant|Ask about ECG/i);
     await expect(composer).toHaveValue(/hello copilot/i, { timeout: 15_000 });
+  });
+
+  test("regression: voice idle and conversation ready after page reload", async ({ page }) => {
+    await page.reload();
+    await expect(page.getByText("Clinical Copilot Workspace")).toBeVisible({ timeout: 30_000 });
+    await disableCopilotVoiceMode(page);
+    await waitForCopilotIdle(page);
+    await expect(page.getByTestId("copilot-conversation-ready")).toBeAttached();
   });
 
   test("streaming tokens render assistant output", async ({ page }) => {

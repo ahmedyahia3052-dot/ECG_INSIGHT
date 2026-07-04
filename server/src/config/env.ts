@@ -24,9 +24,12 @@ const developmentDefaults = {
     "dev-access-bf05c9530d0e5b0cb6261389e7d95e1eda5202327d09cae39d2be38ef3d4a8a6",
   NODE_ENV: "development",
   PORT: "3002",
-  RATE_LIMIT_MAX: "600",
-  RATE_LIMIT_WINDOW_MS: String(15 * 60 * 1000),
-  TRUST_PROXY: "false",
+    RATE_LIMIT_MAX: "600",
+    RATE_LIMIT_WINDOW_MS: String(15 * 60 * 1000),
+    API_SECURITY_IP_MAX: "180",
+    API_SECURITY_USER_MAX: "240",
+    API_SECURITY_WINDOW_MS: "60000",
+    TRUST_PROXY: "false",
 };
 
 function validateOriginList(value: string) {
@@ -84,8 +87,13 @@ const envSchema = z
       .enum(["true", "false"])
       .default("false")
       .transform((value) => value === "true"),
+    COPILOT_LLM_MOCK: z
+      .enum(["true", "false"])
+      .default("false")
+      .transform((value) => value === "true"),
     LLM_PROVIDER: z.enum(["ollama", "openai"]).default("ollama"),
     LOG_LEVEL: z.enum(["debug", "info", "warn", "error"]).default("info"),
+    REDIS_URL: z.string().url().optional(),
     MICROSOFT_OAUTH_CLIENT_ID: z.string().optional(),
     OLLAMA_BASE_URL: z.string().url().default("http://127.0.0.1:11434"),
     OLLAMA_ENABLED: z
@@ -102,6 +110,9 @@ const envSchema = z
     }),
     RATE_LIMIT_MAX: z.coerce.number().int().positive().default(600),
     RATE_LIMIT_WINDOW_MS: z.coerce.number().int().positive().default(15 * 60 * 1000),
+    API_SECURITY_IP_MAX: z.coerce.number().int().positive().default(180),
+    API_SECURITY_USER_MAX: z.coerce.number().int().positive().default(240),
+    API_SECURITY_WINDOW_MS: z.coerce.number().int().positive().default(60_000),
     STORAGE_PATH: z.string().default("uploads"),
     TRUST_PROXY: z
       .enum(["true", "false"])
