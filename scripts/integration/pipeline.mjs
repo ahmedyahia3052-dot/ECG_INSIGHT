@@ -4,6 +4,7 @@ export const NPM_TEST_INTEGRATION_COMMAND = "node scripts/run-integration-suite.
 
 export const integrationScripts = [
   "scripts/ecg-acquisition.test.ts",
+  "scripts/ecg-viewer-engine.test.ts",
   "scripts/ecg-digitization.integration.ts",
   "scripts/ecg-image-pipeline-sprint6.integration.ts",
   "scripts/ecg-measurement-sprint61.integration.ts",
@@ -44,6 +45,7 @@ export const integrationScripts = [
   "scripts/sprint11-enterprise-stability.integration.ts",
   "scripts/sprint11.1-enterprise-hardening.integration.ts",
   "scripts/sprint12-enterprise-workspace.integration.ts",
+  "scripts/sprint13-ecg-viewer-foundation.integration.ts",
   "scripts/copilot-workspace-foundation.integration.ts",
   "scripts/copilot-stabilization.integration.ts",
   "scripts/copilot-medical-knowledge-rag.integration.ts",

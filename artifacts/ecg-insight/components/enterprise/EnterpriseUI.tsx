@@ -69,6 +69,7 @@ const PAGE_TITLES: Record<string, { subtitle: string; title: string }> = {
   "/ecg-benchmark": { subtitle: "Clinical validation benchmark against PTB-XL, PhysioNet, and CPSC datasets.", title: "ECG Benchmark" },
   "/audit-log": { subtitle: "Enterprise audit trail with actor, action, and old/new clinical values.", title: "Audit Trail" },
   "/clinical-workspace/[caseId]": { subtitle: "Unified split-screen patient, ECG viewer, AI findings, measurements, notes, and timeline.", title: "Clinical Workspace" },
+  "/ecg-monitor/[caseId]": { subtitle: "Enterprise PACS-style ECG image viewer with grid, transforms, and dockable panels.", title: "ECG Monitor Workspace" },
   "/billing-subscription": { subtitle: "Subscription plan, quota, billing, and license status.", title: "Billing & Subscription" },
   "/copilot": { subtitle: "Enterprise medical AI chat workspace with real conversation persistence.", title: "AI Clinical Copilot" },
   "/support": { subtitle: "Contact support and submit operational requests.", title: "Support" },
@@ -155,6 +156,8 @@ export function EnterpriseShell({ children }: PropsWithChildren) {
   const sidebarCompact = !isMobile && sidebarCollapsed;
   const meta = pageMeta(pathname);
   const isCopilotWorkspace = pathname.startsWith("/copilot");
+  const isEcgMonitorWorkspace = pathname.startsWith("/ecg-monitor");
+  const isFullBleedWorkspace = isCopilotWorkspace || isEcgMonitorWorkspace;
   const navItems = useMemo(() => NAV_ITEMS.filter((item) => {
     if (item.ownerOnly && user?.email?.toLowerCase() !== "ahmedyahia3052@gmail.com") return false;
     return !item.minRole || roleRank(user?.role) >= roleRank(item.minRole);
@@ -356,8 +359,8 @@ export function EnterpriseShell({ children }: PropsWithChildren) {
           {sidebar}
         </View>
       ) : null}
-      <View style={[styles.contentRoot, isCopilotWorkspace && styles.contentRootFullBleed]}>
-        {!isCopilotWorkspace ? (
+      <View style={[styles.contentRoot, isFullBleedWorkspace && styles.contentRootFullBleed]}>
+        {!isFullBleedWorkspace ? (
           <>
         <View style={[styles.topbar, { paddingTop: isMobile ? insets.top + 12 : 18 }]}>
           {isMobile ? (
