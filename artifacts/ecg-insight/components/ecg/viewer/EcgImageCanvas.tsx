@@ -4,6 +4,7 @@ import { StyleSheet, View } from "react-native";
 import type { AIExplainability } from "@/services/ai";
 
 import { EcgAiClinicalOverlay } from "./EcgAiClinicalOverlay";
+import type { DigitizedWaveformLead } from "./EcgDigitizedWaveformLayer";
 import { EcgProViewerEngine } from "./EcgProViewerEngine";
 import { useAuthenticatedEcgAsset } from "./useAuthenticatedEcgAsset";
 import type { EcgAiOverlayWorkspace } from "./useEcgAiOverlayWorkspace";
@@ -15,6 +16,7 @@ type Props = {
   activeLead?: string;
   aiOverlay?: EcgAiOverlayWorkspace;
   controls: EcgViewerControls;
+  digitizedLeads?: DigitizedWaveformLead[];
   explainability?: AIExplainability | null;
   imageUrl?: string;
   pdfUrl?: string;
@@ -27,6 +29,7 @@ export function EcgImageCanvas({
   activeLead = "II",
   aiOverlay,
   controls,
+  digitizedLeads = [],
   explainability,
   imageUrl,
   pdfUrl,
@@ -44,6 +47,7 @@ export function EcgImageCanvas({
         assetLoading={asset.loading}
         assetWidth={asset.width}
         controls={controls}
+        digitizedLeads={digitizedLeads}
         imageUrl={asset.url}
         pdfUrl={pdfUrl}
         testID={testID}

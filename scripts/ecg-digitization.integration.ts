@@ -131,9 +131,15 @@ async function main() {
   const jsonExport = exportDigitalEcg(persisted, "json");
   const svgExport = exportDigitalEcg(persisted, "svg");
   const pdfExport = exportDigitalEcg(persisted, "pdf");
+  const csvExport = exportDigitalEcg(persisted, "csv");
+  const binaryExport = exportDigitalEcg(persisted, "binary");
   assert(jsonExport.contentType === "application/json", "JSON export content type mismatch.");
   assert(svgExport.data.includes("<svg"), "SVG export should contain SVG markup.");
   assert(pdfExport.data.includes("Digital ECG Export"), "PDF export payload should include export summary.");
+  assert(csvExport.contentType === "text/csv", "CSV export must be available.");
+  assert(String(csvExport.data).includes("lead,sample_index"), "CSV export must include headers.");
+  assert(binaryExport.contentType === "application/octet-stream", "Binary export must be available.");
+  assert(persisted.validation?.score !== undefined, "Validation metrics must be exposed on digital payload.");
 
   const unsupported = await prisma.eCGFile.create({
     data: {

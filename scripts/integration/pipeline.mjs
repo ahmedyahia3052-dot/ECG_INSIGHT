@@ -56,6 +56,8 @@ export const integrationScripts = [
   "scripts/sprint14-ai-clinical-overlay.integration.ts",
   "scripts/ecg-caliper-geometry.test.ts",
   "scripts/sprint15-clinical-measurement-engine.integration.ts",
+  "scripts/ecg-digitization-engine.test.ts",
+  "scripts/sprint16-ecg-digitization.integration.ts",
   "scripts/copilot-workspace-foundation.integration.ts",
   "scripts/copilot-stabilization.integration.ts",
   "scripts/copilot-medical-knowledge-rag.integration.ts",

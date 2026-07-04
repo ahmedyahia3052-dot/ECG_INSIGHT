@@ -306,7 +306,7 @@ ecgProcessingRouter.get("/:id/digitization-quality", async (req, res, next) => {
 ecgProcessingRouter.get("/digital/:caseId/export/:format", async (req, res, next) => {
   try {
     const caseId = String(req.params.caseId);
-    const format = z.enum(["json", "pdf", "png", "svg"]).parse(req.params.format);
+    const format = z.enum(["binary", "csv", "json", "pdf", "png", "svg"]).parse(req.params.format);
     assertResourceAccess(await canAccessCase(caseId, req.auth!));
     const exported = exportDigitalEcg(await getDigitalEcg(caseId), format);
     res.setHeader("content-type", exported.contentType);

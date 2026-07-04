@@ -76,12 +76,32 @@ export function detectGrid(
     ).toFixed(2),
   );
 
+  const pixelsPerMm = pixelsPerSmallSquare > 0 ? Number((pixelsPerSmallSquare / 1).toFixed(3)) : undefined;
+  const pixelsPerMv = pixelsPerMm && gainMmPerMv ? Number((pixelsPerMm * gainMmPerMv).toFixed(3)) : undefined;
+  const pixelsPerMs = pixelsPerMm && paperSpeedMmPerSec
+    ? Number((pixelsPerMm * (paperSpeedMmPerSec / 1000)).toFixed(4))
+    : undefined;
+  const gridRotationDeg = horizontalPeaks.length >= 2 && verticalPeaks.length >= 2
+    ? Number((((verticalPeaks[0] ?? 0) - (horizontalPeaks[0] ?? 0)) / Math.max(width, height) * 90).toFixed(2))
+    : 0;
+
   return {
     confidence,
+    gainConfidence: Number(Math.min(0.99, confidence * 0.92).toFixed(2)),
     gainMmPerMv: paperSpeedMmPerSec === 50 && gainMmPerMv === 5 ? 10 : gainMmPerMv,
+    gridColor: midRow > 8 ? "red" : "pink",
+    gridDensity: pixelsPerSmallSquare > 0 ? Number((100 / pixelsPerSmallSquare).toFixed(2)) : undefined,
     gridDetected,
+    gridRotationDeg,
+    gridThicknessPx: pixelsPerSmallSquare ? Math.max(1, Math.round(pixelsPerSmallSquare * 0.08)) : 1,
+    horizontalGridLines: horizontalPeaks.length,
     paperSpeedMmPerSec,
+    pixelsPerMm,
+    pixelsPerMs,
+    pixelsPerMv,
     pixelsPerSmallSquare: pixelsPerSmallSquare || undefined,
+    speedConfidence: Number(Math.min(0.99, confidence * 0.9).toFixed(2)),
+    verticalGridLines: verticalPeaks.length,
   };
 }
 

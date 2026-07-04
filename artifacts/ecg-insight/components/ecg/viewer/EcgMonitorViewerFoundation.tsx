@@ -8,6 +8,8 @@ import { useAuth } from "@/context/AuthContext";
 import { getAIExplainability, getAIResult, type AIAnalysisResult, type AIExplainability } from "@/services/ai";
 import { API_URL } from "@/services/api";
 import type { ApiECGCase } from "@/services/clinical";
+import { getDigitalECG } from "@/services/ecgProcessing";
+import { buildSegmentAlignedDigitizedWaveformLeads } from "./ecgDigitizedWaveformSync";
 
 import { detectImageFormat } from "./ecgImageEngine";
 import { formatImageResolution } from "./ecgViewerEngine";
@@ -61,6 +63,13 @@ export function EcgMonitorViewerFoundation({
     queryKey: ["ecg-monitor-ai-explainability", token, ecgCase.id],
     retry: false,
   });
+  const digitalEcgQuery = useQuery({
+    enabled: !!token && !!ecgCase.id,
+    queryFn: () => getDigitalECG(token!, ecgCase.id),
+    queryKey: ["ecg-monitor-digital-ecg", token, ecgCase.id],
+    retry: false,
+  });
+  const digitalEcg = digitalEcgQuery.data?.digitalEcg ?? null;
 
   const analysis = analysisQuery.data?.analysis ?? null;
   const explainability =
@@ -131,6 +140,10 @@ export function EcgMonitorViewerFoundation({
   };
 
   const imageResolution = formatImageResolution(controls.viewport.imageWidth, controls.viewport.imageHeight);
+  const digitizedLeads = useMemo(
+    () => buildSegmentAlignedDigitizedWaveformLeads(digitalEcg, controls.viewport.imageWidth, controls.viewport.imageHeight),
+    [controls.viewport.imageHeight, controls.viewport.imageWidth, digitalEcg],
+  );
   const openStudy = (caseId: string) => router.push(`/ecg-monitor/${caseId}` as never);
 
   useEffect(() => {
@@ -190,6 +203,7 @@ export function EcgMonitorViewerFoundation({
               activeLead={selectedLead}
               aiOverlay={aiOverlay}
               controls={controls}
+              digitizedLeads={digitizedLeads}
               explainability={explainability}
               imageUrl={imageUrl}
               pdfUrl={pdfUrl}

@@ -1,5 +1,62 @@
 import type { DigitizationPreprocessing, ImageAnalysisMetrics, ProcessedImageData } from "../types";
 
+function gammaCorrect(data: Uint8Array | Buffer, gamma = 1.12) {
+  return Uint8Array.from(data, (value) => Math.round(255 * ((value / 255) ** (1 / gamma))));
+}
+
+function histogramEqualize(data: Uint8Array | Buffer) {
+  const histogram = new Array<number>(256).fill(0);
+  for (let index = 0; index < data.length; index += 1) histogram[data[index] ?? 0] += 1;
+  const cdf = histogram.reduce<number[]>((accumulator, count, value) => {
+    accumulator[value] = (accumulator[value - 1] ?? 0) + count;
+    return accumulator;
+  }, []);
+  const total = data.length;
+  return Uint8Array.from(data, (value) => Math.round(((cdf[value] ?? 0) / total) * 255));
+}
+
+function sharpenEdges(data: Uint8Array | Buffer, width: number, height: number) {
+  const output = Uint8Array.from(data);
+  for (let y = 1; y < height - 1; y += 1) {
+    for (let x = 1; x < width - 1; x += 1) {
+      const center = data[y * width + x] ?? 128;
+      const neighbors =
+        (data[(y - 1) * width + x] ?? 128)
+        + (data[(y + 1) * width + x] ?? 128)
+        + (data[y * width + x - 1] ?? 128)
+        + (data[y * width + x + 1] ?? 128);
+      const sharpened = Math.max(0, Math.min(255, center * 1.35 - neighbors * 0.0875));
+      output[y * width + x] = Math.round(sharpened);
+    }
+  }
+  return output;
+}
+
+function adaptiveBrightness(data: Uint8Array | Buffer, target = 0.58) {
+  const mean = data.reduce((sum, value) => sum + value, 0) / Math.max(data.length, 1);
+  const current = mean / 255;
+  const factor = current > 0 ? target / current : 1;
+  return Uint8Array.from(data, (value) => Math.max(0, Math.min(255, Math.round(value * factor))));
+}
+
+function cleanBackground(data: Uint8Array | Buffer, width: number, height: number) {
+  const output = Uint8Array.from(data);
+  for (let y = 0; y < height; y += 1) {
+    for (let x = 0; x < width; x += 1) {
+      const index = y * width + x;
+      if ((output[index] ?? 255) > 245) output[index] = 255;
+    }
+  }
+  return output;
+}
+
+function scoreImageQualityLocal(metrics: ImageAnalysisMetrics, preprocessingFlags: number) {
+  const blur = Math.min(100, Math.round((metrics.blurScore / 18) * 100));
+  const brightness = Math.min(100, Math.round(metrics.brightness * 100));
+  const contrast = Math.min(100, Math.round(metrics.contrast * 100));
+  return Math.max(0, Math.min(100, Math.round((blur + brightness + contrast) / 3 + preprocessingFlags)));
+}
+
 function detectBorder(data: Uint8Array, width: number, height: number) {
   const marginX = Math.floor(width * 0.04);
   const marginY = Math.floor(height * 0.04);
@@ -136,11 +193,21 @@ export function preprocessEcgImage(source: ProcessedImageData): {
 
   const borderDetected = detectBorder(data, width, height);
   const deskewDegrees = estimateDeskew(data, width, height);
+  const autoRotationDegrees = Math.abs(deskewDegrees) >= 0.8 ? Number((-deskewDegrees).toFixed(1)) : 0;
   const shadowRemoved = metrics.darkRatio > 0.18;
   if (shadowRemoved) data = Buffer.from(enhanceContrast(data));
 
   const contrastEnhanced = metrics.contrast < 0.62 || metrics.brightness > 0.72;
   if (contrastEnhanced) data = Buffer.from(enhanceContrast(data));
+
+  const adaptiveBrightnessApplied = metrics.brightness < 0.42 || metrics.brightness > 0.78;
+  if (adaptiveBrightnessApplied) data = Buffer.from(adaptiveBrightness(data));
+
+  const gammaCorrected = metrics.contrast < 0.55;
+  if (gammaCorrected) data = Buffer.from(gammaCorrect(data));
+
+  const histogramEqualized = metrics.entropy < 0.42;
+  if (histogramEqualized) data = Buffer.from(histogramEqualize(data));
 
   const noiseReduced = metrics.noise > 0.08;
   if (noiseReduced) data = Buffer.from(denoise3x3(data, width, height));
@@ -150,8 +217,23 @@ export function preprocessEcgImage(source: ProcessedImageData): {
   width = crop.width;
   height = crop.height;
 
+  const backgroundCleaned = borderDetected;
+  if (backgroundCleaned) data = Buffer.from(cleanBackground(data, width, height));
+
+  const edgeEnhanced = metrics.edgeDensity < 0.03;
+  if (edgeEnhanced) data = Buffer.from(sharpenEdges(data, width, height));
+
   const adaptiveThresholdApplied = metrics.edgeDensity > 0.02;
   if (adaptiveThresholdApplied) data = Buffer.from(adaptiveThreshold(data, width, height));
+
+  const colorNormalized = source.channels > 1;
+  const multiResolutionApplied = width > 2400 || height > 1800;
+  const preprocessingFlags =
+    (contrastEnhanced ? 3 : 0)
+    + (noiseReduced ? 3 : 0)
+    + (edgeEnhanced ? 2 : 0)
+    + (gammaCorrected ? 2 : 0);
+  const imageQualityScore = scoreImageQualityLocal(metrics, preprocessingFlags);
 
   const updatedMetrics: ImageAnalysisMetrics = {
     ...metrics,
@@ -160,9 +242,12 @@ export function preprocessEcgImage(source: ProcessedImageData): {
   };
 
   const preprocessing: DigitizationPreprocessing = {
+    adaptiveBrightnessApplied,
     adaptiveThresholdApplied,
-    autoRotationDegrees: 0,
+    autoRotationDegrees,
+    backgroundCleaned,
     borderDetected,
+    colorNormalized,
     contrastEnhanced,
     croppingOptimization: {
       heightPercent: crop.heightPercent,
@@ -171,7 +256,12 @@ export function preprocessEcgImage(source: ProcessedImageData): {
       yPercent: crop.yPercent,
     },
     deskewDegrees,
+    edgeEnhanced,
+    gammaCorrected,
     gridEnhanced: metrics.edgeDensity > 0.035,
+    histogramEqualized,
+    imageQualityScore,
+    multiResolutionApplied,
     noiseReduced,
     perspectiveCorrected: borderDetected && Math.abs(deskewDegrees) >= 0.8,
     shadowRemoved,

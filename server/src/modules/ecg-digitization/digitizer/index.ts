@@ -1,2 +1,2 @@
-export { digitizeLeadsFromImage, estimateDurationSeconds } from "./trace-extractor";
+export { runEnterpriseDigitizationPipeline } from "../engine/enterprise-pipeline";
 export { runDigitizationPipeline } from "./pipeline";

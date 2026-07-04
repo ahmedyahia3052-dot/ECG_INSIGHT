@@ -2,7 +2,15 @@ import type { ECGAnnotationType, ECGFile, Prisma } from "@prisma/client";
 import { prisma } from "../../config/prisma";
 import { AppError } from "../../middleware/error";
 import { detectGridCalibrationFromFile } from "../ecg-digitization/grid-detector";
+import {
+  exportDigitizedSignalsBinary,
+  exportDigitizedSignalsCsv,
+  exportDigitizedSignalsJson,
+} from "../ecg-digitization/export/formats";
+import { buildDigitalSignalObjects } from "../ecg-digitization/signal-engine";
 import { runDigitizationPipeline } from "../ecg-digitization/digitizer";
+import { DIGITIZATION_PIPELINE_VERSION } from "../ecg-digitization/types";
+import type { EcgMetadataOcr, SignalValidationMetrics } from "../ecg-digitization/types";
 import { isPdfEcgFile, isRasterEcgFile } from "../ecg-digitization/image-processing";
 import {
   aiDiagnosisFromMetadata,
@@ -80,7 +88,9 @@ export interface DigitalEcgPayload {
   originalImageUrl?: string;
   preprocessing?: DigitizationPreprocessing;
   quality: DigitizationQuality;
+  ocrMetadata?: EcgMetadataOcr;
   status: "available" | "fallback";
+  validation?: SignalValidationMetrics;
 }
 
 function isImage(file: ECGFile) {
@@ -204,9 +214,11 @@ function buildDigitalPayload(input: {
   leadSegments: LeadSegment[];
   leads: DigitizedLead[];
   measurementEngine: EcgClinicalMeasurementResult;
+  ocrMetadata?: EcgMetadataOcr;
   originalImageUrl?: string;
   preprocessing?: DigitizationPreprocessing;
   quality: DigitizationQuality;
+  validation?: SignalValidationMetrics;
 }): DigitalEcgPayload {
   return {
     ...input,
@@ -278,13 +290,16 @@ export async function reconstructCaseEcg(caseId: string, actorId: string, overri
   }
 
   const {
+    artifacts,
     calibration,
     durationSeconds,
     enhancedImagePath,
     leadSegments,
     leads,
+    ocrMetadata,
     preprocessing,
     quality,
+    validation,
   } = pipeline;
 
   if (leads.length === 0) {
@@ -304,13 +319,15 @@ export async function reconstructCaseEcg(caseId: string, actorId: string, overri
     });
     const digitizationMetadata = {
       aiDiagnosis: aiDiagnosisJson(aiDiagnosis),
+      artifacts,
       calibration,
       enhancedImagePath,
       extractionTimestamp,
       interpretationEngine: interpretationEngineJson(interpretationEngine),
       leadSegments,
       measurementEngine: measurementEngineJson(measurementEngine, calibration),
-      pipelineVersion: "ecg-digitization-v6.3",
+      ocrMetadata,
+      pipelineVersion: DIGITIZATION_PIPELINE_VERSION,
       preprocessing,
       quality,
       source: {
@@ -318,6 +335,7 @@ export async function reconstructCaseEcg(caseId: string, actorId: string, overri
         originalName: file.originalName,
         sizeBytes: file.sizeBytes,
       },
+      validation,
     } as unknown as Prisma.InputJsonObject;
     await prisma.eCGFile.update({
       data: {
@@ -478,9 +496,11 @@ export async function getDigitalEcg(caseId: string): Promise<DigitalEcgPayload> 
     leadSegments: digitization.leadSegments,
     leads: mappedLeads,
     measurementEngine,
+    ocrMetadata: digitization.ocrMetadata,
     originalImageUrl: fileDownloadUrl(file.id),
     preprocessing: digitization.preprocessing,
     quality: digitization.quality,
+    validation: digitization.validation,
   });
 }
 
@@ -491,8 +511,10 @@ function digitizationMetadata(file: ECGFile): {
   interpretationEngine?: EcgClinicalInterpretation;
   leadSegments: LeadSegment[];
   measurementEngine?: EcgClinicalMeasurementResult;
+  ocrMetadata?: EcgMetadataOcr;
   preprocessing?: DigitizationPreprocessing;
   quality: DigitizationQuality;
+  validation?: SignalValidationMetrics;
 } {
   const metadata = file.metadataJson && typeof file.metadataJson === "object" ? (file.metadataJson as Record<string, unknown>) : {};
   const digitization = metadata["digitization"] && typeof metadata["digitization"] === "object" ? metadata["digitization"] as Record<string, unknown> : {};
@@ -506,11 +528,13 @@ function digitizationMetadata(file: ECGFile): {
     interpretationEngine: interpretationFromMetadata(digitization["interpretationEngine"]),
     leadSegments: Array.isArray(digitization["leadSegments"]) ? digitization["leadSegments"] as LeadSegment[] : [],
     measurementEngine: measurementFromMetadata(digitization["measurementEngine"]),
+    ocrMetadata: digitization["ocrMetadata"] as EcgMetadataOcr | undefined,
     preprocessing: digitization["preprocessing"] as DigitizationPreprocessing | undefined,
     quality: {
       score: typeof quality?.score === "number" ? quality.score : typeof metadata["qualityScore"] === "number" ? metadata["qualityScore"] : 0,
       warnings: Array.isArray(quality?.warnings) ? quality.warnings.filter((item): item is string => typeof item === "string") : [],
     },
+    validation: digitization["validation"] as SignalValidationMetrics | undefined,
   };
 }
 
@@ -533,9 +557,26 @@ export async function getDigitalEcgForFile(fileId: string): Promise<DigitalEcgPa
   return getDigitalEcg(file.caseId);
 }
 
-export function exportDigitalEcg(payload: DigitalEcgPayload, format: "json" | "pdf" | "png" | "svg") {
+export function exportDigitalEcg(payload: DigitalEcgPayload, format: "binary" | "csv" | "json" | "pdf" | "png" | "svg") {
   if (format === "json") {
-    return { contentType: "application/json", data: JSON.stringify(payload, null, 2), fileName: "digital-ecg.json" };
+    return { contentType: "application/json", data: exportDigitizedSignalsJson(payload), fileName: "digital-ecg.json" };
+  }
+  if (format === "csv") {
+    return { contentType: "text/csv", data: exportDigitizedSignalsCsv(payload), fileName: "digital-ecg.csv" };
+  }
+  if (format === "binary") {
+    const signalObjects = buildDigitalSignalObjects({
+      calibration: payload.calibration,
+      durationSeconds: payload.durationSeconds,
+      ecgFileId: payload.ecgFileId,
+      leadSegments: payload.leadSegments,
+      leads: payload.leads.map((lead) => ({ lead: lead.lead, samples: lead.samples })),
+    });
+    return {
+      contentType: "application/octet-stream",
+      data: exportDigitizedSignalsBinary(signalObjects),
+      fileName: "digital-ecg.bin",
+    };
   }
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="800"><rect width="100%" height="100%" fill="#fff5f5"/><text x="24" y="36" font-family="Arial" font-size="22">Digital ECG ${payload.status}</text>${payload.leads
     .slice(0, 12)

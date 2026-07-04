@@ -179,11 +179,25 @@ export interface DigitalEcg {
     perspectiveCorrected: boolean;
     shadowRemoved: boolean;
   };
+  ocrMetadata?: {
+    gain?: string;
+    patientName?: string;
+    speed?: string;
+  };
   quality: {
     score: number;
     warnings: string[];
   };
   status: "available" | "fallback";
+  validation?: {
+    calibrationAccuracy: number;
+    digitizationAccuracy: number;
+    gridAccuracy: number;
+    leadDetectionPercent: number;
+    score: number;
+    signalContinuityPercent: number;
+    warnings: string[];
+  };
 }
 
 export async function processECGCase(accessToken: string, caseId: string) {
