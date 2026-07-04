@@ -5,7 +5,8 @@ import Svg, { Circle, Ellipse, Line, Path, Rect, Text as SvgText } from "react-n
 import { medicalTheme } from "@/components/enterprise/EnterpriseUI";
 
 import { resolveLatestRrMs } from "./ecgMeasurementEngine";
-import { gridSpacingPx, imageDisplayRect, imageToScreen, screenToImage } from "./ecgCalibrationMath";
+import { arcPath } from "./ecgCaliperGeometry";
+import { gridSpacingPx, imageDisplayRect, imageToScreen, resolveGridSpacing, screenToImage } from "./ecgCalibrationMath";
 import type { EcgMeasurementWorkspace } from "./useEcgMeasurementWorkspace";
 import { summarizeCaliper } from "./useEcgMeasurementWorkspace";
 import type { EcgViewerControls } from "./useEcgViewerControls";
@@ -54,11 +55,54 @@ function CaliperGraphic({
   rrMs?: number;
   selected: boolean;
 }) {
-  const { end, start } = caliperScreenPoints(caliper, rect, controls.transform);
   const summary = summarizeCaliper(caliper, controls, rrMs);
   const stroke = caliper.color ?? "#2563EB";
   const strokeWidth = selected ? 2.5 : hovered ? 2.25 : 2;
   const label = caliper.label ?? summary.primary.value;
+  if (caliper.kind === "multi" && caliper.waypoints?.length) {
+    const points = caliper.waypoints.map((point) => imageToScreen(point, rect, controls.transform));
+    return (
+      <React.Fragment>
+        {points.slice(1).map((point, index) => (
+          <Line
+            key={`${caliper.id}-${index}`}
+            stroke={stroke}
+            strokeDasharray={caliper.locked ? "5,4" : undefined}
+            strokeLinecap="round"
+            strokeWidth={strokeWidth}
+            x1={points[index]!.x}
+            x2={point.x}
+            y1={points[index]!.y}
+            y2={point.y}
+          />
+        ))}
+        {points.map((point, index) => (
+          <Circle key={`${caliper.id}-handle-${index}`} cx={point.x} cy={point.y} fill={selected ? "#FFFFFF" : stroke} r={HANDLE_RADIUS} stroke={stroke} strokeWidth={2} />
+        ))}
+        <SvgText fill={medicalTheme.text} fontSize={11} fontWeight="700" x={points[0]!.x} y={points[0]!.y - 8}>
+          {`${label}: ${summary.primary.value} ${summary.primary.unit}`}
+        </SvgText>
+      </React.Fragment>
+    );
+  }
+  if (caliper.kind === "angle" && caliper.vertex) {
+    const vertex = imageToScreen(caliper.vertex, rect, controls.transform);
+    const { end, start } = caliperScreenPoints(caliper, rect, controls.transform);
+    return (
+      <React.Fragment>
+        <Line stroke={stroke} strokeWidth={strokeWidth} x1={vertex.x} x2={start.x} y1={vertex.y} y2={start.y} />
+        <Line stroke={stroke} strokeWidth={strokeWidth} x1={vertex.x} x2={end.x} y1={vertex.y} y2={end.y} />
+        <Path d={arcPath(vertex, start, end)} fill="none" stroke={stroke} strokeWidth={1.5} />
+        <Circle cx={vertex.x} cy={vertex.y} fill={selected ? "#FFFFFF" : stroke} r={HANDLE_RADIUS} stroke={stroke} strokeWidth={2} />
+        <Circle cx={start.x} cy={start.y} fill={selected ? "#FFFFFF" : stroke} r={HANDLE_RADIUS} stroke={stroke} strokeWidth={2} />
+        <Circle cx={end.x} cy={end.y} fill={selected ? "#FFFFFF" : stroke} r={HANDLE_RADIUS} stroke={stroke} strokeWidth={2} />
+        <SvgText fill={medicalTheme.text} fontSize={11} fontWeight="700" x={vertex.x + 8} y={vertex.y - 8}>
+          {`${label}: ${summary.primary.value} ${summary.primary.unit}`}
+        </SvgText>
+      </React.Fragment>
+    );
+  }
+  const { end, start } = caliperScreenPoints(caliper, rect, controls.transform);
   return (
     <React.Fragment>
       <Line
@@ -102,7 +146,7 @@ export const EcgMeasurementOverlay = memo(function EcgMeasurementOverlay({
   );
   const dragRef = useRef<DragState>(null);
   const clickAnchorRef = useRef<ImagePoint | null>(null);
-  const spacing = gridSpacingPx(controls.grid.speed, controls.grid.gain);
+  const spacing = resolveGridSpacing(controls.grid);
   const rrMs = resolveLatestRrMs(workspace.present.calipers, spacing, controls.grid.speed);
 
   const screenPoint = useCallback(
@@ -159,6 +203,17 @@ export const EcgMeasurementOverlay = memo(function EcgMeasurementOverlay({
       if (controls.isPanActive || workspace.present.toolMode === "pan") return;
       if (workspace.present.toolMode !== "caliper" && workspace.present.toolMode !== "measurement") return;
       const point = screenPoint(locationX, locationY);
+      const kind = workspace.activeCaliperKind.current;
+      if (kind === "angle" || kind === "multi") {
+        if (!clickAnchorRef.current) {
+          clickAnchorRef.current = point;
+          workspace.beginDraftCaliper(point);
+          return;
+        }
+        const committed = workspace.appendDraftPoint(point);
+        if (committed) clickAnchorRef.current = null;
+        return;
+      }
       if (!clickAnchorRef.current) {
         clickAnchorRef.current = point;
         workspace.beginDraftCaliper(point);

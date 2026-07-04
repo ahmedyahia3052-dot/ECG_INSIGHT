@@ -25,6 +25,7 @@ import {
   loadEcgViewerWorkspace,
   persistEcgViewerWorkspace,
 } from "./ecg-viewer-workspace.service";
+import { buildMeasurementWorkspaceCsv } from "./ecg-viewer-workspace.contracts";
 import {
   assignDoctorSchema,
   caseCreateSchema,
@@ -733,9 +734,28 @@ casesRouter.post("/:caseId/ecg-viewer-workspace/export/json", requireRole("DOCTO
       measurements: Array.isArray((workspace as { measurements?: unknown[] } | null)?.measurements)
         ? (workspace as { measurements: unknown[] }).measurements
         : [],
-      schemaVersion: 3,
+      schemaVersion: 4,
       workspace,
     });
+  } catch (error) {
+    next(error);
+  }
+});
+
+casesRouter.post("/:caseId/ecg-viewer-workspace/export/csv", requireRole("DOCTOR"), async (req, res, next) => {
+  try {
+    const ecgCase = await prisma.eCGCase.findUnique({ where: { id: String(req.params.caseId) } })
+      ?? await findCaseForRoute(String(req.params.caseId));
+    if (!ecgCase) throw new AppError(404, "ECG case not found.", "CASE_NOT_FOUND");
+    assertResourceAccess(await canAccessCase(ecgCase.id, req.auth!));
+    const workspace = await loadEcgViewerWorkspace(ecgCase.id);
+    const measurements = Array.isArray((workspace as { measurements?: Array<Record<string, unknown>> } | null)?.measurements)
+      ? (workspace as { measurements: Array<Record<string, unknown>> }).measurements
+      : [];
+    const csv = buildMeasurementWorkspaceCsv(measurements);
+    res.setHeader("Content-Type", "text/csv");
+    res.setHeader("Content-Disposition", `attachment; filename="${ecgCase.caseNumber ?? ecgCase.caseId}-measurements.csv"`);
+    res.send(csv);
   } catch (error) {
     next(error);
   }

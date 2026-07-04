@@ -9,12 +9,14 @@ import {
 } from "./ecgMeasurementEngine";
 import {
   buildReadouts,
-  deltaPixels,
   dragCaliperEndpoint,
-  gridSpacingPx,
+  dragCaliperVertex,
+  dragMultiWaypoint,
   primaryValueForKind,
+  resolveGridSpacing,
   snapPoint,
 } from "./ecgCalibrationMath";
+import { deltaPixelsForCaliper } from "./ecgCaliperGeometry";
 import {
   ANNOTATION_COLORS,
   createWorkspaceState,
@@ -90,7 +92,8 @@ export function useEcgMeasurementWorkspace(options: {
   const activeMeasurementKind = useRef<EcgMeasurementKind>("rr_interval");
   const activePreset = useRef<ClinicalMeasurementPreset>(presetForKind("rr_interval"));
   const draftAnnotation = useRef<ImagePoint[]>([]);
-  const [draftCaliper, setDraftCaliper] = useState<{ end: ImagePoint; start: ImagePoint } | null>(null);
+  const draftPointsRef = useRef<ImagePoint[]>([]);
+  const [draftCaliper, setDraftCaliper] = useState<{ end: ImagePoint; start: ImagePoint; vertex?: ImagePoint; waypoints?: ImagePoint[] } | null>(null);
   const [hoveredCaliperId, setHoveredCaliperId] = useState<string | null>(null);
 
   const persist = useCallback(
@@ -109,6 +112,7 @@ export function useEcgMeasurementWorkspace(options: {
     (calipers: EcgCaliper[], existing: EcgViewerWorkspaceState["measurements"]) =>
       syncWorkspaceMeasurements(calipers, existing, {
         gain: controlsRef.current.grid.gain,
+        grid: controlsRef.current.grid,
         operator: options.operatorName,
         speed: controlsRef.current.grid.speed,
       }),
@@ -142,9 +146,14 @@ export function useEcgMeasurementWorkspace(options: {
     updateSlice((slice) => ({ ...slice, activeMeasurementKind: preset.kind, toolMode: "caliper" }));
   }, [updateSlice]);
 
+  const spacingForGrid = useCallback(
+    () => resolveGridSpacing(controlsRef.current.grid),
+    [],
+  );
+
   const addCaliper = useCallback(
     (kind: EcgCaliperKind, start: ImagePoint, end?: ImagePoint, overrides?: Partial<EcgCaliper>) => {
-      const spacing = gridSpacingPx(controlsRef.current.grid.speed, controlsRef.current.grid.gain);
+      const spacing = spacingForGrid();
       const snappedStart = overrides?.snapToGrid === false ? start : snapPoint(start, spacing);
       const snappedEnd = snapPoint(end ?? { x: start.x + spacing * 5, y: start.y }, spacing);
       const preset = activePreset.current;
@@ -164,6 +173,9 @@ export function useEcgMeasurementWorkspace(options: {
         snapToGrid: overrides?.snapToGrid ?? true,
         start: snappedStart,
         updatedAt: nowIso(),
+        vertex: overrides?.vertex,
+        waypoints: overrides?.waypoints,
+        groupId: overrides?.groupId,
       };
       updateSlice((slice) => ({
         ...slice,
@@ -173,32 +185,84 @@ export function useEcgMeasurementWorkspace(options: {
       }));
       return caliper.id;
     },
-    [options.operatorName, updateSlice],
+    [options.operatorName, spacingForGrid, updateSlice],
   );
 
   const beginDraftCaliper = useCallback((start: ImagePoint) => {
-    const spacing = gridSpacingPx(controlsRef.current.grid.speed, controlsRef.current.grid.gain);
+    const spacing = spacingForGrid();
     const snapped = snapPoint(start, spacing);
+    draftPointsRef.current = [snapped];
     setDraftCaliper({ end: snapped, start: snapped });
-  }, []);
+  }, [spacingForGrid]);
+
+  const appendDraftPoint = useCallback(
+    (point: ImagePoint) => {
+      const kind = activeCaliperKind.current;
+      const spacing = spacingForGrid();
+      const snapped = snapPoint(point, spacing);
+      if (kind === "angle") {
+        draftPointsRef.current = [...draftPointsRef.current, snapped];
+        if (draftPointsRef.current.length === 1) {
+          setDraftCaliper({ end: snapped, start: snapped, vertex: snapped });
+          return false;
+        }
+        if (draftPointsRef.current.length === 2) {
+          setDraftCaliper({ end: snapped, start: snapped, vertex: draftPointsRef.current[0] });
+          return false;
+        }
+        const [vertex, armA, armB] = draftPointsRef.current;
+        addCaliper("angle", armA!, armB!, { vertex, waypoints: draftPointsRef.current });
+        draftPointsRef.current = [];
+        setDraftCaliper(null);
+        return true;
+      }
+      if (kind === "multi") {
+        draftPointsRef.current = [...draftPointsRef.current, snapped];
+        setDraftCaliper({
+          end: snapped,
+          start: draftPointsRef.current[0]!,
+          waypoints: [...draftPointsRef.current],
+        });
+        return false;
+      }
+      return false;
+    },
+    [addCaliper, spacingForGrid],
+  );
+
+  const finishMultiCaliper = useCallback(() => {
+    if (draftPointsRef.current.length < 2) return null;
+    const points = [...draftPointsRef.current];
+    const id = addCaliper("multi", points[0]!, points[points.length - 1]!, { waypoints: points });
+    draftPointsRef.current = [];
+    setDraftCaliper(null);
+    return id;
+  }, [addCaliper]);
 
   const updateDraftCaliper = useCallback((end: ImagePoint) => {
     setDraftCaliper((current) => {
       if (!current) return current;
-      const spacing = gridSpacingPx(controlsRef.current.grid.speed, controlsRef.current.grid.gain);
+      const spacing = spacingForGrid();
       const snapped = snapPoint(end, spacing);
       const kind = activeCaliperKind.current;
+      if (kind === "multi" && current.waypoints?.length) {
+        const waypoints = [...current.waypoints.slice(0, -1), snapped];
+        return { ...current, end: snapped, waypoints };
+      }
       return {
         end: kind === "horizontal" ? { x: snapped.x, y: current.start.y } : kind === "vertical" ? { x: current.start.x, y: snapped.y } : snapped,
         start: current.start,
+        vertex: current.vertex,
+        waypoints: current.waypoints,
       };
     });
-  }, []);
+  }, [spacingForGrid]);
 
   const commitDraftCaliper = useCallback(() => {
     if (!draftCaliper) return null;
-    const spacing = gridSpacingPx(controlsRef.current.grid.speed, controlsRef.current.grid.gain);
     const kind = activeCaliperKind.current;
+    if (kind === "multi") return finishMultiCaliper();
+    const spacing = spacingForGrid();
     const { start } = draftCaliper;
     let { end } = draftCaliper;
     const delta = Math.hypot(end.x - start.x, end.y - start.y);
@@ -211,11 +275,15 @@ export function useEcgMeasurementWorkspace(options: {
             : { x: start.x + spacing * 5, y: start.y + spacing * 5 };
     }
     const id = addCaliper(kind, start, end);
+    draftPointsRef.current = [];
     setDraftCaliper(null);
     return id;
-  }, [addCaliper, draftCaliper]);
+  }, [addCaliper, draftCaliper, finishMultiCaliper, spacingForGrid]);
 
-  const cancelDraftCaliper = useCallback(() => setDraftCaliper(null), []);
+  const cancelDraftCaliper = useCallback(() => {
+    draftPointsRef.current = [];
+    setDraftCaliper(null);
+  }, []);
 
   const updateCaliper = useCallback(
     (caliperId: string, patch: Partial<EcgCaliper>) => {
@@ -231,11 +299,25 @@ export function useEcgMeasurementWorkspace(options: {
     (caliperId: string, endpoint: "start" | "end", imagePoint: ImagePoint) => {
       const caliper = present.calipers.find((item) => item.id === caliperId);
       if (!caliper || caliper.locked) return;
-      const spacing = gridSpacingPx(controlsRef.current.grid.speed, controlsRef.current.grid.gain);
+      const spacing = spacingForGrid();
       const next = dragCaliperEndpoint(caliper, endpoint, imagePoint, spacing);
       updateCaliper(caliperId, next);
     },
-    [present.calipers, updateCaliper],
+    [present.calipers, spacingForGrid, updateCaliper],
+  );
+
+  const dragCaliperHandle = useCallback(
+    (caliperId: string, handle: "vertex" | number, imagePoint: ImagePoint) => {
+      const caliper = present.calipers.find((item) => item.id === caliperId);
+      if (!caliper || caliper.locked) return;
+      const spacing = spacingForGrid();
+      const next =
+        handle === "vertex"
+          ? dragCaliperVertex(caliper, imagePoint, spacing)
+          : dragMultiWaypoint(caliper, handle, imagePoint, spacing);
+      updateCaliper(caliperId, next);
+    },
+    [present.calipers, spacingForGrid, updateCaliper],
   );
 
   const deleteCaliper = useCallback(
@@ -404,7 +486,7 @@ export function useEcgMeasurementWorkspace(options: {
 
   useEffect(() => {
     recalibrateMeasurements();
-  }, [options.controls.grid.gain, options.controls.grid.speed, recalibrateMeasurements]);
+  }, [options.controls.grid.customCalibration, options.controls.grid.gain, options.controls.grid.pixelsPerSmallBox, options.controls.grid.speed, recalibrateMeasurements]);
 
   useEffect(() => {
     if (Platform.OS !== "web" || typeof window === "undefined") return undefined;
@@ -437,7 +519,7 @@ export function useEcgMeasurementWorkspace(options: {
       adjustments: controlsRef.current.adjustments,
       grid: controlsRef.current.grid,
       transform: controlsRef.current.transform,
-      version: 4,
+      version: 5,
     };
   }, [present]);
 
@@ -459,6 +541,7 @@ export function useEcgMeasurementWorkspace(options: {
     activePreset,
     addAnnotation,
     addCaliper,
+    appendDraftPoint,
     beginDraftCaliper,
     cancelDraftCaliper,
     canRedo,
@@ -470,9 +553,11 @@ export function useEcgMeasurementWorkspace(options: {
     draftAnnotation,
     draftCaliper,
     dragCaliper,
+    dragCaliperHandle,
     duplicateCaliper,
     duplicateMeasurement,
     exportState,
+    finishMultiCaliper,
     hoveredCaliperId,
     hydrate,
     jumpToMeasurement,
@@ -500,9 +585,10 @@ export function useEcgMeasurementWorkspace(options: {
 export type EcgMeasurementWorkspace = ReturnType<typeof useEcgMeasurementWorkspace>;
 
 export function summarizeCaliper(caliper: EcgCaliper, controls: EcgViewerControls, rrMs?: number) {
-  const spacing = gridSpacingPx(controls.grid.speed, controls.grid.gain);
-  const deltaPx = deltaPixels(caliper.start, caliper.end, caliper.kind);
+  const spacing = resolveGridSpacing(controls.grid);
+  const deltaPx = deltaPixelsForCaliper(caliper);
   const readouts = buildReadouts({
+    caliper,
     deltaPx,
     gain: controls.grid.gain,
     kind: caliper.kind,

@@ -43,7 +43,7 @@ export type AiOverlayWorkspaceDto = {
 
 export type EcgViewerWorkspaceEnvelopeDto = {
   aiOverlay?: AiOverlayWorkspaceDto;
-  version: 4;
+  version: 5;
   workspace: Record<string, unknown>;
 };
 

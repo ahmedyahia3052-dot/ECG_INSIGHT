@@ -40,7 +40,7 @@ const capabilityMarkers = [
   "selectMeasurementPreset",
   "setCaliperColor",
   "updateMeasurementComments",
-  "sprint14-ecg-measurements-panel",
+  "sprint15-ecg-measurements-panel",
   "sprint14-ecg-measurement-overlay",
   "pr_interval",
   "qrs_duration",
@@ -54,7 +54,7 @@ const capabilityMarkers = [
   "STANDARD_ECG_LEADS",
   "Export JSON",
   "confidence",
-  "version: 4",
+  "version: 5",
 ];
 
 for (const marker of capabilityMarkers) {

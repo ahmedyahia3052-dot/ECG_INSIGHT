@@ -25,8 +25,8 @@ test.describe("Sprint 14 Clinical Calipers @sprint14", () => {
 
   test("clinical measurement presets and lead selector render", async ({ page }) => {
     await openMonitorReady(page, caseId);
-    await expect(page.getByTestId("sprint14-ecg-measurements-panel")).toBeVisible();
-    const panel = page.getByTestId("sprint14-ecg-measurements-panel");
+    await expect(page.getByTestId("sprint15-ecg-measurements-panel")).toBeVisible();
+    const panel = page.getByTestId("sprint15-ecg-measurements-panel");
     await expect(panel.getByRole("button", { name: "PR", exact: true })).toBeVisible();
     await expect(panel.getByRole("button", { name: "QRS", exact: true })).toBeVisible();
     await expect(panel.getByRole("button", { name: "QT", exact: true })).toBeVisible();
@@ -43,7 +43,7 @@ test.describe("Sprint 14 Clinical Calipers @sprint14", () => {
   test("measurement overlay supports drag placement workflow", async ({ page }) => {
     await openMonitorReady(page, caseId);
     await expect(page.locator("#error-overlay")).toHaveCount(0);
-    await page.getByTestId("sprint14-ecg-measurements-panel").getByRole("button", { name: "PR", exact: true }).click();
+    await page.getByTestId("sprint15-ecg-measurements-panel").getByRole("button", { name: "PR", exact: true }).click();
     await page.getByRole("button", { name: "Caliper" }).click();
     await expect(page.getByTestId("sprint14-ecg-measurement-overlay")).toBeVisible();
     const overlay = page.getByTestId("sprint13-ecg-measurement-overlay");

@@ -16,7 +16,11 @@ import {
   imageDisplayRect,
   measurementFromCaliper,
   primaryValueForKind,
+  resolveGridSpacing,
 } from "./ecgCalibrationMath";
+import { deltaPixelsForCaliper } from "./ecgCaliperGeometry";
+import { evaluateMeasurementReference, formatReferenceRange } from "./ecgMeasurementReference";
+import { measurementsToCsv } from "./ecgMeasurementExport";
 import { MEASUREMENT_KIND_LABELS } from "./measurementTypes";
 
 export type ClinicalMeasurementPreset = {
@@ -35,20 +39,87 @@ export const CLINICAL_MEASUREMENT_PRESETS: ClinicalMeasurementPreset[] = [
   { caliperKind: "horizontal", color: "#0F766E", kind: "qtc", label: "QTc" },
   { caliperKind: "horizontal", color: "#DC2626", kind: "rr_interval", label: "RR" },
   { caliperKind: "horizontal", color: "#DB2777", kind: "pp_interval", label: "PP" },
+  { caliperKind: "horizontal", color: "#B91C1C", kind: "heart_rate", label: "HR" },
+  { caliperKind: "horizontal", color: "#6366F1", kind: "p_wave_duration", label: "P Dur" },
+  { caliperKind: "horizontal", color: "#14B8A6", kind: "t_wave_duration", label: "T Dur" },
   { caliperKind: "vertical", color: "#D97706", kind: "st_elevation", label: "ST↑" },
   { caliperKind: "vertical", color: "#0891B2", kind: "st_depression", label: "ST↓" },
+  { caliperKind: "vertical", color: "#9333EA", kind: "p_amplitude", label: "P Amp" },
+  { caliperKind: "vertical", color: "#EF4444", kind: "r_amplitude", label: "R Amp" },
+  { caliperKind: "vertical", color: "#0284C7", kind: "s_amplitude", label: "S Amp" },
+  { caliperKind: "vertical", color: "#16A34A", kind: "t_amplitude", label: "T Amp" },
+  { caliperKind: "angle", color: "#CA8A04", kind: "electrical_axis", label: "Axis" },
+  { caliperKind: "multi", color: "#475569", kind: "custom", label: "Multi Seg" },
+  { caliperKind: "distance", color: "#64748B", kind: "custom", label: "Dist Seg" },
   { caliperKind: "dual", color: "#64748B", kind: "custom", label: "Custom" },
 ];
 
-export type MeasurementExportFormat = "json" | "fhir" | "hl7" | "pdf";
+export type MeasurementExportFormat = "json" | "fhir" | "hl7" | "pdf" | "csv";
 
 export type SerializedMeasurementBundle = {
   exportedAt: string;
   format: MeasurementExportFormat;
   measurements: EcgClinicalMeasurement[];
-  schemaVersion: 3;
+  schemaVersion: 4;
   workspaceVersion: EcgViewerWorkspaceState["version"];
 };
+
+export function enrichMeasurement(
+  measurement: EcgClinicalMeasurement,
+  calibration: { gain: number; speed: number; spacing: number },
+): EcgClinicalMeasurement {
+  const evaluation = evaluateMeasurementReference(measurement.kind, measurement.value, measurement.unit);
+  return {
+    ...measurement,
+    aiInterpretation: measurement.aiInterpretation ?? null,
+    calibrationSnapshot: measurement.calibrationSnapshot ?? {
+      gain: calibration.gain,
+      pixelsPerSmallBox: calibration.spacing,
+      speed: calibration.speed,
+    },
+    clinicalSignificance: evaluation.clinicalSignificance,
+    referenceRange: evaluation.referenceRange || formatReferenceRange(measurement.kind),
+  };
+}
+
+export function computeQtDispersion(
+  measurements: EcgClinicalMeasurement[],
+): EcgClinicalMeasurement | null {
+  const qtValues = measurements
+    .filter((item) => item.kind === "qt_interval" && !item.hidden && item.durationMs != null && item.durationMs > 0)
+    .map((item) => item.durationMs as number);
+  if (qtValues.length < 2) return null;
+  const max = Math.max(...qtValues);
+  const min = Math.min(...qtValues);
+  const dispersion = Number((max - min).toFixed(1));
+  const timestamp = new Date().toISOString();
+  return {
+    aiInterpretation: null,
+    amplitudeMv: undefined,
+    caliperId: "__qt_dispersion__",
+    clinicalSignificance: evaluateMeasurementReference("qt_dispersion", dispersion, "ms").clinicalSignificance,
+    comments: `Derived from ${qtValues.length} QT interval measurements.`,
+    confidence: null,
+    createdBy: "Measurement Engine",
+    doctorNotes: undefined,
+    durationMs: dispersion,
+    end: { x: 0, y: 0 },
+    hidden: false,
+    id: `qt-dispersion-${timestamp}`,
+    kind: "qt_dispersion",
+    lead: undefined,
+    name: "QT Dispersion",
+    operator: "Measurement Engine",
+    readouts: { milliseconds: dispersion },
+    referenceRange: formatReferenceRange("qt_dispersion"),
+    start: { x: 0, y: 0 },
+    timestamp,
+    type: MEASUREMENT_KIND_LABELS.qt_dispersion,
+    unit: "ms",
+    updatedAt: timestamp,
+    value: dispersion,
+  };
+}
 
 export function presetForKind(kind: EcgMeasurementKind): ClinicalMeasurementPreset {
   return CLINICAL_MEASUREMENT_PRESETS.find((item) => item.kind === kind) ?? CLINICAL_MEASUREMENT_PRESETS[CLINICAL_MEASUREMENT_PRESETS.length - 1]!;
@@ -57,7 +128,7 @@ export function presetForKind(kind: EcgMeasurementKind): ClinicalMeasurementPres
 export function resolveLatestRrMs(calipers: EcgCaliper[], spacing: number, speed: 25 | 50): number | undefined {
   const rrCaliper = [...calipers].reverse().find((item) => !item.hidden && item.measurementKind === "rr_interval");
   if (!rrCaliper) return undefined;
-  const deltaPx = deltaPixels(rrCaliper.start, rrCaliper.end, rrCaliper.kind);
+  const deltaPx = deltaPixelsForCaliper(rrCaliper);
   const ms = horizontalDeltaMs(deltaPx, speed, spacing);
   return ms > 0 ? ms : undefined;
 }
@@ -108,28 +179,32 @@ export function createMeasurementInput(input: {
     updatedAt: new Date().toISOString(),
   };
   const derived = measurementFromCaliper(caliper, input.spacing, input.speed, input.gain, input.createdBy);
-  const measurement: EcgClinicalMeasurement = {
-    amplitudeMv: derived.readouts.mv,
-    caliperId: caliper.id,
-    comments: input.comments,
-    confidence: null,
-    createdBy: input.createdBy,
-    durationMs: derived.readouts.milliseconds,
-    end: caliper.end,
-    hidden: false,
-    id: uid("measurement"),
-    kind: derived.kind,
-    lead: input.lead,
-    name: caliper.label?.trim() || derived.name,
-    operator: input.createdBy,
-    readouts: derived.readouts,
-    start: caliper.start,
-    timestamp: caliper.createdAt,
-    type: MEASUREMENT_KIND_LABELS[derived.kind],
-    unit: derived.unit,
-    updatedAt: caliper.updatedAt,
-    value: derived.value,
-  };
+  const measurement: EcgClinicalMeasurement = enrichMeasurement(
+    {
+      aiInterpretation: null,
+      amplitudeMv: derived.readouts.mv,
+      caliperId: caliper.id,
+      comments: input.comments,
+      confidence: null,
+      createdBy: input.createdBy,
+      durationMs: derived.readouts.milliseconds,
+      end: caliper.end,
+      hidden: false,
+      id: uid("measurement"),
+      kind: derived.kind,
+      lead: input.lead,
+      name: caliper.label?.trim() || derived.name,
+      operator: input.createdBy,
+      readouts: derived.readouts,
+      start: caliper.start,
+      timestamp: caliper.createdAt,
+      type: MEASUREMENT_KIND_LABELS[derived.kind],
+      unit: derived.unit,
+      updatedAt: caliper.updatedAt,
+      value: derived.value,
+    },
+    { gain: input.gain, spacing: input.spacing, speed: input.speed },
+  );
   return { caliper, measurement };
 }
 
@@ -147,21 +222,24 @@ export function updateMeasurementFromCaliper(
   const derived = measurementFromCaliper(caliper, context.spacing, context.speed, context.gain, context.operator, {
     rrMs: resolveLatestRrMs(context.calipers, context.spacing, context.speed),
   });
-  return {
-    ...existing,
-    amplitudeMv: derived.readouts.mv,
-    durationMs: derived.readouts.milliseconds,
-    end: caliper.end,
-    kind: derived.kind,
-    lead: caliper.lead ?? existing.lead,
-    name: caliper.label?.trim() || existing.name,
-    readouts: derived.readouts,
-    start: caliper.start,
-    type: MEASUREMENT_KIND_LABELS[derived.kind],
-    unit: derived.unit,
-    updatedAt: new Date().toISOString(),
-    value: derived.value,
-  };
+  return enrichMeasurement(
+    {
+      ...existing,
+      amplitudeMv: derived.readouts.mv,
+      durationMs: derived.readouts.milliseconds,
+      end: caliper.end,
+      kind: derived.kind,
+      lead: caliper.lead ?? existing.lead,
+      name: caliper.label?.trim() || existing.name,
+      readouts: derived.readouts,
+      start: caliper.start,
+      type: MEASUREMENT_KIND_LABELS[derived.kind],
+      unit: derived.unit,
+      updatedAt: new Date().toISOString(),
+      value: derived.value,
+    },
+    { gain: context.gain, spacing: context.spacing, speed: context.speed },
+  );
 }
 
 export function deleteMeasurementFromState(state: EcgViewerWorkspaceState, measurementId: string): EcgViewerWorkspaceState {
@@ -231,10 +309,16 @@ export function exportMeasurements(
     exportedAt: new Date().toISOString(),
     format,
     measurements,
-    schemaVersion: 3,
-    workspaceVersion: 4,
+    schemaVersion: 4,
+    workspaceVersion: 5,
   };
   if (format === "json") return bundle;
+  if (format === "csv") {
+    return {
+      ...bundle,
+      csv: measurementsToCsv(measurements),
+    };
+  }
   if (format === "fhir") {
     return {
       ...bundle,
@@ -271,11 +355,17 @@ export function exportMeasurements(
 export function syncWorkspaceMeasurements(
   calipers: EcgCaliper[],
   existing: EcgClinicalMeasurement[],
-  input: { gain: 5 | 10 | 20; operator: string; speed: 25 | 50 },
+  input: {
+    gain: 5 | 10 | 20;
+    grid?: Pick<import("./types").EcgViewerGridSettings, "customCalibration" | "gain" | "pixelsPerSmallBox" | "speed">;
+    operator: string;
+    speed: 25 | 50;
+  },
 ): EcgClinicalMeasurement[] {
-  const spacing = gridSpacingPx(input.speed, input.gain);
+  const spacing = input.grid ? resolveGridSpacing(input.grid) : gridSpacingPx(input.speed, input.gain);
+  const calibration = { gain: input.gain, spacing, speed: input.speed };
   const byCaliper = new Map(existing.map((item) => [item.caliperId, item]));
-  return calipers
+  const synced = calipers
     .filter((caliper) => !caliper.hidden)
     .map((caliper) => {
       const previous = byCaliper.get(caliper.id);
@@ -283,29 +373,38 @@ export function syncWorkspaceMeasurements(
         rrMs: resolveLatestRrMs(calipers, spacing, input.speed),
       });
       const primary = primaryValueForKind(derived.kind, derived.readouts, caliper.kind);
-      return {
-        amplitudeMv: derived.readouts.mv,
-        caliperId: caliper.id,
-        comments: previous?.comments ?? caliper.comments,
-        confidence: previous?.confidence ?? null,
-        createdBy: caliper.createdBy ?? previous?.createdBy ?? input.operator,
-        durationMs: derived.readouts.milliseconds,
-        end: caliper.end,
-        hidden: previous?.hidden ?? false,
-        id: previous?.id ?? uid("measurement"),
-        kind: derived.kind,
-        lead: caliper.lead ?? previous?.lead,
-        name: previous?.name ?? caliper.label?.trim() ?? derived.name,
-        operator: previous?.operator ?? input.operator,
-        readouts: derived.readouts,
-        start: caliper.start,
-        timestamp: previous?.timestamp ?? caliper.createdAt,
-        type: MEASUREMENT_KIND_LABELS[derived.kind],
-        unit: primary.unit,
-        updatedAt: caliper.updatedAt,
-        value: primary.value,
-      } satisfies EcgClinicalMeasurement;
+      return enrichMeasurement(
+        {
+          aiInterpretation: previous?.aiInterpretation ?? null,
+          amplitudeMv: derived.readouts.mv,
+          caliperId: caliper.id,
+          comments: previous?.comments ?? caliper.comments,
+          confidence: previous?.confidence ?? null,
+          createdBy: caliper.createdBy ?? previous?.createdBy ?? input.operator,
+          doctorNotes: previous?.doctorNotes,
+          durationMs: derived.readouts.milliseconds,
+          end: caliper.end,
+          groupId: previous?.groupId ?? caliper.groupId,
+          hidden: previous?.hidden ?? false,
+          id: previous?.id ?? uid("measurement"),
+          kind: derived.kind,
+          lead: caliper.lead ?? previous?.lead,
+          name: previous?.name ?? caliper.label?.trim() ?? derived.name,
+          operator: previous?.operator ?? input.operator,
+          readouts: derived.readouts,
+          start: caliper.start,
+          timestamp: previous?.timestamp ?? caliper.createdAt,
+          type: MEASUREMENT_KIND_LABELS[derived.kind],
+          unit: primary.unit,
+          updatedAt: caliper.updatedAt,
+          value: primary.value,
+        },
+        calibration,
+      );
     });
+  const withoutDispersion = synced.filter((item) => item.caliperId !== "__qt_dispersion__");
+  const dispersion = computeQtDispersion(withoutDispersion);
+  return dispersion ? [...withoutDispersion, dispersion] : withoutDispersion;
 }
 
 export function focusTransformForCaliper(

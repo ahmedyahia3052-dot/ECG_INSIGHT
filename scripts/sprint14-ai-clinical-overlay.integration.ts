@@ -58,7 +58,7 @@ const capabilityMarkers = [
   "rejected",
   "Export Overlay",
   "Reset Overlay",
-  "version: 4",
+  "version: 5",
   "AiOverlaySyncEventDto",
 ];
 

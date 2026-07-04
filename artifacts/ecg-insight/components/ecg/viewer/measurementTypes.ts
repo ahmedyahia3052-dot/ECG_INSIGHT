@@ -3,13 +3,14 @@ import type { EcgGridGain, EcgImageAdjustments, EcgPaperSpeed, EcgViewerGridSett
 
 export type EcgViewerToolMode = "select" | "pan" | "caliper" | "measurement" | "annotation";
 
-export type EcgCaliperKind = "horizontal" | "vertical" | "dual";
+export type EcgCaliperKind = "horizontal" | "vertical" | "dual" | "multi" | "angle" | "distance";
 
 export type EcgMeasurementKind =
   | "pr_interval"
   | "qrs_duration"
   | "qt_interval"
   | "qtc"
+  | "qt_dispersion"
   | "rr_interval"
   | "pp_interval"
   | "st_elevation"
@@ -17,7 +18,18 @@ export type EcgMeasurementKind =
   | "heart_rate"
   | "p_wave_duration"
   | "t_wave_duration"
+  | "p_amplitude"
+  | "r_amplitude"
+  | "s_amplitude"
+  | "t_amplitude"
+  | "electrical_axis"
   | "custom";
+
+export type EcgCalibrationSnapshot = {
+  gain: number;
+  pixelsPerSmallBox: number;
+  speed: number;
+};
 
 export type EcgAnnotationKind =
   | "arrow"
@@ -37,6 +49,9 @@ export type EcgCaliper = {
   kind: EcgCaliperKind;
   start: ImagePoint;
   end: ImagePoint;
+  vertex?: ImagePoint;
+  waypoints?: ImagePoint[];
+  groupId?: string;
   locked: boolean;
   hidden: boolean;
   snapToGrid: boolean;
@@ -51,11 +66,13 @@ export type EcgCaliper = {
 };
 
 export type EcgMeasurementReadouts = {
+  angleDegrees?: number;
   bpm?: number;
   largeBoxes?: number;
   milliseconds?: number;
   mm?: number;
   mv?: number;
+  pathPixels?: number;
   seconds?: number;
   smallBoxes?: number;
 };
@@ -74,12 +91,18 @@ export type EcgClinicalMeasurement = {
   durationMs?: number;
   amplitudeMv?: number;
   comments?: string;
+  doctorNotes?: string;
+  aiInterpretation?: string | null;
+  referenceRange?: string;
+  clinicalSignificance?: string;
+  calibrationSnapshot?: EcgCalibrationSnapshot;
   confidence: number | null;
   timestamp: string;
   updatedAt: string;
   createdBy?: string;
   operator: string;
   hidden: boolean;
+  groupId?: string;
   readouts: EcgMeasurementReadouts;
 };
 
@@ -110,21 +133,27 @@ export type EcgViewerWorkspaceState = {
   toolMode: EcgViewerToolMode;
   transform: EcgViewerTransform;
   adjustments: EcgImageAdjustments;
-  version: 4;
+  version: 5;
 };
 
 export const MEASUREMENT_KIND_LABELS: Record<EcgMeasurementKind, string> = {
   custom: "Custom",
+  electrical_axis: "Electrical Axis",
   heart_rate: "Heart Rate",
+  p_amplitude: "P Amplitude",
   p_wave_duration: "P Wave Duration",
   pp_interval: "PP Interval",
   pr_interval: "PR Interval",
   qrs_duration: "QRS Duration",
+  qt_dispersion: "QT Dispersion",
   qt_interval: "QT Interval",
   qtc: "QTc",
+  r_amplitude: "R Amplitude",
   rr_interval: "RR Interval",
+  s_amplitude: "S Amplitude",
   st_depression: "ST Depression",
   st_elevation: "ST Elevation",
+  t_amplitude: "T Amplitude",
   t_wave_duration: "T Wave Duration",
 };
 
@@ -146,7 +175,7 @@ export function migrateWorkspaceState(raw: Partial<EcgViewerWorkspaceState> & { 
     start: item.start ?? { x: 0, y: 0 },
     updatedAt: item.updatedAt ?? item.timestamp,
   }));
-  return createWorkspaceState({ ...raw, aiOverlay: raw.aiOverlay, calipers, measurements, version: 4 });
+  return createWorkspaceState({ ...raw, aiOverlay: raw.aiOverlay, calipers, measurements, version: 5 });
 }
 
 export function createWorkspaceState(partial?: Partial<EcgViewerWorkspaceState>): EcgViewerWorkspaceState {
@@ -172,7 +201,7 @@ export function createWorkspaceState(partial?: Partial<EcgViewerWorkspaceState>)
     selectedMeasurementId: partial?.selectedMeasurementId ?? null,
     toolMode: partial?.toolMode ?? "select",
     transform: partial?.transform ?? { panX: 0, panY: 0, rotation: 0, zoom: 1 },
-    version: 4,
+    version: 5,
   };
 }
 

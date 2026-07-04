@@ -83,8 +83,18 @@ export function clearExpiredImageCache(now = Date.now()) {
   }
 }
 
-export function clampZoom(value: number, min = 0.1, max = 8) {
+export function clampZoom(value: number, min = 0.1, max = 20) {
   return Math.min(max, Math.max(min, value));
+}
+
+export const ECG_ZOOM_PRESETS = [1, 2, 4, 8, 10, 15, 20] as const;
+
+export type EcgZoomPreset = (typeof ECG_ZOOM_PRESETS)[number];
+
+export function nearestZoomPreset(value: number): EcgZoomPreset {
+  return ECG_ZOOM_PRESETS.reduce((closest, preset) =>
+    Math.abs(preset - value) < Math.abs(closest - value) ? preset : closest,
+  ECG_ZOOM_PRESETS[0]);
 }
 
 export function zoomStep(current: number, delta: number) {

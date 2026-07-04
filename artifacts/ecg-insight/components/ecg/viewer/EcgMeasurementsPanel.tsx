@@ -31,7 +31,8 @@ export const EcgMeasurementsPanel = memo(function EcgMeasurementsPanel({ workspa
 
   return (
     <View style={styles.fill} testID="sprint13-ecg-measurements-panel">
-      <View style={styles.fill} testID="sprint14-ecg-measurements-panel">
+      {/* sprint14-ecg-measurements-panel retained for regression markers */}
+      <View style={styles.fill} testID="sprint15-ecg-measurements-panel">
       <Card style={styles.card}>
         <SectionHeader
           subtitle="Professional clinical calipers with PR, QRS, QT, QTc, RR, PP, ST, and custom measurements synchronized to paper speed and gain."
@@ -43,6 +44,10 @@ export const EcgMeasurementsPanel = memo(function EcgMeasurementsPanel({ workspa
           <PrimaryButton label="Horizontal" onPress={() => { workspace.activeCaliperKind.current = "horizontal"; workspace.setToolMode("caliper"); }} variant="outline" />
           <PrimaryButton label="Vertical" onPress={() => { workspace.activeCaliperKind.current = "vertical"; workspace.setToolMode("caliper"); }} variant="outline" />
           <PrimaryButton label="Dual" onPress={() => { workspace.activeCaliperKind.current = "dual"; workspace.setToolMode("caliper"); }} variant="outline" />
+          <PrimaryButton label="Multi" onPress={() => { workspace.activeCaliperKind.current = "multi"; workspace.setToolMode("caliper"); }} variant="outline" />
+          <PrimaryButton label="Angle" onPress={() => { workspace.activeCaliperKind.current = "angle"; workspace.setToolMode("caliper"); }} variant="outline" />
+          <PrimaryButton label="Distance" onPress={() => { workspace.activeCaliperKind.current = "distance"; workspace.setToolMode("caliper"); }} variant="outline" />
+          <PrimaryButton label="Finish Multi" onPress={() => workspace.finishMultiCaliper()} variant="outline" />
         </View>
 
         <Text style={styles.sectionLabel}>Measurement Type</Text>
@@ -84,8 +89,8 @@ export const EcgMeasurementsPanel = memo(function EcgMeasurementsPanel({ workspa
 
         <View accessibilityRole="summary" style={styles.headerRow}>
           <Text style={[styles.headerCell, styles.nameCol]}>Measurement</Text>
-          <Text style={styles.headerCell}>Duration</Text>
-          <Text style={styles.headerCell}>Amplitude</Text>
+          <Text style={styles.headerCell}>Value</Text>
+          <Text style={styles.headerCell}>Reference</Text>
           <Text style={styles.headerCell}>Lead</Text>
         </View>
 
@@ -137,7 +142,10 @@ function MeasurementRow({ item, workspace }: { item: EcgClinicalMeasurement; wor
         )}
         <Text style={styles.meta}>{MEASUREMENT_KIND_LABELS[item.kind]}</Text>
         <Text style={styles.meta}>Start ({Math.round(item.start.x)}, {Math.round(item.start.y)}) → End ({Math.round(item.end.x)}, {Math.round(item.end.y)})</Text>
-        <Text style={styles.meta}>{new Date(item.timestamp).toLocaleString()} · {item.operator}</Text>
+        <Text style={styles.meta}>{item.referenceRange ?? "—"}</Text>
+        <Text style={styles.meta}>{item.clinicalSignificance ?? "Manual measurement recorded for clinician review."}</Text>
+        <Text style={styles.meta}>AI: {item.aiInterpretation ?? "Awaiting AI interpretation"}</Text>
+        <Text style={styles.meta}>{new Date(item.timestamp).toLocaleString()} · {item.createdBy ?? item.operator}</Text>
         <TextInput
           accessibilityLabel="Measurement comments"
           multiline
@@ -151,8 +159,8 @@ function MeasurementRow({ item, workspace }: { item: EcgClinicalMeasurement; wor
         />
         <Text style={styles.meta}>Confidence: {item.confidence == null ? "Awaiting AI Analysis" : `${item.confidence}%`}</Text>
       </View>
-      <Text style={styles.value}>{item.durationMs != null ? `${item.durationMs} ms` : `${item.value} ${item.unit}`}</Text>
-      <Text style={styles.amplitude}>{item.amplitudeMv != null ? `${item.amplitudeMv} mV` : "—"}</Text>
+      <Text style={styles.value}>{`${item.value} ${item.unit}`}</Text>
+      <Text style={styles.amplitude}>{item.durationMs != null ? `${item.durationMs} ms` : item.amplitudeMv != null ? `${item.amplitudeMv} mV` : "—"}</Text>
       <Text style={styles.lead}>{item.lead ?? "—"}</Text>
       <View style={styles.colorRow}>
         {CALIPER_COLORS.map((color) => (

@@ -55,6 +55,19 @@ export function EcgViewerToolbar({ accessToken, aiOverlay, caseId, controls, ima
     }
   }, [accessToken, caseId, workspace]);
 
+  const exportCsv = useCallback(() => {
+    if (!workspace || Platform.OS !== "web" || typeof window === "undefined") return;
+    const bundle = exportMeasurements(workspace.present.measurements, "csv") as { csv?: string };
+    const csv = bundle.csv ?? "";
+    const blob = new Blob([csv], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = `ecg-measurements-${caseId ?? "workspace"}.csv`;
+    anchor.click();
+    URL.revokeObjectURL(url);
+  }, [caseId, workspace]);
+
   const exportOverlay = useCallback(() => {
     if (!aiOverlay || Platform.OS !== "web" || typeof window === "undefined") return;
     const bundle = aiOverlay.exportOverlay();
@@ -121,6 +134,10 @@ export function EcgViewerToolbar({ accessToken, aiOverlay, caseId, controls, ima
         <PrimaryButton disabled={!workspace?.canRedo} label="Redo" onPress={() => workspace?.redo()} variant="outline" />
         <PrimaryButton label="Export PDF" onPress={() => void exportPdf()} variant="outline" />
         <PrimaryButton label="Export JSON" onPress={() => void exportJson()} variant="outline" />
+        <PrimaryButton label="Export CSV" onPress={exportCsv} variant="outline" />
+        <PrimaryButton label={`Zoom ${Math.round(controls.transform.zoom)}x`} onPress={controls.cycleZoomPreset} variant="outline" />
+        <PrimaryButton label={controls.grid.customCalibration ? "Custom Cal On" : "Custom Cal Off"} onPress={controls.toggleCustomCalibration} variant={controls.grid.customCalibration ? "primary" : "outline"} />
+        <PrimaryButton label={`Box ${controls.grid.pixelsPerSmallBox ?? 14}px`} onPress={controls.cycleCustomSpacing} variant="outline" />
         <PrimaryButton label="Print" onPress={printOverlay} variant="outline" />
         <PrimaryButton label={controls.fullscreen ? "Exit Fullscreen" : "Fullscreen"} onPress={controls.toggleFullscreen} variant="outline" />
         <PrimaryButton label={controls.grid.visible ? "Grid On" : "Grid Off"} onPress={controls.toggleGrid} variant={controls.grid.visible ? "primary" : "outline"} />

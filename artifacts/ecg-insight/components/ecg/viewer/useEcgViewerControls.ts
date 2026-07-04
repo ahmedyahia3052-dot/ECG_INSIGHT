@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Platform } from "react-native";
 
-import { clampZoom, fitZoomForDimensions, zoomStep } from "./ecgImageEngine";
+import { clampZoom, ECG_ZOOM_PRESETS, fitZoomForDimensions, zoomStep } from "./ecgImageEngine";
 import {
   DEFAULT_ADJUSTMENTS,
   DEFAULT_GRID,
@@ -116,6 +116,32 @@ export function useEcgViewerControls() {
     setPanMode((current) => (current === "active" ? "none" : "active"));
   }, []);
 
+  const cycleZoomPreset = useCallback(() => {
+    setTransform((current) => {
+      const currentPreset = ECG_ZOOM_PRESETS.find((preset) => Math.abs(preset - current.zoom) < 0.05) ?? ECG_ZOOM_PRESETS[0];
+      const index = ECG_ZOOM_PRESETS.indexOf(currentPreset);
+      const next = ECG_ZOOM_PRESETS[(index + 1) % ECG_ZOOM_PRESETS.length] ?? 1;
+      return { ...current, zoom: clampZoom(next) };
+    });
+    setFitMode("none");
+  }, []);
+
+  const toggleCustomCalibration = useCallback(() => {
+    setGrid((current) => ({
+      ...current,
+      customCalibration: !current.customCalibration,
+      pixelsPerSmallBox: current.pixelsPerSmallBox ?? 14,
+    }));
+  }, []);
+
+  const cycleCustomSpacing = useCallback(() => {
+    setGrid((current) => {
+      const base = current.pixelsPerSmallBox ?? 14;
+      const next = base >= 28 ? 10 : Number((base + 2).toFixed(0));
+      return { ...current, customCalibration: true, pixelsPerSmallBox: next };
+    });
+  }, []);
+
   const toggleFullscreen = useCallback(() => {
     setFullscreen((value) => !value);
   }, []);
@@ -170,9 +196,11 @@ export function useEcgViewerControls() {
     () => ({
       adjustments,
       applyFit,
+      cycleCustomSpacing,
       cycleGain,
       cycleGridOpacity,
       cycleSpeed,
+      cycleZoomPreset,
       fitMode,
       fullscreen,
       grid,
@@ -191,6 +219,7 @@ export function useEcgViewerControls() {
       setViewportDimensions,
       setZoom,
       spacePanActive,
+      toggleCustomCalibration,
       toggleFullscreen,
       toggleGrid,
       togglePanMode,
@@ -201,9 +230,11 @@ export function useEcgViewerControls() {
     [
       adjustments,
       applyFit,
+      cycleCustomSpacing,
       cycleGain,
       cycleGridOpacity,
       cycleSpeed,
+      cycleZoomPreset,
       fitMode,
       fullscreen,
       grid,
@@ -216,6 +247,7 @@ export function useEcgViewerControls() {
       rotate,
       setViewportDimensions,
       spacePanActive,
+      toggleCustomCalibration,
       toggleFullscreen,
       toggleGrid,
       togglePanMode,

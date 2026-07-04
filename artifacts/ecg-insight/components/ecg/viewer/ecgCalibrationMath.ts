@@ -1,5 +1,14 @@
 import type { EcgCaliper, EcgCaliperKind, EcgMeasurementKind, EcgMeasurementReadouts, ImagePoint } from "./measurementTypes";
-import type { EcgGridGain, EcgPaperSpeed } from "./types";
+import type { EcgGridGain, EcgPaperSpeed, EcgViewerGridSettings } from "./types";
+import { computeAngleDegrees, deltaPixelsForCaliper, polylineLength } from "./ecgCaliperGeometry";
+import { MEASUREMENT_KIND_LABELS } from "./measurementTypes";
+
+export function resolveGridSpacing(grid: Pick<EcgViewerGridSettings, "gain" | "speed" | "pixelsPerSmallBox" | "customCalibration">) {
+  if (grid.customCalibration && grid.pixelsPerSmallBox && grid.pixelsPerSmallBox > 0) {
+    return grid.pixelsPerSmallBox;
+  }
+  return gridSpacingPx(grid.speed, grid.gain);
+}
 
 export function gridSpacingPx(speed: EcgPaperSpeed, gain: EcgGridGain) {
   const speedFactor = speed === 50 ? 0.72 : 1;
@@ -16,7 +25,9 @@ export function snapPoint(point: ImagePoint, spacing: number): ImagePoint {
   return { x: snapToGrid(point.x, spacing), y: snapToGrid(point.y, spacing) };
 }
 
-export function deltaPixels(start: ImagePoint, end: ImagePoint, kind: EcgCaliperKind) {
+export function deltaPixels(start: ImagePoint, end: ImagePoint, kind: EcgCaliperKind, caliper?: Pick<EcgCaliper, "vertex" | "waypoints">) {
+  if (kind === "angle" && caliper?.vertex) return computeAngleDegrees(caliper.vertex, start, end);
+  if (kind === "multi" && caliper?.waypoints?.length) return polylineLength(caliper.waypoints);
   if (kind === "horizontal") return Math.abs(end.x - start.x);
   if (kind === "vertical") return Math.abs(end.y - start.y);
   return Math.hypot(end.x - start.x, end.y - start.y);
@@ -48,6 +59,7 @@ export function heartRateFromRr(rrMs: number) {
 }
 
 export function buildReadouts(input: {
+  caliper?: Pick<EcgCaliper, "vertex" | "waypoints">;
   deltaPx: number;
   gain: EcgGridGain;
   kind: EcgCaliperKind;
@@ -56,8 +68,11 @@ export function buildReadouts(input: {
   spacing: number;
   speed: EcgPaperSpeed;
 }): EcgMeasurementReadouts {
+  if (input.kind === "angle") {
+    return { angleDegrees: Number(input.deltaPx.toFixed(1)) };
+  }
   const horizontalPx = input.kind === "vertical" ? 0 : input.deltaPx;
-  const verticalPx = input.kind === "horizontal" ? 0 : input.deltaPx;
+  const verticalPx = input.kind === "horizontal" || input.kind === "multi" ? 0 : input.deltaPx;
   const milliseconds = horizontalDeltaMs(horizontalPx, input.speed, input.spacing);
   const mm = verticalDeltaMm(verticalPx, input.spacing);
   const mv = verticalDeltaMv(verticalPx, input.gain, input.spacing);
@@ -68,6 +83,7 @@ export function buildReadouts(input: {
     milliseconds: Number(milliseconds.toFixed(1)),
     mm: Number(mm.toFixed(2)),
     mv: Number(mv.toFixed(3)),
+    pathPixels: input.kind === "multi" || input.kind === "distance" ? Number(input.deltaPx.toFixed(2)) : undefined,
     seconds: Number((milliseconds / 1000).toFixed(3)),
     smallBoxes: Number(smallBoxes.toFixed(2)),
   };
@@ -88,8 +104,14 @@ export function buildReadouts(input: {
 
 export function primaryValueForKind(kind: EcgMeasurementKind, readouts: EcgMeasurementReadouts, caliperKind: EcgCaliperKind) {
   if (kind === "heart_rate") return { unit: "bpm", value: readouts.bpm ?? 0 };
+  if (kind === "electrical_axis" || caliperKind === "angle") return { unit: "deg", value: readouts.angleDegrees ?? 0 };
   if (kind === "st_elevation" || kind === "st_depression") return { unit: "mm", value: readouts.mm ?? 0 };
+  if (kind === "p_amplitude" || kind === "r_amplitude" || kind === "s_amplitude" || kind === "t_amplitude") {
+    return { unit: "mV", value: readouts.mv ?? 0 };
+  }
+  if (kind === "qt_dispersion") return { unit: "ms", value: readouts.milliseconds ?? 0 };
   if (caliperKind === "vertical") return { unit: "mV", value: readouts.mv ?? 0 };
+  if (caliperKind === "distance") return { unit: "px", value: readouts.pathPixels ?? readouts.milliseconds ?? 0 };
   return { unit: "ms", value: readouts.milliseconds ?? 0 };
 }
 
@@ -102,34 +124,31 @@ export function measurementFromCaliper(
   options?: { rrMs?: number },
 ): { kind: EcgMeasurementKind; name: string; readouts: EcgMeasurementReadouts; unit: string; value: number } {
   const kind = caliper.measurementKind ?? inferMeasurementKind(caliper.kind);
-  const deltaPx = deltaPixels(caliper.start, caliper.end, caliper.kind);
-  const readouts = buildReadouts({ deltaPx, gain, kind: caliper.kind, measurementKind: kind, rrMs: options?.rrMs, spacing, speed });
+  const deltaPx = deltaPixelsForCaliper(caliper);
+  const readouts = buildReadouts({
+    caliper,
+    deltaPx,
+    gain,
+    kind: caliper.kind,
+    measurementKind: kind,
+    rrMs: options?.rrMs,
+    spacing,
+    speed,
+  });
   const primary = primaryValueForKind(kind, readouts, caliper.kind);
   const name = caliper.label?.trim() || defaultNameForKind(kind);
   return { kind, name, readouts, unit: primary.unit, value: primary.value };
 }
 
 function inferMeasurementKind(caliperKind: EcgCaliperKind): EcgMeasurementKind {
+  if (caliperKind === "angle") return "electrical_axis";
+  if (caliperKind === "distance") return "custom";
   if (caliperKind === "vertical") return "st_elevation";
   return "rr_interval";
 }
 
 function defaultNameForKind(kind: EcgMeasurementKind) {
-  const labels: Record<EcgMeasurementKind, string> = {
-    custom: "Custom Measurement",
-    heart_rate: "Heart Rate",
-    p_wave_duration: "P Wave Duration",
-    pp_interval: "PP Interval",
-    pr_interval: "PR Interval",
-    qrs_duration: "QRS Duration",
-    qt_interval: "QT Interval",
-    qtc: "QTc",
-    rr_interval: "RR Interval",
-    st_depression: "ST Depression",
-    st_elevation: "ST Elevation",
-    t_wave_duration: "T Wave Duration",
-  };
-  return labels[kind];
+  return MEASUREMENT_KIND_LABELS[kind] ?? "Custom Measurement";
 }
 
 export type ImageDisplayRect = {
@@ -181,9 +200,28 @@ export function dragCaliperEndpoint(
   if (endpoint === "start") {
     if (caliper.kind === "horizontal") return { ...caliper, start: { x: snapped.x, y: caliper.start.y } };
     if (caliper.kind === "vertical") return { ...caliper, start: { x: caliper.start.x, y: snapped.y } };
+    if (caliper.kind === "angle" && caliper.vertex) return { ...caliper, start: snapped };
     return { ...caliper, start: snapped };
   }
   if (caliper.kind === "horizontal") return { ...caliper, end: { x: snapped.x, y: caliper.start.y } };
   if (caliper.kind === "vertical") return { ...caliper, end: { x: caliper.start.x, y: snapped.y } };
+  if (caliper.kind === "angle" && caliper.vertex) return { ...caliper, end: snapped };
   return { ...caliper, end: snapped };
+}
+
+export function dragCaliperVertex(caliper: EcgCaliper, imagePoint: ImagePoint, spacing: number) {
+  const snapped = caliper.snapToGrid ? snapPoint(imagePoint, spacing) : imagePoint;
+  return { ...caliper, vertex: snapped };
+}
+
+export function dragMultiWaypoint(caliper: EcgCaliper, index: number, imagePoint: ImagePoint, spacing: number) {
+  if (!caliper.waypoints?.length) return caliper;
+  const snapped = caliper.snapToGrid ? snapPoint(imagePoint, spacing) : imagePoint;
+  const waypoints = caliper.waypoints.map((point, pointIndex) => (pointIndex === index ? snapped : point));
+  return {
+    ...caliper,
+    end: waypoints[waypoints.length - 1] ?? caliper.end,
+    start: waypoints[0] ?? caliper.start,
+    waypoints,
+  };
 }

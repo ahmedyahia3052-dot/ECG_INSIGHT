@@ -99,7 +99,7 @@ export function EcgMonitorViewerFoundation({
     snapshot: () => ({
       ...workspace.exportState(),
       aiOverlay: aiOverlay.exportState(),
-      version: 4 as const,
+      version: 5 as const,
     }),
   });
   scheduleSaveRef.current = scheduleSave;

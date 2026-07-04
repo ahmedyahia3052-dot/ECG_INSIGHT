@@ -23,8 +23,10 @@ export type EcgViewerTransform = {
 };
 
 export type EcgViewerGridSettings = {
+  customCalibration?: boolean;
   gain: EcgGridGain;
   opacity: number;
+  pixelsPerSmallBox?: number;
   speed: EcgPaperSpeed;
   visible: boolean;
 };

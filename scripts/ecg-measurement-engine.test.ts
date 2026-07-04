@@ -11,7 +11,7 @@ import {
 } from "../artifacts/ecg-insight/components/ecg/viewer/ecgMeasurementEngine";
 import { createWorkspaceState, migrateWorkspaceState } from "../artifacts/ecg-insight/components/ecg/viewer/measurementTypes";
 
-assert.equal(CLINICAL_MEASUREMENT_PRESETS.length, 9);
+assert.equal(CLINICAL_MEASUREMENT_PRESETS.length, 19);
 assert.equal(presetForKind("pr_interval").label, "PR");
 assert.equal(presetForKind("qtc").caliperKind, "horizontal");
 
@@ -86,11 +86,14 @@ const qtcReadouts = buildReadouts({
 assert.equal(qtcReadouts.milliseconds, Number(computeQtc(400, 800).toFixed(1)));
 
 const migrated = migrateWorkspaceState({ ...workspace, version: 2 as never });
-assert.equal(migrated.version, 4);
+assert.equal(migrated.version, 5);
 assert.equal(migrated.activeLead, "II");
 
 const jsonExport = exportMeasurements(synced, "json") as { schemaVersion: number };
-assert.equal(jsonExport.schemaVersion, 3);
+assert.equal(jsonExport.schemaVersion, 4);
+assert.equal((jsonExport as { workspaceVersion: number }).workspaceVersion, 5);
+const csvExport = exportMeasurements(synced, "csv") as { csv: string };
+assert.ok(csvExport.csv.includes("name,type,kind"));
 const fhirExport = exportMeasurements(synced, "fhir") as { resourceType: string };
 assert.equal(fhirExport.resourceType, "Bundle");
 const hl7Export = exportMeasurements(synced, "hl7") as { segments: string[] };
