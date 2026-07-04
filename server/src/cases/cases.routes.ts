@@ -1,4 +1,6 @@
+import { randomUUID } from "node:crypto";
 import type { Prisma } from "@prisma/client";
+import { Prisma as PrismaRuntime } from "@prisma/client";
 import { Router } from "express";
 import { prisma } from "../config/prisma";
 import { requireAuth, requireRole } from "../middleware/auth";
@@ -55,8 +57,23 @@ function nextCaseId() {
 }
 
 async function nextCaseNumber() {
-  const total = await prisma.eCGCase.count();
-  return `ECGCASE-${String(total + 1).padStart(6, "0")}`;
+  const latest = await prisma.eCGCase.findFirst({
+    orderBy: { createdAt: "desc" },
+    select: { caseNumber: true },
+    where: { caseNumber: { startsWith: "ECGCASE-" } },
+  });
+  const serial = latest?.caseNumber?.match(/^ECGCASE-(\d+)$/)?.[1];
+  const base = serial ? Number(serial) + 1 : 1;
+  for (let attempt = 0; attempt < 8; attempt += 1) {
+    const candidate = `ECGCASE-${String(base + attempt).padStart(6, "0")}`;
+    const exists = await prisma.eCGCase.findFirst({ where: { caseNumber: candidate }, select: { id: true } });
+    if (!exists) return candidate;
+  }
+  return `ECGCASE-${Date.now().toString().slice(-8)}${randomUUID().slice(0, 4).toUpperCase()}`;
+}
+
+function isCaseNumberConflict(error: unknown) {
+  return error instanceof PrismaRuntime.PrismaClientKnownRequestError && error.code === "P2002";
 }
 
 function severityFromApi(severity?: "abnormal" | "critical" | "normal") {
@@ -186,37 +203,48 @@ casesRouter.post("/", requireRole("DOCTOR"), validateBody(caseCreateSchema), asy
     }
     assertResourceAccess(await canAccessPatient(patient.id, req.auth!));
 
-    const ecgCase = await prisma.eCGCase.create({
-      data: {
-        assignedDoctorId: req.body.assignedDoctorId,
-        acquisitionDate: req.body.acquisitionDate,
-        aiDiagnosis: req.body.diagnosis,
-        aiModelVersion: req.body.aiModelVersion,
-        caseId: nextCaseId(),
-        caseNumber: await nextCaseNumber(),
-        clinicalComments: req.body.interpretation,
-        clinicalNotes: req.body.clinicalNotes ?? req.body.interpretation,
-        confidenceScore: req.body.confidenceScore ?? req.body.confidence,
-        doctorDiagnosis: req.body.doctorDiagnosis,
-        ecgType: req.body.ecgType,
-        explainabilityData: req.body.explainabilityData as Prisma.InputJsonValue | undefined,
-        finalDiagnosis: req.body.finalDiagnosis ?? req.body.diagnosis,
-        heartRate: req.body.heartRate,
-        imagePath: req.body.ecgImage,
-        patientId: req.body.patientId,
-        prInterval: req.body.prInterval,
-        priority: fromApiPriority(req.body.priority),
-        qrsDuration: req.body.qrsDuration,
-        qtInterval: req.body.qtInterval,
-        qtcInterval: req.body.qtcInterval,
-        recommendations: req.body.recommendations,
-        rhythm: req.body.rhythm,
-        severity: severityFromApi(req.body.severity),
-        status: fromApiCaseStatus(req.body.status),
-        uploadedById: req.auth!.id,
-      },
-      include: caseInclude,
-    });
+    let ecgCase = null;
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      try {
+        ecgCase = await prisma.eCGCase.create({
+          data: {
+            assignedDoctorId: req.body.assignedDoctorId,
+            acquisitionDate: req.body.acquisitionDate,
+            aiDiagnosis: req.body.diagnosis,
+            aiModelVersion: req.body.aiModelVersion,
+            caseId: nextCaseId(),
+            caseNumber: await nextCaseNumber(),
+            clinicalComments: req.body.interpretation,
+            clinicalNotes: req.body.clinicalNotes ?? req.body.interpretation,
+            confidenceScore: req.body.confidenceScore ?? req.body.confidence,
+            doctorDiagnosis: req.body.doctorDiagnosis,
+            ecgType: req.body.ecgType,
+            explainabilityData: req.body.explainabilityData as Prisma.InputJsonValue | undefined,
+            finalDiagnosis: req.body.finalDiagnosis ?? req.body.diagnosis,
+            heartRate: req.body.heartRate,
+            imagePath: req.body.ecgImage,
+            patientId: req.body.patientId,
+            prInterval: req.body.prInterval,
+            priority: fromApiPriority(req.body.priority),
+            qrsDuration: req.body.qrsDuration,
+            qtInterval: req.body.qtInterval,
+            qtcInterval: req.body.qtcInterval,
+            recommendations: req.body.recommendations,
+            rhythm: req.body.rhythm,
+            severity: severityFromApi(req.body.severity),
+            status: fromApiCaseStatus(req.body.status),
+            uploadedById: req.auth!.id,
+          },
+          include: caseInclude,
+        });
+        break;
+      } catch (error) {
+        if (!isCaseNumberConflict(error) || attempt >= 4) throw error;
+      }
+    }
+    if (!ecgCase) {
+      throw new AppError(500, "Unable to allocate a unique ECG case number.", "CASE_NUMBER_CONFLICT");
+    }
 
     await audit({
       action: "CASE_CREATED",

@@ -34,6 +34,13 @@ All notable changes to this project are documented in this file.
 - Phase 1–2 measurement workspace, persistence, calipers, annotations
 - Compare and AI Overlay remain disabled until Sprint 14
 
+### Fixed (stability closure)
+
+- `/ecg-monitor` patient-loading race that rendered empty state instead of viewer (`ecgMonitorRoute.ts`)
+- Collision-safe `nextCaseNumber()` and create retry on unique constraint (`cases.routes.ts`)
+- Playwright auth bootstrap and shared fixture for 5 consecutive green runs
+- `SPRINT13_PHASE3_FINAL_REPORT.md`
+
 ---
 
 ## [Sprint13-Phase2] — 2026-07-04

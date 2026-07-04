@@ -15,6 +15,7 @@ export { EcgViewerStatusBar, EcgViewerTimeline } from "./EcgViewerTimeline";
 export { EcgViewerToolbar } from "./EcgViewerToolbar";
 export * from "./ecgCalibrationMath";
 export * from "./ecgImageEngine";
+export * from "./ecgMonitorRoute";
 export * from "./ecgViewerEngine";
 export * from "./measurementTypes";
 export * from "./types";

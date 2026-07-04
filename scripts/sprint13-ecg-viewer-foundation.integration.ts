@@ -75,6 +75,9 @@ for (const marker of capabilityMarkers) {
 }
 
 assert(route.includes("EcgMonitorViewerFoundation"), "ecg-monitor route must render EcgMonitorViewerFoundation.");
+assert(route.includes("resolveEcgMonitorScreenPhase"), "ecg-monitor route must resolve loading phases before rendering foundation.");
+assert(route.includes("sprint13-ecg-monitor-loading"), "ecg-monitor route must expose loading test id during startup.");
+assert(route.includes("patient-loading"), "ecg-monitor route must wait for patient context before ready state.");
 assert(enterpriseUi.includes("/ecg-monitor"), "Enterprise shell must register ecg-monitor workspace route.");
 assert(pipeline.includes("sprint13-ecg-viewer-foundation.integration.ts"), "Integration pipeline must register Sprint 13 viewer foundation test.");
 assert(toolbar.includes('label="Compare"') && toolbar.includes("disabled"), "Compare tool must remain disabled in Phase 1.");
