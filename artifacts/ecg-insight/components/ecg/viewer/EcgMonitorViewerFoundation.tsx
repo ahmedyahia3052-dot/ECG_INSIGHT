@@ -90,6 +90,10 @@ export function EcgMonitorViewerFoundation({
   const openStudy = (caseId: string) => router.push(`/ecg-monitor/${caseId}` as never);
 
   useEffect(() => {
+    workspace.setActiveLead(selectedLead);
+  }, [selectedLead, workspace]);
+
+  useEffect(() => {
     scheduleSave();
   }, [controls.adjustments, controls.grid, controls.transform, scheduleSave, workspace.present]);
 
@@ -133,7 +137,7 @@ export function EcgMonitorViewerFoundation({
               />
             </View>
           }
-          center={<EcgImageCanvas controls={controls} imageUrl={imageUrl} pdfUrl={pdfUrl} workspace={workspace} />}
+          center={<EcgImageCanvas accessToken={authToken?.token} controls={controls} imageUrl={imageUrl} pdfUrl={pdfUrl} workspace={workspace} />}
           left={
             <EcgViewerLeftRail
               onSelectPrevious={openStudy}

@@ -24,3 +24,12 @@ export async function downloadEcgViewerWorkspacePdf(accessToken: string, caseId:
   if (!response.ok) throw new Error("Failed to export measurement workspace PDF.");
   return response.blob();
 }
+
+export async function downloadEcgViewerWorkspaceJson(accessToken: string, caseId: string) {
+  const response = await fetch(`${API_URL}/cases/${caseId}/ecg-viewer-workspace/export/json`, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+    method: "POST",
+  });
+  if (!response.ok) throw new Error("Failed to export measurement workspace JSON.");
+  return response.json();
+}

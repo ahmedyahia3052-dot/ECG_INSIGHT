@@ -15,8 +15,12 @@ import type { EcgMeasurementWorkspace } from "./useEcgMeasurementWorkspace";
 import type { EcgViewerControls } from "./useEcgViewerControls";
 
 type Props = {
+  accessToken?: string | null;
   aiOverlayEnabled?: boolean;
   aiOverlayRegions?: EcgAiOverlayRegion[];
+  assetHeight?: number;
+  assetLoading?: boolean;
+  assetWidth?: number;
   controls: EcgViewerControls;
   digitizedLeads?: DigitizedWaveformLead[];
   imageUrl?: string;
@@ -26,8 +30,12 @@ type Props = {
 };
 
 export const EcgProViewerEngine = memo(function EcgProViewerEngine({
+  accessToken,
   aiOverlayEnabled = false,
   aiOverlayRegions = [],
+  assetHeight = 0,
+  assetLoading = false,
+  assetWidth = 0,
   controls,
   digitizedLeads = [],
   imageUrl,
@@ -44,12 +52,23 @@ export const EcgProViewerEngine = memo(function EcgProViewerEngine({
   const viewport = controls.viewport;
 
   useEffect(() => {
-    const cached = imageUrl ? readCachedImageDimensions(imageUrl) : null;
+    if (!imageUrl) {
+      setLoading(false);
+      return;
+    }
+    if (assetWidth > 0 && assetHeight > 0) {
+      controls.setViewportDimensions({ imageHeight: assetHeight, imageWidth: assetWidth });
+      setLoading(false);
+      return;
+    }
+    const cached = readCachedImageDimensions(imageUrl);
     if (cached) {
       controls.setViewportDimensions({ imageHeight: cached.height, imageWidth: cached.width });
       setLoading(false);
-    } else if (imageUrl) setLoading(true);
-  }, [controls, imageUrl]);
+      return;
+    }
+    setLoading(assetLoading);
+  }, [assetHeight, assetLoading, assetWidth, controls.setViewportDimensions, imageUrl]);
 
   useEffect(() => {
     if (!pdfUrl || Platform.OS !== "web" || typeof document === "undefined") return undefined;
@@ -106,14 +125,20 @@ export const EcgProViewerEngine = memo(function EcgProViewerEngine({
   }, [controls]);
 
   const onImageLoad = useCallback(
-    (event: { nativeEvent: { source: { height: number; width: number } } }) => {
-      const { height, width } = event.nativeEvent.source;
+    (event: { nativeEvent: { source?: { height: number; width: number } } }) => {
+      const source = event.nativeEvent?.source;
+      const height = source?.height ?? assetHeight ?? viewport.imageHeight;
+      const width = source?.width ?? assetWidth ?? viewport.imageWidth;
+      if (!height || !width) {
+        setLoading(false);
+        return;
+      }
       if (imageUrl) cacheImageDimensions(imageUrl, width, height);
       controls.setViewportDimensions({ imageHeight: height, imageWidth: width });
       setLoading(false);
       emitRuntimeEvent("ViewerReady", { source: "sprint13-ecg-pro-viewer-engine", url: imageUrl });
     },
-    [controls, imageUrl],
+    [assetHeight, assetWidth, controls, imageUrl, viewport.imageHeight, viewport.imageWidth],
   );
 
   const onLayout = useCallback(
@@ -174,7 +199,7 @@ export const EcgProViewerEngine = memo(function EcgProViewerEngine({
       testID={testID}
     >
       {loading && imageUrl ? (
-        <View style={styles.loadingOverlay}>
+        <View pointerEvents="none" style={styles.loadingOverlay} testID="sprint13-ecg-image-loading">
           <ActivityIndicator color={medicalTheme.primary} size="large" />
           <Text style={styles.loadingText}>Loading ECG image…</Text>
         </View>

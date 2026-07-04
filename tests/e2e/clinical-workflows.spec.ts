@@ -1,5 +1,5 @@
 import { expect, test } from "./test";
-import { apiLogin, bootstrapAuthenticatedPage, createClinicalFixture, createPatient, expectPageReady, navigate, uiLogin } from "./utils/qa";
+import { apiLogin, createClinicalFixture, createPatient, expectPageReady, navigate, uiLogin } from "./utils/qa";
 import { createSyntheticEcgPngBuffer } from "./utils/ecg-fixture-image";
 
 test.describe("enterprise clinical workflows", () => {
@@ -32,7 +32,7 @@ test.describe("enterprise clinical workflows", () => {
     const session = await apiLogin(request, "doctor");
     const patient = await createPatient(request, session);
 
-    await bootstrapAuthenticatedPage(page, "doctor");
+    await uiLogin(page, "doctor");
     await navigate(page, "/ecg-cases", "ECG Case Management");
     await page.getByRole("button", { name: /\+ New ECG Case/i }).first().click();
     await expectPageReady(page, "New ECG Case");
@@ -60,7 +60,7 @@ test.describe("enterprise clinical workflows", () => {
     const session = await apiLogin(request, "doctor");
     const patient = await createPatient(request, session);
 
-    await bootstrapAuthenticatedPage(page, "doctor");
+    await uiLogin(page, "doctor");
     await navigate(page, "/upload-ecg", "Upload ECG");
     await expectPageReady(page, "Upload ECG");
     await page.getByRole("button", { name: "Select Existing Patient" }).click();

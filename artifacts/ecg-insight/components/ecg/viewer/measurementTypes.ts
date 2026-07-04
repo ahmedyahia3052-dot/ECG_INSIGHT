@@ -39,9 +39,12 @@ export type EcgCaliper = {
   locked: boolean;
   hidden: boolean;
   snapToGrid: boolean;
+  color: string;
   label?: string;
+  comments?: string;
   measurementKind?: EcgMeasurementKind;
   lead?: string;
+  createdBy?: string;
   createdAt: string;
   updatedAt: string;
 };
@@ -65,7 +68,15 @@ export type EcgClinicalMeasurement = {
   value: number;
   unit: string;
   lead?: string;
+  start: ImagePoint;
+  end: ImagePoint;
+  durationMs?: number;
+  amplitudeMv?: number;
+  comments?: string;
+  confidence: number | null;
   timestamp: string;
+  updatedAt: string;
+  createdBy?: string;
   operator: string;
   hidden: boolean;
   readouts: EcgMeasurementReadouts;
@@ -85,6 +96,8 @@ export type EcgViewerAnnotation = {
 };
 
 export type EcgViewerWorkspaceState = {
+  activeLead?: string;
+  activeMeasurementKind?: EcgMeasurementKind;
   annotations: EcgViewerAnnotation[];
   calipers: EcgCaliper[];
   grid: EcgViewerGridSettings;
@@ -95,7 +108,7 @@ export type EcgViewerWorkspaceState = {
   toolMode: EcgViewerToolMode;
   transform: EcgViewerTransform;
   adjustments: EcgImageAdjustments;
-  version: 2;
+  version: 3;
 };
 
 export const MEASUREMENT_KIND_LABELS: Record<EcgMeasurementKind, string> = {
@@ -115,8 +128,29 @@ export const MEASUREMENT_KIND_LABELS: Record<EcgMeasurementKind, string> = {
 
 export const ANNOTATION_COLORS = ["#DC2626", "#2563EB", "#059669", "#D97706", "#7C3AED", "#0F766E"] as const;
 
+export function migrateWorkspaceState(raw: Partial<EcgViewerWorkspaceState> & { version?: number }): EcgViewerWorkspaceState {
+  const calipers = (raw.calipers ?? []).map((caliper) => ({
+    ...caliper,
+    color: caliper.color ?? "#2563EB",
+    createdBy: caliper.createdBy,
+  }));
+  const measurements = (raw.measurements ?? []).map((item) => ({
+    ...item,
+    amplitudeMv: item.amplitudeMv ?? item.readouts?.mv,
+    confidence: item.confidence ?? null,
+    createdBy: item.createdBy ?? item.operator,
+    durationMs: item.durationMs ?? item.readouts?.milliseconds,
+    end: item.end ?? { x: 0, y: 0 },
+    start: item.start ?? { x: 0, y: 0 },
+    updatedAt: item.updatedAt ?? item.timestamp,
+  }));
+  return createWorkspaceState({ ...raw, calipers, measurements, version: 3 });
+}
+
 export function createWorkspaceState(partial?: Partial<EcgViewerWorkspaceState>): EcgViewerWorkspaceState {
   return {
+    activeLead: partial?.activeLead ?? "II",
+    activeMeasurementKind: partial?.activeMeasurementKind ?? "rr_interval",
     adjustments: partial?.adjustments ?? {
       brightness: 100,
       contrast: 100,
@@ -135,7 +169,7 @@ export function createWorkspaceState(partial?: Partial<EcgViewerWorkspaceState>)
     selectedMeasurementId: partial?.selectedMeasurementId ?? null,
     toolMode: partial?.toolMode ?? "select",
     transform: partial?.transform ?? { panX: 0, panY: 0, rotation: 0, zoom: 1 },
-    version: 2,
+    version: 3,
   };
 }
 

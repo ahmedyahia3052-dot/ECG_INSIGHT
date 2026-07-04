@@ -718,6 +718,29 @@ casesRouter.post("/:caseId/ecg-viewer-workspace/export", requireRole("DOCTOR"), 
   }
 });
 
+casesRouter.post("/:caseId/ecg-viewer-workspace/export/json", requireRole("DOCTOR"), async (req, res, next) => {
+  try {
+    const ecgCase = await prisma.eCGCase.findUnique({ where: { id: String(req.params.caseId) } })
+      ?? await findCaseForRoute(String(req.params.caseId));
+    if (!ecgCase) throw new AppError(404, "ECG case not found.", "CASE_NOT_FOUND");
+    assertResourceAccess(await canAccessCase(ecgCase.id, req.auth!));
+    const workspace = await loadEcgViewerWorkspace(ecgCase.id);
+    res.json({
+      caseId: ecgCase.id,
+      caseNumber: ecgCase.caseNumber ?? ecgCase.caseId,
+      exportedAt: new Date().toISOString(),
+      format: "json",
+      measurements: Array.isArray((workspace as { measurements?: unknown[] } | null)?.measurements)
+        ? (workspace as { measurements: unknown[] }).measurements
+        : [],
+      schemaVersion: 3,
+      workspace,
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
 casesRouter.get("/:caseId/timeline", async (req, res, next) => {
   try {
     assertResourceAccess(await canAccessCase(String(req.params.caseId), req.auth!));

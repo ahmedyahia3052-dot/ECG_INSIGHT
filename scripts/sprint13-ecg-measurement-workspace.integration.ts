@@ -28,6 +28,8 @@ for (const file of requiredFiles) {
 const foundation = fs.readFileSync(path.join(viewerDir, "EcgMonitorViewerFoundation.tsx"), "utf8");
 const toolbar = fs.readFileSync(path.join(viewerDir, "EcgViewerToolbar.tsx"), "utf8");
 const panel = fs.readFileSync(path.join(viewerDir, "EcgMeasurementsPanel.tsx"), "utf8");
+const measurementTypes = fs.readFileSync(path.join(viewerDir, "measurementTypes.ts"), "utf8");
+const measurementEngine = fs.readFileSync(path.join(viewerDir, "ecgMeasurementEngine.ts"), "utf8");
 const workspaceHook = fs.readFileSync(path.join(viewerDir, "useEcgMeasurementWorkspace.ts"), "utf8");
 const overlay = fs.readFileSync(path.join(viewerDir, "EcgMeasurementOverlay.tsx"), "utf8");
 const routes = fs.readFileSync(casesRoutes, "utf8");
@@ -63,7 +65,7 @@ const capabilityMarkers = [
 ];
 
 for (const marker of capabilityMarkers) {
-  const source = [foundation, toolbar, panel, workspaceHook, overlay, routes, service].some((file) => file.includes(marker));
+  const source = [foundation, toolbar, panel, measurementTypes, measurementEngine, workspaceHook, overlay, routes, service].some((file) => file.includes(marker));
   assert(source, `Sprint 13 Phase 2 missing capability marker: ${marker}`);
 }
 

@@ -2,7 +2,9 @@ import React, { useCallback } from "react";
 import { Linking, Platform, ScrollView, StyleSheet, View } from "react-native";
 
 import { PrimaryButton, medicalTheme } from "@/components/enterprise/EnterpriseUI";
-import { downloadEcgViewerWorkspacePdf } from "@/services/ecgViewerWorkspace";
+import { downloadEcgViewerWorkspacePdf, downloadEcgViewerWorkspaceJson } from "@/services/ecgViewerWorkspace";
+
+import { exportMeasurements } from "./ecgMeasurementEngine";
 
 import type { EcgMeasurementWorkspace } from "./useEcgMeasurementWorkspace";
 import type { EcgViewerControls } from "./useEcgViewerControls";
@@ -33,6 +35,23 @@ export function EcgViewerToolbar({ accessToken, caseId, controls, imageUrl, pdfU
     if (exportTarget) void Linking.openURL(exportTarget);
   }, [accessToken, caseId, exportTarget]);
 
+  const exportJson = useCallback(async () => {
+    if (workspace && Platform.OS === "web" && typeof window !== "undefined") {
+      const bundle = exportMeasurements(workspace.present.measurements, "json");
+      const blob = new Blob([JSON.stringify(bundle, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = `ecg-measurements-${caseId ?? "workspace"}.json`;
+      anchor.click();
+      URL.revokeObjectURL(url);
+      return;
+    }
+    if (accessToken && caseId) {
+      await downloadEcgViewerWorkspaceJson(accessToken, caseId);
+    }
+  }, [accessToken, caseId, workspace]);
+
   return (
     <View style={styles.toolbar} testID="sprint13-ecg-viewer-toolbar">
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.row}>
@@ -59,6 +78,7 @@ export function EcgViewerToolbar({ accessToken, caseId, controls, imageUrl, pdfU
         <PrimaryButton disabled={!workspace?.canUndo} label="Undo" onPress={() => workspace?.undo()} variant="outline" />
         <PrimaryButton disabled={!workspace?.canRedo} label="Redo" onPress={() => workspace?.redo()} variant="outline" />
         <PrimaryButton label="Export PDF" onPress={() => void exportPdf()} variant="outline" />
+        <PrimaryButton label="Export JSON" onPress={() => void exportJson()} variant="outline" />
         <PrimaryButton
           label="Print"
           onPress={() => {

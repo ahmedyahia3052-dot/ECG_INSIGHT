@@ -52,6 +52,7 @@ export function buildReadouts(input: {
   gain: EcgGridGain;
   kind: EcgCaliperKind;
   measurementKind?: EcgMeasurementKind;
+  rrMs?: number;
   spacing: number;
   speed: EcgPaperSpeed;
 }): EcgMeasurementReadouts {
@@ -74,7 +75,13 @@ export function buildReadouts(input: {
     readouts.bpm = heartRateFromRr(milliseconds);
   }
   if (input.measurementKind === "qtc") {
-    readouts.milliseconds = Number(computeQtc(readouts.milliseconds ?? 0, 800).toFixed(1));
+    const qtMs = milliseconds;
+    readouts.milliseconds = input.rrMs && input.rrMs > 0
+      ? Number(computeQtc(qtMs, input.rrMs).toFixed(1))
+      : qtMs;
+  }
+  if (input.measurementKind === "st_depression" && readouts.mm != null) {
+    readouts.mm = Number(Math.abs(readouts.mm).toFixed(2));
   }
   return readouts;
 }
@@ -92,10 +99,11 @@ export function measurementFromCaliper(
   speed: EcgPaperSpeed,
   gain: EcgGridGain,
   operator: string,
+  options?: { rrMs?: number },
 ): { kind: EcgMeasurementKind; name: string; readouts: EcgMeasurementReadouts; unit: string; value: number } {
   const kind = caliper.measurementKind ?? inferMeasurementKind(caliper.kind);
   const deltaPx = deltaPixels(caliper.start, caliper.end, caliper.kind);
-  const readouts = buildReadouts({ deltaPx, gain, kind: caliper.kind, measurementKind: kind, spacing, speed });
+  const readouts = buildReadouts({ deltaPx, gain, kind: caliper.kind, measurementKind: kind, rrMs: options?.rrMs, spacing, speed });
   const primary = primaryValueForKind(kind, readouts, caliper.kind);
   const name = caliper.label?.trim() || defaultNameForKind(kind);
   return { kind, name, readouts, unit: primary.unit, value: primary.value };
@@ -161,4 +169,21 @@ export function screenToImage(point: ImagePoint, rect: ImageDisplayRect, transfo
     x: (baseX - rect.offsetX) / Math.max(rect.scale, 0.0001),
     y: (baseY - rect.offsetY) / Math.max(rect.scale, 0.0001),
   };
+}
+
+export function dragCaliperEndpoint(
+  caliper: EcgCaliper,
+  endpoint: "start" | "end",
+  imagePoint: ImagePoint,
+  spacing: number,
+) {
+  const snapped = caliper.snapToGrid ? snapPoint(imagePoint, spacing) : imagePoint;
+  if (endpoint === "start") {
+    if (caliper.kind === "horizontal") return { ...caliper, start: { x: snapped.x, y: caliper.start.y } };
+    if (caliper.kind === "vertical") return { ...caliper, start: { x: caliper.start.x, y: snapped.y } };
+    return { ...caliper, start: snapped };
+  }
+  if (caliper.kind === "horizontal") return { ...caliper, end: { x: snapped.x, y: caliper.start.y } };
+  if (caliper.kind === "vertical") return { ...caliper, end: { x: caliper.start.x, y: snapped.y } };
+  return { ...caliper, end: snapped };
 }

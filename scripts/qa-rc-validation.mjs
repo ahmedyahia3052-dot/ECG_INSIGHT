@@ -47,6 +47,11 @@ for (let run = 1; run <= runs; run += 1) {
     console.error(`Run ${run} failed with exit code ${result.status ?? "unknown"}.`);
     break;
   }
+
+  if (run < runs) {
+    console.log(`[qa-rc] Run ${run}/${runs} passed. Cooling down 15s before next run...`);
+    spawnSync("powershell", ["-Command", "Start-Sleep -Seconds 15"], { shell: true, stdio: "ignore" });
+  }
 }
 
 const gatePassed = failures.length === 0 && runSummaries.length === runs;

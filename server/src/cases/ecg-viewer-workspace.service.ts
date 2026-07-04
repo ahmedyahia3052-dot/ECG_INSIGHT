@@ -20,7 +20,7 @@ export async function persistEcgViewerWorkspace(caseId: string, authorId: string
     await prisma.caseClinicalNote.update({
       data: {
         authorId,
-        metadata: { workspace, version: 2 },
+        metadata: { workspace, version: 3 },
       },
       where: { id: existing.id },
     });
@@ -30,7 +30,7 @@ export async function persistEcgViewerWorkspace(caseId: string, authorId: string
     data: {
       authorId,
       caseId,
-      metadata: { workspace, version: 2 },
+      metadata: { workspace, version: 3 },
       plainText: ECG_VIEWER_WORKSPACE_MARKER,
       richText: ECG_VIEWER_WORKSPACE_MARKER,
     },

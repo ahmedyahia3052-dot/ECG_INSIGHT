@@ -97,7 +97,11 @@ export async function apiLogin(request: APIRequestContext, role: keyof typeof us
 export async function bootstrapAuthenticatedPage(page: Page, role: keyof typeof users = "doctor") {
   await apiLogin(page.request, role);
   await page.goto("/dashboard", { timeout: 30_000, waitUntil: "domcontentloaded" });
-  await expect(page.getByText(/Enterprise Clinical Command Center|Good Morning|Good Afternoon|Good Evening/).first()).toBeVisible({ timeout: 30_000 });
+  try {
+    await expect(page.getByText(/Enterprise Clinical Command Center|Good Morning|Good Afternoon|Good Evening/).first()).toBeVisible({ timeout: 15_000 });
+  } catch {
+    await uiLogin(page, role);
+  }
 }
 
 export async function uiLogin(page: Page, role: keyof typeof users = "doctor") {

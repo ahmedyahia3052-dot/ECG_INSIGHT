@@ -1,22 +1,27 @@
-import { useCallback, useEffect, useMemo, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Platform } from "react-native";
 
 import {
+  focusTransformForCaliper,
+  presetForKind,
+  syncWorkspaceMeasurements,
+  type ClinicalMeasurementPreset,
+} from "./ecgMeasurementEngine";
+import {
   buildReadouts,
   deltaPixels,
+  dragCaliperEndpoint,
   gridSpacingPx,
-  measurementFromCaliper,
   primaryValueForKind,
   snapPoint,
 } from "./ecgCalibrationMath";
 import {
   ANNOTATION_COLORS,
   createWorkspaceState,
-  MEASUREMENT_KIND_LABELS,
+  migrateWorkspaceState,
   type EcgAnnotationKind,
   type EcgCaliper,
   type EcgCaliperKind,
-  type EcgClinicalMeasurement,
   type EcgMeasurementKind,
   type EcgViewerAnnotation,
   type EcgViewerToolMode,
@@ -36,11 +41,21 @@ function nowIso() {
 
 type WorkspaceSlice = Pick<
   EcgViewerWorkspaceState,
-  "annotations" | "calipers" | "measurements" | "selectedAnnotationId" | "selectedCaliperId" | "selectedMeasurementId" | "toolMode"
+  | "activeLead"
+  | "activeMeasurementKind"
+  | "annotations"
+  | "calipers"
+  | "measurements"
+  | "selectedAnnotationId"
+  | "selectedCaliperId"
+  | "selectedMeasurementId"
+  | "toolMode"
 >;
 
 function workspaceSlice(state: EcgViewerWorkspaceState): WorkspaceSlice {
   return {
+    activeLead: state.activeLead,
+    activeMeasurementKind: state.activeMeasurementKind,
     annotations: state.annotations,
     calipers: state.calipers,
     measurements: state.measurements,
@@ -49,36 +64,6 @@ function workspaceSlice(state: EcgViewerWorkspaceState): WorkspaceSlice {
     selectedMeasurementId: state.selectedMeasurementId,
     toolMode: state.toolMode,
   };
-}
-
-function syncMeasurementsFromCalipers(
-  calipers: EcgCaliper[],
-  existing: EcgClinicalMeasurement[],
-  controls: EcgViewerControls,
-  operator: string,
-) {
-  const spacing = gridSpacingPx(controls.grid.speed, controls.grid.gain);
-  const byCaliper = new Map(existing.map((item) => [item.caliperId, item]));
-  return calipers
-    .filter((caliper) => !caliper.hidden)
-    .map((caliper) => {
-      const derived = measurementFromCaliper(caliper, spacing, controls.grid.speed, controls.grid.gain, operator);
-      const previous = byCaliper.get(caliper.id);
-      return {
-        caliperId: caliper.id,
-        hidden: previous?.hidden ?? false,
-        id: previous?.id ?? uid("measurement"),
-        kind: derived.kind,
-        lead: caliper.lead ?? previous?.lead,
-        name: previous?.name ?? derived.name,
-        operator: previous?.operator ?? operator,
-        readouts: derived.readouts,
-        timestamp: previous?.timestamp ?? nowIso(),
-        type: MEASUREMENT_KIND_LABELS[derived.kind],
-        unit: derived.unit,
-        value: derived.value,
-      } satisfies EcgClinicalMeasurement;
-    });
 }
 
 export function useEcgMeasurementWorkspace(options: {
@@ -103,7 +88,10 @@ export function useEcgMeasurementWorkspace(options: {
   const activeCaliperKind = useRef<EcgCaliperKind>("horizontal");
   const activeAnnotationKind = useRef<EcgAnnotationKind>("arrow");
   const activeMeasurementKind = useRef<EcgMeasurementKind>("rr_interval");
+  const activePreset = useRef<ClinicalMeasurementPreset>(presetForKind("rr_interval"));
   const draftAnnotation = useRef<ImagePoint[]>([]);
+  const [draftCaliper, setDraftCaliper] = useState<{ end: ImagePoint; start: ImagePoint } | null>(null);
+  const [hoveredCaliperId, setHoveredCaliperId] = useState<string | null>(null);
 
   const persist = useCallback(
     (next: EcgViewerWorkspaceState) => {
@@ -117,6 +105,16 @@ export function useEcgMeasurementWorkspace(options: {
     [options.onPersist],
   );
 
+  const syncMeasurements = useCallback(
+    (calipers: EcgCaliper[], existing: EcgViewerWorkspaceState["measurements"]) =>
+      syncWorkspaceMeasurements(calipers, existing, {
+        gain: controlsRef.current.grid.gain,
+        operator: options.operatorName,
+        speed: controlsRef.current.grid.speed,
+      }),
+    [options.operatorName],
+  );
+
   const updateSlice = useCallback(
     (updater: (slice: WorkspaceSlice) => WorkspaceSlice) => {
       commit((current) => {
@@ -124,47 +122,100 @@ export function useEcgMeasurementWorkspace(options: {
         const measurements =
           nextSlice.calipers === current.calipers
             ? nextSlice.measurements
-            : syncMeasurementsFromCalipers(nextSlice.calipers, nextSlice.measurements, controlsRef.current, options.operatorName);
+            : syncMeasurements(nextSlice.calipers, nextSlice.measurements);
         const next = { ...current, ...nextSlice, measurements };
         persist(next);
         return next;
       });
     },
-    [commit, options.operatorName, persist],
+    [commit, persist, syncMeasurements],
   );
 
-  const setToolMode = useCallback(
-    (toolMode: EcgViewerToolMode) => updateSlice((slice) => ({ ...slice, toolMode })),
-    [updateSlice],
-  );
+  const setToolMode = useCallback((toolMode: EcgViewerToolMode) => updateSlice((slice) => ({ ...slice, toolMode })), [updateSlice]);
+
+  const setActiveLead = useCallback((lead: string) => updateSlice((slice) => ({ ...slice, activeLead: lead })), [updateSlice]);
+
+  const selectMeasurementPreset = useCallback((preset: ClinicalMeasurementPreset) => {
+    activePreset.current = preset;
+    activeMeasurementKind.current = preset.kind;
+    activeCaliperKind.current = preset.caliperKind;
+    updateSlice((slice) => ({ ...slice, activeMeasurementKind: preset.kind, toolMode: "caliper" }));
+  }, [updateSlice]);
 
   const addCaliper = useCallback(
-    (kind: EcgCaliperKind, start: ImagePoint, end?: ImagePoint) => {
+    (kind: EcgCaliperKind, start: ImagePoint, end?: ImagePoint, overrides?: Partial<EcgCaliper>) => {
       const spacing = gridSpacingPx(controlsRef.current.grid.speed, controlsRef.current.grid.gain);
-      const snappedStart = snapPoint(start, spacing);
+      const snappedStart = overrides?.snapToGrid === false ? start : snapPoint(start, spacing);
       const snappedEnd = snapPoint(end ?? { x: start.x + spacing * 5, y: start.y }, spacing);
+      const preset = activePreset.current;
       const caliper: EcgCaliper = {
+        color: overrides?.color ?? preset.color,
+        comments: overrides?.comments,
         createdAt: nowIso(),
+        createdBy: options.operatorName,
         end: kind === "horizontal" ? { x: snappedEnd.x, y: snappedStart.y } : kind === "vertical" ? { x: snappedStart.x, y: snappedEnd.y } : snappedEnd,
         hidden: false,
         id: uid("caliper"),
         kind,
+        label: overrides?.label ?? preset.label,
+        lead: overrides?.lead,
         locked: false,
-        measurementKind: activeMeasurementKind.current,
-        snapToGrid: true,
+        measurementKind: overrides?.measurementKind ?? activeMeasurementKind.current,
+        snapToGrid: overrides?.snapToGrid ?? true,
         start: snappedStart,
         updatedAt: nowIso(),
       };
       updateSlice((slice) => ({
         ...slice,
-        calipers: [...slice.calipers, caliper],
+        calipers: [...slice.calipers, { ...caliper, lead: overrides?.lead ?? slice.activeLead }],
         selectedCaliperId: caliper.id,
         toolMode: "caliper",
       }));
       return caliper.id;
     },
-    [updateSlice],
+    [options.operatorName, updateSlice],
   );
+
+  const beginDraftCaliper = useCallback((start: ImagePoint) => {
+    const spacing = gridSpacingPx(controlsRef.current.grid.speed, controlsRef.current.grid.gain);
+    const snapped = snapPoint(start, spacing);
+    setDraftCaliper({ end: snapped, start: snapped });
+  }, []);
+
+  const updateDraftCaliper = useCallback((end: ImagePoint) => {
+    setDraftCaliper((current) => {
+      if (!current) return current;
+      const spacing = gridSpacingPx(controlsRef.current.grid.speed, controlsRef.current.grid.gain);
+      const snapped = snapPoint(end, spacing);
+      const kind = activeCaliperKind.current;
+      return {
+        end: kind === "horizontal" ? { x: snapped.x, y: current.start.y } : kind === "vertical" ? { x: current.start.x, y: snapped.y } : snapped,
+        start: current.start,
+      };
+    });
+  }, []);
+
+  const commitDraftCaliper = useCallback(() => {
+    if (!draftCaliper) return null;
+    const spacing = gridSpacingPx(controlsRef.current.grid.speed, controlsRef.current.grid.gain);
+    const kind = activeCaliperKind.current;
+    const { start } = draftCaliper;
+    let { end } = draftCaliper;
+    const delta = Math.hypot(end.x - start.x, end.y - start.y);
+    if (delta < spacing * 0.35) {
+      end =
+        kind === "horizontal"
+          ? { x: start.x + spacing * 5, y: start.y }
+          : kind === "vertical"
+            ? { x: start.x, y: start.y + spacing * 5 }
+            : { x: start.x + spacing * 5, y: start.y + spacing * 5 };
+    }
+    const id = addCaliper(kind, start, end);
+    setDraftCaliper(null);
+    return id;
+  }, [addCaliper, draftCaliper]);
+
+  const cancelDraftCaliper = useCallback(() => setDraftCaliper(null), []);
 
   const updateCaliper = useCallback(
     (caliperId: string, patch: Partial<EcgCaliper>) => {
@@ -174,6 +225,17 @@ export function useEcgMeasurementWorkspace(options: {
       }));
     },
     [updateSlice],
+  );
+
+  const dragCaliper = useCallback(
+    (caliperId: string, endpoint: "start" | "end", imagePoint: ImagePoint) => {
+      const caliper = present.calipers.find((item) => item.id === caliperId);
+      if (!caliper || caliper.locked) return;
+      const spacing = gridSpacingPx(controlsRef.current.grid.speed, controlsRef.current.grid.gain);
+      const next = dragCaliperEndpoint(caliper, endpoint, imagePoint, spacing);
+      updateCaliper(caliperId, next);
+    },
+    [present.calipers, updateCaliper],
   );
 
   const deleteCaliper = useCallback(
@@ -198,6 +260,7 @@ export function useEcgMeasurementWorkspace(options: {
           createdAt: nowIso(),
           end: { x: source.end.x + 12, y: source.end.y + 12 },
           id: uid("caliper"),
+          locked: false,
           start: { x: source.start.x + 12, y: source.start.y + 12 },
           updatedAt: nowIso(),
         };
@@ -205,6 +268,20 @@ export function useEcgMeasurementWorkspace(options: {
       });
     },
     [updateSlice],
+  );
+
+  const setCaliperColor = useCallback(
+    (caliperId: string, color: string) => updateCaliper(caliperId, { color }),
+    [updateCaliper],
+  );
+
+  const toggleCaliperLock = useCallback(
+    (caliperId: string) => {
+      const caliper = present.calipers.find((item) => item.id === caliperId);
+      if (!caliper) return;
+      updateCaliper(caliperId, { locked: !caliper.locked });
+    },
+    [present.calipers, updateCaliper],
   );
 
   const addAnnotation = useCallback(
@@ -256,7 +333,17 @@ export function useEcgMeasurementWorkspace(options: {
     (measurementId: string, name: string) => {
       updateSlice((slice) => ({
         ...slice,
-        measurements: slice.measurements.map((item) => (item.id === measurementId ? { ...item, name } : item)),
+        measurements: slice.measurements.map((item) => (item.id === measurementId ? { ...item, name, updatedAt: nowIso() } : item)),
+      }));
+    },
+    [updateSlice],
+  );
+
+  const updateMeasurementComments = useCallback(
+    (measurementId: string, comments: string) => {
+      updateSlice((slice) => ({
+        ...slice,
+        measurements: slice.measurements.map((item) => (item.id === measurementId ? { ...item, comments, updatedAt: nowIso() } : item)),
       }));
     },
     [updateSlice],
@@ -274,32 +361,33 @@ export function useEcgMeasurementWorkspace(options: {
 
   const duplicateMeasurement = useCallback(
     (measurementId: string) => {
-      const caliperId = sliceCalipers(present, measurementId);
+      const caliperId = present.measurements.find((item) => item.id === measurementId)?.caliperId;
       if (caliperId) duplicateCaliper(caliperId);
     },
-    [duplicateCaliper, present],
+    [duplicateCaliper, present.measurements],
   );
-
-  function sliceCalipers(state: EcgViewerWorkspaceState, measurementId: string) {
-    const measurement = state.measurements.find((item) => item.id === measurementId);
-    return measurement?.caliperId ?? "";
-  }
 
   const deleteMeasurement = useCallback(
     (measurementId: string) => {
-      const caliperId = sliceCalipers(present, measurementId);
+      const caliperId = present.measurements.find((item) => item.id === measurementId)?.caliperId;
       if (caliperId) deleteCaliper(caliperId);
     },
-    [deleteCaliper, present],
+    [deleteCaliper, present.measurements],
   );
 
   const jumpToMeasurement = useCallback(
     (measurementId: string) => {
       const measurement = present.measurements.find((item) => item.id === measurementId);
       if (!measurement) return;
+      const caliper = present.calipers.find((item) => item.id === measurement.caliperId);
+      if (caliper) {
+        controlsRef.current.setTransform(
+          focusTransformForCaliper(caliper, controlsRef.current.viewport, controlsRef.current.transform),
+        );
+      }
       updateSlice((slice) => ({ ...slice, selectedMeasurementId: measurementId, selectedCaliperId: measurement.caliperId }));
     },
-    [present.measurements, updateSlice],
+    [present.calipers, present.measurements, updateSlice],
   );
 
   const removeSelected = useCallback(() => {
@@ -307,17 +395,12 @@ export function useEcgMeasurementWorkspace(options: {
       deleteAnnotation(present.selectedAnnotationId);
       return;
     }
-    if (present.selectedCaliperId) {
-      deleteCaliper(present.selectedCaliperId);
-    }
+    if (present.selectedCaliperId) deleteCaliper(present.selectedCaliperId);
   }, [deleteAnnotation, deleteCaliper, present.selectedAnnotationId, present.selectedCaliperId]);
 
   const recalibrateMeasurements = useCallback(() => {
-    updateSlice((slice) => ({
-      ...slice,
-      measurements: syncMeasurementsFromCalipers(slice.calipers, slice.measurements, controlsRef.current, options.operatorName),
-    }));
-  }, [options.operatorName, updateSlice]);
+    updateSlice((slice) => ({ ...slice, measurements: syncMeasurements(slice.calipers, slice.measurements) }));
+  }, [syncMeasurements, updateSlice]);
 
   useEffect(() => {
     recalibrateMeasurements();
@@ -358,11 +441,12 @@ export function useEcgMeasurementWorkspace(options: {
   }, [present]);
 
   const hydrate = useCallback(
-    (state: EcgViewerWorkspaceState) => {
-      resetHistory(state);
-      controlsRef.current.setGrid(state.grid);
-      controlsRef.current.setTransform(state.transform);
-      controlsRef.current.setAdjustments(state.adjustments);
+    (state: EcgViewerWorkspaceState | (Partial<EcgViewerWorkspaceState> & { version?: number })) => {
+      const migrated = migrateWorkspaceState(state);
+      resetHistory(migrated);
+      controlsRef.current.setGrid(migrated.grid);
+      controlsRef.current.setTransform(migrated.transform);
+      controlsRef.current.setAdjustments(migrated.adjustments);
     },
     [resetHistory],
   );
@@ -371,17 +455,24 @@ export function useEcgMeasurementWorkspace(options: {
     activeAnnotationKind,
     activeCaliperKind,
     activeMeasurementKind,
+    activePreset,
     addAnnotation,
     addCaliper,
+    beginDraftCaliper,
+    cancelDraftCaliper,
     canRedo,
     canUndo,
+    commitDraftCaliper,
     deleteAnnotation,
     deleteCaliper,
     deleteMeasurement,
     draftAnnotation,
+    draftCaliper,
+    dragCaliper,
     duplicateCaliper,
     duplicateMeasurement,
     exportState,
+    hoveredCaliperId,
     hydrate,
     jumpToMeasurement,
     present,
@@ -389,24 +480,33 @@ export function useEcgMeasurementWorkspace(options: {
     redo,
     removeSelected,
     renameMeasurement,
+    selectMeasurementPreset,
+    setActiveLead,
+    setCaliperColor,
+    setHoveredCaliperId,
     setToolMode,
+    toggleCaliperLock,
     toggleMeasurementHidden,
     undo,
     updateAnnotation,
     updateCaliper,
+    updateDraftCaliper,
+    updateMeasurementComments,
     updateSlice,
   };
 }
 
 export type EcgMeasurementWorkspace = ReturnType<typeof useEcgMeasurementWorkspace>;
 
-export function summarizeCaliper(caliper: EcgCaliper, controls: EcgViewerControls) {
+export function summarizeCaliper(caliper: EcgCaliper, controls: EcgViewerControls, rrMs?: number) {
   const spacing = gridSpacingPx(controls.grid.speed, controls.grid.gain);
   const deltaPx = deltaPixels(caliper.start, caliper.end, caliper.kind);
   const readouts = buildReadouts({
     deltaPx,
     gain: controls.grid.gain,
     kind: caliper.kind,
+    measurementKind: caliper.measurementKind,
+    rrMs,
     spacing,
     speed: controls.grid.speed,
   });
