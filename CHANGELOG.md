@@ -4,6 +4,38 @@ All notable changes to this project are documented in this file.
 
 ---
 
+## [Sprint13-Phase3] — 2026-07-04
+
+### Added
+
+- Production **ECG Pro Viewer Engine** with 5-layer render stack (`EcgProViewerEngine.tsx`)
+- Layer 3 digitized waveform and Layer 4 AI overlay architecture (data-driven, no mock UI)
+- `ecgViewerEngine.ts` contain-fit math, layer constants, rhythm strip markers
+- Clinical findings panel with real case/measurement binding pipeline (`useEcgClinicalFindings`)
+- Rhythm strip panel with 12-lead selector and paper-speed time markers
+- Web pan navigation (Space+drag, Pan tool), grid opacity cycle, viewport-aware fit
+- Tests: `ecg-pro-viewer-engine.test.ts`, `sprint13-ecg-pro-viewer-engine.integration.ts`
+- Playwright Phase 3 spec (pan, grid opacity, clinical findings, resolution)
+- `SPRINT13_PHASE3_REPORT.md`
+
+### Changed
+
+- `useEcgViewerControls` — internal viewport dimensions, pan mode, grid opacity
+- `EcgPaperGrid` — zoom-synchronized spacing, opacity support
+- `EcgImageCanvas` delegates to `EcgProViewerEngine`
+- `EcgViewerRightRail` — clinical findings + measurements (removed placeholder cards)
+- `EcgMonitorViewerFoundation` — rhythm strip, findings pipeline, resolution in status bar
+- Toolbar: Pan, Grid opacity %, Export PDF label
+- Integration pipeline: 59 scripts (Phase 3 engine test + integration)
+
+### Preserved
+
+- Sprint 12 `EcgProViewer` unchanged
+- Phase 1–2 measurement workspace, persistence, calipers, annotations
+- Compare and AI Overlay remain disabled until Sprint 14
+
+---
+
 ## [Sprint13-Phase2] — 2026-07-04
 
 ### Added

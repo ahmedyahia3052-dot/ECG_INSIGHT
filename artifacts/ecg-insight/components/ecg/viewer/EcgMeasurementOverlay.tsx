@@ -55,7 +55,7 @@ export function EcgMeasurementOverlay({ containerHeight, containerWidth, control
     <Pressable
       accessibilityLabel="ECG measurement overlay"
       onPress={onPressCanvas}
-      pointerEvents={workspace.present.toolMode === "pan" || controls.spacePanActive ? "none" : "auto"}
+      pointerEvents={controls.isPanActive || workspace.present.toolMode === "pan" ? "none" : "auto"}
       style={StyleSheet.absoluteFill}
       testID="sprint13-ecg-measurement-overlay"
     >

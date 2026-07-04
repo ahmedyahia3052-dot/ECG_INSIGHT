@@ -43,6 +43,8 @@ export function EcgViewerTimeline({
 
 export function EcgViewerStatusBar({
   fileType,
+  fitMode,
+  gridOpacity,
   gridVisible,
   imageResolution,
   measurementCount,
@@ -50,6 +52,8 @@ export function EcgViewerStatusBar({
   zoom,
 }: {
   fileType?: string;
+  fitMode?: string;
+  gridOpacity?: number;
   gridVisible: boolean;
   imageResolution?: string;
   measurementCount?: number;
@@ -60,6 +64,8 @@ export function EcgViewerStatusBar({
     <View style={styles.statusBar} testID="sprint13-ecg-viewer-status">
       <Text style={styles.statusText}>Zoom {Math.round(zoom * 100)}%</Text>
       <Text style={styles.statusText}>Grid {gridVisible ? "ON" : "OFF"}</Text>
+      {typeof gridOpacity === "number" ? <Text style={styles.statusText}>Grid Opacity {Math.round(gridOpacity * 100)}%</Text> : null}
+      {fitMode && fitMode !== "none" ? <Text style={styles.statusText}>Fit {fitMode}</Text> : null}
       <Text style={styles.statusText}>Type {fileType ?? "N/A"}</Text>
       <Text style={styles.statusText}>Resolution {imageResolution ?? "Pending"}</Text>
       {typeof measurementCount === "number" ? <Text style={styles.statusText}>Measurements {measurementCount}</Text> : null}

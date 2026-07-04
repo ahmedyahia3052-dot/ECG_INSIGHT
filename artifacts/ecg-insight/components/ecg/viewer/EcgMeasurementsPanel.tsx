@@ -28,13 +28,7 @@ export function EcgMeasurementsPanel({ workspace }: Props) {
   }, [query, sortBy, workspace.present.measurements]);
 
   return (
-    <ScrollView contentContainerStyle={styles.scroll} style={styles.fill} testID="sprint13-ecg-measurements-panel">
-      <Card style={styles.card}>
-        <SectionHeader subtitle="Sprint 13 Phase 2" title="AI Findings" />
-        <Text accessibilityRole="text" style={styles.placeholder}>
-          AI overlay remains deferred to a later sprint phase.
-        </Text>
-      </Card>
+    <View style={styles.fill} testID="sprint13-ecg-measurements-panel">
       <Card style={styles.card}>
         <SectionHeader subtitle="PR Interval, QRS Duration, QT Interval, QTc, RR Interval, PP Interval, ST Elevation, Heart Rate, P Wave Duration, T Wave Duration" title="Measurements" />
         <View style={styles.toolbar}>
@@ -72,7 +66,7 @@ export function EcgMeasurementsPanel({ workspace }: Props) {
           <PrimaryButton disabled={!workspace.canRedo} label="Redo" onPress={workspace.redo} variant="outline" />
         </View>
       </Card>
-    </ScrollView>
+    </View>
   );
 }
 

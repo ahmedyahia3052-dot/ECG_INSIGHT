@@ -41,6 +41,7 @@ export function EcgViewerToolbar({ accessToken, caseId, controls, imageUrl, pdfU
         <PrimaryButton label="Capture" onPress={() => onCapture?.()} variant="outline" />
         <PrimaryButton label="Zoom In" onPress={() => controls.zoomBy(0.2)} variant="outline" />
         <PrimaryButton label="Zoom Out" onPress={() => controls.zoomBy(-0.2)} variant="outline" />
+        <PrimaryButton label="Pan" onPress={controls.togglePanMode} variant={controls.panMode === "active" ? "primary" : "outline"} />
         <PrimaryButton label="Fit Width" onPress={() => controls.applyFit("width")} variant="outline" />
         <PrimaryButton label="Fit Height" onPress={() => controls.applyFit("height")} variant="outline" />
         <PrimaryButton label="100%" onPress={() => controls.applyFit("100")} variant="outline" />
@@ -57,7 +58,7 @@ export function EcgViewerToolbar({ accessToken, caseId, controls, imageUrl, pdfU
         <PrimaryButton label="Annotation" onPress={() => workspace?.setToolMode("annotation")} variant={workspace?.present.toolMode === "annotation" ? "primary" : "outline"} />
         <PrimaryButton disabled={!workspace?.canUndo} label="Undo" onPress={() => workspace?.undo()} variant="outline" />
         <PrimaryButton disabled={!workspace?.canRedo} label="Redo" onPress={() => workspace?.redo()} variant="outline" />
-        <PrimaryButton label="Export" onPress={() => void exportPdf()} variant="outline" />
+        <PrimaryButton label="Export PDF" onPress={() => void exportPdf()} variant="outline" />
         <PrimaryButton
           label="Print"
           onPress={() => {
@@ -67,6 +68,7 @@ export function EcgViewerToolbar({ accessToken, caseId, controls, imageUrl, pdfU
         />
         <PrimaryButton label={controls.fullscreen ? "Exit Fullscreen" : "Fullscreen"} onPress={controls.toggleFullscreen} variant="outline" />
         <PrimaryButton label={controls.grid.visible ? "Grid On" : "Grid Off"} onPress={controls.toggleGrid} variant={controls.grid.visible ? "primary" : "outline"} />
+        <PrimaryButton label={`Grid ${Math.round(controls.grid.opacity * 100)}%`} onPress={controls.cycleGridOpacity} variant="outline" />
         <PrimaryButton label={`${controls.grid.speed} mm/sec`} onPress={controls.cycleSpeed} variant="outline" />
         <PrimaryButton label={`${controls.grid.gain} mm/mV`} onPress={controls.cycleGain} variant="outline" />
         <PrimaryButton label="Flip H" onPress={() => controls.setAdjustments((value) => ({ ...value, flipHorizontal: !value.flipHorizontal }))} variant="outline" />

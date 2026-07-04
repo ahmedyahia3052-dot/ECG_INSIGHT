@@ -100,7 +100,9 @@ export function fitZoomForDimensions(
 ) {
   if (!containerWidth || !containerHeight || !imageWidth || !imageHeight) return 1;
   if (mode === "100") return 1;
-  const widthRatio = containerWidth / imageWidth;
-  const heightRatio = containerHeight / imageHeight;
-  return mode === "width" ? widthRatio : heightRatio;
+  const contain = Math.min(containerWidth / imageWidth, containerHeight / imageHeight);
+  const displayWidth = imageWidth * contain;
+  const displayHeight = imageHeight * contain;
+  if (mode === "width") return containerWidth / Math.max(displayWidth, 1);
+  return containerHeight / Math.max(displayHeight, 1);
 }

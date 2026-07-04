@@ -1,35 +1,26 @@
 import React from "react";
-import { ScrollView, StyleSheet, Text, View } from "react-native";
+import { ScrollView, StyleSheet } from "react-native";
 
-import { Card, medicalTheme, SectionHeader } from "@/components/enterprise/EnterpriseUI";
-
+import { EcgClinicalFindingsPanel } from "./EcgClinicalFindingsPanel";
 import { EcgMeasurementsPanel } from "./EcgMeasurementsPanel";
+import type { EcgClinicalFindingsModel } from "./types";
 import type { EcgMeasurementWorkspace } from "./useEcgMeasurementWorkspace";
 
 type Props = {
-  workspace?: EcgMeasurementWorkspace;
+  findings: EcgClinicalFindingsModel;
+  workspace: EcgMeasurementWorkspace;
 };
 
-export function EcgViewerRightRail({ workspace }: Props) {
-  if (workspace) return <EcgMeasurementsPanel workspace={workspace} />;
-
+export function EcgViewerRightRail({ findings, workspace }: Props) {
   return (
     <ScrollView contentContainerStyle={styles.scroll} style={styles.fill}>
-      <Card style={styles.card}>
-        <SectionHeader subtitle="Sprint 13 Phase 2" title="AI Findings" />
-        <Text style={styles.placeholder}>AI overlay and explainability panels will mount here in a future sprint phase.</Text>
-      </Card>
-      <Card style={styles.card}>
-        <SectionHeader subtitle="Sprint 13 Phase 2" title="Measurements" />
-        <Text style={styles.placeholder}>Interactive calipers and measurement readouts will mount here in a future sprint phase.</Text>
-      </Card>
+      <EcgClinicalFindingsPanel findings={findings} />
+      <EcgMeasurementsPanel workspace={workspace} />
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  card: { gap: 8, marginBottom: 10 },
   fill: { flex: 1 },
-  placeholder: { color: medicalTheme.muted, fontSize: 12, fontWeight: "700", lineHeight: 18 },
   scroll: { gap: 8, paddingBottom: 12 },
 });

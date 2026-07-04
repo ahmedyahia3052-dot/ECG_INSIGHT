@@ -24,10 +24,9 @@ assert.equal(isSupportedEcgAsset("https://cdn/ecg/unknown.bin"), false);
 assert.equal(clampZoom(12), 8);
 assert.equal(clampZoom(0), 0.1);
 assert.equal(zoomStep(1, 0.5), 1.5);
-assert.equal(
-  fitZoomForDimensions(800, 600, 1600, 1200, "width"),
-  0.5,
-);
+assert.equal(fitZoomForDimensions(800, 600, 1600, 1200, "width"), 1);
+assert.equal(fitZoomForDimensions(800, 600, 1600, 1200, "height"), 1);
+assert.equal(fitZoomForDimensions(400, 600, 1600, 1200, "height"), 2);
 assert.match(buildImageFilterStyle({ ...DEFAULT_ADJUSTMENTS, grayscale: true, invert: true }) ?? "", /grayscale\(1\)/);
 assert.match(buildImageFilterStyle({ ...DEFAULT_ADJUSTMENTS, brightness: 120 }) ?? "", /brightness\(1\.2\)/);
 

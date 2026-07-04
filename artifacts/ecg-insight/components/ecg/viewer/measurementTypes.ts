@@ -128,7 +128,7 @@ export function createWorkspaceState(partial?: Partial<EcgViewerWorkspaceState>)
     },
     annotations: partial?.annotations ?? [],
     calipers: partial?.calipers ?? [],
-    grid: partial?.grid ?? { gain: 10, speed: 25, visible: true },
+    grid: partial?.grid ?? { gain: 10, opacity: 0.75, speed: 25, visible: true },
     measurements: partial?.measurements ?? [],
     selectedAnnotationId: partial?.selectedAnnotationId ?? null,
     selectedCaliperId: partial?.selectedCaliperId ?? null,

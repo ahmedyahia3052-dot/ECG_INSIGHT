@@ -34,8 +34,11 @@ const toolbar = fs.readFileSync(path.join(viewerDir, "EcgViewerToolbar.tsx"), "u
 const controls = fs.readFileSync(path.join(viewerDir, "useEcgViewerControls.ts"), "utf8");
 const workspace = fs.readFileSync(path.join(viewerDir, "EcgViewerResizableWorkspace.tsx"), "utf8");
 const canvas = fs.readFileSync(path.join(viewerDir, "EcgImageCanvas.tsx"), "utf8");
+const proEngine = fs.readFileSync(path.join(viewerDir, "EcgProViewerEngine.tsx"), "utf8");
+const paperGrid = fs.readFileSync(path.join(viewerDir, "EcgPaperGrid.tsx"), "utf8");
 const leftRail = fs.readFileSync(path.join(viewerDir, "EcgViewerLeftRail.tsx"), "utf8");
 const rightRail = fs.readFileSync(path.join(viewerDir, "EcgViewerRightRail.tsx"), "utf8");
+const clinicalPanel = fs.readFileSync(path.join(viewerDir, "EcgClinicalFindingsPanel.tsx"), "utf8");
 const route = fs.readFileSync(routePath, "utf8");
 const enterpriseUi = fs.readFileSync(enterpriseUiPath, "utf8");
 const pipeline = fs.readFileSync(pipelinePath, "utf8");
@@ -53,7 +56,7 @@ const capabilityMarkers = [
   "Grid On",
   "mm/sec",
   "mm/mV",
-  "AI Findings",
+  "Clinical Findings",
   "Measurements",
   "Previous ECGs",
   "sprint13-ecg-monitor-ready",
@@ -67,16 +70,16 @@ const capabilityMarkers = [
 ];
 
 for (const marker of capabilityMarkers) {
-  const source = [foundation, toolbar, controls, workspace, canvas, leftRail, rightRail].some((file) => file.includes(marker));
+  const source = [foundation, toolbar, controls, workspace, canvas, proEngine, paperGrid, leftRail, rightRail, clinicalPanel].some((file) => file.includes(marker));
   assert(source, `Sprint 13 viewer foundation missing capability marker: ${marker}`);
 }
 
 assert(route.includes("EcgMonitorViewerFoundation"), "ecg-monitor route must render EcgMonitorViewerFoundation.");
 assert(enterpriseUi.includes("/ecg-monitor"), "Enterprise shell must register ecg-monitor workspace route.");
 assert(pipeline.includes("sprint13-ecg-viewer-foundation.integration.ts"), "Integration pipeline must register Sprint 13 viewer foundation test.");
-assert(toolbar.includes('label="Measure"') && toolbar.includes("disabled"), "Measure tool must remain disabled in Phase 1.");
 assert(toolbar.includes('label="Compare"') && toolbar.includes("disabled"), "Compare tool must remain disabled in Phase 1.");
 assert(toolbar.includes('label="AI Overlay"') && toolbar.includes("disabled"), "AI Overlay must remain disabled in Phase 1.");
+assert(toolbar.includes('label="Measure"'), "Measure tool must exist in viewer toolbar.");
 assert(!foundation.includes("AnnotationLayer"), "Phase 1 foundation must not include AI annotation overlays.");
 assert(!foundation.includes("WaveformGrid"), "Phase 1 foundation must not include waveform digitization UI.");
 

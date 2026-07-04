@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import { useRouter } from "expo-router";
 
@@ -8,13 +8,16 @@ import type { ApiECGCase } from "@/services/clinical";
 import { useAuth } from "@/context/AuthContext";
 
 import { detectImageFormat } from "./ecgImageEngine";
+import { formatImageResolution } from "./ecgViewerEngine";
 import { EcgImageCanvas } from "./EcgImageCanvas";
+import { EcgRhythmStripPanel } from "./EcgRhythmStripPanel";
 import { EcgViewerLeftRail } from "./EcgViewerLeftRail";
 import { EcgViewerResizableWorkspace } from "./EcgViewerResizableWorkspace";
 import { EcgViewerRightRail } from "./EcgViewerRightRail";
 import { EcgViewerStatusBar, EcgViewerTimeline } from "./EcgViewerTimeline";
 import { EcgViewerToolbar } from "./EcgViewerToolbar";
-import type { EcgViewerPreviousStudy } from "./types";
+import type { EcgLeadId, EcgViewerPreviousStudy } from "./types";
+import { useEcgClinicalFindings } from "./useEcgClinicalFindings";
 import { useEcgMeasurementWorkspace } from "./useEcgMeasurementWorkspace";
 import { useEcgViewerControls } from "./useEcgViewerControls";
 import { useEcgViewerPersistence } from "./useEcgViewerPersistence";
@@ -35,9 +38,10 @@ export function EcgMonitorViewerFoundation({
 }) {
   const router = useRouter();
   const { authToken, user } = useAuth();
+  const [selectedLead, setSelectedLead] = useState<EcgLeadId>("II");
   const imageUrl = absoluteUrl(ecgCase.imagePath ?? ecgCase.originalFileUrl ?? ecgCase.files.find((file) => file.mimeType.startsWith("image/"))?.downloadUrl);
   const pdfUrl = absoluteUrl(ecgCase.pdfPath ?? ecgCase.files.find((file) => file.mimeType.includes("pdf"))?.downloadUrl);
-  const controls = useEcgViewerControls({});
+  const controls = useEcgViewerControls();
   const operatorName = user?.name ?? user?.email ?? "Clinician";
   const scheduleSaveRef = useRef<() => void>(() => undefined);
   const workspace = useEcgMeasurementWorkspace({
@@ -45,6 +49,7 @@ export function EcgMonitorViewerFoundation({
     onPersist: () => scheduleSaveRef.current(),
     operatorName,
   });
+  const findings = useEcgClinicalFindings(ecgCase, workspace);
   const { scheduleSave } = useEcgViewerPersistence({
     accessToken: authToken?.token,
     caseId: ecgCase.id,
@@ -81,6 +86,7 @@ export function EcgMonitorViewerFoundation({
     studyDate: ecgCase.acquisitionDate ?? ecgCase.uploadDate,
   };
 
+  const imageResolution = formatImageResolution(controls.viewport.imageWidth, controls.viewport.imageHeight);
   const openStudy = (caseId: string) => router.push(`/ecg-monitor/${caseId}` as never);
 
   useEffect(() => {
@@ -91,7 +97,7 @@ export function EcgMonitorViewerFoundation({
     <View style={[styles.root, controls.fullscreen && styles.fullscreenRoot]} testID="sprint13-ecg-monitor-ready">
       <View style={styles.header}>
         <SectionHeader
-          subtitle="Enterprise clinical measurement workstation with calipers, annotations, and persistent workspace state."
+          subtitle="Production ECG Pro Viewer Engine with layered rendering, clinical findings, and rhythm strip architecture."
           title="ECG Pro Viewer & Monitor Workspace"
         />
         <Text style={styles.caseLabel}>{ecgCase.caseNumber ?? ecgCase.caseId}</Text>
@@ -113,11 +119,14 @@ export function EcgMonitorViewerFoundation({
         <EcgViewerResizableWorkspace
           bottom={
             <View style={styles.bottomStack}>
+              <EcgRhythmStripPanel controls={controls} onLeadChange={setSelectedLead} selectedLead={selectedLead} />
               <EcgViewerTimeline currentStudy={study} onSelect={openStudy} studies={previousStudies} />
               <EcgViewerStatusBar
                 fileType={study.fileType}
+                fitMode={controls.fitMode}
+                gridOpacity={controls.grid.opacity}
                 gridVisible={controls.grid.visible}
-                imageResolution={undefined}
+                imageResolution={imageResolution}
                 measurementCount={workspace.present.measurements.filter((item) => !item.hidden).length}
                 toolMode={workspace.present.toolMode}
                 zoom={controls.transform.zoom}
@@ -133,7 +142,7 @@ export function EcgMonitorViewerFoundation({
               study={study}
             />
           }
-          right={<EcgViewerRightRail workspace={workspace} />}
+          right={<EcgViewerRightRail findings={findings} workspace={workspace} />}
         />
       </View>
     </View>

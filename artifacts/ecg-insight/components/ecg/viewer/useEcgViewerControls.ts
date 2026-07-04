@@ -9,23 +9,37 @@ import {
   type EcgImageAdjustments,
   type EcgViewerFitMode,
   type EcgViewerGridSettings,
+  type EcgViewerPanMode,
   type EcgViewerTransform,
+  type EcgViewerViewport,
 } from "./types";
 
-type Dimensions = { height: number; width: number };
+const DEFAULT_VIEWPORT: EcgViewerViewport = {
+  containerHeight: 480,
+  containerWidth: 720,
+  imageHeight: 1200,
+  imageWidth: 1600,
+};
 
-export function useEcgViewerControls(options: {
-  containerSize?: Dimensions;
-  imageSize?: Dimensions;
-}) {
+export function useEcgViewerControls() {
   const [transform, setTransform] = useState<EcgViewerTransform>(DEFAULT_TRANSFORM);
   const [adjustments, setAdjustments] = useState<EcgImageAdjustments>(DEFAULT_ADJUSTMENTS);
   const [grid, setGrid] = useState<EcgViewerGridSettings>(DEFAULT_GRID);
   const [fullscreen, setFullscreen] = useState(false);
   const [spacePanActive, setSpacePanActive] = useState(false);
+  const [panMode, setPanMode] = useState<EcgViewerPanMode>("none");
   const [fitMode, setFitMode] = useState<EcgViewerFitMode>("none");
+  const [viewport, setViewport] = useState<EcgViewerViewport>(DEFAULT_VIEWPORT);
   const transformRef = useRef(transform);
   transformRef.current = transform;
+  const viewportRef = useRef(viewport);
+  viewportRef.current = viewport;
+
+  const isPanActive = spacePanActive || panMode === "active";
+
+  const setViewportDimensions = useCallback((next: Partial<EcgViewerViewport>) => {
+    setViewport((current) => ({ ...current, ...next }));
+  }, []);
 
   const resetView = useCallback(() => {
     setTransform(DEFAULT_TRANSFORM);
@@ -56,11 +70,7 @@ export function useEcgViewerControls(options: {
 
   const applyFit = useCallback(
     (mode: EcgViewerFitMode) => {
-      if (!options.containerSize || !options.imageSize) {
-        if (mode === "100") setTransform((current) => ({ ...current, panX: 0, panY: 0, zoom: 1 }));
-        setFitMode(mode);
-        return;
-      }
+      const currentViewport = viewportRef.current;
       if (mode === "100") {
         setTransform({ panX: 0, panY: 0, rotation: transformRef.current.rotation, zoom: 1 });
         setFitMode("100");
@@ -71,16 +81,16 @@ export function useEcgViewerControls(options: {
         return;
       }
       const zoom = fitZoomForDimensions(
-        options.containerSize.width,
-        options.containerSize.height,
-        options.imageSize.width,
-        options.imageSize.height,
+        currentViewport.containerWidth,
+        currentViewport.containerHeight,
+        currentViewport.imageWidth,
+        currentViewport.imageHeight,
         mode,
       );
       setTransform({ panX: 0, panY: 0, rotation: transformRef.current.rotation, zoom: clampZoom(zoom) });
       setFitMode(mode);
     },
-    [options.containerSize, options.imageSize, resetView],
+    [resetView],
   );
 
   const toggleGrid = useCallback(() => {
@@ -93,6 +103,17 @@ export function useEcgViewerControls(options: {
 
   const cycleGain = useCallback(() => {
     setGrid((current) => ({ ...current, gain: current.gain === 5 ? 10 : current.gain === 10 ? 20 : 5 }));
+  }, []);
+
+  const cycleGridOpacity = useCallback(() => {
+    setGrid((current) => ({
+      ...current,
+      opacity: current.opacity >= 1 ? 0.35 : Math.min(Number((current.opacity + 0.15).toFixed(2)), 1),
+    }));
+  }, []);
+
+  const togglePanMode = useCallback(() => {
+    setPanMode((current) => (current === "active" ? "none" : "active"));
   }, []);
 
   const toggleFullscreen = useCallback(() => {
@@ -111,7 +132,12 @@ export function useEcgViewerControls(options: {
   useEffect(() => {
     if (Platform.OS !== "web" || typeof window === "undefined") return undefined;
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.code === "Space") setSpacePanActive(true);
+      const target = event.target as HTMLElement | null;
+      if (target?.tagName === "INPUT" || target?.tagName === "TEXTAREA") return;
+      if (event.code === "Space") {
+        event.preventDefault();
+        setSpacePanActive(true);
+      }
       if (event.ctrlKey && (event.key === "+" || event.key === "=")) {
         event.preventDefault();
         zoomBy(0.15);
@@ -145,43 +171,56 @@ export function useEcgViewerControls(options: {
       adjustments,
       applyFit,
       cycleGain,
+      cycleGridOpacity,
       cycleSpeed,
       fitMode,
       fullscreen,
       grid,
       handleDoubleClickZoom,
+      isPanActive,
       panBy,
+      panMode,
       resetAdjustments,
       resetView,
       rotate,
       setAdjustments,
       setFullscreen,
       setGrid,
+      setPanMode,
       setTransform,
+      setViewportDimensions,
       setZoom,
       spacePanActive,
       toggleFullscreen,
       toggleGrid,
+      togglePanMode,
       transform,
+      viewport,
       zoomBy,
     }),
     [
       adjustments,
       applyFit,
       cycleGain,
+      cycleGridOpacity,
       cycleSpeed,
       fitMode,
       fullscreen,
       grid,
       handleDoubleClickZoom,
+      isPanActive,
       panBy,
+      panMode,
       resetAdjustments,
       resetView,
       rotate,
+      setViewportDimensions,
       spacePanActive,
       toggleFullscreen,
       toggleGrid,
+      togglePanMode,
       transform,
+      viewport,
       zoomBy,
       setZoom,
     ],

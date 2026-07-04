@@ -18,7 +18,7 @@ test.describe("Sprint 13 ECG Monitor Workspace @sprint13", () => {
     await expect(page.getByText("ECG Pro Viewer & Monitor Workspace")).toBeVisible();
     await expect(page.getByText("Patient Information")).toBeVisible();
     await expect(page.getByText("Study Information")).toBeVisible();
-    await expect(page.getByText("AI Findings")).toBeVisible();
+    await expect(page.getByTestId("sprint13-ecg-clinical-findings-panel")).toBeVisible();
     await expect(page.getByTestId("sprint13-ecg-measurements-panel")).toBeVisible();
     await expect(page.getByTestId("sprint13-ecg-viewer-timeline")).toBeVisible();
     await expect(page.getByTestId("sprint13-ecg-viewer-status")).toBeVisible();
@@ -59,5 +59,20 @@ test.describe("Sprint 13 ECG Monitor Workspace @sprint13", () => {
     await expect(page.getByTestId("sprint13-ecg-measurement-overlay")).toBeVisible();
     await expect(page.getByTestId("sprint13-ecg-viewer-status").getByText(/Tool caliper/)).toBeVisible();
     await expect(page.getByText("Please reload the app to continue.")).toHaveCount(0);
+  });
+
+  test("production viewer engine exposes pan, grid opacity, and clinical findings", async ({ page, request }) => {
+    const fixture = await createClinicalFixture(request, { analyze: false, report: false });
+    await loginDoctorPage(page);
+    await page.goto(`/ecg-monitor/${fixture.caseId}`);
+    await expect(page.getByTestId("sprint13-ecg-monitor-ready")).toBeVisible({ timeout: 45_000 });
+    await expect(page.getByTestId("sprint13-ecg-pro-viewer-engine")).toBeVisible();
+    await expect(page.getByTestId("sprint13-ecg-image-canvas")).toBeVisible();
+    await expect(page.getByTestId("sprint13-ecg-clinical-findings-panel")).toBeVisible();
+    await expect(page.getByTestId("sprint13-ecg-rhythm-strip-panel")).toBeVisible();
+    await page.getByRole("button", { name: "Pan" }).click();
+    await page.getByRole("button", { name: /Grid \d+%/ }).click();
+    await page.getByRole("button", { name: "Fit Width" }).click();
+    await expect(page.getByTestId("sprint13-ecg-viewer-status").getByText(/Resolution \d+ × \d+/)).toBeVisible();
   });
 });

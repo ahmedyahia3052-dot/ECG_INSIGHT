@@ -24,9 +24,44 @@ export type EcgViewerTransform = {
 
 export type EcgViewerGridSettings = {
   gain: EcgGridGain;
+  opacity: number;
   speed: EcgPaperSpeed;
   visible: boolean;
 };
+
+export type EcgViewerPanMode = "none" | "active";
+
+export type EcgViewerViewport = {
+  containerHeight: number;
+  containerWidth: number;
+  imageHeight: number;
+  imageWidth: number;
+};
+
+export type EcgClinicalFindingSource = "case" | "measurement" | "pending";
+
+export type EcgClinicalFindingField = {
+  label: string;
+  source: EcgClinicalFindingSource;
+  unit?: string;
+  value: string;
+};
+
+export type EcgClinicalFindingsModel = {
+  axis: EcgClinicalFindingField;
+  confidence: EcgClinicalFindingField;
+  heartRate: EcgClinicalFindingField;
+  interpretation: EcgClinicalFindingField;
+  prInterval: EcgClinicalFindingField;
+  qrsDuration: EcgClinicalFindingField;
+  qtInterval: EcgClinicalFindingField;
+  qtcInterval: EcgClinicalFindingField;
+  rhythm: EcgClinicalFindingField;
+};
+
+export const STANDARD_ECG_LEADS = ["I", "II", "III", "aVR", "aVL", "aVF", "V1", "V2", "V3", "V4", "V5", "V6"] as const;
+
+export type EcgLeadId = (typeof STANDARD_ECG_LEADS)[number];
 
 export const DEFAULT_ADJUSTMENTS: EcgImageAdjustments = {
   brightness: 100,
@@ -47,6 +82,7 @@ export const DEFAULT_TRANSFORM: EcgViewerTransform = {
 
 export const DEFAULT_GRID: EcgViewerGridSettings = {
   gain: 10,
+  opacity: 0.75,
   speed: 25,
   visible: true,
 };

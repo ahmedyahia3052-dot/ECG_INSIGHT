@@ -1,42 +1,48 @@
-import React, { useMemo } from "react";
+import React, { memo, useMemo } from "react";
 import { StyleSheet, View } from "react-native";
 import Svg, { Line } from "react-native-svg";
 
+import { gridSpacingPx } from "./ecgCalibrationMath";
 import type { EcgViewerGridSettings } from "./types";
 
-export function EcgPaperGrid({ grid }: { grid: EcgViewerGridSettings }) {
-  const spacing = useMemo(() => {
-    const speedFactor = grid.speed === 50 ? 0.72 : 1;
-    const gainFactor = grid.gain === 5 ? 1.25 : grid.gain === 20 ? 0.72 : 1;
-    return 14 * speedFactor * gainFactor;
-  }, [grid.gain, grid.speed]);
+type Props = {
+  grid: EcgViewerGridSettings;
+  height: number;
+  width: number;
+  zoom?: number;
+};
 
-  if (!grid.visible) return null;
+export const EcgPaperGrid = memo(function EcgPaperGrid({ grid, height, width, zoom = 1 }: Props) {
+  const spacing = useMemo(() => gridSpacingPx(grid.speed, grid.gain) * zoom, [grid.gain, grid.speed, zoom]);
+
+  if (!grid.visible || width <= 0 || height <= 0) return null;
 
   const minor = "#F3A6A6";
   const major = "#E36A6A";
+  const verticalCount = Math.ceil(width / spacing) + 2;
+  const horizontalCount = Math.ceil(height / spacing) + 2;
 
   return (
-    <View pointerEvents="none" style={StyleSheet.absoluteFill}>
-      <Svg height="100%" width="100%">
-        {Array.from({ length: 120 }).map((_, index) => (
+    <View pointerEvents="none" style={[StyleSheet.absoluteFill, { opacity: grid.opacity }]}>
+      <Svg height={height} width={width}>
+        {Array.from({ length: verticalCount }).map((_, index) => (
           <Line
             key={`v-${index}`}
             stroke={index % 5 === 0 ? major : minor}
             strokeWidth={index % 5 === 0 ? 0.9 : 0.35}
             x1={index * spacing}
             x2={index * spacing}
-            y1="0"
-            y2="100%"
+            y1={0}
+            y2={height}
           />
         ))}
-        {Array.from({ length: 80 }).map((_, index) => (
+        {Array.from({ length: horizontalCount }).map((_, index) => (
           <Line
             key={`h-${index}`}
             stroke={index % 5 === 0 ? major : minor}
             strokeWidth={index % 5 === 0 ? 0.9 : 0.35}
-            x1="0"
-            x2="100%"
+            x1={0}
+            x2={width}
             y1={index * spacing}
             y2={index * spacing}
           />
@@ -44,4 +50,4 @@ export function EcgPaperGrid({ grid }: { grid: EcgViewerGridSettings }) {
       </Svg>
     </View>
   );
-}
+});
