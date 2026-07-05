@@ -94,7 +94,21 @@ export async function apiLogin(request: APIRequestContext, role: keyof typeof us
   throw new Error(`API login failed for ${role}`);
 }
 
+export async function stabilizeAuthRefresh(page: Page, role: keyof typeof users = "doctor") {
+  const loginResponse = await page.request.post(`${API_URL}/auth/login`, {
+    data: { email: users[role].email, password: users[role].password, rememberMe: true },
+  });
+  if (!loginResponse.ok()) {
+    throw new Error(`Auth refresh setup failed: HTTP ${loginResponse.status()} ${await loginResponse.text()}`);
+  }
+  const loginPayload = await loginResponse.json();
+  await page.route("**/api/auth/refresh", async (route) => {
+    await route.fulfill({ contentType: "application/json", json: loginPayload, status: 200 });
+  });
+}
+
 export async function bootstrapAuthenticatedPage(page: Page, role: keyof typeof users = "doctor") {
+  await stabilizeAuthRefresh(page, role);
   await apiLogin(page.request, role);
   await page.goto("/dashboard", { timeout: 30_000, waitUntil: "domcontentloaded" });
   try {

@@ -13,6 +13,7 @@ export { useEcgEnterpriseViewerState } from "./useEcgEnterpriseViewerState";
 export { EcgImageCanvas } from "./EcgImageCanvas";
 export { EcgMeasurementsPanel } from "./EcgMeasurementsPanel";
 export { EcgMeasurementOverlay } from "./EcgMeasurementOverlay";
+export { EcgEnterpriseWorkspaceScreen } from "./EcgEnterpriseWorkspaceScreen";
 export { EcgMonitorViewerFoundation } from "./EcgMonitorViewerFoundation";
 export { EcgPaperGrid } from "./EcgPaperGrid";
 export { EcgProViewerEngine } from "./EcgProViewerEngine";
@@ -37,3 +38,4 @@ export { buildEcgClinicalFindings, useEcgClinicalFindings } from "./useEcgClinic
 export { useEcgMeasurementWorkspace } from "./useEcgMeasurementWorkspace";
 export { useEcgViewerControls } from "./useEcgViewerControls";
 export { useEcgViewerPersistence } from "./useEcgViewerPersistence";
+export { useEcgWorkspaceCaseResolver } from "./useEcgWorkspaceCaseResolver";

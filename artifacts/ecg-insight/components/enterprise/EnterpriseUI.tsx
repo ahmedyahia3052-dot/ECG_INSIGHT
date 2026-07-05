@@ -85,7 +85,7 @@ const PAGE_TITLES: Record<string, { subtitle: string; title: string }> = {
   "/settings": { subtitle: "Workspace preferences, accessibility, and clinical defaults.", title: "Settings" },
   "/team-management": { subtitle: "Manage users, roles, access, and clinical workspace membership.", title: "Team Management" },
   "/upload-ecg": { subtitle: "Capture, upload, preview, analyze, validate, and save ECG records.", title: "Upload ECG" },
-  "/ecg-workspace": { subtitle: "Import, preprocess, digitize, and review ECG images with lead and grid detection.", title: "ECG Workspace" },
+  "/ecg-workspace": { subtitle: "Enterprise ECG Pro clinical workspace with viewer, digitization, measurements, overlay, and AI readiness.", title: "ECG Pro Clinical Workspace" },
 };
 
 function roleRank(role?: string) {
@@ -156,7 +156,7 @@ export function EnterpriseShell({ children }: PropsWithChildren) {
   const sidebarCompact = !isMobile && sidebarCollapsed;
   const meta = pageMeta(pathname);
   const isCopilotWorkspace = pathname.startsWith("/copilot");
-  const isEcgMonitorWorkspace = pathname.startsWith("/ecg-monitor");
+  const isEcgMonitorWorkspace = pathname.startsWith("/ecg-monitor") || pathname.startsWith("/ecg-workspace");
   const isFullBleedWorkspace = isCopilotWorkspace || isEcgMonitorWorkspace;
   const navItems = useMemo(() => NAV_ITEMS.filter((item) => {
     if (item.ownerOnly && user?.email?.toLowerCase() !== "ahmedyahia3052@gmail.com") return false;

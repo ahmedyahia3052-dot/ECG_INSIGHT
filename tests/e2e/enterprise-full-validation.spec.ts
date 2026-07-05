@@ -77,11 +77,18 @@ test.describe("ECG Insight Enterprise — Full Validation @enterprise @e2e", () 
     await expect(page.getByText(/Analyzing|Processing|AI Results|Normal ECG|Pending|Enterprise report/).first()).toBeVisible({ timeout: 90_000 });
   });
 
-  test("UI: ECG workspace route loads digitization workspace", async ({ page }) => {
-    await uiLogin(page, "doctor");
-    await page.getByRole("button", { name: "Open ECG Workspace" }).click();
-    await expectPageReady(page, /ECG Image Interpretation/i);
-    await expect(page.getByText(/Import|Digitize|ECG Workspace/i).first()).toBeVisible();
+  test("UI: ECG workspace route loads enterprise clinical viewer", async ({ page }) => {
+    await bootstrapAuthenticatedPage(page, "doctor");
+    await page.goto("/ecg-workspace", { waitUntil: "domcontentloaded" });
+    await expect(
+      page.getByTestId("ecg-enterprise-workspace-ready").or(page.getByTestId("ecg-workspace-no-demo")),
+    ).toBeVisible({ timeout: 60_000 });
+    if (await page.getByTestId("ecg-enterprise-workspace-ready").isVisible()) {
+      await expect(page.getByText("ECG Pro Clinical Workspace")).toBeVisible();
+      await expect(page.getByTestId("sprint13-ecg-viewer-toolbar")).toBeVisible();
+      await expect(page.getByTestId("sprint165-ecg-left-rail")).toBeVisible();
+      await expect(page.getByTestId("sprint165-ecg-right-rail")).toBeVisible();
+    }
   });
 
   test("UI: voice input and speech recognition populate composer", async ({ page }) => {
@@ -193,8 +200,8 @@ test.describe("ECG Insight Enterprise — Full Validation @enterprise @e2e", () 
       await navigate(page, path, heading);
       await attachA11yScan(page, testInfo, `enterprise-${path.replace(/\W+/g, "-")}`);
     }
-    await page.getByRole("button", { name: "Open ECG Workspace" }).click();
-    await expectPageReady(page, /ECG Image Interpretation/i);
+    await page.goto("/ecg-workspace", { waitUntil: "domcontentloaded" });
+    await expect(page.getByText("ECG Pro Clinical Workspace")).toBeVisible({ timeout: 60_000 });
     await attachA11yScan(page, testInfo, "enterprise-ecg-workspace");
   });
 

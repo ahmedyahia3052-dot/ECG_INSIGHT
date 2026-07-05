@@ -173,7 +173,7 @@ export function EcgMonitorViewerFoundation({
     compareCase?.imagePath ?? compareCase?.originalFileUrl ?? compareCase?.files.find((file) => file.mimeType.startsWith("image/"))?.downloadUrl,
   );
 
-  const openStudy = (caseId: string) => router.push(`/ecg-monitor/${caseId}` as never);
+  const openStudy = (nextCaseId: string) => router.push(`/ecg-workspace?caseId=${nextCaseId}` as never);
 
   const cycleLead = useCallback(() => {
     setSelectedLead((current) => {
