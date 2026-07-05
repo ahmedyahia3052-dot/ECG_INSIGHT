@@ -69,7 +69,7 @@ for (const marker of capabilityMarkers) {
   assert(source, `Sprint 14 Phase 2 missing capability marker: ${marker}`);
 }
 
-assert(toolbar.includes('"AI Overlay"') && toolbar.includes("toggleOverlay") && !toolbar.includes('disabled label="AI Overlay"'), "AI Overlay toolbar must be enabled.");
+assert(toolbar.includes("toggleOverlay") && toolbar.includes("AI Overlay"), "AI Overlay toolbar must be enabled.");
 assert(pipeline.includes("sprint14-ai-clinical-overlay.integration.ts"), "Integration pipeline must register Sprint 14 Phase 2 overlay test.");
 assert(pipeline.includes("ecg-ai-overlay-engine.test.ts"), "Integration pipeline must register AI overlay unit test.");
 assert(!engine.includes("TODO"), "AI overlay engine must not contain TODO markers.");

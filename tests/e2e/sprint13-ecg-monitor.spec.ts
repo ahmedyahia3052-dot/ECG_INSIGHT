@@ -27,7 +27,7 @@ test.describe("Sprint 13 ECG Monitor Workspace @sprint13", () => {
   test("ecg monitor workspace renders viewer foundation with toolbar and dockable panels", async ({ page }) => {
     await openEcgMonitorReady(page, fixture.caseId);
     await expect(page.getByTestId("sprint13-ecg-viewer-toolbar")).toBeVisible();
-    await expect(page.getByText("ECG Pro Viewer & Monitor Workspace")).toBeVisible();
+    await expect(page.getByText("ECG Pro Clinical Workspace")).toBeVisible();
     await expect(page.getByText("Patient Information")).toBeVisible();
     await expect(page.getByText("Study Information")).toBeVisible();
     await expect(page.getByTestId("sprint13-ecg-clinical-findings-panel")).toBeVisible();

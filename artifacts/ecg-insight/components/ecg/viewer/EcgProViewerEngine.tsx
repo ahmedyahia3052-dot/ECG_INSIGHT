@@ -25,6 +25,7 @@ type Props = {
   digitizedLeads?: DigitizedWaveformLead[];
   imageUrl?: string;
   pdfUrl?: string;
+  showDigitizedWaveform?: boolean;
   testID?: string;
   workspace?: EcgMeasurementWorkspace;
 };
@@ -40,6 +41,7 @@ export const EcgProViewerEngine = memo(function EcgProViewerEngine({
   digitizedLeads = [],
   imageUrl,
   pdfUrl,
+  showDigitizedWaveform = true,
   testID = "sprint13-ecg-pro-viewer-engine",
   workspace,
 }: Props) {
@@ -169,7 +171,7 @@ export const EcgProViewerEngine = memo(function EcgProViewerEngine({
       {imageUrl ? (
         <Image
           onLoad={onImageLoad}
-          resizeMode="stretch"
+          resizeMode="contain"
           source={{ uri: imageUrl }}
           style={[styles.layerImage as never, filterStyle ? ({ filter: filterStyle } as never) : null]}
           testID="sprint13-ecg-layer-image"
@@ -178,9 +180,11 @@ export const EcgProViewerEngine = memo(function EcgProViewerEngine({
       <View pointerEvents="none" style={[styles.layer, { zIndex: VIEWER_LAYER.ecgGrid }]}>
         <EcgPaperGrid grid={controls.grid} height={rect.displayHeight} width={rect.displayWidth} zoom={controls.transform.zoom} />
       </View>
-      <View pointerEvents="none" style={[styles.layer, { zIndex: VIEWER_LAYER.digitizedWaveform }]}>
-        <EcgDigitizedWaveformLayer height={rect.displayHeight} leads={digitizedLeads} width={rect.displayWidth} />
-      </View>
+      {showDigitizedWaveform ? (
+        <View pointerEvents="none" style={[styles.layer, { zIndex: VIEWER_LAYER.digitizedWaveform }]}>
+          <EcgDigitizedWaveformLayer height={rect.displayHeight} leads={digitizedLeads} width={rect.displayWidth} />
+        </View>
+      ) : null}
       <View pointerEvents="none" style={[styles.layer, { zIndex: VIEWER_LAYER.aiOverlay }]}>
         <EcgAiOverlayLayer enabled={aiOverlayEnabled} height={rect.displayHeight} regions={aiOverlayRegions} width={rect.displayWidth} />
       </View>

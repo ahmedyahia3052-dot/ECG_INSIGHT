@@ -2,6 +2,7 @@ import { useMemo } from "react";
 
 import type { AIAnalysisResult, AIExplainability } from "@/services/ai";
 import type { ApiECGCase } from "@/services/clinical";
+import type { DigitalEcg } from "@/services/ecgProcessing";
 
 import { confidencePercent } from "./ecgAiOverlayEngine";
 import type { EcgClinicalFindingsModel, EcgClinicalFindingField } from "./types";
@@ -33,7 +34,10 @@ export function buildEcgClinicalFindings(
   workspace?: EcgMeasurementWorkspace,
   analysis?: AIAnalysisResult | null,
   explainability?: AIExplainability | null,
+  digitalEcg?: DigitalEcg | null,
 ): EcgClinicalFindingsModel {
+  const engine = digitalEcg?.measurementEngine;
+  const engineFlat = digitalEcg?.measurements;
   const hrMeasurement = measurementValue(workspace, ["heart_rate", "rr_interval"]);
   const prMeasurement = measurementValue(workspace, ["pr_interval"]);
   const qrsMeasurement = measurementValue(workspace, ["qrs_duration"]);
@@ -42,12 +46,12 @@ export function buildEcgClinicalFindings(
 
   const heartRate = hrMeasurement
     ? field("Heart Rate", hrMeasurement.value, hrMeasurement.unit, "measurement")
-    : field("Heart Rate", ecgCase.heartRate ?? analysis?.heartRate, "bpm");
+    : field("Heart Rate", engine?.heartRate ?? engineFlat?.heartRate ?? ecgCase.heartRate ?? analysis?.heartRate, "bpm");
 
   const confidenceScore = confidencePercent(ecgCase.confidenceScore ?? ecgCase.confidence ?? analysis?.confidenceScore);
 
   return {
-    axis: field("Axis", extractAxis(explainability, ecgCase)),
+    axis: field("Axis", extractAxis(explainability, ecgCase) ?? (engine?.axis?.meanQrsAxisDeg !== undefined ? `${engine.axis.meanQrsAxisDeg}°` : undefined)),
     confidence: field("Confidence", confidenceScore || undefined, "%", confidenceScore ? "case" : "pending"),
     heartRate,
     interpretation: field(
@@ -56,17 +60,17 @@ export function buildEcgClinicalFindings(
     ),
     prInterval: prMeasurement
       ? field("PR Interval", prMeasurement.value, prMeasurement.unit, "measurement")
-      : field("PR Interval", ecgCase.prInterval, "ms"),
+      : field("PR Interval", engine?.intervals?.prIntervalMs ?? engineFlat?.prIntervalMs ?? ecgCase.prInterval, "ms"),
     qrsDuration: qrsMeasurement
       ? field("QRS Duration", qrsMeasurement.value, qrsMeasurement.unit, "measurement")
-      : field("QRS Duration", ecgCase.qrsDuration, "ms"),
+      : field("QRS Duration", engine?.intervals?.qrsDurationMs ?? engineFlat?.qrsDurationMs ?? ecgCase.qrsDuration, "ms"),
     qtInterval: qtMeasurement
       ? field("QT Interval", qtMeasurement.value, qtMeasurement.unit, "measurement")
-      : field("QT Interval", ecgCase.qtInterval, "ms"),
+      : field("QT Interval", engine?.intervals?.qtIntervalMs ?? engineFlat?.qtIntervalMs ?? ecgCase.qtInterval, "ms"),
     qtcInterval: qtcMeasurement
       ? field("QTc Interval", qtcMeasurement.value, qtcMeasurement.unit, "measurement")
-      : field("QTc Interval", ecgCase.qtcInterval, "ms"),
-    rhythm: field("Rhythm", ecgCase.rhythm ?? analysis?.rhythm),
+      : field("QTc Interval", engine?.intervals?.qtcBazettMs ?? engineFlat?.qtcBazettMs ?? ecgCase.qtcInterval, "ms"),
+    rhythm: field("Rhythm", engine?.rhythm ?? ecgCase.rhythm ?? analysis?.rhythm),
   };
 }
 
@@ -75,9 +79,10 @@ export function useEcgClinicalFindings(
   workspace?: EcgMeasurementWorkspace,
   analysis?: AIAnalysisResult | null,
   explainability?: AIExplainability | null,
+  digitalEcg?: DigitalEcg | null,
 ) {
   return useMemo(
-    () => buildEcgClinicalFindings(ecgCase, workspace, analysis, explainability),
-    [analysis, ecgCase, explainability, workspace?.present.measurements],
+    () => buildEcgClinicalFindings(ecgCase, workspace, analysis, explainability, digitalEcg),
+    [analysis, digitalEcg, ecgCase, explainability, workspace?.present.measurements],
   );
 }
