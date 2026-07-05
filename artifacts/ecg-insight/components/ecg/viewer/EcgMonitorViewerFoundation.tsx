@@ -13,6 +13,7 @@ import { buildSegmentAlignedDigitizedWaveformLeads } from "./ecgDigitizedWavefor
 
 import { detectImageFormat } from "./ecgImageEngine";
 import { formatImageResolution } from "./ecgViewerEngine";
+import { estimateImageDpi } from "./useViewerRuntimeMetrics";
 import { EcgImageCanvas } from "./EcgImageCanvas";
 import { EcgRhythmStripPanel } from "./EcgRhythmStripPanel";
 import { EcgViewerLeftRail } from "./EcgViewerLeftRail";
@@ -49,6 +50,8 @@ export function EcgMonitorViewerFoundation({
   const { authToken, user } = useAuth();
   const token = authToken?.token;
   const [selectedLead, setSelectedLead] = useState<EcgLeadId>("II");
+  const [pointerCoords, setPointerCoords] = useState<{ imageX: number; imageY: number; x: number; y: number } | null>(null);
+  const [renderFps, setRenderFps] = useState(60);
   const imageUrl = absoluteUrl(ecgCase.imagePath ?? ecgCase.originalFileUrl ?? ecgCase.files.find((file) => file.mimeType.startsWith("image/"))?.downloadUrl);
   const pdfUrl = absoluteUrl(ecgCase.pdfPath ?? ecgCase.files.find((file) => file.mimeType.includes("pdf"))?.downloadUrl);
   const controls = useEcgViewerControls();
@@ -219,6 +222,7 @@ export function EcgMonitorViewerFoundation({
         nextCaseId={enterprise.navigation.nextCaseId}
         onCapture={() => router.push("/upload-ecg" as never)}
         onCompareToggle={enterprise.toggleCompareMode}
+        onDigitize={() => digitizeMutation.mutate()}
         onLeadCycle={cycleLead}
         onNextStudy={() => enterprise.navigation.nextCaseId && openStudy(enterprise.navigation.nextCaseId)}
         onOpen={() => openStudy(ecgCase.id)}
@@ -241,12 +245,39 @@ export function EcgMonitorViewerFoundation({
               <EcgViewerStatusBar
                 aiOverlayEnabled={aiOverlay.present.settings.enabled}
                 annotationCount={aiOverlay.present.annotations.filter((item) => item.visible).length}
+                coordinates={
+                  pointerCoords
+                    ? `${Math.round(pointerCoords.imageX)},${Math.round(pointerCoords.imageY)}`
+                    : undefined
+                }
+                digitizationQuality={
+                  digitalEcg?.quality?.score != null
+                    ? `${Math.round(digitalEcg.quality.score)}%`
+                    : digitizeMutation.isPending
+                      ? "Processing"
+                      : digitalEcg
+                        ? "Available"
+                        : "Pending"
+                }
                 fileType={study.fileType}
                 fitMode={controls.fitMode}
+                fps={renderFps}
+                gain={controls.grid.gain}
                 gridOpacity={controls.grid.opacity}
                 gridVisible={controls.grid.visible}
+                imageDpi={estimateImageDpi(controls.viewport.imageWidth, controls.viewport.imageHeight, controls.transform.zoom)}
                 imageResolution={formatImageResolution(controls.viewport.imageWidth, controls.viewport.imageHeight)}
+                imageSize={`${controls.viewport.imageWidth}×${controls.viewport.imageHeight}`}
+                lead={selectedLead}
                 measurementCount={workspace.present.measurements.filter((item) => !item.hidden).length}
+                paperSpeed={controls.grid.speed}
+                signalQuality={
+                  digitalEcg?.calibration?.confidence != null
+                    ? `${Math.round(digitalEcg.calibration.confidence * 100)}%`
+                    : analysis?.confidenceScore != null
+                      ? `${Math.round(analysis.confidenceScore * 100)}%`
+                      : "Pending"
+                }
                 toolMode={workspace.present.toolMode}
                 zoom={controls.transform.zoom}
               />
@@ -266,6 +297,10 @@ export function EcgMonitorViewerFoundation({
               digitizedLeads={digitizedLeads}
               explainability={explainability}
               imageUrl={imageUrl}
+              onPointerMove={(coords) => {
+                setPointerCoords(coords);
+              }}
+              onFpsUpdate={setRenderFps}
               pdfUrl={pdfUrl}
               showDigitizedWaveform={enterprise.showDigitizedWaveform}
               workspace={workspace}
@@ -274,12 +309,14 @@ export function EcgMonitorViewerFoundation({
           left={
             <EcgViewerLeftRail
               compareCaseId={enterprise.compareCaseId}
+              leadFocusMode={enterprise.leadFocusMode}
               onSelectCompare={(caseId) => {
                 enterprise.setCompareCaseId(caseId);
                 enterprise.setCompareMode(true);
               }}
               onSelectLead={setSelectedLead}
               onSelectPrevious={openStudy}
+              onToggleLeadFocus={() => enterprise.setLeadFocusMode((value) => !value)}
               patient={{ age: patient.age, gender: patient.gender, id: patient.id, name: patientDisplayName(patient) }}
               previousStudies={previousStudies}
               selectedLead={selectedLead}

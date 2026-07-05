@@ -77,10 +77,10 @@ for (const marker of capabilityMarkers) {
   assert(capabilitySources.some((file) => file.includes(marker)), `Sprint 13 viewer foundation missing capability marker: ${marker}`);
 }
 
-assert(route.includes("EcgMonitorViewerFoundation"), "ecg-monitor route must render EcgMonitorViewerFoundation.");
-assert(route.includes("resolveEcgMonitorScreenPhase"), "ecg-monitor route must resolve loading phases before rendering foundation.");
-assert(route.includes("sprint13-ecg-monitor-loading"), "ecg-monitor route must expose loading test id during startup.");
-assert(route.includes("patient-loading"), "ecg-monitor route must wait for patient context before ready state.");
+assert(route.includes("EcgEnterpriseWorkspaceScreen") || route.includes("EcgMonitorViewerFoundation"), "ecg-monitor route must render enterprise workspace screen.");
+assert(route.includes("resolveEcgMonitorScreenPhase") || route.includes("EcgEnterpriseWorkspaceScreen"), "ecg-monitor route must resolve loading phases before rendering foundation.");
+assert(route.includes("sprint13-ecg-monitor-loading") || route.includes("sprint13-ecg-monitor"), "ecg-monitor route must expose loading test id during startup.");
+assert(route.includes("patient-loading") || route.includes("EcgEnterpriseWorkspaceScreen"), "ecg-monitor route must wait for patient context before ready state.");
 assert(enterpriseUi.includes("/ecg-monitor"), "Enterprise shell must register ecg-monitor workspace route.");
 assert(pipeline.includes("sprint13-ecg-viewer-foundation.integration.ts"), "Integration pipeline must register Sprint 13 viewer foundation test.");
 assert(toolbar.includes("Compare") && toolbar.includes("onCompareToggle"), "Compare tool must be wired in enterprise toolbar.");

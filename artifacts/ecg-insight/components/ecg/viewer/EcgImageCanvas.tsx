@@ -25,6 +25,8 @@ type Props = {
   digitizedLeads?: DigitizedWaveformLead[];
   explainability?: AIExplainability | null;
   imageUrl?: string;
+  onFpsUpdate?: (fps: number) => void;
+  onPointerMove?: (coords: { imageX: number; imageY: number; x: number; y: number }) => void;
   pdfUrl?: string;
   showDigitizedWaveform?: boolean;
   testID?: string;
@@ -44,6 +46,8 @@ export function EcgImageCanvas({
   digitizedLeads = [],
   explainability,
   imageUrl,
+  onFpsUpdate,
+  onPointerMove,
   pdfUrl,
   showDigitizedWaveform = true,
   testID = "sprint13-ecg-image-canvas",
@@ -74,6 +78,8 @@ export function EcgImageCanvas({
           controls={controls}
           digitizedLeads={digitizedLeads}
           imageUrl={asset.url}
+          onFpsUpdate={onFpsUpdate}
+          onPointerMove={onPointerMove}
           pdfUrl={pdfUrl}
           showDigitizedWaveform={showDigitizedWaveform}
           testID={testID}

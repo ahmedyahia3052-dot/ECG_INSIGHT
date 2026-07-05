@@ -44,31 +44,58 @@ export function EcgViewerTimeline({
 export function EcgViewerStatusBar({
   aiOverlayEnabled,
   annotationCount,
+  coordinates,
+  digitizationQuality,
   fileType,
   fitMode,
+  fps,
+  gain,
   gridOpacity,
   gridVisible,
+  imageDpi,
   imageResolution,
+  imageSize,
+  lead,
   measurementCount,
+  paperSpeed,
+  signalQuality,
   toolMode,
   zoom,
 }: {
   aiOverlayEnabled?: boolean;
   annotationCount?: number;
+  coordinates?: string;
+  digitizationQuality?: string;
   fileType?: string;
   fitMode?: string;
+  fps?: number;
+  gain?: number;
   gridOpacity?: number;
   gridVisible: boolean;
+  imageDpi?: number;
   imageResolution?: string;
+  imageSize?: string;
+  lead?: string;
   measurementCount?: number;
+  paperSpeed?: number;
+  signalQuality?: string;
   toolMode?: string;
   zoom: number;
 }) {
   return (
     <View style={styles.statusBar} testID="sprint13-ecg-viewer-status">
-      <Text style={styles.statusText}>Zoom {Math.round(zoom * 100)}%</Text>
-      <Text style={styles.statusText}>Grid {gridVisible ? "ON" : "OFF"}</Text>
+      <Text style={styles.statusText} testID="sprint17-status-paper-speed">Paper {paperSpeed ?? 25} mm/s</Text>
+      <Text style={styles.statusText} testID="sprint17-status-gain">Gain {gain ?? 10} mm/mV</Text>
+      <Text style={styles.statusText} testID="sprint17-status-zoom">Zoom {Math.round(zoom * 100)}%</Text>
+      <Text style={styles.statusText} testID="sprint17-status-grid">Grid {gridVisible ? "ON" : "OFF"}</Text>
       {typeof gridOpacity === "number" ? <Text style={styles.statusText}>Grid Opacity {Math.round(gridOpacity * 100)}%</Text> : null}
+      {lead ? <Text style={styles.statusText} testID="sprint17-status-lead">Lead {lead}</Text> : null}
+      {signalQuality ? <Text style={styles.statusText} testID="sprint17-status-signal">Signal {signalQuality}</Text> : null}
+      {digitizationQuality ? <Text style={styles.statusText} testID="sprint17-status-digitization">Digitization {digitizationQuality}</Text> : null}
+      {typeof imageDpi === "number" ? <Text style={styles.statusText} testID="sprint17-status-dpi">DPI {imageDpi}</Text> : null}
+      {imageSize ? <Text style={styles.statusText} testID="sprint17-status-size">Size {imageSize}</Text> : null}
+      {typeof fps === "number" ? <Text style={styles.statusText} testID="sprint17-status-fps">FPS {fps}</Text> : null}
+      {coordinates ? <Text style={styles.statusText} testID="sprint17-status-coords">Coords {coordinates}</Text> : null}
       {fitMode && fitMode !== "none" ? <Text style={styles.statusText}>Fit {fitMode}</Text> : null}
       <Text style={styles.statusText}>Type {fileType ?? "N/A"}</Text>
       <Text style={styles.statusText}>Resolution {imageResolution ?? "Pending"}</Text>

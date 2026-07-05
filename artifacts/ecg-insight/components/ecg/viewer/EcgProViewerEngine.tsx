@@ -8,11 +8,13 @@ import { emitRuntimeEvent } from "@/services/runtimeEvents";
 import { EcgAiOverlayLayer, type EcgAiOverlayRegion } from "./EcgAiOverlayLayer";
 import { EcgDigitizedWaveformLayer, type DigitizedWaveformLead } from "./EcgDigitizedWaveformLayer";
 import { EcgMeasurementOverlay } from "./EcgMeasurementOverlay";
+import { EcgMiniNavigator } from "./EcgMiniNavigator";
 import { EcgPaperGrid } from "./EcgPaperGrid";
-import { buildImageFilterStyle, buildTransformStyle, cacheImageDimensions, detectImageFormat, readCachedImageDimensions } from "./ecgImageEngine";
+import { buildImageFilterStyle, buildTransformStyle, cacheImageDimensions, clampZoom, detectImageFormat, readCachedImageDimensions } from "./ecgImageEngine";
 import { displayDimensions, VIEWER_LAYER } from "./ecgViewerEngine";
 import type { EcgMeasurementWorkspace } from "./useEcgMeasurementWorkspace";
 import type { EcgViewerControls } from "./useEcgViewerControls";
+import { useViewerRuntimeMetrics } from "./useViewerRuntimeMetrics";
 
 type Props = {
   accessToken?: string | null;
@@ -24,6 +26,8 @@ type Props = {
   controls: EcgViewerControls;
   digitizedLeads?: DigitizedWaveformLead[];
   imageUrl?: string;
+  onPointerMove?: (coords: { imageX: number; imageY: number; x: number; y: number }) => void;
+  onFpsUpdate?: (fps: number) => void;
   pdfUrl?: string;
   showDigitizedWaveform?: boolean;
   testID?: string;
@@ -43,12 +47,18 @@ export const EcgProViewerEngine = memo(function EcgProViewerEngine({
   pdfUrl,
   showDigitizedWaveform = true,
   testID = "sprint13-ecg-pro-viewer-engine",
+  onFpsUpdate,
+  onPointerMove,
   workspace,
 }: Props) {
   const [loading, setLoading] = React.useState(true);
   const pinchBase = useRef(controls.transform.zoom);
   const panBase = useRef({ x: controls.transform.panX, y: controls.transform.panY });
   const dragOrigin = useRef<{ x: number; y: number } | null>(null);
+  const momentumRef = useRef<number | null>(null);
+  const velocityRef = useRef({ x: 0, y: 0 });
+  const lastPanRef = useRef({ t: 0, x: 0, y: 0 });
+  const { updatePointer } = useViewerRuntimeMetrics(onFpsUpdate);
   const format = detectImageFormat(imageUrl ?? pdfUrl ?? "");
   const isPdf = format === "pdf" || (!imageUrl && !!pdfUrl);
   const viewport = controls.viewport;
@@ -96,35 +106,83 @@ export const EcgProViewerEngine = memo(function EcgProViewerEngine({
     const onWheel = (event: WheelEvent) => {
       if (controls.isPanActive) return;
       event.preventDefault();
-      controls.zoomBy(event.deltaY < 0 ? 0.12 : -0.12);
+      const rect = node.getBoundingClientRect();
+      const anchor = { x: event.clientX - rect.left, y: event.clientY - rect.top };
+      const delta = event.deltaY < 0 ? 0.12 : -0.12;
+      controls.zoomAtAnchor(anchor, delta);
     };
     node.addEventListener("wheel", onWheel, { passive: false });
     return () => node.removeEventListener("wheel", onWheel);
   }, [controls, imageUrl, testID]);
 
+  const stopMomentum = useCallback(() => {
+    if (momentumRef.current) {
+      cancelAnimationFrame(momentumRef.current);
+      momentumRef.current = null;
+    }
+  }, []);
+
+  const startMomentum = useCallback(() => {
+    stopMomentum();
+    const step = () => {
+      const { x, y } = velocityRef.current;
+      if (Math.abs(x) < 0.05 && Math.abs(y) < 0.05) {
+        momentumRef.current = null;
+        return;
+      }
+      controls.panBy(x, y);
+      velocityRef.current = { x: x * 0.92, y: y * 0.92 };
+      momentumRef.current = requestAnimationFrame(step);
+    };
+    momentumRef.current = requestAnimationFrame(step);
+  }, [controls, stopMomentum]);
+
   useEffect(() => {
     if (Platform.OS !== "web" || typeof window === "undefined") return undefined;
+    const canPan = () => {
+      const locked =
+        workspace?.present.toolMode === "caliper" ||
+        workspace?.present.toolMode === "annotation" ||
+        workspace?.present.toolMode === "measurement";
+      return controls.isPanActive || !locked;
+    };
     const onMouseDown = (event: MouseEvent) => {
-      if (!controls.isPanActive) return;
+      if (event.button !== 0 && event.button !== 1) return;
+      if (!canPan()) return;
+      stopMomentum();
       dragOrigin.current = { x: event.clientX, y: event.clientY };
+      lastPanRef.current = { t: performance.now(), x: event.clientX, y: event.clientY };
+      velocityRef.current = { x: 0, y: 0 };
     };
     const onMouseMove = (event: MouseEvent) => {
       if (!dragOrigin.current) return;
-      controls.panBy(event.clientX - dragOrigin.current.x, event.clientY - dragOrigin.current.y);
+      const dx = event.clientX - dragOrigin.current.x;
+      const dy = event.clientY - dragOrigin.current.y;
+      controls.panBy(dx, dy);
+      const now = performance.now();
+      const elapsed = Math.max(now - lastPanRef.current.t, 1);
+      velocityRef.current = {
+        x: ((event.clientX - lastPanRef.current.x) / elapsed) * 16,
+        y: ((event.clientY - lastPanRef.current.y) / elapsed) * 16,
+      };
+      lastPanRef.current = { t: now, x: event.clientX, y: event.clientY };
       dragOrigin.current = { x: event.clientX, y: event.clientY };
     };
     const onMouseUp = () => {
+      if (!dragOrigin.current) return;
       dragOrigin.current = null;
+      startMomentum();
     };
     window.addEventListener("mousedown", onMouseDown);
     window.addEventListener("mousemove", onMouseMove);
     window.addEventListener("mouseup", onMouseUp);
     return () => {
+      stopMomentum();
       window.removeEventListener("mousedown", onMouseDown);
       window.removeEventListener("mousemove", onMouseMove);
       window.removeEventListener("mouseup", onMouseUp);
     };
-  }, [controls]);
+  }, [controls, startMomentum, stopMomentum, workspace?.present.toolMode]);
 
   const onImageLoad = useCallback(
     (event: { nativeEvent: { source?: { height: number; width: number } } }) => {
@@ -156,6 +214,19 @@ export const EcgProViewerEngine = memo(function EcgProViewerEngine({
   const layerTransform = buildTransformStyle(controls.transform, controls.adjustments);
   const interactionLocked = workspace?.present.toolMode === "caliper" || workspace?.present.toolMode === "annotation" || workspace?.present.toolMode === "measurement";
 
+  const handlePointerMove = useCallback(
+    (event: { nativeEvent: { locationX?: number; locationY?: number; clientX?: number; clientY?: number; offsetX?: number; offsetY?: number } }) => {
+      const native = event.nativeEvent;
+      const x = native.locationX ?? native.offsetX ?? native.clientX ?? 0;
+      const y = native.locationY ?? native.offsetY ?? native.clientY ?? 0;
+      const imageX = (x - controls.transform.panX) / Math.max(controls.transform.zoom, 0.001);
+      const imageY = (y - controls.transform.panY) / Math.max(controls.transform.zoom, 0.001);
+      updatePointer({ imageX, imageY, x, y });
+      onPointerMove?.({ imageX, imageY, x, y });
+    },
+    [controls.transform.panX, controls.transform.panY, controls.transform.zoom, onPointerMove, updatePointer],
+  );
+
   const layerStack = (
     <View
       style={[
@@ -173,7 +244,11 @@ export const EcgProViewerEngine = memo(function EcgProViewerEngine({
           onLoad={onImageLoad}
           resizeMode="contain"
           source={{ uri: imageUrl }}
-          style={[styles.layerImage as never, filterStyle ? ({ filter: filterStyle } as never) : null]}
+          style={[
+            styles.layerImage as never,
+            filterStyle ? ({ filter: filterStyle } as never) : null,
+            Platform.OS === "web" ? ({ imageRendering: "crisp-edges" } as never) : null,
+          ]}
           testID="sprint13-ecg-layer-image"
         />
       ) : null}
@@ -195,10 +270,11 @@ export const EcgProViewerEngine = memo(function EcgProViewerEngine({
     <View
       nativeID={testID}
       onLayout={onLayout}
+      onPointerMove={Platform.OS === "web" ? (handlePointerMove as never) : undefined}
       style={[
         styles.canvas,
         controls.fullscreen && styles.fullscreenCanvas,
-        controls.isPanActive && !interactionLocked && Platform.OS === "web" ? ({ cursor: "grab" } as never) : null,
+        !interactionLocked && Platform.OS === "web" ? ({ cursor: controls.isPanActive ? "grab" : "crosshair" } as never) : null,
       ]}
       testID={testID}
     >
@@ -235,6 +311,9 @@ export const EcgProViewerEngine = memo(function EcgProViewerEngine({
           />
         </View>
       ) : null}
+      {imageUrl && !isPdf ? (
+        <EcgMiniNavigator controls={controls} imageUrl={imageUrl} />
+      ) : null}
     </View>
   );
 
@@ -243,7 +322,16 @@ export const EcgProViewerEngine = memo(function EcgProViewerEngine({
       <View style={styles.wrapper} testID="sprint13-ecg-pro-viewer-engine">
         <View
           // @ts-expect-error web only
-          onDoubleClick={controls.handleDoubleClickZoom}
+          onDoubleClick={(event: MouseEvent) => {
+            const target = event.currentTarget as HTMLElement;
+            const rect = target.getBoundingClientRect();
+            const anchor = { x: event.clientX - rect.left, y: event.clientY - rect.top };
+            if (controls.transform.zoom >= 1.8) {
+              controls.applyFit("100");
+              return;
+            }
+            controls.zoomAtAnchor(anchor, 0.6);
+          }}
           style={styles.wrapper}
         >
           {canvasBody}
@@ -255,7 +343,7 @@ export const EcgProViewerEngine = memo(function EcgProViewerEngine({
   return (
     <View style={styles.wrapper} testID="sprint13-ecg-pro-viewer-engine">
       <PinchGestureHandler
-        onGestureEvent={(event) => controls.setZoom(Math.max(0.1, Math.min(pinchBase.current * event.nativeEvent.scale, 8)))}
+        onGestureEvent={(event) => controls.setZoom(clampZoom(pinchBase.current * event.nativeEvent.scale))}
         onHandlerStateChange={(event) => {
           if (event.nativeEvent.state === State.BEGAN) pinchBase.current = controls.transform.zoom;
           if (event.nativeEvent.oldState === State.ACTIVE) pinchBase.current = controls.transform.zoom;

@@ -4,7 +4,9 @@ import { Linking, Platform, ScrollView, StyleSheet, View } from "react-native";
 import { PrimaryButton, medicalTheme } from "@/components/enterprise/EnterpriseUI";
 import { downloadEcgViewerWorkspacePdf, downloadEcgViewerWorkspaceJson } from "@/services/ecgViewerWorkspace";
 
+import { exportEcgViewerPng } from "./ecgViewerExport";
 import { exportMeasurements } from "./ecgMeasurementEngine";
+import { ECG_ZOOM_PRESETS } from "./ecgImageEngine";
 import type { EcgLeadId } from "./types";
 import type { EcgAiOverlayWorkspace } from "./useEcgAiOverlayWorkspace";
 import type { EcgMeasurementWorkspace } from "./useEcgMeasurementWorkspace";
@@ -20,6 +22,7 @@ type Props = {
   nextCaseId?: string;
   onCapture?: () => void;
   onCompareToggle?: () => void;
+  onDigitize?: () => void;
   onLeadCycle?: () => void;
   onNextStudy?: () => void;
   onOpen?: () => void;
@@ -43,6 +46,7 @@ export function EcgViewerToolbar({
   nextCaseId,
   onCapture,
   onCompareToggle,
+  onDigitize,
   onLeadCycle,
   onNextStudy,
   onOpen,
@@ -109,6 +113,11 @@ export function EcgViewerToolbar({
     URL.revokeObjectURL(url);
   }, [aiOverlay, caseId]);
 
+  const exportPng = useCallback(async () => {
+    if (!imageUrl) return;
+    await exportEcgViewerPng({ accessToken, caseId, imageUrl });
+  }, [accessToken, caseId, imageUrl]);
+
   return (
     <View style={styles.toolbar} testID="sprint13-ecg-viewer-toolbar">
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.row}>
@@ -122,6 +131,8 @@ export function EcgViewerToolbar({
         <PrimaryButton label={overlayEnabled ? "AI Overlay On" : "AI Overlay"} onPress={() => aiOverlay?.toggleOverlay()} variant={overlayEnabled ? "primary" : "outline"} />
         <PrimaryButton label="AI" onPress={() => aiOverlay?.setSettings({ enabled: true, showAnnotations: true, showLabels: true })} variant="outline" />
         <PrimaryButton label={showDigitizedWaveform ? "Wave On" : "Wave Off"} onPress={() => onToggleDigitized?.()} variant={showDigitizedWaveform ? "primary" : "outline"} />
+        <PrimaryButton label="Digitize" onPress={() => onDigitize?.()} variant="outline" />
+        <PrimaryButton label="Export PNG" onPress={() => void exportPng()} variant="outline" />
         <PrimaryButton label="Export PDF" onPress={() => void exportPdf()} variant="outline" />
         <PrimaryButton label="Export JSON" onPress={() => void exportJson()} variant="outline" />
         <PrimaryButton label="Export CSV" onPress={exportCsv} variant="outline" />
@@ -137,6 +148,20 @@ export function EcgViewerToolbar({
         <PrimaryButton label="Fit Width" onPress={() => controls.applyFit("width")} variant="outline" />
         <PrimaryButton label="Fit Height" onPress={() => controls.applyFit("height")} variant="outline" />
         <PrimaryButton label="100%" onPress={() => controls.applyFit("100")} variant="outline" />
+        {ECG_ZOOM_PRESETS.map((preset) => (
+          <PrimaryButton
+            key={preset}
+            label={`${preset * 100}%`}
+            onPress={() => controls.setZoomPreset(preset)}
+            variant={Math.abs(controls.transform.zoom - preset) < 0.05 ? "primary" : "outline"}
+          />
+        ))}
+        <PrimaryButton label={`Speed ${controls.grid.speed} mm/s`} onPress={controls.cycleSpeed} variant="outline" />
+        <PrimaryButton label={`Gain ${controls.grid.gain} mm/mV`} onPress={controls.cycleGain} variant="outline" />
+        <PrimaryButton label="Brightness +" onPress={() => controls.adjustBrightness(8)} variant="outline" />
+        <PrimaryButton label="Brightness −" onPress={() => controls.adjustBrightness(-8)} variant="outline" />
+        <PrimaryButton label="Contrast +" onPress={() => controls.adjustContrast(8)} variant="outline" />
+        <PrimaryButton label="Contrast −" onPress={() => controls.adjustContrast(-8)} variant="outline" />
         <PrimaryButton label="Reset View" onPress={controls.resetView} variant="outline" />
         <PrimaryButton label="Rotate" onPress={controls.rotate} variant="outline" />
         <PrimaryButton label={`Zoom ${Math.round(controls.transform.zoom)}x`} onPress={controls.cycleZoomPreset} variant="outline" />

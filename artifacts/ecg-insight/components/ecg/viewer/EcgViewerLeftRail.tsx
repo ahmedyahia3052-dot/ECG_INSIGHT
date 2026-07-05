@@ -17,18 +17,22 @@ function InfoRow({ label, value }: { label: string; value?: string | number }) {
 
 export function EcgViewerLeftRail({
   compareCaseId,
+  leadFocusMode = false,
   onSelectCompare,
   onSelectLead,
   onSelectPrevious,
+  onToggleLeadFocus,
   patient,
   previousStudies,
   selectedLead,
   study,
 }: {
   compareCaseId?: string | null;
+  leadFocusMode?: boolean;
   onSelectCompare?: (caseId: string) => void;
   onSelectLead?: (lead: EcgLeadId) => void;
   onSelectPrevious?: (caseId: string) => void;
+  onToggleLeadFocus?: () => void;
   patient?: EcgViewerPatientContext;
   previousStudies: EcgViewerPreviousStudy[];
   selectedLead?: EcgLeadId;
@@ -54,6 +58,11 @@ export function EcgViewerLeftRail({
       </Card>
       <Card style={styles.card}>
         <SectionHeader title="Lead Selector" subtitle="Focus measurements and rhythm strip on a lead" />
+        <PrimaryButton
+          label={leadFocusMode ? "Lead Focus On" : "Lead Focus Off"}
+          onPress={() => onToggleLeadFocus?.()}
+          variant={leadFocusMode ? "primary" : "outline"}
+        />
         <View style={styles.leadGrid}>
           {STANDARD_ECG_LEADS.map((lead) => (
             <PrimaryButton key={lead} label={lead} onPress={() => onSelectLead?.(lead)} variant={selectedLead === lead ? "primary" : "outline"} />

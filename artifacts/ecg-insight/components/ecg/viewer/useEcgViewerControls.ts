@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Platform } from "react-native";
 
-import { clampZoom, ECG_ZOOM_PRESETS, fitZoomForDimensions, zoomStep } from "./ecgImageEngine";
+import { clampZoom, ECG_ZOOM_PRESETS, fitZoomForDimensions, zoomAtPoint, zoomStep, type EcgZoomPreset } from "./ecgImageEngine";
 import {
   DEFAULT_ADJUSTMENTS,
   DEFAULT_GRID,
@@ -126,6 +126,28 @@ export function useEcgViewerControls() {
     setFitMode("none");
   }, []);
 
+  const setZoomPreset = useCallback((preset: EcgZoomPreset) => {
+    setTransform((current) => ({ ...current, zoom: clampZoom(preset) }));
+    setFitMode("none");
+  }, []);
+
+  const zoomAtAnchor = useCallback((anchor: { x: number; y: number }, delta: number) => {
+    setTransform((current) => zoomAtPoint(current, anchor, zoomStep(current.zoom, delta)));
+    setFitMode("none");
+  }, []);
+
+  const adjustBrightness = useCallback((delta: number) => {
+    setAdjustments((current) => ({ ...current, brightness: Math.min(200, Math.max(40, current.brightness + delta)) }));
+  }, []);
+
+  const adjustContrast = useCallback((delta: number) => {
+    setAdjustments((current) => ({ ...current, contrast: Math.min(200, Math.max(40, current.contrast + delta)) }));
+  }, []);
+
+  const setGridOpacity = useCallback((opacity: number) => {
+    setGrid((current) => ({ ...current, opacity: Math.min(1, Math.max(0.1, opacity)) }));
+  }, []);
+
   const toggleCustomCalibration = useCallback(() => {
     setGrid((current) => ({
       ...current,
@@ -195,6 +217,8 @@ export function useEcgViewerControls() {
   const controls = useMemo(
     () => ({
       adjustments,
+      adjustBrightness,
+      adjustContrast,
       applyFit,
       cycleCustomSpacing,
       cycleGain,
@@ -214,10 +238,12 @@ export function useEcgViewerControls() {
       setAdjustments,
       setFullscreen,
       setGrid,
+      setGridOpacity,
       setPanMode,
       setTransform,
       setViewportDimensions,
       setZoom,
+      setZoomPreset,
       spacePanActive,
       toggleCustomCalibration,
       toggleFullscreen,
@@ -225,10 +251,13 @@ export function useEcgViewerControls() {
       togglePanMode,
       transform,
       viewport,
+      zoomAtAnchor,
       zoomBy,
     }),
     [
       adjustments,
+      adjustBrightness,
+      adjustContrast,
       applyFit,
       cycleCustomSpacing,
       cycleGain,
@@ -255,6 +284,8 @@ export function useEcgViewerControls() {
       viewport,
       zoomBy,
       setZoom,
+      setZoomPreset,
+      zoomAtAnchor,
     ],
   );
 

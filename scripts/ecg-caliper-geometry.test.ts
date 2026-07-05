@@ -52,7 +52,7 @@ const customSpacing = resolveGridSpacing({
 });
 assert.equal(customSpacing, 16);
 
-assert.deepEqual(ECG_ZOOM_PRESETS, [1, 2, 4, 8, 10, 15, 20]);
+assert.deepEqual(ECG_ZOOM_PRESETS, [1, 2, 4, 8, 16]);
 
 const evaluation = evaluateMeasurementReference("pr_interval", 180, "ms");
 assert.equal(evaluation.status, "normal");

@@ -1,45 +1,58 @@
-# Test Report — Sprint 11.1
+# Sprint 17 Test Report
 
-## New Regression Suite — `scripts/sprint11.1-enterprise-hardening.integration.ts`
+**Date:** 2026-07-05  
+**Sprint:** 17 — ECG Pro Viewer Enterprise Finalization
 
-| Test | Validates |
-|------|-----------|
-| Extractor registry | ECG plugin selected and findings extracted |
-| Attachment Context Builder SSOT | `normalizedContext` v11.1 stored at upload; prompt reads stored context |
-| OCR cache | Repeated processing of identical file uses cache path |
-| Clinical validator | Low-confidence + overconfident language flagged; review guidance appended |
-| PromptBuilder independence | Module exists; React UI does not build prompts |
+## Summary
 
-## Updated Suites
+All validation gates passed. No regressions detected in ECG workspace restoration tests.
 
-- `scripts/sprint11-enterprise-stability.integration.ts` — attachment block text updated for SSOT wording
-- `scripts/copilot-final-closure.integration.ts` — architecture markers (replaces dead legacy OCR helpers)
-- `scripts/copilot-stabilization.integration.ts` — architecture markers
-- `scripts/dashboard-production-lockdown.integration.ts` — architecture markers
+## Static Analysis
 
-## Key Modules Added
+| Command | Exit Code |
+|---------|-----------|
+| `npm run lint` | 0 |
+| `npm run typecheck` | 0 |
+| `npm run build` | 0 |
 
-### Attachment layer
-- `server/src/modules/copilot/attachment/attachment-context-builder.service.ts`
-- `server/src/modules/copilot/attachment/ocr-cache.service.ts`
-- `server/src/modules/copilot/attachment/attachment-job-queue.service.ts`
+## Unit Tests
 
-### Extractor plugins
-- `server/src/modules/copilot/extractors/registry.ts`
-- `server/src/modules/copilot/extractors/modality-extractors.ts`
-- `server/src/modules/copilot/extractors/document-classifier.ts`
+| Script | Result |
+|--------|--------|
+| `ecg-viewer-engine.test.ts` | Pass (updated clampZoom max 32) |
+| `ecg-caliper-geometry.test.ts` | Pass (presets `[1,2,4,8,16]`) |
+| `ecg-pro-viewer-engine.test.ts` | Pass |
 
-### Prompt & validation
-- `server/src/modules/copilot/prompt/prompt-builder.ts`
-- `server/src/modules/copilot/validation/attachment-validator.ts`
-- `server/src/modules/copilot/validation/clinical-validator.ts`
+## Integration Tests
 
-## Commands
+| Script | Result |
+|--------|--------|
+| `sprint17-ecg-pro-viewer-enterprise.integration.ts` | Pass |
+| `sprint13-ecg-viewer-foundation.integration.ts` | Pass (route alias updated) |
+| `ecg-workspace-restoration.integration.ts` | Pass |
+| Full suite (`npm test`) | Pass — 68 scripts, exit 0 |
 
-```bash
-npm run lint
-npm run typecheck
-npx tsx scripts/sprint11.1-enterprise-hardening.integration.ts
-npx tsx scripts/sprint11-enterprise-stability.integration.ts
-npx tsx scripts/copilot-enterprise-workspace.integration.ts
-```
+## End-to-End (Playwright)
+
+| Spec | Tests | Result |
+|------|-------|--------|
+| `sprint17-ecg-pro-viewer.spec.ts` | 4 | Pass |
+| `ecg-workspace-restoration.spec.ts` | 2 | Pass |
+
+### Sprint 17 E2E Coverage
+
+- Toolbar: Export PNG, Digitize, zoom presets 200%/1600%, speed/gain
+- Status bar: paper speed, gain, zoom, lead, FPS, DPI
+- Mini navigator visible; 400% zoom updates status bar
+- Lead focus mode toggle in left rail
+
+## Screenshots
+
+- `test-results/screenshots/sprint17-ecg-pro-viewer.png`
+- `test-results/screenshots/ecg-workspace-restored.png`
+
+## Fixes Applied During Validation
+
+- Updated `ecg-viewer-engine.test.ts` for `clampZoom` max 32
+- Updated `ecg-caliper-geometry.test.ts` for new zoom presets
+- Updated `sprint13-ecg-viewer-foundation.integration.ts` for `EcgEnterpriseWorkspaceScreen` route alias

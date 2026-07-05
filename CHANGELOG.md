@@ -4,6 +4,33 @@ All notable changes to this project are documented in this file.
 
 ---
 
+## [Sprint17] — 2026-07-05
+
+### Added
+
+- **Sprint 17 ECG Pro Viewer Enterprise** — cursor-anchored wheel zoom, momentum pan, mini navigator, crisp rendering
+- Zoom presets 100%–1600% with `setZoomPreset` toolbar buttons
+- Clinical status bar metrics: paper speed, gain, lead, signal/digitization quality, DPI, size, FPS, coordinates
+- Toolbar: Export PNG, Digitize, brightness/contrast, speed/gain cycles
+- Lead focus mode toggle in left rail
+- `useViewerRuntimeMetrics`, `ecgViewerExport`, `EcgMiniNavigator` exports
+- Tests: `sprint17-ecg-pro-viewer-enterprise.integration.ts`, `sprint17-ecg-pro-viewer.spec.ts`
+- Reports: `SPRINT17_FINAL_REPORT.md`, `TEST_REPORT.md`, `PERFORMANCE_REPORT.md`
+
+### Changed
+
+- `ECG_ZOOM_PRESETS` → `[1, 2, 4, 8, 16]`; `clampZoom` max → 32
+- `EcgProViewerEngine` — anchor zoom, momentum pan, mini nav, pointer tracking
+- `EcgViewerToolbar` / `EcgViewerTimeline` — Sprint 17 controls and status bar
+- `EcgMonitorViewerFoundation` — runtime metrics wiring, digitize toolbar action
+- `sprint13-ecg-viewer-foundation.integration.ts` — accepts `EcgEnterpriseWorkspaceScreen` route
+
+### Preserved
+
+- All Sprint 13–16.5 viewer, measurement, digitization, overlay, and workspace features
+
+---
+
 ## [Sprint13-Phase3] — 2026-07-04
 
 ### Added
