@@ -1,11 +1,11 @@
-# Test Report — Sprint 18
+# Test Report — Sprint 19
 
 **Date:** 2026-07-05
 
-## Static Gates
+## Static Validation
 
-| Command | Result |
-|---------|--------|
+| Check | Result |
+|-------|--------|
 | `npm run lint` | Pass |
 | `npm run typecheck` | Pass |
 | `npm run build` | Pass |
@@ -14,24 +14,23 @@
 
 | Script | Result |
 |--------|--------|
-| `sprint18-ecg-clinical-workstation.integration.ts` | Pass |
-| `ecg-workspace-restoration.integration.ts` | Updated for Workstation 2.0 |
+| `sprint19-ecg-enterprise-hardening.integration.ts` | Pass |
+| `sprint18-ecg-clinical-workstation.integration.ts` | Pass (regression) |
 
 ## Playwright E2E
 
 | Spec | Tests | Result |
 |------|-------|--------|
+| `sprint19-ecg-enterprise-hardening.spec.ts` | 2 | Pass |
 | `sprint18-ecg-clinical-workstation.spec.ts` | 4 | Pass |
-| `sprint17-ecg-pro-viewer.spec.ts` | 4 | Pass |
-| `ecg-workspace-restoration.spec.ts` | 2 | Pass |
 
-## Sprint 18 E2E Coverage
+## Coverage Added
 
-- Grouped toolbar sections visible
-- View mode: monitor, waveform, compare
-- Playback timeline + clinical panel
-- Mini navigator + status bar regression
+- Report preview panel visibility
+- Measurement view mode
+- Canvas monitor element + monitor status bar
+- View mode chip navigation
 
-## Screenshots
+## Notes
 
-- `test-results/screenshots/sprint18-ecg-workstation.png`
+- Runtime recovery script dashboard greeting selector timed out (pre-existing); ECG workspace Playwright suite passes independently.

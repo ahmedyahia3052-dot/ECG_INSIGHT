@@ -10,8 +10,10 @@ const MODES: Array<{ id: EcgWorkstationViewMode; label: string }> = [
   { id: "processed", label: "Processed" },
   { id: "waveform", label: "Waveform" },
   { id: "monitor", label: "Monitor" },
+  { id: "measurement", label: "Measure" },
   { id: "compare", label: "Compare" },
   { id: "overlay", label: "Overlay" },
+  { id: "report", label: "Report" },
 ];
 
 export const EcgViewModeSwitcher = memo(function EcgViewModeSwitcher({

@@ -70,6 +70,7 @@ export function EcgImageCanvas({
   const effectiveCompare = compareMode || viewMode === "compare";
   const overlayForced = viewMode === "overlay" || (aiOverlay?.present.settings.enabled ?? false);
   const waveformOnly = viewMode === "waveform";
+  const measurementMode = viewMode === "measurement";
   const rectW = controls.viewport.imageWidth || 1600;
   const rectH = controls.viewport.imageHeight || 1200;
 
@@ -85,7 +86,7 @@ export function EcgImageCanvas({
   }
 
   return (
-    <View style={styles.host}>
+    <View style={styles.host} testID={measurementMode ? "sprint19-measurement-view" : undefined}>
       {effectiveCompare ? (
         <EcgCompareViewer
           accessToken={accessToken}

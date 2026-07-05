@@ -65,13 +65,15 @@ export const STANDARD_ECG_LEADS = ["I", "II", "III", "aVR", "aVL", "aVF", "V1", 
 
 export type EcgLeadId = (typeof STANDARD_ECG_LEADS)[number];
 
-/** Sprint 18 workstation view modes */
+/** Sprint 18+ workstation view modes */
 export type EcgWorkstationViewMode =
   | "compare"
   | "image"
+  | "measurement"
   | "monitor"
   | "overlay"
   | "processed"
+  | "report"
   | "waveform";
 
 export type EcgCompareLayoutMode = "overlay" | "side-by-side" | "split";

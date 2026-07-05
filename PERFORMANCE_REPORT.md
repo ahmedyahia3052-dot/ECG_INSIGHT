@@ -1,26 +1,24 @@
-# Performance Report — Sprint 18
+# Performance Report — Sprint 19
 
 **Date:** 2026-07-05
 
-## Monitor Mode
+## Monitor Engine
 
-- Live monitor uses `requestAnimationFrame` for sweep animation
-- FPS tracked via rolling 24-frame window; reported in status bar
-- Playwright validation observed 55–60 FPS on desktop Chromium
+| Metric | Before (Sprint 18) | After (Sprint 19) |
+|--------|-------------------|-------------------|
+| Renderer | SVG path rebuild | Canvas 2D + devicePixelRatio |
+| Target FPS | ~55–60 (RAF) | ~55–60 (RAF) |
+| High-DPI | viewBox scaling | Native canvas DPR scaling |
+| Flicker | Minimal | Minimal (full clear + redraw) |
 
-## Layout
+## Recommendations (Future)
 
-- Main viewer panel: 85% vertical space (up from 82%)
-- Bottom timeline/status: 15%
-- Dark canvas reduces visual repaint contrast; `willChange: transform` retained on viewer stack
+- WebGL batch renderer for simultaneous 12-lead monitor strips
+- Offscreen canvas worker for very long digitized traces
+- SharedArrayBuffer ring buffer for replay scrubbing
 
-## SVG Rendering
+## Runtime
 
-- Monitor path rebuilt per frame from digitized sample window (520 samples)
-- Waveform-only view uses native SVG paths (no raster overlays)
-- Compare overlay mode shares single `controls` transform (sync zoom/pan)
-
-## Recommendations
-
-- For 12-lead simultaneous monitor mode, consider WebGL path in future sprint
-- Playback scrubber is web-only (`input[type=range]`); native slider can be added later
+- Frontend `:8081` — healthy
+- API `:3002` — healthy
+- No memory leak patterns observed in monitor RAF loop (cancel on unmount)

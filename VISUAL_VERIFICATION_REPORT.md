@@ -1,37 +1,26 @@
-# Visual Verification Report — Sprint 18
+# Visual Verification Report — Sprint 19
 
-**Date:** 2026-07-05
+**Date:** 2026-07-05  
+**Route:** `/ecg-workspace`
 
-## Screenshots Captured
+## Screenshots
 
-| File | Description |
-|------|-------------|
-| `test-results/screenshots/sprint18-ecg-workstation.png` | Full workstation with toolbar, timeline, clinical panel |
-| `test-results/screenshots/sprint17-ecg-pro-viewer.png` | Zoom/navigator regression |
-| `test-results/screenshots/ecg-workspace-restored.png` | Enterprise workspace restoration |
+| File | Feature verified |
+|------|------------------|
+| `test-results/screenshots/sprint19-measurement-view.png` | Measurement view mode |
+| `test-results/screenshots/sprint19-monitor-canvas.png` | Canvas live monitor + status bar |
+| `test-results/screenshots/sprint18-ecg-workstation.png` | Sprint 18 baseline (regression) |
 
-## Verified Visible Features
+## Verified UI
 
-- [x] ECG Pro Clinical Workstation 2.0 title bar
-- [x] Grouped toolbar (FILE, VIEWER, LEADS, CLINICAL, VIEW)
-- [x] View mode switcher (Image / Processed / Waveform / Monitor / Compare / Overlay)
-- [x] Live monitor mode with green SVG sweep
-- [x] Waveform-only view on dark canvas
-- [x] Compare side-by-side and overlay layouts
-- [x] Playback timeline with scrubber
-- [x] Clinical right panel (measurements, AI, quality)
-- [x] Mini navigator (transparent)
-- [x] Bottom status bar with FPS, DPI, coordinates
-- [x] Left rail lead selector and lead focus
+- [x] Grouped toolbar visible, no clipping
+- [x] 8 view mode chips (including Report, Measure)
+- [x] Report preview panel with generate action
+- [x] Measurement view with image canvas
+- [x] Canvas monitor with green sweep trace
+- [x] Status bar shows Monitor Live/Frozen/Paused
+- [x] Clinical right panel, playback timeline, mini navigator
 
-## Before / After
+## Browser
 
-**Before (Sprint 17):** Flat dual-row text toolbar, light viewer canvas, stacked right-rail cards.
-
-**After (Sprint 18):** Dark hospital-grade shell, grouped icon toolbar, 85% viewer area, unified clinical panel, live monitor mode, playback timeline.
-
-## Runtime
-
-- Frontend: http://localhost:8081/ecg-workspace
-- API: http://localhost:3002
-- Both servers left running after validation
+Opened automatically at `http://localhost:8081/ecg-workspace`

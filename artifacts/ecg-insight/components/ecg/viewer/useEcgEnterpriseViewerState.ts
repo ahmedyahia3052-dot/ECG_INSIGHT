@@ -48,6 +48,7 @@ export function useEcgEnterpriseViewerState(input: {
       if (!compareCaseId && orderedStudies[0]) setCompareCaseId(orderedStudies[0].caseId);
     }
     if (mode === "waveform") setShowDigitizedWaveform(true);
+    if (mode === "measurement") setShowDigitizedWaveform(false);
   }, [compareCaseId, orderedStudies]);
 
   const toggleCompareMode = useCallback(() => {

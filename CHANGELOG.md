@@ -4,6 +4,25 @@ All notable changes to this project are documented in this file.
 
 ---
 
+## [Sprint19] — 2026-07-05
+
+### Added
+
+- **Report Preview** view mode in ECG workstation (`EcgReportPreviewPanel`) with generate, HTML preview, PDF export
+- **Measurement Mode** dedicated view chip with automatic caliper activation
+- **Canvas 2D monitor engine** (`ecgMonitorCanvas.ts`) for high-DPI live waveform rendering on web
+- **Keyboard shortcuts** via `useEcgWorkstationShortcuts` (Ctrl+O, Ctrl+U, M, R, G)
+- Monitor state in status bar (Live / Frozen / Paused)
+- Tests: `sprint19-ecg-enterprise-hardening.integration.ts`, `sprint19-ecg-enterprise-hardening.spec.ts`
+
+### Changed
+
+- `EcgLiveMonitorView` — Canvas rendering on web, SVG fallback on native
+- `EcgWorkstationToolbar` — Open navigates to case list; Report and Measure Mode actions
+- View modes expanded to 8: Image, Processed, Waveform, Monitor, Measurement, Compare, Overlay, Report
+
+---
+
 ## [Sprint18] — 2026-07-05
 
 ### Added

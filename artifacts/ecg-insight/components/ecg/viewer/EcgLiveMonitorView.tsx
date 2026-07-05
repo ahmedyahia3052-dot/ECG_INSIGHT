@@ -1,10 +1,11 @@
-import React, { memo, useEffect, useMemo, useRef, useState } from "react";
+import React, { createElement, memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import Svg, { Circle, Line, Path, Rect, Text as SvgText } from "react-native-svg";
 
 import { medicalTheme, PrimaryButton } from "@/components/enterprise/EnterpriseUI";
 import type { DigitalEcgLead } from "@/services/ecgProcessing";
 
+import { drawMonitorCanvas } from "./ecgMonitorCanvas";
 import { buildScrollingMonitorPath, durationMsForLead, msToSampleIndex } from "./ecgMonitorPath";
 import type { EcgLeadId } from "./types";
 import type { EcgWaveformPlaybackState } from "./useEcgWaveformPlayback";
@@ -12,6 +13,56 @@ import type { EcgViewerControls } from "./useEcgViewerControls";
 
 const CANVAS_W = 920;
 const CANVAS_H = 280;
+
+function WebMonitorCanvas({
+  alarmTone,
+  gainScale,
+  height,
+  lead,
+  offsetIndex,
+  playback,
+  width,
+}: {
+  alarmTone: boolean;
+  gainScale: number;
+  height: number;
+  lead: DigitalEcgLead;
+  offsetIndex: number;
+  playback: EcgWaveformPlaybackState;
+  width: number;
+}) {
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+
+  const paint = useCallback(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = Math.floor(width * dpr);
+    canvas.height = Math.floor(height * dpr);
+    canvas.style.width = `${width}px`;
+    canvas.style.height = `${height}px`;
+    drawMonitorCanvas(ctx, lead, width, height, {
+      alarmTone,
+      frozen: playback.frozen,
+      gainScale,
+      isPlaying: playback.isPlaying,
+      offsetIndex,
+      playheadMs: playback.playheadMs,
+    });
+  }, [alarmTone, gainScale, height, lead, offsetIndex, playback.frozen, playback.isPlaying, playback.playheadMs, width]);
+
+  useEffect(() => {
+    paint();
+  }, [paint]);
+
+  return createElement("canvas", {
+    "data-testid": "sprint19-monitor-canvas",
+    ref: canvasRef,
+    style: { display: "block", height: "100%", width: "100%" },
+  });
+}
 
 export const EcgLiveMonitorView = memo(function EcgLiveMonitorView({
   controls,
@@ -35,6 +86,7 @@ export const EcgLiveMonitorView = memo(function EcgLiveMonitorView({
   selectedLead: EcgLeadId;
 }) {
   const [offsetIndex, setOffsetIndex] = useState(0);
+  const [canvasSize, setCanvasSize] = useState({ height: CANVAS_H, width: CANVAS_W });
   const frameTimes = useRef<number[]>([]);
   const gainScale = controls.grid.gain / 10;
 
@@ -68,13 +120,14 @@ export const EcgLiveMonitorView = memo(function EcgLiveMonitorView({
 
   const sweepX = lead ? 40 + ((offsetIndex % 520) / 520) * (CANVAS_W - 80) : 0;
   const alarmTone = heartRate != null && (heartRate < 50 || heartRate > 120);
+  const useWebCanvas = typeof document !== "undefined";
 
   if (!lead) {
     return (
       <View style={styles.empty} testID="sprint18-live-monitor">
         <Text style={styles.emptyTitle}>Live Monitor — Lead {selectedLead}</Text>
         <Text style={styles.emptyBody}>
-          {isDigitizing ? "Digitizing ECG signal for live monitor rendering…" : "Digitize this ECG to render a real-time SVG waveform monitor."}
+          {isDigitizing ? "Digitizing ECG signal for live monitor rendering…" : "Digitize this ECG to render a real-time canvas waveform monitor."}
         </Text>
         {onDigitize ? <PrimaryButton label={isDigitizing ? "Digitizing…" : "Run Digitization"} onPress={onDigitize} variant="primary" /> : null}
       </View>
@@ -88,23 +141,43 @@ export const EcgLiveMonitorView = memo(function EcgLiveMonitorView({
         <Text style={[styles.metric, alarmTone && styles.metricAlarm]}>HR {heartRate ?? "--"} BPM</Text>
         <Text style={styles.metric}>{rhythm ?? "Rhythm pending"}</Text>
         <Text style={styles.metric}>{controls.grid.speed} mm/s · {controls.grid.gain} mm/mV</Text>
+        <Text style={styles.metric}>{playback.frozen ? "FROZEN" : playback.isPlaying ? "LIVE" : "PAUSED"}</Text>
       </View>
-      <Pressable onPress={playback.togglePlay} style={styles.canvasHost}>
-        <Svg height={CANVAS_H} viewBox={`0 0 ${CANVAS_W} ${CANVAS_H}`} width="100%">
-          <Rect fill="#020617" height={CANVAS_H} width={CANVAS_W} />
-          {Array.from({ length: 19 }).map((_, index) => (
-            <Line key={`v-${index}`} stroke="#064E3B" strokeWidth={0.45} x1={index * 48} x2={index * 48} y1={0} y2={CANVAS_H} />
-          ))}
-          {Array.from({ length: 6 }).map((_, index) => (
-            <Line key={`h-${index}`} stroke="#064E3B" strokeWidth={0.45} x1={0} x2={CANVAS_W} y1={index * 48} y2={index * 48} />
-          ))}
-          {path ? <Path d={path} fill="none" stroke={alarmTone ? "#FACC15" : "#22C55E"} strokeLinecap="round" strokeWidth={2.6} transform="translate(30 18)" /> : null}
-          <Line stroke="#DCFCE7" strokeOpacity={playback.frozen ? 0.35 : 0.92} strokeWidth={2} x1={sweepX} x2={sweepX} y1={8} y2={CANVAS_H - 8} />
-          <Circle cx={sweepX} cy={36} fill={playback.frozen ? "#FACC15" : alarmTone ? "#F87171" : "#22C55E"} r={5} />
-          <SvgText fill="#86EFAC" fontSize={12} x={32} y={CANVAS_H - 10}>
-            {playback.frozen ? "FROZEN" : playback.isPlaying ? "LIVE SWEEP" : "PAUSED"} · {Math.round(playback.playheadMs)} ms / {Math.round(durationMsForLead(lead))} ms
-          </SvgText>
-        </Svg>
+      <Pressable
+        onLayout={(event) => {
+          const { height, width } = event.nativeEvent.layout;
+          if (width > 0 && height > 0) setCanvasSize({ height: Math.max(height, CANVAS_H), width: Math.max(width, 640) });
+        }}
+        onPress={playback.togglePlay}
+        style={styles.canvasHost}
+      >
+        {useWebCanvas ? (
+          <WebMonitorCanvas
+            alarmTone={alarmTone}
+            gainScale={gainScale}
+            height={canvasSize.height}
+            lead={lead}
+            offsetIndex={offsetIndex}
+            playback={playback}
+            width={canvasSize.width}
+          />
+        ) : (
+          <Svg height={CANVAS_H} viewBox={`0 0 ${CANVAS_W} ${CANVAS_H}`} width="100%">
+            <Rect fill="#020617" height={CANVAS_H} width={CANVAS_W} />
+            {Array.from({ length: 19 }).map((_, index) => (
+              <Line key={`v-${index}`} stroke="#064E3B" strokeWidth={0.45} x1={index * 48} x2={index * 48} y1={0} y2={CANVAS_H} />
+            ))}
+            {Array.from({ length: 6 }).map((_, index) => (
+              <Line key={`h-${index}`} stroke="#064E3B" strokeWidth={0.45} x1={0} x2={CANVAS_W} y1={index * 48} y2={index * 48} />
+            ))}
+            {path ? <Path d={path} fill="none" stroke={alarmTone ? "#FACC15" : "#22C55E"} strokeLinecap="round" strokeWidth={2.6} transform="translate(30 18)" /> : null}
+            <Line stroke="#DCFCE7" strokeOpacity={playback.frozen ? 0.35 : 0.92} strokeWidth={2} x1={sweepX} x2={sweepX} y1={8} y2={CANVAS_H - 8} />
+            <Circle cx={sweepX} cy={36} fill={playback.frozen ? "#FACC15" : alarmTone ? "#F87171" : "#22C55E"} r={5} />
+            <SvgText fill="#86EFAC" fontSize={12} x={32} y={CANVAS_H - 10}>
+              {playback.frozen ? "FROZEN" : playback.isPlaying ? "LIVE SWEEP" : "PAUSED"} · {Math.round(playback.playheadMs)} ms / {Math.round(durationMsForLead(lead))} ms
+            </SvgText>
+          </Svg>
+        )}
       </Pressable>
       <View style={styles.controls}>
         <PrimaryButton label={playback.isPlaying ? "Pause" : "Play"} onPress={playback.togglePlay} variant="primary" />

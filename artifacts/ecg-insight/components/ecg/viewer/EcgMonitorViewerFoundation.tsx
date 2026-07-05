@@ -20,6 +20,7 @@ import { durationMsForLead } from "./ecgMonitorPath";
 import { EcgClinicalRightPanel } from "./EcgClinicalRightPanel";
 import { EcgImageCanvas } from "./EcgImageCanvas";
 import { EcgLiveMonitorView } from "./EcgLiveMonitorView";
+import { EcgReportPreviewPanel } from "./EcgReportPreviewPanel";
 import { EcgRhythmStripPanel } from "./EcgRhythmStripPanel";
 import { EcgViewModeSwitcher } from "./EcgViewModeSwitcher";
 import { EcgViewerLeftRail } from "./EcgViewerLeftRail";
@@ -37,6 +38,7 @@ import { useEcgMeasurementWorkspace } from "./useEcgMeasurementWorkspace";
 import { useEcgViewerControls } from "./useEcgViewerControls";
 import { useEcgViewerPersistence } from "./useEcgViewerPersistence";
 import { useEcgWaveformPlayback } from "./useEcgWaveformPlayback";
+import { useEcgWorkstationShortcuts } from "./useEcgWorkstationShortcuts";
 import { estimateImageDpi } from "./useViewerRuntimeMetrics";
 
 function absoluteUrl(path?: string | null) {
@@ -258,10 +260,32 @@ export function EcgMonitorViewerFoundation({
   }, [aiOverlay, enterprise.viewMode]);
 
   useEffect(() => {
+    if (enterprise.viewMode === "measurement") {
+      workspace.setToolMode("measurement");
+    }
+  }, [enterprise.viewMode, workspace]);
+
+  useEcgWorkstationShortcuts({
+    controls,
+    onOpenCases: () => router.push("/ecg-cases" as never),
+    onUpload: () => router.push("/upload-ecg" as never),
+    onViewModeChange: enterprise.setViewMode,
+    workspace,
+  });
+
+  useEffect(() => {
     scheduleSave();
   }, [aiOverlay.present, controls.adjustments, controls.grid, controls.transform, scheduleSave, workspace.present]);
 
   const waveFps = enterprise.viewMode === "monitor" ? renderFps : renderFps;
+  const monitorState =
+    enterprise.viewMode === "monitor"
+      ? playback.frozen
+        ? "Frozen"
+        : playback.isPlaying
+          ? "Live"
+          : "Paused"
+      : undefined;
 
   return (
     <View style={[styles.root, controls.fullscreen && styles.fullscreenRoot]} testID="sprint13-ecg-monitor-ready" nativeID="sprint18-ecg-workstation-ready">
@@ -291,6 +315,7 @@ export function EcgMonitorViewerFoundation({
         onExportPng={() => void exportPng()}
         onLeadCycle={cycleLead}
         onLeadLayoutChange={enterprise.setLeadLayout}
+        onOpenCases={() => router.push("/ecg-cases" as never)}
         onOpenSettings={() => enterprise.setSettingsVisible(true)}
         onRhythmStrip={() => enterprise.setViewMode("monitor")}
         onToggleLeadFocus={() => enterprise.setLeadFocusMode((value) => !value)}
@@ -336,6 +361,7 @@ export function EcgMonitorViewerFoundation({
                 imageSize={`${controls.viewport.imageWidth}×${controls.viewport.imageHeight}`}
                 lead={selectedLead}
                 measurementCount={workspace.present.measurements.filter((item) => !item.hidden).length}
+                monitorState={monitorState}
                 paperSpeed={controls.grid.speed}
                 signalQuality={
                   digitalEcg?.calibration?.confidence != null
@@ -350,7 +376,14 @@ export function EcgMonitorViewerFoundation({
             </View>
           }
           center={
-            enterprise.viewMode === "monitor" ? (
+            enterprise.viewMode === "report" ? (
+              <EcgReportPreviewPanel
+                accessToken={token}
+                caseId={ecgCase.id}
+                caseNumber={ecgCase.caseNumber ?? ecgCase.caseId}
+                patientName={patientDisplayName(patient)}
+              />
+            ) : enterprise.viewMode === "monitor" ? (
               <EcgLiveMonitorView
                 controls={controls}
                 heartRate={study.heartRate ?? undefined}

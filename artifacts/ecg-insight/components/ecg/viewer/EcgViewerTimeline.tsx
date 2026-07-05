@@ -57,6 +57,7 @@ export function EcgViewerStatusBar({
   imageSize,
   lead,
   measurementCount,
+  monitorState,
   paperSpeed,
   signalQuality,
   toolMode,
@@ -77,6 +78,7 @@ export function EcgViewerStatusBar({
   imageSize?: string;
   lead?: string;
   measurementCount?: number;
+  monitorState?: string;
   paperSpeed?: number;
   signalQuality?: string;
   toolMode?: string;
@@ -94,6 +96,7 @@ export function EcgViewerStatusBar({
       {digitizationQuality ? <Text style={styles.statusText} testID="sprint17-status-digitization">Digitization {digitizationQuality}</Text> : null}
       {typeof imageDpi === "number" ? <Text style={styles.statusText} testID="sprint17-status-dpi">DPI {imageDpi}</Text> : null}
       {imageSize ? <Text style={styles.statusText} testID="sprint17-status-size">Size {imageSize}</Text> : null}
+      {monitorState ? <Text style={styles.statusText} testID="sprint19-status-monitor">Monitor {monitorState}</Text> : null}
       {typeof fps === "number" ? <Text style={styles.statusText} testID="sprint17-status-fps">FPS {fps}</Text> : null}
       {coordinates ? <Text style={styles.statusText} testID="sprint17-status-coords">Coords {coordinates}</Text> : null}
       {fitMode && fitMode !== "none" ? <Text style={styles.statusText}>Fit {fitMode}</Text> : null}

@@ -81,6 +81,7 @@ export const EcgWorkstationToolbar = memo(function EcgWorkstationToolbar({
   onExportPng,
   onLeadCycle,
   onLeadLayoutChange,
+  onOpenCases,
   onOpenSettings,
   onRhythmStrip,
   onToggleLeadFocus,
@@ -107,6 +108,7 @@ export const EcgWorkstationToolbar = memo(function EcgWorkstationToolbar({
   onExportPng?: () => void;
   onLeadCycle?: () => void;
   onLeadLayoutChange?: (layout: EcgLeadLayoutMode) => void;
+  onOpenCases?: () => void;
   onOpenSettings?: () => void;
   onRhythmStrip?: () => void;
   onToggleLeadFocus?: () => void;
@@ -126,7 +128,7 @@ export const EcgWorkstationToolbar = memo(function EcgWorkstationToolbar({
       id: "file",
       label: "FILE",
       actions: [
-        { icon: "folder", label: "Open", onPress: onCapture, shortcut: "Ctrl+O" },
+        { icon: "folder", label: "Open", onPress: onOpenCases ?? onCapture, shortcut: "Ctrl+O" },
         { icon: "upload", label: "Upload", onPress: onUpload, shortcut: "Ctrl+U" },
         { icon: "camera", label: "Capture", onPress: onCapture },
         { icon: "file-text", label: "PDF", onPress: onExportPdf, testID: "sprint18-export-pdf" },
@@ -179,6 +181,8 @@ export const EcgWorkstationToolbar = memo(function EcgWorkstationToolbar({
       id: "clinical",
       label: "CLINICAL",
       actions: [
+        { active: viewMode === "measurement", icon: "edit-3", label: "Measure Mode", onPress: () => onViewModeChange?.("measurement") },
+        { active: viewMode === "report", icon: "file-text", label: "Report", onPress: () => onViewModeChange?.("report"), shortcut: "R" },
         { active: measureActive, icon: "edit-3", label: "Measure", onPress: () => workspace?.setToolMode(measureActive ? "select" : "measurement") },
         { active: workspace?.present.toolMode === "caliper", icon: "maximize", label: "Caliper", onPress: () => workspace?.setToolMode("caliper") },
         { active: compareMode, icon: "columns", label: "Compare", onPress: onCompareToggle },
