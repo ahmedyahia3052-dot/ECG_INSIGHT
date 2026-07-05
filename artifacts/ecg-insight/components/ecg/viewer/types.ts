@@ -67,6 +67,7 @@ export type EcgLeadId = (typeof STANDARD_ECG_LEADS)[number];
 
 /** Sprint 18+ workstation view modes */
 export type EcgWorkstationViewMode =
+  | "ai-review"
   | "compare"
   | "image"
   | "measurement"

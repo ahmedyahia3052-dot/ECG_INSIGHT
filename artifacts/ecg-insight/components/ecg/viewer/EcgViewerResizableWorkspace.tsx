@@ -89,19 +89,19 @@ function WebWorkspace({
 
   return (
     <Group id="ecg-monitor-workspace" orientation="vertical" style={styles.webRoot}>
-      <Panel defaultSize={85} id="ecg-monitor-main" minSize={60}>
+      <Panel defaultSize={88} id="ecg-monitor-main" minSize={62}>
         <Group orientation="horizontal" style={styles.webRoot}>
-          <Panel defaultSize={layout.leftSize ?? 20} id="ecg-monitor-left" maxSize={35} minSize={14}>
+          <Panel defaultSize={layout.leftSize ?? 18} id="ecg-monitor-left" maxSize={28} minSize={14}>
             <View style={styles.panelFill}>{left}</View>
           </Panel>
           <Separator style={styles.separator} />
-          <Panel defaultSize={layout.rightCollapsed ? 80 : 56} id="ecg-monitor-center" minSize={35}>
+          <Panel defaultSize={layout.rightCollapsed ? 82 : 58} id="ecg-monitor-center" minSize={40}>
             <View style={styles.panelFill}>{center}</View>
           </Panel>
           {!layout.rightCollapsed ? (
             <>
               <Separator style={styles.separator} />
-              <Panel defaultSize={layout.rightSize ?? 24} id="ecg-monitor-right" maxSize={35} minSize={14}>
+              <Panel defaultSize={layout.rightSize ?? 22} id="ecg-monitor-right" maxSize={30} minSize={18}>
                 <View style={styles.panelFill}>{right}</View>
               </Panel>
             </>
@@ -109,7 +109,7 @@ function WebWorkspace({
         </Group>
       </Panel>
       <Separator style={styles.separatorHorizontal} />
-      <Panel defaultSize={15} id="ecg-monitor-bottom" maxSize={30} minSize={10}>
+      <Panel defaultSize={12} id="ecg-monitor-bottom" maxSize={24} minSize={8}>
         <View style={styles.panelFill}>{bottom}</View>
       </Panel>
     </Group>

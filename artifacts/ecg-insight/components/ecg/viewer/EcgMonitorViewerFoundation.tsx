@@ -14,10 +14,10 @@ import { buildSegmentAlignedDigitizedWaveformLeads } from "./ecgDigitizedWavefor
 
 import { detectImageFormat } from "./ecgImageEngine";
 import { exportMeasurements } from "./ecgMeasurementEngine";
-import { formatImageResolution } from "./ecgViewerEngine";
 import { exportEcgViewerPng } from "./ecgViewerExport";
 import { durationMsForLead } from "./ecgMonitorPath";
 import { EcgClinicalRightPanel } from "./EcgClinicalRightPanel";
+import { EcgEnterpriseStatusBar } from "./EcgEnterpriseStatusBar";
 import { EcgImageCanvas } from "./EcgImageCanvas";
 import { EcgLiveMonitorView } from "./EcgLiveMonitorView";
 import { EcgReportPreviewPanel } from "./EcgReportPreviewPanel";
@@ -26,7 +26,7 @@ import { EcgViewModeSwitcher } from "./EcgViewModeSwitcher";
 import { EcgViewerLeftRail } from "./EcgViewerLeftRail";
 import { EcgViewerResizableWorkspace } from "./EcgViewerResizableWorkspace";
 import { EcgViewerSettingsPanel } from "./EcgViewerSettingsPanel";
-import { EcgViewerStatusBar, EcgViewerTimeline } from "./EcgViewerTimeline";
+import { EcgViewerTimeline } from "./EcgViewerTimeline";
 import { EcgWaveformPlaybackTimeline } from "./EcgWaveformPlaybackTimeline";
 import { EcgWorkstationToolbar } from "./EcgWorkstationToolbar";
 import type { EcgLeadId, EcgViewerPreviousStudy } from "./types";
@@ -39,7 +39,7 @@ import { useEcgViewerControls } from "./useEcgViewerControls";
 import { useEcgViewerPersistence } from "./useEcgViewerPersistence";
 import { useEcgWaveformPlayback } from "./useEcgWaveformPlayback";
 import { useEcgWorkstationShortcuts } from "./useEcgWorkstationShortcuts";
-import { estimateImageDpi } from "./useViewerRuntimeMetrics";
+import { useEnterpriseStatusMetrics } from "./useEnterpriseStatusMetrics";
 
 function absoluteUrl(path?: string | null) {
   if (!path) return undefined;
@@ -254,8 +254,8 @@ export function EcgMonitorViewerFoundation({
   }, [controls.setGrid, digitalEcg?.calibration]);
 
   useEffect(() => {
-    if (enterprise.viewMode === "overlay") {
-      aiOverlay.setSettings({ enabled: true, showAnnotations: true, showLabels: true });
+    if (enterprise.viewMode === "overlay" || enterprise.viewMode === "ai-review") {
+      aiOverlay.setSettings({ enabled: true, showAnnotations: true, showHeatmap: true, showLabels: true });
     }
   }, [aiOverlay, enterprise.viewMode]);
 
@@ -287,11 +287,17 @@ export function EcgMonitorViewerFoundation({
           : "Paused"
       : undefined;
 
+  const statusMetrics = useEnterpriseStatusMetrics({
+    aiOverlayEnabled: aiOverlay.present.settings.enabled,
+    annotationCount: aiOverlay.present.annotations.filter((item) => item.visible).length,
+    viewMode: enterprise.viewMode,
+  });
+
   return (
-    <View style={[styles.root, controls.fullscreen && styles.fullscreenRoot]} testID="sprint13-ecg-monitor-ready" nativeID="sprint18-ecg-workstation-ready">
+    <View style={[styles.root, controls.fullscreen && styles.fullscreenRoot]} testID="sprint13-ecg-monitor-ready" nativeID="sprint21-ecg-workstation-ready">
       <View style={styles.topBar}>
         <View style={styles.titleBlock}>
-          <Text style={styles.title}>ECG Pro Clinical Workstation 2.0</Text>
+          <Text style={styles.title}>ECG Insight Enterprise Workstation</Text>
           <Text style={styles.subtitle}>
             {patientDisplayName(patient)} · {ecgCase.caseNumber ?? ecgCase.caseId} · Lead {selectedLead}
           </Text>
@@ -322,6 +328,7 @@ export function EcgMonitorViewerFoundation({
         onToggleTheme={enterprise.toggleWorkstationTheme}
         onUpload={() => router.push("/upload-ecg" as never)}
         onViewModeChange={enterprise.setViewMode}
+        recentCaseId={ecgCase.id}
         selectedLead={selectedLead}
         showDigitizedWaveform={enterprise.showDigitizedWaveform}
         viewMode={enterprise.viewMode}
@@ -337,9 +344,9 @@ export function EcgMonitorViewerFoundation({
                 <EcgRhythmStripPanel controls={controls} leadWaveform={rhythmLead} onLeadChange={setSelectedLead} selectedLead={selectedLead} />
               ) : null}
               <EcgViewerTimeline currentStudy={study} onSelect={openStudy} studies={previousStudies} />
-              <EcgViewerStatusBar
-                aiOverlayEnabled={aiOverlay.present.settings.enabled}
-                annotationCount={aiOverlay.present.annotations.filter((item) => item.visible).length}
+              <EcgEnterpriseStatusBar
+                aiStatus={statusMetrics.aiStatus}
+                backendStatus={statusMetrics.backendStatus}
                 coordinates={pointerCoords ? `${Math.round(pointerCoords.imageX)},${Math.round(pointerCoords.imageY)}` : undefined}
                 digitizationQuality={
                   digitalEcg?.quality?.score != null
@@ -350,19 +357,14 @@ export function EcgMonitorViewerFoundation({
                         ? "Available"
                         : "Pending"
                 }
-                fileType={study.fileType}
-                fitMode={controls.fitMode}
                 fps={waveFps}
                 gain={controls.grid.gain}
-                gridOpacity={controls.grid.opacity}
-                gridVisible={controls.grid.visible}
-                imageDpi={estimateImageDpi(controls.viewport.imageWidth, controls.viewport.imageHeight, controls.transform.zoom)}
-                imageResolution={formatImageResolution(controls.viewport.imageWidth, controls.viewport.imageHeight)}
-                imageSize={`${controls.viewport.imageWidth}×${controls.viewport.imageHeight}`}
+                gpuRenderer={statusMetrics.gpuRenderer}
                 lead={selectedLead}
-                measurementCount={workspace.present.measurements.filter((item) => !item.hidden).length}
+                memory={statusMetrics.memory}
                 monitorState={monitorState}
                 paperSpeed={controls.grid.speed}
+                renderTimeMs={statusMetrics.renderTimeMs}
                 signalQuality={
                   digitalEcg?.calibration?.confidence != null
                     ? `${Math.round(digitalEcg.calibration.confidence * 100)}%`
@@ -370,7 +372,7 @@ export function EcgMonitorViewerFoundation({
                       ? `${Math.round(analysis.confidenceScore * 100)}%`
                       : "Pending"
                 }
-                toolMode={workspace.present.toolMode}
+                transport={statusMetrics.transport}
                 zoom={controls.transform.zoom}
               />
             </View>
@@ -382,6 +384,24 @@ export function EcgMonitorViewerFoundation({
                 caseId={ecgCase.id}
                 caseNumber={ecgCase.caseNumber ?? ecgCase.caseId}
                 patientName={patientDisplayName(patient)}
+              />
+            ) : enterprise.viewMode === "ai-review" ? (
+              <EcgImageCanvas
+                accessToken={token}
+                activeLead={selectedLead}
+                aiOverlay={aiOverlay}
+                controls={controls}
+                currentLabel={study.caseNumber ?? "Current Study"}
+                digitizedLeads={digitizedLeads}
+                explainability={explainability}
+                imageUrl={imageUrl}
+                onPointerMove={setPointerCoords}
+                onFpsUpdate={setRenderFps}
+                pdfUrl={pdfUrl}
+                processedImageUrl={processedImageUrl}
+                showDigitizedWaveform={false}
+                viewMode="ai-review"
+                workspace={workspace}
               />
             ) : enterprise.viewMode === "monitor" ? (
               <EcgLiveMonitorView
@@ -443,12 +463,16 @@ export function EcgMonitorViewerFoundation({
             <EcgClinicalRightPanel
               aiOverlay={aiOverlay}
               analysis={analysis}
+              clinicalNotes={ecgCase.clinicalNotes ?? ecgCase.clinicalComments}
               digitalEcg={digitalEcg}
               digitalEcgLoading={digitalEcgQuery.isLoading || digitizeMutation.isPending}
               findings={findings}
               imageHeight={controls.viewport.imageHeight}
               imageWidth={controls.viewport.imageWidth}
               onDigitize={() => digitizeMutation.mutate()}
+              onOpenReview={() => router.push(`/ecg-cases/${ecgCase.id}/review` as never)}
+              patient={{ age: patient.age, gender: patient.gender, id: patient.id, name: patientDisplayName(patient) }}
+              studyDate={study.studyDate}
               workspace={workspace}
             />
           }
@@ -468,10 +492,10 @@ const styles = StyleSheet.create({
     padding: 8,
     zIndex: 50,
   },
-  root: { backgroundColor: "#040E1A", flex: 1, gap: 6, minHeight: 720, padding: 6 },
+  root: { backgroundColor: "#040E1A", flex: 1, gap: 6, minHeight: 720, overflow: "hidden", padding: 6 },
   subtitle: { color: medicalTheme.muted, fontSize: 12, fontWeight: "700" },
   title: { color: medicalTheme.text, fontSize: 16, fontWeight: "900" },
   titleBlock: { flex: 1, gap: 2, minWidth: 220 },
   topBar: { alignItems: "center", flexDirection: "row", flexWrap: "wrap", gap: 10, justifyContent: "space-between" },
-  workspace: { flex: 1, minHeight: 520 },
+  workspace: { flex: 1, minHeight: 0, overflow: "hidden" },
 });

@@ -4,6 +4,27 @@ All notable changes to this project are documented in this file.
 
 ---
 
+## [Sprint21] — 2026-07-06
+
+### Added
+
+- **ECG Insight Enterprise Workstation** branding and UX revolution at `/ecg-workspace`
+- Toolbar groups: FILE, VIEW, ECG, MEASURE, AI, EXPORT
+- AI Review clinical mode (`ai-review`) with heatmap + explainability
+- `EcgEnterpriseStatusBar` with memory, GPU renderer, render time, backend health
+- Monitor canvas glow + R-peak beat markers (`ecgMonitorBeatMarkers.ts`)
+- Clinical sidebar: patient card, warnings, clinical notes, source provenance
+- `useEnterpriseStatusMetrics.ts` runtime metrics hook
+
+### Changed
+
+- View mode switcher: Original, Processed, Waveform, Monitor, AI Review, Compare
+- Layout: 88% viewer / 12% bottom panel
+- `EcgClinicalRightPanel` full redesign
+- `EcgWorkstationToolbar` complete regroup per enterprise protocol
+
+---
+
 ## [Sprint19] — 2026-07-05
 
 ### Added

@@ -5,7 +5,7 @@ async function openEcgWorkspace(page: import("@playwright/test").Page, caseId: s
   await page.goto(`/ecg-workspace?caseId=${caseId}`, { waitUntil: "domcontentloaded" });
   await expect(page.getByTestId("ecg-workspace-loading")).toHaveCount(0, { timeout: 45_000 });
   await expect(page.getByTestId("ecg-enterprise-workspace-ready")).toBeVisible({ timeout: 45_000 });
-  await expect(page.getByTestId("sprint18-ecg-workstation-toolbar")).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByTestId("sprint21-ecg-workstation-toolbar").or(page.getByTestId("sprint18-ecg-workstation-toolbar"))).toBeVisible({ timeout: 20_000 });
 }
 
 test.describe("Sprint 19 ECG Enterprise Hardening @sprint19", () => {
@@ -29,16 +29,16 @@ test.describe("Sprint 19 ECG Enterprise Hardening @sprint19", () => {
 
   test("report preview and measurement view modes visible", async ({ page }) => {
     await openEcgWorkspace(page, caseId);
-    await page.getByTestId("sprint18-view-mode-report").click();
+    await page.getByTestId("sprint21-open-report").click();
     await expect(page.getByTestId("sprint19-report-preview-panel")).toBeVisible();
-    await page.getByTestId("sprint18-view-mode-measurement").click();
+    await page.getByTestId("sprint21-measurement-mode").click();
     await expect(page.getByTestId("sprint19-measurement-view")).toBeVisible();
     await page.screenshot({ fullPage: true, path: "test-results/screenshots/sprint19-measurement-view.png" });
   });
 
   test("canvas monitor renders with monitor status", async ({ page }) => {
     await openEcgWorkspace(page, caseId);
-    await page.getByTestId("sprint18-view-mode-monitor").click();
+    await page.getByTestId("sprint21-view-mode-monitor").click();
     await expect(page.getByTestId("sprint18-live-monitor")).toBeVisible();
     await expect(page.getByTestId("sprint19-monitor-canvas")).toBeVisible();
     await expect(page.getByTestId("sprint19-status-monitor")).toBeVisible();

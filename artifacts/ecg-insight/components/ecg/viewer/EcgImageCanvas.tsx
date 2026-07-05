@@ -68,7 +68,7 @@ export function EcgImageCanvas({
   const sourceUrl = viewMode === "processed" && processedImageUrl ? processedImageUrl : imageUrl;
   const asset = useAuthenticatedEcgAsset(sourceUrl, accessToken);
   const effectiveCompare = compareMode || viewMode === "compare";
-  const overlayForced = viewMode === "overlay" || (aiOverlay?.present.settings.enabled ?? false);
+  const overlayForced = viewMode === "overlay" || viewMode === "ai-review" || (aiOverlay?.present.settings.enabled ?? false);
   const waveformOnly = viewMode === "waveform";
   const measurementMode = viewMode === "measurement";
   const rectW = controls.viewport.imageWidth || 1600;
@@ -86,7 +86,7 @@ export function EcgImageCanvas({
   }
 
   return (
-    <View style={styles.host} testID={measurementMode ? "sprint19-measurement-view" : undefined}>
+    <View style={styles.host} testID={measurementMode ? "sprint19-measurement-view" : viewMode === "ai-review" ? "sprint21-ai-review-view" : undefined}>
       {effectiveCompare ? (
         <EcgCompareViewer
           accessToken={accessToken}

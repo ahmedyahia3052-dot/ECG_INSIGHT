@@ -1,5 +1,6 @@
 import type { DigitalEcgLead } from "@/services/ecgProcessing";
 
+import { beatMarkerPositions } from "./ecgMonitorBeatMarkers";
 import { msToSampleIndex } from "./ecgMonitorPath";
 
 export type MonitorCanvasState = {
@@ -52,9 +53,11 @@ export function drawMonitorCanvas(
     const traceW = width - padX * 2;
     const traceH = height - padY * 2;
 
+    ctx.shadowBlur = 14;
+    ctx.shadowColor = state.alarmTone ? "rgba(250,204,21,0.85)" : "rgba(34,197,94,0.75)";
     ctx.beginPath();
     ctx.strokeStyle = traceColor;
-    ctx.lineWidth = 2.4;
+    ctx.lineWidth = 2.6;
     ctx.lineJoin = "round";
     ctx.lineCap = "round";
     slice.forEach((sample, index) => {
@@ -64,6 +67,19 @@ export function drawMonitorCanvas(
       else ctx.lineTo(x, y);
     });
     ctx.stroke();
+    ctx.shadowBlur = 0;
+
+    const markers = beatMarkerPositions(lead, width, height, state.gainScale, state.offsetIndex);
+    markers.forEach((marker) => {
+      ctx.fillStyle = "rgba(250,204,21,0.95)";
+      ctx.beginPath();
+      ctx.moveTo(marker.x, marker.y - 7);
+      ctx.lineTo(marker.x + 5, marker.y);
+      ctx.lineTo(marker.x, marker.y + 7);
+      ctx.lineTo(marker.x - 5, marker.y);
+      ctx.closePath();
+      ctx.fill();
+    });
 
     const sweepX = padX + ((state.offsetIndex % 520) / 520) * traceW;
     ctx.strokeStyle = "rgba(220,252,231,0.92)";

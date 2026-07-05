@@ -39,6 +39,11 @@ export function useEcgWorkstationShortcuts(input: {
         input.onViewModeChange?.("report");
         return;
       }
+      if (!event.ctrlKey && !event.metaKey && event.key.toLowerCase() === "a") {
+        event.preventDefault();
+        input.onViewModeChange?.("ai-review");
+        return;
+      }
       if (!event.ctrlKey && !event.metaKey && event.key.toLowerCase() === "g") {
         event.preventDefault();
         input.controls.toggleGrid();
