@@ -65,6 +65,21 @@ export const STANDARD_ECG_LEADS = ["I", "II", "III", "aVR", "aVL", "aVF", "V1", 
 
 export type EcgLeadId = (typeof STANDARD_ECG_LEADS)[number];
 
+/** Sprint 18 workstation view modes */
+export type EcgWorkstationViewMode =
+  | "compare"
+  | "image"
+  | "monitor"
+  | "overlay"
+  | "processed"
+  | "waveform";
+
+export type EcgCompareLayoutMode = "overlay" | "side-by-side" | "split";
+
+export type EcgLeadLayoutMode = "12-lead" | "rhythm" | "single";
+
+export type EcgWorkstationTheme = "clinical" | "dark";
+
 export const DEFAULT_ADJUSTMENTS: EcgImageAdjustments = {
   brightness: 100,
   contrast: 100,

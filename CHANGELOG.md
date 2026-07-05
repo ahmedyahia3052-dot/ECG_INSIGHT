@@ -4,11 +4,37 @@ All notable changes to this project are documented in this file.
 
 ---
 
-## [Sprint17] — 2026-07-05
+## [Sprint18] — 2026-07-05
 
 ### Added
 
-- **Sprint 17 ECG Pro Viewer Enterprise** — cursor-anchored wheel zoom, momentum pan, mini navigator, crisp rendering
+- **ECG Pro Clinical Workstation 2.0** — full dark UI rebuild at `/ecg-workspace`
+- Grouped icon toolbar (`EcgWorkstationToolbar`) with FILE/VIEWER/LEADS/CLINICAL/VIEW sections
+- Live monitor mode (`EcgLiveMonitorView`) with RAF SVG sweep from digitized leads
+- View mode switcher: Image, Processed, Waveform, Monitor, Compare, Overlay
+- Waveform playback timeline with play/pause/loop/scrubber
+- Unified clinical right panel (`EcgClinicalRightPanel`)
+- Compare overlay and split layout modes
+- Tests: `sprint18-ecg-clinical-workstation.integration.ts`, `sprint18-ecg-clinical-workstation.spec.ts`
+- Reports: `SPRINT18_FINAL_REPORT.md`, `VISUAL_VERIFICATION_REPORT.md`
+
+### Changed
+
+- `EcgMonitorViewerFoundation` — workstation 2.0 shell, replaces flat toolbar
+- `EcgImageCanvas` — view mode routing (processed/waveform/overlay)
+- `EcgCompareViewer` — overlay + split layouts
+- `useEcgEnterpriseViewerState` — view modes, compare layout, lead layout, theme
+- Viewer layout 85% main / 15% bottom; dark canvas background
+
+### Preserved
+
+- All Sprint 13–17 engines: measurements, digitization, AI overlay, export, persistence
+
+---
+
+## [Sprint17] — 2026-07-05
+
+### Added — cursor-anchored wheel zoom, momentum pan, mini navigator, crisp rendering
 - Zoom presets 100%–1600% with `setZoomPreset` toolbar buttons
 - Clinical status bar metrics: paper speed, gain, lead, signal/digitization quality, DPI, size, FPS, coordinates
 - Toolbar: Export PNG, Digitize, brightness/contrast, speed/gain cycles

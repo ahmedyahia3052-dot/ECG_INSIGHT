@@ -30,7 +30,7 @@ assertContains("artifacts/ecg-insight/components/ecg/viewer/useEcgWorkspaceCaseR
 ]);
 
 assertContains("artifacts/ecg-insight/components/ecg/viewer/EcgMonitorViewerFoundation.tsx", [
-  'title="ECG Pro Clinical Workspace"',
+  'title="ECG Pro Clinical Workstation 2.0"',
   "sprint13-ecg-monitor-ready",
   "EcgViewerToolbar",
 ]);

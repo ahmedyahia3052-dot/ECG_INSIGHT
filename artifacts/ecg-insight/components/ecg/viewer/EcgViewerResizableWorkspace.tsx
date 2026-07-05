@@ -89,7 +89,7 @@ function WebWorkspace({
 
   return (
     <Group id="ecg-monitor-workspace" orientation="vertical" style={styles.webRoot}>
-      <Panel defaultSize={82} id="ecg-monitor-main" minSize={55}>
+      <Panel defaultSize={85} id="ecg-monitor-main" minSize={60}>
         <Group orientation="horizontal" style={styles.webRoot}>
           <Panel defaultSize={layout.leftSize ?? 20} id="ecg-monitor-left" maxSize={35} minSize={14}>
             <View style={styles.panelFill}>{left}</View>
@@ -109,7 +109,7 @@ function WebWorkspace({
         </Group>
       </Panel>
       <Separator style={styles.separatorHorizontal} />
-      <Panel defaultSize={layout.bottomSize ?? 18} id="ecg-monitor-bottom" maxSize={35} minSize={12}>
+      <Panel defaultSize={15} id="ecg-monitor-bottom" maxSize={30} minSize={10}>
         <View style={styles.panelFill}>{bottom}</View>
       </Panel>
     </Group>

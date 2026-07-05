@@ -6,7 +6,7 @@ async function openEcgWorkspace(page: import("@playwright/test").Page, caseId: s
   await expect(page.getByTestId("ecg-workspace-loading")).toHaveCount(0, { timeout: 45_000 });
   await expect(page.getByTestId("ecg-enterprise-workspace-ready")).toBeVisible({ timeout: 45_000 });
   await expect(page.getByTestId("sprint13-ecg-monitor-ready")).toBeVisible({ timeout: 20_000 });
-  await expect(page.getByTestId("sprint13-ecg-viewer-toolbar")).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByTestId("sprint18-ecg-workstation-toolbar")).toBeVisible({ timeout: 20_000 });
 }
 
 test.describe("ECG Workspace Restoration @restoration", () => {
@@ -30,10 +30,9 @@ test.describe("ECG Workspace Restoration @restoration", () => {
 
   test("ecg-workspace renders enterprise viewer instead of legacy import UI", async ({ page }) => {
     await openEcgWorkspace(page, caseId);
-    await expect(page.getByText("ECG Pro Clinical Workspace")).toBeVisible();
+    await expect(page.getByTestId("sprint18-ecg-workstation-toolbar")).toBeVisible();
     await expect(page.getByTestId("sprint165-ecg-left-rail")).toBeVisible();
-    await expect(page.getByTestId("sprint165-ecg-right-rail")).toBeVisible();
-    await expect(page.getByTestId("sprint165-digitization-quality-panel")).toBeVisible();
+    await expect(page.getByTestId("sprint18-clinical-right-panel")).toBeVisible();
     await expect(page.getByText("ECG Image Interpretation")).toHaveCount(0);
     await page.screenshot({ fullPage: true, path: "test-results/screenshots/ecg-workspace-restored.png" });
   });
@@ -44,7 +43,7 @@ test.describe("ECG Workspace Restoration @restoration", () => {
       page.getByTestId("ecg-enterprise-workspace-ready").or(page.getByTestId("ecg-workspace-no-demo")),
     ).toBeVisible({ timeout: 60_000 });
     if (await page.getByTestId("ecg-enterprise-workspace-ready").isVisible()) {
-      await expect(page.getByText("ECG Pro Clinical Workspace")).toBeVisible();
+      await expect(page.getByTestId("sprint18-ecg-workstation-toolbar")).toBeVisible();
       await page.screenshot({ fullPage: true, path: "test-results/screenshots/ecg-workspace-demo-mode.png" });
     }
   });

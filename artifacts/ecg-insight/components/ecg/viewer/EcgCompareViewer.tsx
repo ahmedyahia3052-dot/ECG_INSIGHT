@@ -5,12 +5,15 @@ import { medicalTheme, SectionHeader } from "@/components/enterprise/EnterpriseU
 
 import { EcgProViewerEngine } from "./EcgProViewerEngine";
 import type { DigitizedWaveformLead } from "./EcgDigitizedWaveformLayer";
+import type { EcgCompareLayoutMode } from "./types";
 import type { EcgViewerControls } from "./useEcgViewerControls";
 
 export const EcgCompareViewer = memo(function EcgCompareViewer({
   accessToken,
   compareImageUrl,
   compareLabel,
+  compareLayout = "side-by-side",
+  compareOpacity = 0.45,
   compareThumbnailUrl,
   controls,
   currentDigitizedLeads,
@@ -20,12 +23,59 @@ export const EcgCompareViewer = memo(function EcgCompareViewer({
   accessToken?: string | null;
   compareImageUrl?: string;
   compareLabel: string;
+  compareLayout?: EcgCompareLayoutMode;
+  compareOpacity?: number;
   compareThumbnailUrl?: string;
   controls: EcgViewerControls;
   currentDigitizedLeads: DigitizedWaveformLead[];
   currentImageUrl?: string;
   currentLabel: string;
 }) {
+  if (compareLayout === "overlay") {
+    return (
+      <View style={styles.root} testID="sprint18-ecg-compare-overlay">
+        <Text style={styles.paneLabel}>{currentLabel} + {compareLabel}</Text>
+        <View style={styles.overlayHost}>
+          <EcgProViewerEngine
+            accessToken={accessToken}
+            controls={controls}
+            digitizedLeads={currentDigitizedLeads}
+            imageUrl={currentImageUrl}
+            showDigitizedWaveform
+            testID="sprint165-ecg-compare-current"
+          />
+          {compareImageUrl ? (
+            <View pointerEvents="none" style={[StyleSheet.absoluteFill, styles.overlayLayer, { opacity: compareOpacity }]}>
+              <EcgProViewerEngine accessToken={accessToken} controls={controls} imageUrl={compareImageUrl} testID="sprint165-ecg-compare-previous" />
+            </View>
+          ) : null}
+        </View>
+      </View>
+    );
+  }
+
+  if (compareLayout === "split") {
+    return (
+      <View style={styles.root} testID="sprint18-ecg-compare-split">
+        <View style={styles.splitPane}>
+          <Text style={styles.paneLabel}>{currentLabel}</Text>
+          <EcgProViewerEngine accessToken={accessToken} controls={controls} digitizedLeads={currentDigitizedLeads} imageUrl={currentImageUrl} showDigitizedWaveform testID="sprint165-ecg-compare-current" />
+        </View>
+        <View style={styles.splitDivider} />
+        <View style={styles.splitPane}>
+          <Text style={styles.paneLabel}>{compareLabel}</Text>
+          {compareImageUrl ? (
+            <EcgProViewerEngine accessToken={accessToken} controls={controls} imageUrl={compareImageUrl} testID="sprint165-ecg-compare-previous" />
+          ) : (
+            <View style={styles.emptyPane}>
+              <SectionHeader subtitle="Select a prior study from the left panel." title="No comparison study" />
+            </View>
+          )}
+        </View>
+      </View>
+    );
+  }
+
   return (
     <View style={styles.root} testID="sprint165-ecg-compare-viewer">
       <View style={styles.pane}>
@@ -51,7 +101,7 @@ export const EcgCompareViewer = memo(function EcgCompareViewer({
           </View>
         ) : (
           <View style={styles.emptyPane}>
-            <SectionHeader title="No comparison study" subtitle="Select a prior ECG from the left panel to compare." />
+            <SectionHeader subtitle="Select a prior ECG from the left panel to compare." title="No comparison study" />
           </View>
         )}
       </View>
@@ -62,9 +112,13 @@ export const EcgCompareViewer = memo(function EcgCompareViewer({
 const styles = StyleSheet.create({
   divider: { backgroundColor: medicalTheme.border, width: 2 },
   emptyPane: { alignItems: "center", flex: 1, justifyContent: "center", minHeight: 280, padding: 16 },
+  overlayHost: { flex: 1, minHeight: 320, position: "relative" },
+  overlayLayer: { zIndex: 4 },
   pane: { flex: 1, gap: 6, minWidth: 0 },
   paneLabel: { color: medicalTheme.primary, fontSize: 12, fontWeight: "900" },
   root: { flex: 1, flexDirection: "row", gap: 8, minHeight: 320 },
+  splitDivider: { backgroundColor: medicalTheme.primary, width: 3 },
+  splitPane: { flex: 1, gap: 6, minWidth: 0 },
   thumbnail: { flex: 1, minHeight: 240, width: "100%" },
   thumbnailHint: { color: medicalTheme.muted, fontSize: 11, fontWeight: "700", textAlign: "center" },
   thumbnailPane: { backgroundColor: medicalTheme.surface, borderColor: medicalTheme.border, borderRadius: 12, borderWidth: 1, flex: 1, gap: 8, minHeight: 280, padding: 8 },

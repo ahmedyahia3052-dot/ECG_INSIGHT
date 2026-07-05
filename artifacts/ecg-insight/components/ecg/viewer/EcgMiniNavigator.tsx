@@ -54,8 +54,8 @@ export const EcgMiniNavigator = memo(function EcgMiniNavigator({ controls, onNav
 const styles = StyleSheet.create({
   frame: {
     alignItems: "center",
-    backgroundColor: "rgba(15,23,42,0.82)",
-    borderColor: medicalTheme.border,
+    backgroundColor: "rgba(4,14,26,0.72)",
+    borderColor: "rgba(20,221,230,0.35)",
     borderRadius: 8,
     borderWidth: 1,
     justifyContent: "center",
@@ -68,14 +68,14 @@ const styles = StyleSheet.create({
     zIndex: 24,
   },
   thumbnail: {
-    backgroundColor: "#FFF7F7",
-    borderColor: "#E36A6A",
+    backgroundColor: "rgba(8,22,37,0.88)",
+    borderColor: "rgba(20,221,230,0.25)",
     borderRadius: 4,
     borderWidth: 1,
     position: "relative",
   },
   viewportRect: {
-    backgroundColor: "rgba(14,165,233,0.18)",
+    backgroundColor: "rgba(20,221,230,0.12)",
     borderColor: medicalTheme.primary,
     borderRadius: 2,
     borderWidth: 1,

@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useState } from "react";
 
-import type { EcgLeadId, EcgViewerPreviousStudy } from "./types";
+import type { EcgCompareLayoutMode, EcgLeadId, EcgLeadLayoutMode, EcgViewerPreviousStudy, EcgWorkstationTheme, EcgWorkstationViewMode } from "./types";
 
 export function useEcgEnterpriseViewerState(input: {
   caseId: string;
@@ -11,6 +11,11 @@ export function useEcgEnterpriseViewerState(input: {
   const [showDigitizedWaveform, setShowDigitizedWaveform] = useState(true);
   const [settingsVisible, setSettingsVisible] = useState(false);
   const [leadFocusMode, setLeadFocusMode] = useState(false);
+  const [viewMode, setViewMode] = useState<EcgWorkstationViewMode>("image");
+  const [compareLayout, setCompareLayout] = useState<EcgCompareLayoutMode>("side-by-side");
+  const [compareOpacity, setCompareOpacity] = useState(0.45);
+  const [leadLayout, setLeadLayout] = useState<EcgLeadLayoutMode>("12-lead");
+  const [workstationTheme, setWorkstationTheme] = useState<EcgWorkstationTheme>("dark");
 
   const orderedStudies = useMemo(
     () =>
@@ -36,37 +41,66 @@ export function useEcgEnterpriseViewerState(input: {
     };
   }, [input.caseId, orderedStudies]);
 
+  const setViewModeSafe = useCallback((mode: EcgWorkstationViewMode) => {
+    setViewMode(mode);
+    if (mode === "compare") {
+      setCompareMode(true);
+      if (!compareCaseId && orderedStudies[0]) setCompareCaseId(orderedStudies[0].caseId);
+    }
+    if (mode === "waveform") setShowDigitizedWaveform(true);
+  }, [compareCaseId, orderedStudies]);
+
   const toggleCompareMode = useCallback(() => {
     setCompareMode((value) => {
       const next = !value;
-      if (next && !compareCaseId && orderedStudies[0]) setCompareCaseId(orderedStudies[0].caseId);
+      if (next) {
+        setViewMode("compare");
+        if (!compareCaseId && orderedStudies[0]) setCompareCaseId(orderedStudies[0].caseId);
+      } else if (viewMode === "compare") {
+        setViewMode("image");
+      }
       return next;
     });
-  }, [compareCaseId, orderedStudies]);
+  }, [compareCaseId, orderedStudies, viewMode]);
 
   const filterDigitizedLeads = useCallback(
     <T extends { lead: string }>(leads: T[], selectedLead: EcgLeadId) => {
-      if (!showDigitizedWaveform) return [] as T[];
-      if (leadFocusMode) return leads.filter((item) => item.lead === selectedLead);
+      if (!showDigitizedWaveform && viewMode !== "waveform") return [] as T[];
+      if (leadFocusMode || leadLayout === "single") return leads.filter((item) => item.lead === selectedLead);
+      if (leadLayout === "rhythm") return leads.filter((item) => item.lead === selectedLead || item.lead === "II");
       return leads;
     },
-    [leadFocusMode, showDigitizedWaveform],
+    [leadFocusMode, leadLayout, showDigitizedWaveform, viewMode],
   );
+
+  const toggleWorkstationTheme = useCallback(() => {
+    setWorkstationTheme((current) => (current === "dark" ? "clinical" : "dark"));
+  }, []);
 
   return {
     compareCaseId,
+    compareLayout,
     compareMode,
+    compareOpacity,
     compareStudy,
     filterDigitizedLeads,
     leadFocusMode,
+    leadLayout,
     navigation,
     setCompareCaseId,
+    setCompareLayout,
     setCompareMode,
+    setCompareOpacity,
     setLeadFocusMode,
+    setLeadLayout,
     setSettingsVisible,
     setShowDigitizedWaveform,
+    setViewMode: setViewModeSafe,
     settingsVisible,
     showDigitizedWaveform,
     toggleCompareMode,
+    toggleWorkstationTheme,
+    viewMode,
+    workstationTheme,
   };
 }

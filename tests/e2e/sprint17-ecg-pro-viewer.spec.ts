@@ -30,12 +30,12 @@ test.describe("Sprint 17 ECG Pro Viewer Enterprise @sprint17", () => {
 
   test("enterprise toolbar exposes sprint 17 controls", async ({ page }) => {
     await openEcgWorkspace(page, caseId);
-    await expect(page.getByRole("button", { name: "Export PNG" })).toBeVisible();
-    await expect(page.getByRole("button", { name: "Digitize" })).toBeVisible();
-    await expect(page.getByRole("button", { name: "200%" })).toBeVisible();
-    await expect(page.getByRole("button", { name: "1600%" })).toBeVisible();
-    await expect(page.getByRole("button", { name: /Speed 25 mm\/s|Speed 50 mm\/s/ })).toBeVisible();
-    await expect(page.getByRole("button", { name: /Gain \d+ mm\/mV/ })).toBeVisible();
+    await expect(page.getByTestId("sprint18-export-png")).toBeVisible();
+    await expect(page.getByTestId("sprint18-digitize")).toBeVisible();
+    await expect(page.getByTestId("sprint18-zoom-200")).toBeVisible();
+    await expect(page.getByTestId("sprint18-zoom-1600")).toBeVisible();
+    await expect(page.getByTestId("sprint18-speed")).toBeVisible();
+    await expect(page.getByTestId("sprint18-gain")).toBeVisible();
   });
 
   test("clinical status bar shows sprint 17 metrics", async ({ page }) => {
@@ -52,8 +52,8 @@ test.describe("Sprint 17 ECG Pro Viewer Enterprise @sprint17", () => {
     await openEcgWorkspace(page, caseId);
     await expect(page.getByTestId("sprint17-ecg-mini-navigator")).toBeVisible();
     const canvas = page.getByTestId("sprint13-ecg-pro-viewer-engine");
-    await canvas.click();
-    await page.getByRole("button", { name: "400%" }).click();
+    await page.getByTestId("sprint18-view-mode-image").click();
+    await page.getByTestId("sprint18-zoom-400").click();
     await expect(page.getByTestId("sprint17-status-zoom")).toContainText("400%");
     await page.screenshot({ fullPage: true, path: "test-results/screenshots/sprint17-ecg-pro-viewer.png" });
   });

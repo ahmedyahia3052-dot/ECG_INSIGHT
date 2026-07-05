@@ -373,7 +373,7 @@ export const EcgProViewerEngine = memo(function EcgProViewerEngine({
 
 const styles = StyleSheet.create({
   canvas: {
-    backgroundColor: "#FFF7F7",
+    backgroundColor: "#040E1A",
     borderColor: medicalTheme.border,
     borderRadius: 12,
     borderWidth: 1,
