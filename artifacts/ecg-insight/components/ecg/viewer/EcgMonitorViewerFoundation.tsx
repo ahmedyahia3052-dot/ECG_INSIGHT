@@ -26,9 +26,9 @@ import { EcgViewModeSwitcher } from "./EcgViewModeSwitcher";
 import { EcgViewerLeftRail } from "./EcgViewerLeftRail";
 import { EcgViewerResizableWorkspace } from "./EcgViewerResizableWorkspace";
 import { EcgViewerSettingsPanel } from "./EcgViewerSettingsPanel";
-import { EcgViewerTimeline } from "./EcgViewerTimeline";
 import { EcgWaveformPlaybackTimeline } from "./EcgWaveformPlaybackTimeline";
 import { EcgWorkstationToolbar } from "./EcgWorkstationToolbar";
+import { ECG_WORKSTATION_VISUAL } from "./ecgWorkstationVisualTokens";
 import type { EcgLeadId, EcgViewerPreviousStudy } from "./types";
 import { STANDARD_ECG_LEADS } from "./types";
 import { useEcgAiOverlayWorkspace } from "./useEcgAiOverlayWorkspace";
@@ -299,6 +299,7 @@ export function EcgMonitorViewerFoundation({
 
   return (
     <View style={[styles.root, controls.fullscreen && styles.fullscreenRoot]} testID="sprint13-ecg-monitor-ready" nativeID="sprint22-hospital-workstation-ready">
+      <View style={styles.inspectorReady} testID="sprint23-visual-inspector-ready">
       <View style={styles.topBar}>
         <View style={styles.titleBlock}>
           <Text style={styles.title}>Hospital ECG Workstation</Text>
@@ -356,10 +357,9 @@ export function EcgMonitorViewerFoundation({
           bottom={
             <View style={styles.bottomStack}>
               <EcgWaveformPlaybackTimeline durationMs={playbackDurationMs} playback={playback} />
-              {enterprise.leadLayout === "rhythm" || enterprise.viewMode === "monitor" ? (
+              {enterprise.leadLayout === "rhythm" && enterprise.viewMode !== "monitor" ? (
                 <EcgRhythmStripPanel controls={controls} leadWaveform={rhythmLead} onLeadChange={setSelectedLead} selectedLead={selectedLead} />
               ) : null}
-              <EcgViewerTimeline currentStudy={study} onSelect={openStudy} studies={previousStudies} />
               <EcgEnterpriseStatusBar
                 aiStatus={statusMetrics.aiStatus}
                 backendStatus={statusMetrics.backendStatus}
@@ -496,6 +496,7 @@ export function EcgMonitorViewerFoundation({
           }
         />
       </View>
+      </View>
 
       <EcgViewerSettingsPanel aiOverlay={aiOverlay} controls={controls} onClose={() => enterprise.setSettingsVisible(false)} visible={enterprise.settingsVisible} />
     </View>
@@ -503,14 +504,15 @@ export function EcgMonitorViewerFoundation({
 }
 
 const styles = StyleSheet.create({
-  bottomStack: { gap: 6 },
+  bottomStack: { flexShrink: 0, gap: 4, minHeight: 0, overflow: "hidden" },
   fullscreenRoot: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: "#040E1A",
     padding: 8,
     zIndex: 50,
   },
-  root: { backgroundColor: "#040E1A", flex: 1, gap: 6, minHeight: 720, overflow: "hidden", padding: 6 },
+  inspectorReady: { flex: 1, gap: ECG_WORKSTATION_VISUAL.workspaceGap, minHeight: 0, overflow: "hidden" },
+  root: { backgroundColor: "#040E1A", flex: 1, gap: ECG_WORKSTATION_VISUAL.workspaceGap, minHeight: 0, overflow: "hidden", padding: ECG_WORKSTATION_VISUAL.workspacePadding },
   subtitle: { color: medicalTheme.muted, fontSize: 12, fontWeight: "700" },
   title: { color: medicalTheme.text, fontSize: 16, fontWeight: "900" },
   titleBlock: { flex: 1, gap: 2, minWidth: 220 },

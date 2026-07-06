@@ -4,6 +4,25 @@ All notable changes to this project are documented in this file.
 
 ---
 
+## [Sprint23] — 2026-07-06
+
+### Added
+
+- **Visual Inspector AI Engine** (`scripts/sprint23/visual-inspector-engine.mjs`) — live DOM audit, hospital UI scoring, multi-viewport screenshots
+- Hospital UI Score Engine (14 modules, 98% minimum acceptance)
+- Shared visual tokens (`ecgWorkstationVisualTokens.ts`)
+- Sprint 23 readiness testIDs and integration/e2e tests
+
+### Changed
+
+- Self-healing layout: compact bottom dock, removed duplicate timeline from bottom stack
+- Canvas resize optimization (no per-frame buffer reset)
+- Responsive mini navigator with layout-aware width
+- Enterprise shell title unified to **Hospital ECG Workstation**
+- Clinical panel full-width fill; right panel min 20%
+
+---
+
 ## [Sprint22] — 2026-07-06
 
 ### Added

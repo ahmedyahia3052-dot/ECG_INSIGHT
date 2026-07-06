@@ -97,7 +97,7 @@ function WebWorkspace({
 
   return (
     <Group id="ecg-monitor-workspace" orientation="vertical" style={styles.webRoot}>
-      <Panel defaultSize={90} id="ecg-monitor-main" minSize={68}>
+      <Panel defaultSize={90} id="ecg-monitor-main" minSize={72}>
         <Group orientation="horizontal" style={styles.webRoot}>
         {!layout.leftCollapsed ? (
           <>
@@ -117,7 +117,7 @@ function WebWorkspace({
           {!layout.rightCollapsed ? (
             <>
               <Separator style={styles.separator} />
-              <Panel defaultSize={layout.rightSize ?? 22} id="ecg-monitor-right" maxSize={30} minSize={18}>
+              <Panel defaultSize={layout.rightSize ?? 24} id="ecg-monitor-right" maxSize={32} minSize={20}>
                 <View style={styles.panelFill}>{right}</View>
               </Panel>
             </>
@@ -125,7 +125,7 @@ function WebWorkspace({
         </Group>
       </Panel>
       <Separator style={styles.separatorHorizontal} />
-      <Panel defaultSize={10} id="ecg-monitor-bottom" maxSize={18} minSize={6}>
+      <Panel defaultSize={11} id="ecg-monitor-bottom" maxSize={16} minSize={8}>
         <View style={styles.panelFill}>{bottom}</View>
       </Panel>
     </Group>

@@ -6,7 +6,7 @@ async function openEcgWorkspace(page: import("@playwright/test").Page, caseId: s
   await expect(page.getByTestId("ecg-workspace-loading")).toHaveCount(0, { timeout: 45_000 });
   await expect(page.getByTestId("ecg-enterprise-workspace-ready")).toBeVisible({ timeout: 45_000 });
   await expect(
-    page.getByTestId("sprint22-hospital-workstation-toolbar").or(page.getByTestId("sprint21-ecg-workstation-toolbar")),
+    page.getByTestId("sprint23-visual-inspector-toolbar").or(page.getByTestId("sprint22-hospital-workstation-toolbar")),
   ).toBeVisible({ timeout: 20_000 });
 }
 
@@ -32,7 +32,7 @@ test.describe("Sprint 22 Hospital ECG Workstation @sprint22", () => {
   test("hospital shell, toolbar groups, and clinical sidebar sections", async ({ page }) => {
     await openEcgWorkspace(page, caseId);
     await expect(page.getByText("Hospital ECG Workstation")).toBeVisible();
-    await expect(page.getByTestId("sprint22-hospital-workstation-toolbar")).toBeVisible();
+    await expect(page.getByTestId("sprint23-visual-inspector-toolbar").or(page.getByTestId("sprint22-hospital-workstation-toolbar"))).toBeVisible();
     await expect(page.getByTestId("sprint21-toolbar-group-file")).toBeVisible();
     const panel = page.getByTestId("sprint22-clinical-right-panel");
     await expect(panel).toBeVisible();

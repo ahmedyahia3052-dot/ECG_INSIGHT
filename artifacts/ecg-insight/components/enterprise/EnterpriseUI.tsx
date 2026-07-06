@@ -85,7 +85,7 @@ const PAGE_TITLES: Record<string, { subtitle: string; title: string }> = {
   "/settings": { subtitle: "Workspace preferences, accessibility, and clinical defaults.", title: "Settings" },
   "/team-management": { subtitle: "Manage users, roles, access, and clinical workspace membership.", title: "Team Management" },
   "/upload-ecg": { subtitle: "Capture, upload, preview, analyze, validate, and save ECG records.", title: "Upload ECG" },
-  "/ecg-workspace": { subtitle: "Enterprise ECG Pro clinical workspace with viewer, digitization, measurements, overlay, and AI readiness.", title: "ECG Pro Clinical Workspace" },
+  "/ecg-workspace": { subtitle: "Hospital-grade ECG clinical workstation with digitization, live monitor, measurements, AI review, and export.", title: "Hospital ECG Workstation" },
 };
 
 function roleRank(role?: string) {

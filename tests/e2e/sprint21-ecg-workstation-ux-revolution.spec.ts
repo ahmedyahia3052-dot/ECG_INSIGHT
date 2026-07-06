@@ -5,7 +5,7 @@ async function openEcgWorkspace(page: import("@playwright/test").Page, caseId: s
   await page.goto(`/ecg-workspace?caseId=${caseId}`, { waitUntil: "domcontentloaded" });
   await expect(page.getByTestId("ecg-workspace-loading")).toHaveCount(0, { timeout: 45_000 });
   await expect(page.getByTestId("ecg-enterprise-workspace-ready")).toBeVisible({ timeout: 45_000 });
-  await expect(page.getByTestId("sprint21-ecg-workstation-toolbar").or(page.getByTestId("sprint22-hospital-workstation-toolbar"))).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByTestId("sprint23-visual-inspector-toolbar").or(page.getByTestId("sprint21-ecg-workstation-toolbar"))).toBeVisible({ timeout: 20_000 });
 }
 
 test.describe("Sprint 21 ECG Workstation UX Revolution @sprint21", () => {

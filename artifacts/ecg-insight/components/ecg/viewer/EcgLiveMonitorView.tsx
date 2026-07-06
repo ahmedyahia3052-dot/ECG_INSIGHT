@@ -6,6 +6,7 @@ import { medicalTheme, PrimaryButton } from "@/components/enterprise/EnterpriseU
 import type { DigitalEcgLead } from "@/services/ecgProcessing";
 
 import { drawMonitorCanvas } from "./ecgMonitorCanvas";
+import { ECG_WORKSTATION_VISUAL } from "./ecgWorkstationVisualTokens";
 import { EcgMonitorMiniNavigator } from "./EcgMonitorMiniNavigator";
 import { buildScrollingMonitorPath, durationMsForLead, msToSampleIndex } from "./ecgMonitorPath";
 import type { EcgLeadId } from "./types";
@@ -38,6 +39,7 @@ function WebMonitorCanvas({
 }) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const offsetRef = useRef(offsetIndex);
+  const sizeRef = useRef({ dpr: 0, height: 0, width: 0 });
   offsetRef.current = offsetIndex;
 
   useEffect(() => {
@@ -48,10 +50,13 @@ function WebMonitorCanvas({
       const ctx = canvas.getContext("2d");
       if (!ctx) return;
       const dpr = window.devicePixelRatio || 1;
-      canvas.width = Math.floor(width * dpr);
-      canvas.height = Math.floor(height * dpr);
-      canvas.style.width = `${width}px`;
-      canvas.style.height = `${height}px`;
+      if (sizeRef.current.width !== width || sizeRef.current.height !== height || sizeRef.current.dpr !== dpr) {
+        canvas.width = Math.floor(width * dpr);
+        canvas.height = Math.floor(height * dpr);
+        canvas.style.width = `${width}px`;
+        canvas.style.height = `${height}px`;
+        sizeRef.current = { dpr, height, width };
+      }
       drawMonitorCanvas(ctx, lead, width, height, {
         alarmTone,
         brightness,
@@ -228,6 +233,15 @@ const styles = StyleSheet.create({
   header: { alignItems: "center", flexDirection: "row", flexWrap: "wrap", gap: 12, paddingBottom: 8 },
   metric: { color: "#86EFAC", fontSize: 12, fontWeight: "800" },
   metricAlarm: { color: "#FACC15" },
-  root: { backgroundColor: "#020617", borderColor: medicalTheme.border, borderRadius: 12, borderWidth: 1, flex: 1, minHeight: 320, padding: 10 },
+  root: {
+    backgroundColor: "#020617",
+    borderColor: medicalTheme.border,
+    borderRadius: ECG_WORKSTATION_VISUAL.monitorBorderRadius,
+    borderWidth: 1,
+    flex: 1,
+    minHeight: 320,
+    overflow: "hidden",
+    padding: 10,
+  },
   title: { color: "#86EFAC", flex: 1, fontSize: 13, fontWeight: "900", letterSpacing: 1.1 },
 });

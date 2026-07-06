@@ -265,7 +265,7 @@ const styles = StyleSheet.create({
   },
   actionLabel: { color: "#03131B", fontSize: 12, fontWeight: "900" },
   actionLabelOutline: { color: medicalTheme.primary, fontSize: 12, fontWeight: "900" },
-  fill: { flex: 1 },
+  fill: { flex: 1, minWidth: 0, width: "100%" },
   historyMeta: { color: medicalTheme.muted, fontSize: 10, fontWeight: "700" },
   historyRow: {
     borderBottomColor: "rgba(30,58,74,0.55)",

@@ -5,6 +5,7 @@ import { Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-n
 import { medicalTheme } from "@/components/enterprise/EnterpriseUI";
 
 import { ECG_ZOOM_PRESETS } from "./ecgImageEngine";
+import { ECG_WORKSTATION_VISUAL } from "./ecgWorkstationVisualTokens";
 import type { EcgCompareLayoutMode, EcgLeadId, EcgLeadLayoutMode, EcgWorkstationViewMode } from "./types";
 import type { EcgAiOverlayWorkspace } from "./useEcgAiOverlayWorkspace";
 import type { EcgMeasurementWorkspace } from "./useEcgMeasurementWorkspace";
@@ -248,7 +249,7 @@ export const EcgWorkstationToolbar = memo(function EcgWorkstationToolbar({
   ];
 
   return (
-    <View style={styles.toolbar} testID="sprint22-hospital-workstation-toolbar" nativeID="sprint21-ecg-workstation-toolbar">
+    <View nativeID="sprint21-ecg-workstation-toolbar" style={styles.toolbar} testID="sprint23-visual-inspector-toolbar">
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.scroll}>
         {groups.map((group) => (
           <ToolGroupSection key={group.id} group={group} />
@@ -274,7 +275,7 @@ const styles = StyleSheet.create({
     fontWeight: "900",
     letterSpacing: 1.2,
   },
-  groupRow: { flexDirection: "row", flexWrap: "wrap", gap: 4, maxWidth: 420 },
+  groupRow: { flexDirection: "row", flexWrap: "nowrap", gap: ECG_WORKSTATION_VISUAL.toolbarGroupGap },
   recentHint: { color: medicalTheme.muted, fontSize: 9, fontWeight: "700", paddingHorizontal: 8, paddingBottom: 4 },
   scroll: { alignItems: "stretch", gap: 2, paddingHorizontal: 4, paddingVertical: 2 },
   toolButton: {
@@ -284,9 +285,9 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     borderWidth: 1,
     gap: 2,
-    height: 48,
+    height: ECG_WORKSTATION_VISUAL.toolbarButtonHeight,
     justifyContent: "center",
-    minWidth: 50,
+    minWidth: ECG_WORKSTATION_VISUAL.toolbarButtonMinWidth,
     paddingHorizontal: 5,
     paddingVertical: 4,
   },
