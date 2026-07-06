@@ -8,6 +8,7 @@ import type { EcgViewerControls } from "./useEcgViewerControls";
 export function useEcgWorkstationShortcuts(input: {
   controls: EcgViewerControls;
   onOpenCases?: () => void;
+  onOpenCommandPalette?: () => void;
   onUpload?: () => void;
   onViewModeChange?: (mode: EcgWorkstationViewMode) => void;
   workspace?: EcgMeasurementWorkspace;
@@ -19,6 +20,11 @@ export function useEcgWorkstationShortcuts(input: {
       const target = event.target as HTMLElement | null;
       if (target?.tagName === "INPUT" || target?.tagName === "TEXTAREA" || target?.isContentEditable) return;
 
+      if (event.ctrlKey && event.key.toLowerCase() === "k") {
+        event.preventDefault();
+        input.onOpenCommandPalette?.();
+        return;
+      }
       if (event.ctrlKey && event.key.toLowerCase() === "o") {
         event.preventDefault();
         input.onOpenCases?.();
@@ -52,5 +58,5 @@ export function useEcgWorkstationShortcuts(input: {
 
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [input.controls, input.onOpenCases, input.onUpload, input.onViewModeChange, input.workspace]);
+  }, [input.controls, input.onOpenCases, input.onOpenCommandPalette, input.onUpload, input.onViewModeChange, input.workspace]);
 }

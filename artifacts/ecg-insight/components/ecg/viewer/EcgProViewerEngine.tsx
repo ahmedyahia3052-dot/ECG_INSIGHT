@@ -9,6 +9,7 @@ import { EcgAiOverlayLayer, type EcgAiOverlayRegion } from "./EcgAiOverlayLayer"
 import { EcgDigitizedWaveformLayer, type DigitizedWaveformLead } from "./EcgDigitizedWaveformLayer";
 import { EcgMeasurementOverlay } from "./EcgMeasurementOverlay";
 import { EcgMiniNavigator } from "./EcgMiniNavigator";
+import { EcgViewerCrosshairOverlay } from "./EcgViewerCrosshairOverlay";
 import { EcgPaperGrid } from "./EcgPaperGrid";
 import { buildImageFilterStyle, buildTransformStyle, cacheImageDimensions, clampZoom, detectImageFormat, readCachedImageDimensions } from "./ecgImageEngine";
 import { displayDimensions, VIEWER_LAYER } from "./ecgViewerEngine";
@@ -29,7 +30,9 @@ type Props = {
   onPointerMove?: (coords: { imageX: number; imageY: number; x: number; y: number }) => void;
   onFpsUpdate?: (fps: number) => void;
   pdfUrl?: string;
+  showCrosshair?: boolean;
   showDigitizedWaveform?: boolean;
+  showMagnifier?: boolean;
   testID?: string;
   workspace?: EcgMeasurementWorkspace;
 };
@@ -46,12 +49,15 @@ export const EcgProViewerEngine = memo(function EcgProViewerEngine({
   imageUrl,
   pdfUrl,
   showDigitizedWaveform = true,
+  showCrosshair = false,
+  showMagnifier = false,
   testID = "sprint13-ecg-pro-viewer-engine",
   onFpsUpdate,
   onPointerMove,
   workspace,
 }: Props) {
   const [loading, setLoading] = React.useState(true);
+  const [localPointer, setLocalPointer] = React.useState<{ imageX: number; imageY: number; x: number; y: number } | null>(null);
   const pinchBase = useRef(controls.transform.zoom);
   const panBase = useRef({ x: controls.transform.panX, y: controls.transform.panY });
   const dragOrigin = useRef<{ x: number; y: number } | null>(null);
@@ -222,7 +228,9 @@ export const EcgProViewerEngine = memo(function EcgProViewerEngine({
       const imageX = (x - controls.transform.panX) / Math.max(controls.transform.zoom, 0.001);
       const imageY = (y - controls.transform.panY) / Math.max(controls.transform.zoom, 0.001);
       updatePointer({ imageX, imageY, x, y });
-      onPointerMove?.({ imageX, imageY, x, y });
+      const coords = { imageX, imageY, x, y };
+      setLocalPointer(coords);
+      onPointerMove?.(coords);
     },
     [controls.transform.panX, controls.transform.panY, controls.transform.zoom, onPointerMove, updatePointer],
   );
@@ -313,6 +321,18 @@ export const EcgProViewerEngine = memo(function EcgProViewerEngine({
       ) : null}
       {imageUrl && !isPdf ? (
         <EcgMiniNavigator controls={controls} imageUrl={imageUrl} />
+      ) : null}
+      {imageUrl && !isPdf ? (
+        <EcgViewerCrosshairOverlay
+          containerHeight={viewport.containerHeight}
+          containerWidth={viewport.containerWidth}
+          imageHeight={viewport.imageHeight}
+          imageWidth={viewport.imageWidth}
+          magnifierEnabled={showMagnifier}
+          pointer={localPointer}
+          showCrosshair={showCrosshair}
+          zoom={controls.transform.zoom}
+        />
       ) : null}
     </View>
   );

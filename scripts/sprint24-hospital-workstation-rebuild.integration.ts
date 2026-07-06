@@ -29,14 +29,14 @@ async function main() {
   const canvas = await fs.readFile(path.join(viewerRoot, "ecgMonitorCanvas.ts"), "utf8");
 
   const checks: Array<[string, boolean]> = [
-    ["CSS grid layout shell", grid.includes("display: \"grid\"") && grid.includes("sprint24-workstation-grid")],
+    ["CSS grid layout shell", grid.includes("display: \"grid\"") && (grid.includes("sprint24-workstation-grid") || grid.includes("sprint25-workstation-dock"))],
     ["left workstation nav", nav.includes("sprint24-workstation-left-nav") && foundation.includes("EcgWorkstationLeftNav")],
-    ["ribbon toolbar groups", toolbar.includes('label: "GRID"') && toolbar.includes('label: "MONITOR"') && toolbar.includes('label: "REPORT"')],
+    ["ribbon toolbar groups", (toolbar.includes('label: "GRID"') || toolbar.includes('label: "DIGITIZE"')) && toolbar.includes('label: "MONITOR"') && (toolbar.includes('label: "REPORT"') || toolbar.includes('label: "EXPORT"'))],
     ["playback wired to ribbon", toolbar.includes("playback?.togglePlay") && foundation.includes("playback={playback}")],
     ["hospital status bar metrics", status.includes("sprint24-status-cpu") && status.includes("sprint24-status-canvas")],
     ["clinical sidebar export/timeline", panel.includes('title="Export"') && panel.includes('title="Timeline"')],
     ["bezier monitor smoothing", canvas.includes("quadraticCurveTo")],
-    ["sprint24 readiness", foundation.includes("sprint24-hospital-workstation-ready")],
+    ["sprint24 readiness", foundation.includes("sprint24-hospital-workstation-ready") || foundation.includes("sprint25-hospital-workstation-ready")],
   ];
 
   for (const [label, passed] of checks) {

@@ -6,6 +6,7 @@ import type { AIAnalysisResult } from "@/services/ai";
 import type { DigitalEcg } from "@/services/ecgProcessing";
 
 import { EcgAiAnnotationInspector } from "./EcgAiAnnotationInspector";
+import { EcgClinicalCard } from "./EcgClinicalCard";
 import { EcgMeasurementsPanel } from "./EcgMeasurementsPanel";
 import type { EcgClinicalFindingsModel, EcgViewerPreviousStudy } from "./types";
 import type { EcgAiOverlayWorkspace } from "./useEcgAiOverlayWorkspace";
@@ -37,12 +38,11 @@ function MetricRow({
   );
 }
 
-function PanelSection({ children, title }: { children: React.ReactNode; title: string }) {
+function PanelSection({ children, id, title }: { children: React.ReactNode; id: string; title: string }) {
   return (
-    <View style={styles.section}>
-      <Text style={styles.sectionTitle}>{title}</Text>
+    <EcgClinicalCard id={id} title={title}>
       {children}
-    </View>
+    </EcgClinicalCard>
   );
 }
 
@@ -108,9 +108,9 @@ export const EcgClinicalRightPanel = memo(function EcgClinicalRightPanel({
   ].filter(Boolean) as string[];
 
   return (
-    <ScrollView contentContainerStyle={styles.scroll} style={styles.fill} testID="sprint24-clinical-right-panel" nativeID="sprint22-clinical-right-panel">
+    <ScrollView contentContainerStyle={styles.scroll} style={styles.fill} testID="sprint25-clinical-right-panel" nativeID="sprint24-clinical-right-panel">
       {patient ? (
-        <PanelSection title="Patient">
+        <PanelSection id="patient" title="Patient">
           <Text style={styles.patientName}>{patient.name}</Text>
           <Text style={styles.patientMeta}>
             {patient.gender ?? "Gender N/A"} · Age {patient.age ?? "N/A"} · ID {patient.id.slice(0, 8)}
@@ -120,14 +120,18 @@ export const EcgClinicalRightPanel = memo(function EcgClinicalRightPanel({
       ) : null}
 
       {caseNumber ? (
-        <PanelSection title="Case">
+        <PanelSection id="case" title="Case">
           <MetricRow label="Case Number" value={caseNumber} />
           <MetricRow label="Status" value={digitalEcg?.status === "available" ? "Digitized" : digitalEcgLoading ? "Processing" : "Awaiting Digitization"} />
           <MetricRow label="Leads" value={digitalEcg?.leads?.length ? `${digitalEcg.leads.length} leads` : "Pending"} />
         </PanelSection>
       ) : null}
 
-      <PanelSection title="Rate">
+      <PanelSection id="measurements" title="Measurements">
+        <EcgMeasurementsPanel workspace={workspace} />
+      </PanelSection>
+
+      <PanelSection id="rate" title="Heart Rate">
         <MetricRow label="Heart Rate" source={sourceLabel} value={findings.heartRate.value} />
         <MetricRow
           label="RR Interval"
@@ -136,21 +140,21 @@ export const EcgClinicalRightPanel = memo(function EcgClinicalRightPanel({
         />
       </PanelSection>
 
-      <PanelSection title="Intervals">
+      <PanelSection id="intervals" title="Intervals">
         <MetricRow label="PR" source={findings.prInterval.source} value={findings.prInterval.value} />
         <MetricRow label="QRS" source={findings.qrsDuration.source} value={findings.qrsDuration.value} />
         <MetricRow label="QT" source={findings.qtInterval.source} value={findings.qtInterval.value} />
         <MetricRow label="QTc" source={findings.qtcInterval.source} value={findings.qtcInterval.value} />
       </PanelSection>
 
-      <PanelSection title="Axis">
+      <PanelSection id="axis" title="Axis">
         <MetricRow label="Mean QRS Axis" source={findings.axis.source} value={findings.axis.value} />
         {engine?.axis?.electricalAxisDeg != null ? (
           <MetricRow label="Electrical Axis" source="Digital ECG" value={`${Math.round(engine.axis.electricalAxisDeg)}°`} />
         ) : null}
       </PanelSection>
 
-      <PanelSection title="ST">
+      <PanelSection id="st" title="ST">
         <MetricRow label="ST Deviation" source={engine ? "Digital ECG" : "Pending"} value={stDisplay} />
         {engine?.morphology?.length ? (
           <View style={styles.listBlock}>
@@ -162,12 +166,12 @@ export const EcgClinicalRightPanel = memo(function EcgClinicalRightPanel({
         ) : null}
       </PanelSection>
 
-      <PanelSection title="Rhythm">
+      <PanelSection id="rhythm" title="Rhythm">
         <MetricRow label="Classification" source={findings.rhythm.source} value={findings.rhythm.value} />
         {engine?.rhythm ? <MetricRow label="Engine" source="Digital ECG" value={engine.rhythm.replace(/_/g, " ")} /> : null}
       </PanelSection>
 
-      <PanelSection title="Signal Quality">
+      <PanelSection id="signal-quality" title="Signal Quality">
         <MetricRow label="Resolution" value={imageWidth && imageHeight ? `${imageWidth}×${imageHeight}` : "Pending"} />
         <MetricRow label="Signal Quality" tone={qualityTone} value={digitalEcg?.calibration?.confidence != null ? `${Math.round(digitalEcg.calibration.confidence * 100)}%` : "Pending"} />
         <MetricRow label="Digitization Score" tone={qualityTone} value={qualityScore != null ? `${qualityScore}/100` : digitalEcgLoading ? "Processing" : "Pending"} />
@@ -179,20 +183,36 @@ export const EcgClinicalRightPanel = memo(function EcgClinicalRightPanel({
         ) : null}
       </PanelSection>
 
-      <PanelSection title="Noise">
+      <PanelSection id="noise" title="Noise Analysis">
         {noiseFlags.length ? noiseFlags.map((item) => <Text key={item} style={styles.listItem}>• {item}</Text>) : <Text style={styles.listItem}>No noise mitigation applied yet.</Text>}
       </PanelSection>
 
-      <PanelSection title="Artifacts">
+      <PanelSection id="artifacts" title="Artifact Detection">
         {artifactFlags.length ? artifactFlags.map((item) => <Text key={item} style={styles.listItem}>• {item}</Text>) : <Text style={styles.listItem}>No artifact flags detected.</Text>}
       </PanelSection>
 
-      <PanelSection title="Diagnosis">
+      <PanelSection id="confidence" title="Confidence">
+        <MetricRow label="AI Confidence" value={findings.confidence.value} />
+        <MetricRow label="Digitization" tone={qualityTone} value={qualityScore != null ? `${qualityScore}/100` : "Pending"} />
+        <MetricRow label="Calibration" value={digitalEcg?.calibration?.confidence != null ? `${Math.round(digitalEcg.calibration.confidence * 100)}%` : "Pending"} />
+      </PanelSection>
+
+      <PanelSection id="diagnosis" title="AI Interpretation">
         <MetricRow label="Primary" tone={severity === "critical" || severity === "severe" ? "critical" : "primary"} value={analysis?.diagnosis ?? findings.interpretation.value} />
         <MetricRow label="Confidence" value={findings.confidence.value} />
       </PanelSection>
 
-      <PanelSection title="AI Findings">
+      <PanelSection id="recommendations" title="Recommendations">
+        {analysis?.recommendations?.length ? (
+          analysis.recommendations.slice(0, 6).map((item) => (
+            <Text key={item} style={styles.listItem}>• {item}</Text>
+          ))
+        ) : (
+          <Text style={styles.listItem}>No recommendations generated yet.</Text>
+        )}
+      </PanelSection>
+
+      <PanelSection id="ai-findings" title="Findings">
         <MetricRow label="Diagnosis" tone={severity === "critical" || severity === "severe" ? "critical" : "primary"} value={analysis?.diagnosis ?? findings.interpretation.value} />
         <MetricRow label="Confidence" value={findings.confidence.value} />
         <MetricRow label="Severity" tone={severity === "critical" ? "critical" : severity === "severe" ? "warning" : "success"} value={severity.toUpperCase()} />
@@ -211,18 +231,18 @@ export const EcgClinicalRightPanel = memo(function EcgClinicalRightPanel({
         ) : null}
       </PanelSection>
 
-      <PanelSection title="Warnings">
+      <PanelSection id="clinical-alerts" title="Clinical Alerts">
         {warnings.map((warning) => (
           <Text key={warning} style={styles.warningText}>• {warning}</Text>
         ))}
       </PanelSection>
 
-      <PanelSection title="Doctor Notes">
+      <PanelSection id="notes" title="Clinical Notes">
         <Text style={styles.notesText}>{clinicalNotes ?? "No clinical notes recorded for this study."}</Text>
       </PanelSection>
 
       {previousStudies.length ? (
-        <PanelSection title="Previous ECG">
+        <PanelSection id="previous-ecg" title="Previous Comparison">
           {previousStudies.slice(0, 4).map((item) => (
             <View key={item.caseId} style={styles.historyRow}>
               <Text style={styles.historyTitle}>{item.caseNumber ?? item.caseId}</Text>
@@ -232,35 +252,35 @@ export const EcgClinicalRightPanel = memo(function EcgClinicalRightPanel({
         </PanelSection>
       ) : null}
 
-      <PanelSection title="History">
+      <PanelSection id="history" title="History">
         <MetricRow label="Prior Studies" value={previousStudies.length ? `${previousStudies.length} on record` : "None linked"} />
         {previousStudies[0] ? (
           <MetricRow label="Most Recent Prior" value={previousStudies[0].caseNumber ?? previousStudies[0].caseId} />
         ) : null}
       </PanelSection>
 
-      <PanelSection title="Comparison">
+      <PanelSection id="comparison" title="Comparison">
         <MetricRow label="Compare Mode" value={previousStudies.length ? "Select prior study in left rail" : "No prior studies available"} />
       </PanelSection>
 
-      <PanelSection title="Timeline">
+      <PanelSection id="timeline" title="Timeline">
         {studyDate ? <MetricRow label="Current Study" value={formatDate(studyDate)} /> : null}
         {previousStudies.slice(0, 3).map((item) => (
           <MetricRow key={item.caseId} label={item.caseNumber ?? item.caseId} value={item.studyDate ? formatDate(item.studyDate) : "Pending"} />
         ))}
       </PanelSection>
 
-      <PanelSection title="Bookmarks">
+      <PanelSection id="bookmarks" title="Bookmarks">
         <MetricRow label="Pinned Case" value={caseNumber ?? "Current study"} />
         {previousStudies[0] ? <MetricRow label="Bookmark" value={previousStudies[0].caseNumber ?? previousStudies[0].caseId} /> : null}
       </PanelSection>
 
-      <PanelSection title="Status">
+      <PanelSection id="status" title="Status">
         <MetricRow label="Digitization" value={digitalEcg?.status === "available" ? "Complete" : digitalEcgLoading ? "Running" : "Pending"} />
         <MetricRow label="Signal Engine" value={digitalEcg?.measurementEngine ? "Digital ECG" : "Awaiting"} />
       </PanelSection>
 
-      <PanelSection title="Export">
+      <PanelSection id="export" title="Export">
         {onExportPdf ? (
           <Pressable onPress={onExportPdf} style={styles.actionButtonOutline}>
             <Text style={styles.actionLabelOutline}>Export PDF</Text>
@@ -273,8 +293,9 @@ export const EcgClinicalRightPanel = memo(function EcgClinicalRightPanel({
         ) : null}
       </PanelSection>
 
-      <EcgMeasurementsPanel workspace={workspace} />
-      <EcgAiAnnotationInspector workspace={aiOverlay} />
+      <EcgClinicalCard id="ai-inspector" title="AI Inspector">
+        <EcgAiAnnotationInspector workspace={aiOverlay} />
+      </EcgClinicalCard>
     </ScrollView>
   );
 });

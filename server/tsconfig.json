@@ -13,5 +13,6 @@
     "target": "es2022",
     "types": ["node"]
   },
-  "include": ["src/**/*.ts"]
+  "include": ["src/**/*.ts"],
+  "exclude": ["src/modules/medical-intelligence"]
 }

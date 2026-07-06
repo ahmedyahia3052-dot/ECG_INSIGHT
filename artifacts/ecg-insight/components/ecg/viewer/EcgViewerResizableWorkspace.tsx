@@ -3,7 +3,7 @@ import { Platform, StyleSheet, View } from "react-native";
 
 import { EcgWorkstationGridShell } from "./EcgWorkstationGridShell";
 
-const LAYOUT_KEY = "ecg-insight:ecg-monitor-panel-layout";
+const LAYOUT_KEY = "ecg-insight:ecg-monitor-panel-layout-v2";
 
 type SavedLayout = {
   bottomSize?: number;
@@ -14,11 +14,12 @@ type SavedLayout = {
 };
 
 function loadLayout(): SavedLayout {
-  if (typeof window === "undefined") return {};
+  if (typeof window === "undefined") return { leftSize: 260, rightSize: 280 };
   try {
-    return JSON.parse(window.localStorage.getItem(LAYOUT_KEY) ?? "{}") as SavedLayout;
+    const raw = window.localStorage.getItem(LAYOUT_KEY) ?? window.localStorage.getItem("ecg-insight:ecg-monitor-panel-layout");
+    return { leftSize: 260, rightSize: 280, ...(JSON.parse(raw ?? "{}") as SavedLayout) };
   } catch {
-    return {};
+    return { leftSize: 260, rightSize: 280 };
   }
 }
 
@@ -52,6 +53,8 @@ export function EcgViewerResizableWorkspace({ bottom, center, layout: controlled
     onLayoutChange?.(layout);
   }, [layout, onLayoutChange]);
 
+  const updateLayout = (patch: Partial<SavedLayout>) => setLayout((current) => ({ ...current, ...patch }));
+
   if (Platform.OS === "web") {
     return (
       <View style={styles.webRoot}>
@@ -60,8 +63,12 @@ export function EcgViewerResizableWorkspace({ bottom, center, layout: controlled
           center={center}
           left={left}
           leftCollapsed={!!layout.leftCollapsed}
+          leftWidth={layout.leftSize ?? 260}
+          onLeftWidthChange={(leftSize) => updateLayout({ leftSize })}
+          onRightWidthChange={(rightSize) => updateLayout({ rightSize })}
           right={right}
           rightCollapsed={!!layout.rightCollapsed}
+          rightWidth={layout.rightSize ?? 280}
         />
       </View>
     );
@@ -70,7 +77,7 @@ export function EcgViewerResizableWorkspace({ bottom, center, layout: controlled
   return (
     <View style={styles.nativeColumn}>
       <View style={styles.nativeMainRow}>
-        <View style={[styles.nativeSide, { width: layout.leftSize ?? 280 }]}>{left}</View>
+        {!layout.leftCollapsed ? <View style={[styles.nativeSide, { width: layout.leftSize ?? 280 }]}>{left}</View> : null}
         <View style={styles.nativeCenter}>{center}</View>
         {!layout.rightCollapsed ? <View style={[styles.nativeSide, { width: layout.rightSize ?? 260 }]}>{right}</View> : null}
       </View>
@@ -85,8 +92,5 @@ const styles = StyleSheet.create({
   nativeColumn: { flex: 1, gap: 10, minHeight: 0 },
   nativeMainRow: { flex: 1, flexDirection: "row", gap: 10, minHeight: 0 },
   nativeSide: { flexShrink: 0 },
-  panelFill: { flex: 1, height: "100%", minHeight: 0, overflow: "hidden" },
-  separator: { backgroundColor: "rgba(148,163,184,0.18)", width: 6 },
-  separatorHorizontal: { backgroundColor: "rgba(148,163,184,0.18)", height: 6 },
   webRoot: { display: "flex", flex: 1, height: "100%", minHeight: 0, overflow: "hidden", width: "100%" },
 });

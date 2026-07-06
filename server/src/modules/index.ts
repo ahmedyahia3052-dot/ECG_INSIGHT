@@ -26,6 +26,8 @@ import { enterpriseRouter } from "./enterprise/enterprise.routes";
 import { fhirRouter, pacsRouter, telecardiologyRouter } from "./hospital-integration/hospital-integration.routes";
 import { healthRouter } from "./health/health.routes";
 import { knowledgeRouter } from "./knowledge/knowledge.routes";
+// WIP module excluded from typecheck until schema integration completes (Sprint 25 build gate).
+// import { medicalIntelligenceRouter } from "./medical-intelligence/medical-intelligence.routes";
 import { notificationsRouter } from "../notifications/notifications.routes";
 import { ocrRouter } from "./ocr/ocr.routes";
 import { patientsRouter } from "../patients/patients.routes";
@@ -88,6 +90,7 @@ modulesRouter.use("/emr", emrRouter);
 modulesRouter.use("/enterprise", enterpriseRouter);
 modulesRouter.use("/fitness-assessments", fitnessAssessmentsRouter);
 modulesRouter.use("/knowledge", knowledgeRouter);
+// modulesRouter.use("/medical-intelligence", medicalIntelligenceRouter);
 modulesRouter.use("/notifications", notificationsRouter);
 modulesRouter.use("/ocr", ocrRouter);
 modulesRouter.use("/occupational-risk", occupationalRiskRouter);

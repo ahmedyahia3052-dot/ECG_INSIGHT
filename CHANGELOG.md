@@ -4,6 +4,26 @@ All notable changes to this project are documented in this file.
 
 ---
 
+## [Sprint25] — 2026-07-06
+
+### Added
+
+- **Docking layout** with drag-resize left/right panels (~70% center viewer)
+- **Collapsible clinical cards** on left rail (Patient, Cases, Timeline, Vitals, Notes, Quick Actions)
+- **Clinical workflow timeline** with 11-stage progress indicator
+- **Command ribbon** regrouped: FILE, VIEW, DIGITIZE, MONITOR, MEASURE, AI, COMPARE, REPORT, EXPORT
+- **Command palette** (Ctrl+K) with searchable actions
+- **Crosshair overlay** and magnifier toggle on ECG viewer
+- **Decision-support clinical panel** with collapsible Recommendations, Alerts, Confidence sections
+
+### Changed
+
+- Panel sizes persisted to `ecg-insight:ecg-monitor-panel-layout-v2`
+- Left rail redesigned from form layout to clinical card system
+- Readiness testID `sprint25-hospital-workstation-ready`
+
+---
+
 ## [Sprint24] — 2026-07-06
 
 ### Added

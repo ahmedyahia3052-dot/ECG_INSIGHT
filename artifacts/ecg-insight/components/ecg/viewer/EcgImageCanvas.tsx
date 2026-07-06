@@ -35,7 +35,9 @@ type Props = {
   onPointerMove?: (coords: { imageX: number; imageY: number; x: number; y: number }) => void;
   pdfUrl?: string;
   processedImageUrl?: string;
+  showCrosshair?: boolean;
   showDigitizedWaveform?: boolean;
+  showMagnifier?: boolean;
   testID?: string;
   viewMode?: EcgWorkstationViewMode;
   workspace?: EcgMeasurementWorkspace;
@@ -61,6 +63,8 @@ export function EcgImageCanvas({
   pdfUrl,
   processedImageUrl,
   showDigitizedWaveform = true,
+  showCrosshair = false,
+  showMagnifier = false,
   testID = "sprint13-ecg-image-canvas",
   viewMode = "image",
   workspace,
@@ -113,7 +117,9 @@ export function EcgImageCanvas({
           onFpsUpdate={onFpsUpdate}
           onPointerMove={onPointerMove}
           pdfUrl={pdfUrl}
+          showCrosshair={showCrosshair}
           showDigitizedWaveform={showDigitizedWaveform}
+          showMagnifier={showMagnifier}
           testID={testID}
           workspace={workspace}
         />

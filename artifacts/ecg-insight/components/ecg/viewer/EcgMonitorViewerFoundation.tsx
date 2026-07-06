@@ -17,6 +17,8 @@ import { exportMeasurements } from "./ecgMeasurementEngine";
 import { exportEcgViewerPng } from "./ecgViewerExport";
 import { durationMsForLead } from "./ecgMonitorPath";
 import { EcgClinicalRightPanel } from "./EcgClinicalRightPanel";
+import { EcgClinicalWorkflowTimeline } from "./EcgClinicalWorkflowTimeline";
+import { EcgCommandPalette, type EcgCommandItem } from "./EcgCommandPalette";
 import { EcgEnterpriseStatusBar } from "./EcgEnterpriseStatusBar";
 import { EcgImageCanvas } from "./EcgImageCanvas";
 import { EcgLiveMonitorView } from "./EcgLiveMonitorView";
@@ -69,6 +71,9 @@ export function EcgMonitorViewerFoundation({
   });
   const [leftNavCollapsed, setLeftNavCollapsed] = useState(false);
   const [leftNavPinned, setLeftNavPinned] = useState(true);
+  const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
+  const [showCrosshair, setShowCrosshair] = useState(true);
+  const [showMagnifier, setShowMagnifier] = useState(false);
   const imageUrl = absoluteUrl(ecgCase.imagePath ?? ecgCase.originalFileUrl ?? ecgCase.files.find((file) => file.mimeType.startsWith("image/"))?.downloadUrl);
   const pdfUrl = absoluteUrl(ecgCase.pdfPath ?? ecgCase.files.find((file) => file.mimeType.includes("pdf"))?.downloadUrl);
   const controls = useEcgViewerControls();
@@ -275,6 +280,7 @@ export function EcgMonitorViewerFoundation({
   useEcgWorkstationShortcuts({
     controls,
     onOpenCases: () => router.push("/ecg-cases" as never),
+    onOpenCommandPalette: () => setCommandPaletteOpen(true),
     onUpload: () => router.push("/upload-ecg" as never),
     onViewModeChange: enterprise.setViewMode,
     workspace,
@@ -300,9 +306,24 @@ export function EcgMonitorViewerFoundation({
     viewMode: enterprise.viewMode,
   });
 
+  const commandItems: EcgCommandItem[] = useMemo(
+    () => [
+      { group: "FILE", icon: "folder", id: "open-cases", label: "Open ECG Cases", onPress: () => router.push("/ecg-cases" as never), shortcut: "Ctrl+O" },
+      { group: "FILE", icon: "upload", id: "upload", label: "Upload ECG", onPress: () => router.push("/upload-ecg" as never), shortcut: "Ctrl+U" },
+      { group: "VIEW", icon: "monitor", id: "monitor", keywords: ["live"], label: "Live Monitor Mode", onPress: () => enterprise.setViewMode("monitor"), shortcut: "M" },
+      { group: "VIEW", icon: "eye", id: "ai-review", label: "AI Review Mode", onPress: () => enterprise.setViewMode("ai-review"), shortcut: "A" },
+      { group: "VIEW", icon: "file", id: "report", label: "Report Preview", onPress: () => enterprise.setViewMode("report"), shortcut: "R" },
+      { group: "DIGITIZE", icon: "cpu", id: "digitize", label: "Run Digitization", onPress: () => digitizeMutation.mutate() },
+      { group: "MEASURE", icon: "sliders", id: "measure", label: "Measurement Mode", onPress: () => enterprise.setViewMode("measurement") },
+      { group: "EXPORT", icon: "file-text", id: "export-pdf", label: "Export PDF", onPress: () => void exportPdf() },
+      { group: "EXPORT", icon: "image", id: "export-png", label: "Export PNG", onPress: () => void exportPng() },
+    ],
+    [digitizeMutation, enterprise, exportPdf, exportPng, router],
+  );
+
   return (
     <View style={[styles.root, controls.fullscreen && styles.fullscreenRoot]} testID="sprint13-ecg-monitor-ready" nativeID="sprint22-hospital-workstation-ready">
-      <View nativeID="sprint23-visual-inspector-ready" style={styles.inspectorReady} testID="sprint24-hospital-workstation-ready">
+      <View nativeID="sprint24-hospital-workstation-ready" style={styles.inspectorReady} testID="sprint25-hospital-workstation-ready">
       <View style={styles.topBar}>
         <View style={styles.titleBlock}>
           <Text style={styles.title}>Hospital ECG Workstation</Text>
@@ -330,7 +351,12 @@ export function EcgMonitorViewerFoundation({
         onLeadCycle={cycleLead}
         onLeadLayoutChange={enterprise.setLeadLayout}
         onOpenCases={() => router.push("/ecg-cases" as never)}
+        onOpenCommandPalette={() => setCommandPaletteOpen(true)}
         onOpenSettings={() => enterprise.setSettingsVisible(true)}
+        onToggleCrosshair={() => setShowCrosshair((value) => !value)}
+        onToggleMagnifier={() => setShowMagnifier((value) => !value)}
+        showCrosshair={showCrosshair}
+        showMagnifier={showMagnifier}
         onRhythmStrip={() => enterprise.setViewMode("monitor")}
         onToggleLeadFocus={() => enterprise.setLeadFocusMode((value) => !value)}
         onToggleLeftPanel={() => setPanelLayout((current) => ({ ...current, leftCollapsed: !current.leftCollapsed }))}
@@ -427,6 +453,8 @@ export function EcgMonitorViewerFoundation({
                 pdfUrl={pdfUrl}
                 processedImageUrl={processedImageUrl}
                 showDigitizedWaveform={false}
+                showCrosshair={showCrosshair}
+                showMagnifier={showMagnifier}
                 viewMode="ai-review"
                 workspace={workspace}
               />
@@ -462,7 +490,9 @@ export function EcgMonitorViewerFoundation({
                 onFpsUpdate={setRenderFps}
                 pdfUrl={pdfUrl}
                 processedImageUrl={processedImageUrl}
+                showCrosshair={showCrosshair}
                 showDigitizedWaveform={enterprise.showDigitizedWaveform}
+                showMagnifier={showMagnifier}
                 viewMode={enterprise.viewMode}
                 workspace={workspace}
               />
@@ -479,9 +509,17 @@ export function EcgMonitorViewerFoundation({
                 />
               ) : null}
               <View style={styles.leftRailHost}>
+              <EcgClinicalWorkflowTimeline
+                analysis={analysis}
+                digitalEcg={digitalEcg}
+                digitizing={digitizeMutation.isPending}
+                hasReport={!!pdfUrl}
+                reviewed={!!ecgCase.reviewedBy}
+              />
               <EcgViewerLeftRail
               compareCaseId={enterprise.compareCaseId}
               leadFocusMode={enterprise.leadFocusMode}
+              notes={ecgCase.clinicalNotes ?? ecgCase.clinicalComments ?? undefined}
               onSelectCompare={(caseId) => {
                 enterprise.setCompareCaseId(caseId);
                 enterprise.setCompareMode(true);
@@ -522,6 +560,8 @@ export function EcgMonitorViewerFoundation({
         />
       </View>
       </View>
+
+      <EcgCommandPalette commands={commandItems} onClose={() => setCommandPaletteOpen(false)} visible={commandPaletteOpen} />
 
       <EcgViewerSettingsPanel aiOverlay={aiOverlay} controls={controls} onClose={() => enterprise.setSettingsVisible(false)} visible={enterprise.settingsVisible} />
     </View>

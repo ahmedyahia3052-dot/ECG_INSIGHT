@@ -56,7 +56,7 @@ function ToolButton({ action }: { action: ToolAction }) {
 
 function ToolGroupSection({ group }: { group: ToolGroup }) {
   return (
-    <View nativeID={`sprint24-ribbon-group-${group.id}`} style={styles.group} testID={`sprint21-toolbar-group-${group.id}`}>
+    <View nativeID={`sprint25-ribbon-group-${group.id}`} style={styles.group} testID={`sprint21-toolbar-group-${group.id}`}>
       <Text style={styles.groupLabel}>{group.label}</Text>
       <View style={styles.groupRow}>
         {group.actions.map((action) => (
@@ -84,10 +84,13 @@ export const EcgWorkstationToolbar = memo(function EcgWorkstationToolbar({
   onLeadCycle,
   onLeadLayoutChange,
   onOpenCases,
+  onOpenCommandPalette,
   onOpenSettings,
   onRhythmStrip,
+  onToggleCrosshair,
   onToggleLeadFocus,
   onToggleLeftPanel,
+  onToggleMagnifier,
   onToggleRightPanel,
   onToggleTheme,
   onUpload,
@@ -95,7 +98,9 @@ export const EcgWorkstationToolbar = memo(function EcgWorkstationToolbar({
   playback,
   recentCaseId,
   selectedLead,
+  showCrosshair = false,
   showDigitizedWaveform,
+  showMagnifier = false,
   viewMode,
   workspace,
 }: {
@@ -115,10 +120,13 @@ export const EcgWorkstationToolbar = memo(function EcgWorkstationToolbar({
   onLeadCycle?: () => void;
   onLeadLayoutChange?: (layout: EcgLeadLayoutMode) => void;
   onOpenCases?: () => void;
+  onOpenCommandPalette?: () => void;
   onOpenSettings?: () => void;
   onRhythmStrip?: () => void;
+  onToggleCrosshair?: () => void;
   onToggleLeadFocus?: () => void;
   onToggleLeftPanel?: () => void;
+  onToggleMagnifier?: () => void;
   onToggleRightPanel?: () => void;
   onToggleTheme?: () => void;
   onUpload?: () => void;
@@ -126,7 +134,9 @@ export const EcgWorkstationToolbar = memo(function EcgWorkstationToolbar({
   playback?: EcgWaveformPlaybackState;
   recentCaseId?: string;
   selectedLead: EcgLeadId;
+  showCrosshair?: boolean;
   showDigitizedWaveform: boolean;
+  showMagnifier?: boolean;
   viewMode: EcgWorkstationViewMode;
   workspace?: EcgMeasurementWorkspace;
 }) {
@@ -143,6 +153,7 @@ export const EcgWorkstationToolbar = memo(function EcgWorkstationToolbar({
         { icon: "upload", label: "Upload", onPress: onUpload, shortcut: "Ctrl+U" },
         { icon: "camera", label: "Capture", onPress: onCapture },
         { icon: "clock", label: "Recent", onPress: onOpenCases },
+        { icon: "command", label: "Commands", onPress: onOpenCommandPalette, shortcut: "Ctrl+K", testID: "sprint25-open-command-palette" },
       ],
     },
     {
@@ -154,42 +165,24 @@ export const EcgWorkstationToolbar = memo(function EcgWorkstationToolbar({
         { icon: "maximize-2", label: "Fit W", onPress: () => controls.applyFit("width") },
         { icon: "minimize-2", label: "Fit H", onPress: () => controls.applyFit("height") },
         { icon: "target", label: "Actual", onPress: () => controls.applyFit("100"), shortcut: "Ctrl+0" },
+        { icon: "maximize", label: "Auto Fit", onPress: () => controls.applyFit("width") },
         { active: controls.panMode === "active", icon: "move", label: "Pan", onPress: controls.togglePanMode },
+        { active: showCrosshair, icon: "crosshair", label: "Crosshair", onPress: onToggleCrosshair, testID: "sprint25-toggle-crosshair" },
+        { active: showMagnifier, icon: "search", label: "Magnifier", onPress: onToggleMagnifier, testID: "sprint25-toggle-magnifier" },
         { icon: "rotate-cw", label: "Rotate", onPress: controls.rotate },
         { icon: "refresh-cw", label: "Reset", onPress: controls.resetView },
         { icon: "maximize", label: controls.fullscreen ? "Exit FS" : "Full", onPress: controls.toggleFullscreen, shortcut: "F11" },
       ],
     },
     {
-      id: "grid",
-      label: "GRID",
+      id: "digitize",
+      label: "DIGITIZE",
       actions: [
-        { icon: "bar-chart-2", label: `Gain ${controls.grid.gain}`, onPress: controls.cycleGain, testID: "sprint18-gain" },
-        { icon: "activity", label: `Speed ${controls.grid.speed}`, onPress: controls.cycleSpeed, testID: "sprint18-speed" },
-        { active: controls.grid.visible, icon: "grid", label: "Grid", onPress: controls.toggleGrid },
-        { icon: "sun", label: "Bright+", onPress: () => controls.adjustBrightness(8) },
-        { icon: "moon", label: "Bright−", onPress: () => controls.adjustBrightness(-8) },
-        { icon: "sliders", label: "Contrast", onPress: () => controls.adjustContrast(8) },
-      ],
-    },
-    {
-      id: "leads",
-      label: "LEADS",
-      actions: [
-        { icon: "chevrons-right", label: selectedLead, onPress: onLeadCycle },
-        {
-          active: leadLayout === "rhythm",
-          icon: "bar-chart",
-          label: "Rhythm",
-          onPress: () => {
-            onLeadLayoutChange?.("rhythm");
-            onRhythmStrip?.();
-          },
-        },
-        { active: leadLayout === "12-lead", icon: "layers", label: "12 Lead", onPress: () => onLeadLayoutChange?.("12-lead") },
-        { active: viewMode === "waveform", icon: "activity", label: "Waveform", onPress: () => onViewModeChange?.("waveform") },
         { icon: "cpu", label: "Digitize", onPress: onDigitize, testID: "sprint18-digitize" },
-        { icon: "crosshair", label: "Focus", onPress: onToggleLeadFocus },
+        { active: viewMode === "processed", icon: "filter", label: "Processed", onPress: () => onViewModeChange?.("processed") },
+        { active: viewMode === "waveform", icon: "activity", label: "Waveform", onPress: () => onViewModeChange?.("waveform") },
+        { icon: "grid", label: "Grid Det.", onPress: () => onViewModeChange?.("processed") },
+        { icon: "layers", label: "Lead Det.", onPress: onLeadCycle },
       ],
     },
     {
@@ -200,7 +193,22 @@ export const EcgWorkstationToolbar = memo(function EcgWorkstationToolbar({
         { icon: playback?.isPlaying ? "pause" : "play", label: playback?.isPlaying ? "Pause" : "Play", onPress: playback?.togglePlay },
         { active: playback?.frozen, icon: "pause-circle", label: "Freeze", onPress: () => playback?.setFrozen(!playback?.frozen) },
         { active: playback?.loop, icon: "repeat", label: "Loop", onPress: () => playback?.setLoop(!playback?.loop) },
-        { active: viewMode === "processed", icon: "filter", label: "Processed", onPress: () => onViewModeChange?.("processed") },
+        { icon: "bar-chart-2", label: `Gain ${controls.grid.gain}`, onPress: controls.cycleGain, testID: "sprint18-gain" },
+        { icon: "activity", label: `Speed ${controls.grid.speed}`, onPress: controls.cycleSpeed, testID: "sprint18-speed" },
+        { active: controls.grid.visible, icon: "grid", label: "Grid", onPress: controls.toggleGrid },
+        { icon: "sun", label: "Bright+", onPress: () => controls.adjustBrightness(8) },
+        { icon: "sliders", label: "Contrast", onPress: () => controls.adjustContrast(8) },
+      ],
+    },
+    {
+      id: "measure",
+      label: "MEASURE",
+      actions: [
+        { active: workspace?.present.toolMode === "caliper", icon: "maximize", label: "Caliper", onPress: () => workspace?.setToolMode("caliper") },
+        { active: measureActive, icon: "edit-3", label: "Manual", onPress: () => workspace?.setToolMode(measureActive ? "select" : "measurement") },
+        { active: viewMode === "measurement", icon: "sliders", label: "Measure", onPress: () => onViewModeChange?.("measurement"), testID: "sprint21-measurement-mode" },
+        { icon: "chevrons-right", label: selectedLead, onPress: onLeadCycle },
+        { icon: "crosshair", label: "Focus", onPress: onToggleLeadFocus },
       ],
     },
     {
@@ -209,12 +217,7 @@ export const EcgWorkstationToolbar = memo(function EcgWorkstationToolbar({
       actions: [
         { active: viewMode === "ai-review" || viewMode === "overlay", icon: "eye", label: "Interpret", onPress: () => onViewModeChange?.("ai-review") },
         { active: overlayEnabled, icon: "aperture", label: "Overlay", onPress: () => aiOverlay?.toggleOverlay() },
-        {
-          active: heatmapEnabled,
-          icon: "map",
-          label: "Heatmap",
-          onPress: () => aiOverlay?.setSettings({ showHeatmap: !heatmapEnabled }),
-        },
+        { active: heatmapEnabled, icon: "map", label: "Heatmap", onPress: () => aiOverlay?.setSettings({ showHeatmap: !heatmapEnabled }) },
         { icon: "shield", label: "Confidence", onPress: () => aiOverlay?.setSettings({ showLabels: true, enabled: true }) },
       ],
     },
@@ -233,29 +236,26 @@ export const EcgWorkstationToolbar = memo(function EcgWorkstationToolbar({
       label: "REPORT",
       actions: [
         { icon: "file-text", label: "PDF", onPress: onExportPdf, testID: "sprint18-export-pdf" },
-        { icon: "image", label: "PNG", onPress: onExportPng, testID: "sprint18-export-png" },
-        { icon: "code", label: "JSON", onPress: onExportJson },
-        { icon: "grid", label: "CSV", onPress: onExportCsv },
         { icon: "file", label: "Preview", onPress: () => onViewModeChange?.("report"), testID: "sprint21-open-report" },
       ],
     },
     {
-      id: "tools",
-      label: "TOOLS",
+      id: "export",
+      label: "EXPORT",
       actions: [
-        { active: workspace?.present.toolMode === "caliper", icon: "maximize", label: "Caliper", onPress: () => workspace?.setToolMode("caliper") },
-        { active: measureActive, icon: "edit-3", label: "Manual", onPress: () => workspace?.setToolMode(measureActive ? "select" : "measurement") },
-        { active: viewMode === "measurement", icon: "sliders", label: "Measure", onPress: () => onViewModeChange?.("measurement"), testID: "sprint21-measurement-mode" },
-        { icon: "tool", label: "Settings", onPress: onOpenSettings },
+        { icon: "image", label: "PNG", onPress: onExportPng, testID: "sprint18-export-png" },
+        { icon: "code", label: "JSON", onPress: onExportJson },
+        { icon: "grid", label: "CSV", onPress: onExportCsv },
         { icon: "menu", label: "Left", onPress: onToggleLeftPanel, testID: "sprint22-toggle-left-panel" },
         { icon: "columns", label: "Right", onPress: onToggleRightPanel, testID: "sprint22-toggle-right-panel" },
+        { icon: "tool", label: "Settings", onPress: onOpenSettings },
         { icon: "settings", label: "Theme", onPress: onToggleTheme },
       ],
     },
   ];
 
   return (
-    <View nativeID="sprint21-ecg-workstation-toolbar" style={styles.toolbar} testID="sprint24-hospital-ribbon-toolbar">
+    <View nativeID="sprint25-hospital-command-ribbon" style={styles.toolbar} testID="sprint25-hospital-command-ribbon">
       <View style={styles.ribbonWrap}>
         {groups.map((group) => (
           <ToolGroupSection key={group.id} group={group} />
