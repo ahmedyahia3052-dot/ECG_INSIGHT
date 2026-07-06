@@ -1,13 +1,6 @@
-# Performance Report — Sprint 28
+# Performance Report — Sprint 23
 
-## Targets: 60 FPS, ≤16.7ms frame time
-
-Optimizations: virtual sample windowing, dirty rects, memoized pipeline, momentum pan decay.
-
-## Benchmark
-
-Run `npx tsx scripts/ecg-rendering-engine.test.ts` and `npx tsx scripts/ecg-clinical-visualization.test.ts`.
-
-SVG 12-lead @ 50k samples: 60 FPS sustained via visible-window tessellation.
-
-**Result: PASS**
+- Canvas resize optimized (no buffer reset every frame unless size changes)
+- Visual inspector confirms monitor canvas fills host at 1920×1080
+- RAF loop retained for 60 FPS phosphor sweep
+- Status bar FPS/GPU/memory metrics available via `sprint21-enterprise-status-bar`

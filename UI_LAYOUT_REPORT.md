@@ -1,37 +1,41 @@
-# UI Layout Report — Sprint 25
+# UI Layout Report — Sprint 29 Zero-Chrome Clinical Workspace
 
 **Date:** 2026-07-06  
-**Status:** PASS
+**Overall:** Hospital-grade zero-chrome layout
 
-## Layout Structure
+## Layout Architecture
 
 ```
-┌─────────────────────────────────────────────────────────┐
-│ Title + View Mode Switcher                              │
-├─────────────────────────────────────────────────────────┤
-│ Command Ribbon (FILE | VIEW | DIGITIZE | MONITOR | …)   │
-├──────────┬──────────────────────────────┬───────────────┤
-│ Left Nav │                              │ Clinical      │
-│ + Cards  │     ECG Viewer (~70%)        │ Decision      │
-│ + Flow   │                              │ Panel         │
-├──────────┴──────────────────────────────┴───────────────┤
-│ Playback Timeline + Hospital Status Bar                 │
-└─────────────────────────────────────────────────────────┘
+EcgMonitorViewerFoundation
+├── EcgViewModeSwitcher (compact single row)
+├── EcgZeroChromeToolbar (contextual collapsible groups, ≤48px)
+└── EcgViewerResizableWorkspace
+    └── EcgEnterpriseLayoutEngine (auto-hide panels)
+        └── EcgWorkstationGridShell (CSS grid, ≥80% center)
+            ├── Left rail (240px / 60px collapsed)
+            ├── Center viewer + EcgFloatingToolPalette
+            ├── Right clinical tabs (220px / 48px collapsed)
+            └── EcgEnterpriseStatusBar (28px)
 ```
 
-## Docking
+## Space Optimization
 
-| Region | Default | Resizable | Collapsible | Persisted |
-|--------|---------|-----------|-------------|-----------|
-| Left | 260px | Drag handle | Yes | localStorage v2 |
-| Center | 1fr (~70%) | Expands on collapse | — | — |
-| Right | 280px | Drag handle | Yes | localStorage v2 |
-| Bottom | auto | — | — | — |
+| Element | Before (Sprint 26) | After (Sprint 29) |
+|---------|-------------------|-------------------|
+| Toolbar height | 44px flat ribbon | 48px contextual groups |
+| Workspace padding | 4px | 2px |
+| Workspace gap | 4px | 2px |
+| Header title row | Always visible | Removed (zero-chrome) |
+| Side panels | Manual toggle only | Auto-hide + hover expand |
+| Tool visibility | All tools in scroll row | Mode-contextual groups |
 
-## Grid Test ID
+## Diagnostic Mode (F11)
 
-`sprint25-workstation-dock`
+- Hides toolbar, mode switcher, left/right panels
+- Black background, patient identifier strip only
+- Floating tool palette forced visible
+- ESC or exit button restores workspace
 
-## Responsive Viewports Validated
+## Viewer Area Target
 
-1366×768, 1440×900, 1536×864, 1920×1080, 2560×1440
+Center column uses `minmax(0, 1fr)` — viewer receives all remaining horizontal space after collapsed rails (60px + 48px minimum).

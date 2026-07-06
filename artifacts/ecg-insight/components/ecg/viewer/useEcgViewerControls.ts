@@ -198,10 +198,6 @@ export function useEcgViewerControls() {
         event.preventDefault();
         applyFit("100");
       }
-      if (event.key === "F11") {
-        event.preventDefault();
-        toggleFullscreen();
-      }
     };
     const onKeyUp = (event: KeyboardEvent) => {
       if (event.code === "Space") setSpacePanActive(false);

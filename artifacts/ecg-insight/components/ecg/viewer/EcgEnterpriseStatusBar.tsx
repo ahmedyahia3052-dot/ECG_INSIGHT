@@ -21,6 +21,7 @@ function StatusChip({ label, testID, value }: { label: string; testID?: string; 
 export function EcgEnterpriseStatusBar({
   apiStatus,
   canvasResolution,
+  coordinates,
   cpuUsage,
   fps,
   gain,
@@ -41,7 +42,6 @@ export function EcgEnterpriseStatusBar({
   autoRefresh?: string;
   backendStatus?: EnterpriseStatusMetrics["backendStatus"];
   canvasResolution?: string;
-  canvasStatus?: string;
   coordinates?: string;
   cpuUsage?: number;
   digitizationQuality?: string;
@@ -64,7 +64,7 @@ export function EcgEnterpriseStatusBar({
   const mode = renderMode ?? renderingMode ?? "SVG";
   const memLabel = memory?.jsHeapMb ? `${memory.jsHeapMb}MB` : "—";
   return (
-    <View style={styles.bar} testID="sprint28-enterprise-status-bar" nativeID="sprint24-hospital-status-bar">
+    <View style={styles.bar} testID="sprint29-enterprise-status-bar" nativeID="sprint28-enterprise-status-bar">
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.row}>
         {patientName ? <StatusChip label="Patient" testID="sprint24-status-patient" value={patientName} /> : null}
         <StatusChip label="Zoom" testID="sprint17-status-zoom" value={`${Math.round(zoom * 100)}%`} />
@@ -77,6 +77,7 @@ export function EcgEnterpriseStatusBar({
         {typeof cpuUsage === "number" ? <StatusChip label="CPU" testID="sprint28-status-cpu" value={`${cpuUsage}%`} /> : null}
         <StatusChip label="Mem" testID="sprint28-status-memory" value={memLabel} />
         {canvasResolution ? <StatusChip label="Canvas" testID="sprint28-status-canvas" value={canvasResolution} /> : null}
+        {coordinates ? <StatusChip label="XY" testID="sprint29-status-coordinates" value={coordinates} /> : null}
         {typeof renderTimeMs === "number" ? <StatusChip label="Frame" testID="sprint28-status-frame" value={`${renderTimeMs}ms`} /> : null}
         <StatusChip label="Render" testID="sprint28-status-render-mode" value={mode} />
         {signalQuality ? <StatusChip label="Signal" testID="sprint28-status-signal-quality" value={signalQuality} /> : null}

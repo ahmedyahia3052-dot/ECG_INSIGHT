@@ -3,10 +3,7 @@ import { Platform, StyleSheet, View } from "react-native";
 
 import { ECG_WORKSTATION_VISUAL } from "./ecgWorkstationVisualTokens";
 
-const MIN_SIDE = 180;
-const MAX_SIDE = 360;
-
-/** Sprint 26 — docking layout optimized for ≥80% center viewer area. */
+/** Sprint 29 — docking layout optimized for ≥80% center viewer with hover-expand rails. */
 export function EcgWorkstationGridShell({
   bottom,
   center,
@@ -31,6 +28,8 @@ export function EcgWorkstationGridShell({
   rightWidth?: number;
 }) {
   const dragRef = useRef<{ edge: "left" | "right"; startX: number; startWidth: number } | null>(null);
+  const minSide = ECG_WORKSTATION_VISUAL.leftPanelMinWidth;
+  const maxSide = ECG_WORKSTATION_VISUAL.leftPanelMaxWidth;
 
   const startDrag = useCallback(
     (edge: "left" | "right", event: React.MouseEvent) => {
@@ -45,8 +44,8 @@ export function EcgWorkstationGridShell({
         const delta = moveEvent.clientX - dragRef.current.startX;
         const next =
           dragRef.current.edge === "left"
-            ? Math.min(MAX_SIDE, Math.max(MIN_SIDE, dragRef.current.startWidth + delta))
-            : Math.min(MAX_SIDE, Math.max(MIN_SIDE, dragRef.current.startWidth - delta));
+            ? Math.min(maxSide, Math.max(minSide, dragRef.current.startWidth + delta))
+            : Math.min(maxSide, Math.max(minSide, dragRef.current.startWidth - delta));
         if (dragRef.current.edge === "left") onLeftWidthChange?.(next);
         else onRightWidthChange?.(next);
       };
@@ -58,12 +57,20 @@ export function EcgWorkstationGridShell({
       window.addEventListener("mousemove", onMove);
       window.addEventListener("mouseup", onUp);
     },
-    [leftWidth, onLeftWidthChange, onRightWidthChange, rightWidth],
+    [leftWidth, maxSide, minSide, onLeftWidthChange, onRightWidthChange, rightWidth],
+  );
+
+  const resetWidth = useCallback(
+    (edge: "left" | "right") => {
+      if (edge === "left") onLeftWidthChange?.(ECG_WORKSTATION_VISUAL.leftExpandedWidth);
+      else onRightWidthChange?.(ECG_WORKSTATION_VISUAL.rightExpandedWidth);
+    },
+    [onLeftWidthChange, onRightWidthChange],
   );
 
   const gap = ECG_WORKSTATION_VISUAL.workspaceGap;
   const leftCol = leftCollapsed ? `${ECG_WORKSTATION_VISUAL.leftCollapsedWidth}px` : `${leftWidth}px`;
-  const rightCol = rightCollapsed ? "0px" : `${rightWidth}px`;
+  const rightCol = rightCollapsed ? `${ECG_WORKSTATION_VISUAL.rightCollapsedWidth}px` : `${rightWidth}px`;
 
   if (Platform.OS !== "web") {
     return (
@@ -71,7 +78,7 @@ export function EcgWorkstationGridShell({
         <View style={styles.nativeRow}>
           <View style={[styles.nativeSide, { width: leftCollapsed ? ECG_WORKSTATION_VISUAL.leftCollapsedWidth : leftWidth }]}>{left}</View>
           <View style={styles.nativeCenter}>{center}</View>
-          {!rightCollapsed ? <View style={[styles.nativeSide, { width: rightWidth }]}>{right}</View> : null}
+          <View style={[styles.nativeSide, { width: rightCollapsed ? ECG_WORKSTATION_VISUAL.rightCollapsedWidth : rightWidth }]}>{right}</View>
         </View>
         <View style={styles.nativeBottom}>{bottom}</View>
       </View>
@@ -81,8 +88,8 @@ export function EcgWorkstationGridShell({
   return createElement(
     "div",
     {
-      "data-testid": "sprint26-workstation-layout",
-      nativeID: "sprint25-workstation-dock",
+      "data-testid": "sprint29-enterprise-layout",
+      nativeID: "sprint26-workstation-layout",
       style: {
         boxSizing: "border-box",
         display: "grid",
@@ -115,7 +122,8 @@ export function EcgWorkstationGridShell({
       left,
       !leftCollapsed
         ? createElement("div", {
-            "data-testid": "sprint26-resize-left",
+            "data-testid": "sprint29-resize-left",
+            onDoubleClick: () => resetWidth("left"),
             onMouseDown: (event: React.MouseEvent) => startDrag("left", event),
             role: "separator",
             style: { bottom: 0, cursor: "col-resize", position: "absolute", right: -2, top: 0, width: 4, zIndex: 20 },
@@ -127,17 +135,19 @@ export function EcgWorkstationGridShell({
       "div",
       {
         style: {
-          display: rightCollapsed ? "none" : "flex",
+          display: "flex",
           gridArea: "right",
           minHeight: 0,
           minWidth: 0,
           overflow: "hidden",
           position: "relative",
+          transition: "width 180ms ease",
         },
       },
       !rightCollapsed
         ? createElement("div", {
-            "data-testid": "sprint26-resize-right",
+            "data-testid": "sprint29-resize-right",
+            onDoubleClick: () => resetWidth("right"),
             onMouseDown: (event: React.MouseEvent) => startDrag("right", event),
             role: "separator",
             style: { bottom: 0, cursor: "col-resize", left: -2, position: "absolute", top: 0, width: 4, zIndex: 20 },

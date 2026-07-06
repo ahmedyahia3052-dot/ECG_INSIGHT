@@ -1,16 +1,19 @@
-import React, { type ReactNode, useEffect, useState } from "react";
+import React, { type ReactNode, useCallback, useEffect, useRef, useState } from "react";
 import { Platform, StyleSheet, View } from "react-native";
 
+import { EcgEnterpriseLayoutEngine } from "./EcgEnterpriseLayoutEngine";
 import { ECG_WORKSTATION_VISUAL } from "./ecgWorkstationVisualTokens";
-import { EcgWorkstationGridShell } from "./EcgWorkstationGridShell";
 
-const LAYOUT_KEY = "ecg-insight:ecg-monitor-panel-layout-v3";
+const LAYOUT_KEY = "ecg-insight:ecg-monitor-panel-layout-v4";
 
 type SavedLayout = {
+  autoHidePanels?: boolean;
   bottomSize?: number;
   leftCollapsed?: boolean;
+  leftPinned?: boolean;
   leftSize?: number;
   rightCollapsed?: boolean;
+  rightPinned?: boolean;
   rightSize?: number;
 };
 
@@ -21,9 +24,12 @@ function loadLayout(): SavedLayout {
   try {
     const raw =
       window.localStorage.getItem(LAYOUT_KEY) ??
-      window.localStorage.getItem("ecg-insight:ecg-monitor-panel-layout-v2") ??
-      window.localStorage.getItem("ecg-insight:ecg-monitor-panel-layout");
+      window.localStorage.getItem("ecg-insight:ecg-monitor-panel-layout-v3") ??
+      window.localStorage.getItem("ecg-insight:ecg-monitor-panel-layout-v2");
     return {
+      autoHidePanels: true,
+      leftPinned: true,
+      rightPinned: false,
       leftSize: ECG_WORKSTATION_VISUAL.leftExpandedWidth,
       rightSize: ECG_WORKSTATION_VISUAL.rightExpandedWidth,
       ...(JSON.parse(raw ?? "{}") as SavedLayout),
@@ -45,64 +51,53 @@ function saveLayout(layout: SavedLayout) {
 type Props = {
   bottom: ReactNode;
   center: ReactNode;
+  diagnosticMode?: boolean;
   layout?: SavedLayout;
   left: ReactNode;
   onLayoutChange?: (layout: SavedLayout) => void;
   right: ReactNode;
 };
 
-export function EcgViewerResizableWorkspace({ bottom, center, layout: controlledLayout, left, onLayoutChange, right }: Props) {
+export function EcgViewerResizableWorkspace({ bottom, center, diagnosticMode = false, layout: controlledLayout, left, onLayoutChange, right }: Props) {
   const [layout, setLayout] = useState<SavedLayout>(() => controlledLayout ?? loadLayout());
+  const mergedRef = useRef(layout);
 
   useEffect(() => {
-    if (controlledLayout) setLayout(controlledLayout);
+    if (controlledLayout) setLayout((current) => ({ ...current, ...controlledLayout }));
   }, [controlledLayout]);
 
   useEffect(() => {
+    mergedRef.current = layout;
     saveLayout(layout);
     onLayoutChange?.(layout);
   }, [layout, onLayoutChange]);
 
-  const updateLayout = (patch: Partial<SavedLayout>) => setLayout((current) => ({ ...current, ...patch }));
-
-  if (Platform.OS === "web") {
-    return (
-      <View style={styles.webRoot}>
-        <EcgWorkstationGridShell
-          bottom={bottom}
-          center={center}
-          left={left}
-          leftCollapsed={!!layout.leftCollapsed}
-          leftWidth={layout.leftSize ?? ECG_WORKSTATION_VISUAL.leftExpandedWidth}
-          onLeftWidthChange={(leftSize) => updateLayout({ leftSize })}
-          onRightWidthChange={(rightSize) => updateLayout({ rightSize })}
-          right={right}
-          rightCollapsed={!!layout.rightCollapsed}
-          rightWidth={layout.rightSize ?? ECG_WORKSTATION_VISUAL.rightExpandedWidth}
-        />
-      </View>
-    );
-  }
+  const updateLayout = useCallback((patch: Partial<SavedLayout>) => setLayout((current) => ({ ...current, ...patch })), []);
 
   return (
-    <View style={styles.nativeColumn}>
-      <View style={styles.nativeMainRow}>
-        <View style={[styles.nativeSide, { width: layout.leftCollapsed ? ECG_WORKSTATION_VISUAL.leftCollapsedWidth : layout.leftSize ?? 240 }]}>
-          {left}
-        </View>
-        <View style={styles.nativeCenter}>{center}</View>
-        {!layout.rightCollapsed ? <View style={[styles.nativeSide, { width: layout.rightSize ?? 220 }]}>{right}</View> : null}
-      </View>
-      <View style={styles.nativeBottom}>{bottom}</View>
+    <View style={styles.webRoot}>
+      <EcgEnterpriseLayoutEngine
+        autoHidePanels={layout.autoHidePanels ?? true}
+        bottom={bottom}
+        center={center}
+        diagnosticMode={diagnosticMode}
+        left={left}
+        leftCollapsed={!!layout.leftCollapsed}
+        leftPinned={layout.leftPinned ?? true}
+        leftWidth={layout.leftSize ?? ECG_WORKSTATION_VISUAL.leftExpandedWidth}
+        onLeftCollapsedChange={(leftCollapsed) => updateLayout({ leftCollapsed })}
+        onLeftWidthChange={(leftSize) => updateLayout({ leftSize })}
+        onRightCollapsedChange={(rightCollapsed) => updateLayout({ rightCollapsed })}
+        onRightWidthChange={(rightSize) => updateLayout({ rightSize })}
+        right={right}
+        rightCollapsed={!!layout.rightCollapsed}
+        rightPinned={layout.rightPinned ?? false}
+        rightWidth={layout.rightSize ?? ECG_WORKSTATION_VISUAL.rightExpandedWidth}
+      />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  nativeBottom: { flexShrink: 0 },
-  nativeCenter: { flex: 1, minWidth: 0 },
-  nativeColumn: { flex: 1, gap: ECG_WORKSTATION_VISUAL.workspaceGap, minHeight: 0 },
-  nativeMainRow: { flex: 1, flexDirection: "row", gap: ECG_WORKSTATION_VISUAL.workspaceGap, minHeight: 0 },
-  nativeSide: { flexShrink: 0 },
   webRoot: { display: "flex", flex: 1, height: "100%", minHeight: 0, overflow: "hidden", width: "100%" },
 });

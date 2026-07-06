@@ -26,7 +26,7 @@ export const EcgViewModeSwitcher = memo(function EcgViewModeSwitcher({
   const activeValue = value === "overlay" ? "overlay" : value;
 
   return (
-    <View nativeID="sprint26-view-mode-switcher" style={styles.root} testID="sprint26-view-mode-switcher">
+    <View nativeID="sprint26-view-mode-switcher" style={styles.root} testID="sprint29-view-mode-switcher">
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.row}>
         {MODES.map((mode) => {
           const active = activeValue === mode.id || (mode.id === "ai-review" && value === "overlay");

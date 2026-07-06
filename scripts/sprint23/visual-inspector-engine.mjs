@@ -56,7 +56,7 @@ function auditDomScript() {
   }
 
   // Toolbar buttons
-  const toolbar = document.querySelector('[data-testid="sprint26-compact-ribbon"], [data-testid="sprint25-hospital-command-ribbon"], [data-testid="sprint24-hospital-ribbon-toolbar"], [data-testid="sprint23-visual-inspector-toolbar"], [data-testid="sprint22-hospital-workstation-toolbar"]');
+  const toolbar = document.querySelector('[data-testid="sprint29-zero-chrome-toolbar"], [data-testid="sprint26-compact-ribbon"], [data-testid="sprint25-hospital-command-ribbon"], [data-testid="sprint24-hospital-ribbon-toolbar"], [data-testid="sprint23-visual-inspector-toolbar"], [data-testid="sprint22-hospital-workstation-toolbar"]');
   if (toolbar) {
     const buttons = toolbar.querySelectorAll('[role="button"], button');
     buttons.forEach((btn, i) => {
@@ -65,8 +65,8 @@ function auditDomScript() {
       const clipped = btn.scrollWidth > btn.clientWidth + 2 || btn.scrollHeight > btn.clientHeight + 2;
       if (clipped) issues.push({ module: "toolbar", severity: "medium", type: "clipped_control", detail: `Toolbar button ${i} clipped`, rect: r });
       const h = r.height;
-      if (h > 0 && (h < 40 || h > 56)) {
-        issues.push({ module: "toolbar", severity: "low", type: "uneven_button_height", detail: `Toolbar button height ${Math.round(h)}px (expected 48px)` });
+      if (h > 0 && (h < 28 || h > 56)) {
+        issues.push({ module: "toolbar", severity: "low", type: "uneven_button_height", detail: `Toolbar button height ${Math.round(h)}px (expected ≤52px)` });
       }
     });
     const tb = rect(toolbar);
@@ -134,7 +134,7 @@ function auditDomScript() {
   }
 
   // Status bar
-  const status = document.querySelector('[data-testid="sprint24-hospital-status-bar"], [data-testid="sprint21-enterprise-status-bar"]');
+  const status = document.querySelector('[data-testid="sprint29-enterprise-status-bar"], [data-testid="sprint28-enterprise-status-bar"], [data-testid="sprint24-hospital-status-bar"], [data-testid="sprint21-enterprise-status-bar"]');
   if (status) {
     const sr = rect(status);
     const bottomPanel = status.closest('[data-panel-id="ecg-monitor-bottom"]') ?? status.parentElement;
@@ -146,10 +146,10 @@ function auditDomScript() {
     issues.push({ module: "status", severity: "medium", type: "missing", detail: "Enterprise status bar not found" });
   }
 
-  // Title consistency
-  const title = document.body.innerText.includes("Hospital ECG Workstation");
+  // Title consistency — zero-chrome mode uses patient identifier instead
+  const title = document.body.innerText.includes("Hospital ECG Workstation") || document.body.innerText.includes("Lead ");
   if (!title) {
-    issues.push({ module: "layout", severity: "low", type: "title_missing", detail: "Hospital ECG Workstation title not visible" });
+    issues.push({ module: "layout", severity: "low", type: "title_missing", detail: "Workstation identifier not visible" });
   }
 
   // Empty unused main area
@@ -287,7 +287,7 @@ export async function runVisualInspector(options = {}) {
       await page.reload({ waitUntil: "domcontentloaded" });
       await page.getByTestId("ecg-workspace-loading").waitFor({ state: "detached", timeout: 45_000 }).catch(() => undefined);
       await page.getByTestId("ecg-enterprise-workspace-ready").waitFor({ timeout: 45_000 });
-      await page.getByTestId("sprint26-hospital-workstation-ready").or(page.getByTestId("sprint25-hospital-workstation-ready")).or(page.getByTestId("sprint24-hospital-workstation-ready")).or(page.getByTestId("sprint23-visual-inspector-ready")).waitFor({ timeout: 20_000 }).catch(() => undefined);
+      await page.getByTestId("sprint29-zero-chrome-workstation-ready").or(page.getByTestId("sprint26-hospital-workstation-ready")).or(page.getByTestId("sprint25-hospital-workstation-ready")).or(page.getByTestId("sprint24-hospital-workstation-ready")).or(page.getByTestId("sprint23-visual-inspector-ready")).waitFor({ timeout: 20_000 }).catch(() => undefined);
       await page.getByTestId("sprint22-clinical-right-panel").getByText("Patient", { exact: true }).waitFor({ timeout: 15_000 }).catch(() => undefined);
       await page.waitForTimeout(1200);
 

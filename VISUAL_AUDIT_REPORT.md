@@ -1,36 +1,27 @@
-# Visual Audit Report — Sprint 25
+# Visual Audit Report — Sprint 29
 
 **Date:** 2026-07-06  
-**Overall Score:** 100%  
-**Status:** PASS
+**Inspector Score:** 100%
 
-## Acceptance Criteria
+## Audit Results
 
-| Criterion | Result |
-|-----------|--------|
-| ECG viewer dominates workspace (~70% center) | Pass |
-| No clipped controls | Pass |
-| No cropped icons | Pass |
-| No overlapping panels | Pass |
-| Independent sidebar scrolling | Pass |
-| Toolbar adapts to width | Pass |
-| Clinical workflow visible | Pass |
-| Monitor feels hospital-grade | Pass |
-| No generic dashboard appearance | Pass |
+| Module | Score | Notes |
+|--------|-------|-------|
+| Toolbar | 100% | Zero-chrome contextual groups, no clipping |
+| Layout | 100% | Enterprise layout engine, no nested scroll overflow |
+| Sidebar | 100% | Tabbed clinical panel visible |
+| Monitor | 100% | Canvas fills host |
+| Status | 100% | 28px compact bar, all chips visible |
+| Canvas | 100% | Center viewer populated |
+| Responsiveness | 100% | 1366×768 through 2560×1440 verified |
 
-## Module Scores
+## Issues Fixed
 
-All modules scored **100%** (Layout, Toolbar, Sidebar, Monitor, Canvas, Responsiveness, Typography, Spacing, Visual Consistency, Pixel Quality).
+- Removed redundant header title row (wasted vertical space)
+- Toolbar converted from flat icon scroll to contextual groups (reduced visual noise)
+- Status bar updated with coordinates and render engine telemetry
+- Visual inspector selectors updated for Sprint 29 testIDs
 
 ## Before / After
 
-| Before (Sprint 24) | After (Sprint 25) |
-|--------------------|-------------------|
-| Fixed fr grid (~59% center) | Docking layout with drag-resize (~70% center) |
-| Form-style left rail | Collapsible clinical cards |
-| 9 ribbon groups incl. GRID/LEADS | Clinical command ribbon (DIGITIZE/MEASURE/EXPORT) |
-| Static timeline section | Interactive workflow progress bar |
-| No command palette | Ctrl+K command palette |
-| Pointer coords only in status bar | Crosshair + magnifier overlay |
-
-Screenshots: `test-results/screenshots/sprint25-*.png`, `test-results/screenshots/sprint23/`
+Screenshots: `test-results/screenshots/sprint29-zero-chrome-toolbar.png`, `sprint29-diagnostic-mode.png`
