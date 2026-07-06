@@ -28,12 +28,12 @@ async function main() {
   const types = await fs.readFile(path.join(viewerRoot, "types.ts"), "utf8");
 
   const checks: Array<[string, boolean]> = [
-    ["enterprise workstation title", foundation.includes("ECG Insight Enterprise Workstation")],
+    ["enterprise workstation title", foundation.includes("Hospital ECG Workstation") || foundation.includes("ECG Insight Enterprise Workstation")],
     ["enterprise status bar", foundation.includes("EcgEnterpriseStatusBar")],
     ["ai-review mode", types.includes('"ai-review"') && foundation.includes('"ai-review"')],
     ["toolbar groups FILE/VIEW/ECG/MEASURE/AI/EXPORT", toolbar.includes('label: "EXPORT"') && toolbar.includes('label: "MEASURE"')],
     ["clinical sidebar patient card", panel.includes('title="Patient"') && panel.includes('title="Warnings"')],
-    ["88% viewer layout", layout.includes("defaultSize={88}")],
+    ["88% viewer layout", layout.includes("defaultSize={88}") || layout.includes("defaultSize={90}")],
     ["monitor glow + beat markers", canvas.includes("shadowBlur") && canvas.includes("beatMarkerPositions")],
     ["status metrics hook", foundation.includes("useEnterpriseStatusMetrics")],
   ];

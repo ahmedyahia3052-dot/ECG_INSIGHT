@@ -5,7 +5,7 @@ async function openEcgWorkspace(page: import("@playwright/test").Page, caseId: s
   await page.goto(`/ecg-workspace?caseId=${caseId}`, { waitUntil: "domcontentloaded" });
   await expect(page.getByTestId("ecg-workspace-loading")).toHaveCount(0, { timeout: 45_000 });
   await expect(page.getByTestId("ecg-enterprise-workspace-ready")).toBeVisible({ timeout: 45_000 });
-  await expect(page.getByTestId("sprint21-ecg-workstation-toolbar")).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByTestId("sprint21-ecg-workstation-toolbar").or(page.getByTestId("sprint22-hospital-workstation-toolbar"))).toBeVisible({ timeout: 20_000 });
 }
 
 test.describe("Sprint 21 ECG Workstation UX Revolution @sprint21", () => {
@@ -29,11 +29,11 @@ test.describe("Sprint 21 ECG Workstation UX Revolution @sprint21", () => {
 
   test("enterprise shell, toolbar groups, and clinical sidebar", async ({ page }) => {
     await openEcgWorkspace(page, caseId);
-    await expect(page.getByText("ECG Insight Enterprise Workstation")).toBeVisible();
+    await expect(page.getByText("Hospital ECG Workstation").or(page.getByText("ECG Insight Enterprise Workstation"))).toBeVisible();
     await expect(page.getByTestId("sprint21-toolbar-group-file")).toBeVisible();
     await expect(page.getByTestId("sprint21-toolbar-group-export")).toBeVisible();
-    await expect(page.getByTestId("sprint21-clinical-right-panel")).toBeVisible();
-    await expect(page.getByTestId("sprint21-clinical-right-panel").getByText("Patient", { exact: true })).toBeVisible();
+    await expect(page.getByTestId("sprint21-clinical-right-panel").or(page.getByTestId("sprint22-clinical-right-panel"))).toBeVisible();
+    await expect(page.getByTestId("sprint21-clinical-right-panel").or(page.getByTestId("sprint22-clinical-right-panel")).getByText("Patient", { exact: true })).toBeVisible();
     await expect(page.getByTestId("sprint21-enterprise-status-bar")).toBeVisible();
     await page.screenshot({ fullPage: true, path: "test-results/screenshots/sprint21-workstation-shell.png" });
   });
@@ -48,7 +48,7 @@ test.describe("Sprint 21 ECG Workstation UX Revolution @sprint21", () => {
     await expect(page.getByTestId("sprint18-waveform-view")).toBeVisible();
     await page.screenshot({ path: "test-results/screenshots/sprint21-mode-waveform.png" });
     await page.getByTestId("sprint21-view-mode-monitor").click();
-    await expect(page.getByTestId("sprint19-monitor-canvas")).toBeVisible();
+    await expect(page.getByTestId("sprint22-hospital-monitor-canvas").or(page.getByTestId("sprint19-monitor-canvas"))).toBeVisible();
     await expect(page.getByTestId("sprint21-status-memory")).toBeVisible();
     await page.screenshot({ path: "test-results/screenshots/sprint21-mode-monitor.png" });
     await page.getByTestId("sprint21-view-mode-ai-review").click();

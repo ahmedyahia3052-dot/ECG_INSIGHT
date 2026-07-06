@@ -1,11 +1,11 @@
-# Test Report — Sprint 19
+# Test Report — Sprint 22
 
-**Date:** 2026-07-05
+**Date:** 2026-07-06
 
-## Static Validation
+## Static Analysis
 
-| Check | Result |
-|-------|--------|
+| Command | Result |
+|---------|--------|
 | `npm run lint` | Pass |
 | `npm run typecheck` | Pass |
 | `npm run build` | Pass |
@@ -14,23 +14,19 @@
 
 | Script | Result |
 |--------|--------|
-| `sprint19-ecg-enterprise-hardening.integration.ts` | Pass |
-| `sprint18-ecg-clinical-workstation.integration.ts` | Pass (regression) |
+| `sprint22-hospital-workstation.integration.ts` | Pass (11 checks) |
+| `sprint21-ecg-workstation-ux-revolution.integration.ts` | Pass (backward compatible) |
 
 ## Playwright E2E
 
 | Spec | Tests | Result |
 |------|-------|--------|
 | `sprint19-ecg-enterprise-hardening.spec.ts` | 2 | Pass |
-| `sprint18-ecg-clinical-workstation.spec.ts` | 4 | Pass |
+| `sprint21-ecg-workstation-ux-revolution.spec.ts` | 2 | Pass |
+| `sprint22-hospital-workstation.spec.ts` | 3 | Pass |
 
-## Coverage Added
+## Sprint 22 Test Coverage
 
-- Report preview panel visibility
-- Measurement view mode
-- Canvas monitor element + monitor status bar
-- View mode chip navigation
-
-## Notes
-
-- Runtime recovery script dashboard greeting selector timed out (pre-existing); ECG workspace Playwright suite passes independently.
+1. Hospital shell + toolbar + clinical sidebar sections
+2. Digital monitor canvas + mini navigator + panel toggle
+3. Digitized waveform + view mode switcher

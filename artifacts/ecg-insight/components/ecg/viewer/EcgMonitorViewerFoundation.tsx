@@ -62,6 +62,10 @@ export function EcgMonitorViewerFoundation({
   const [selectedLead, setSelectedLead] = useState<EcgLeadId>("II");
   const [pointerCoords, setPointerCoords] = useState<{ imageX: number; imageY: number; x: number; y: number } | null>(null);
   const [renderFps, setRenderFps] = useState(60);
+  const [panelLayout, setPanelLayout] = useState<{ bottomSize?: number; leftCollapsed: boolean; leftSize?: number; rightCollapsed: boolean; rightSize?: number }>({
+    leftCollapsed: false,
+    rightCollapsed: false,
+  });
   const imageUrl = absoluteUrl(ecgCase.imagePath ?? ecgCase.originalFileUrl ?? ecgCase.files.find((file) => file.mimeType.startsWith("image/"))?.downloadUrl);
   const pdfUrl = absoluteUrl(ecgCase.pdfPath ?? ecgCase.files.find((file) => file.mimeType.includes("pdf"))?.downloadUrl);
   const controls = useEcgViewerControls();
@@ -294,10 +298,10 @@ export function EcgMonitorViewerFoundation({
   });
 
   return (
-    <View style={[styles.root, controls.fullscreen && styles.fullscreenRoot]} testID="sprint13-ecg-monitor-ready" nativeID="sprint21-ecg-workstation-ready">
+    <View style={[styles.root, controls.fullscreen && styles.fullscreenRoot]} testID="sprint13-ecg-monitor-ready" nativeID="sprint22-hospital-workstation-ready">
       <View style={styles.topBar}>
         <View style={styles.titleBlock}>
-          <Text style={styles.title}>ECG Insight Enterprise Workstation</Text>
+          <Text style={styles.title}>Hospital ECG Workstation</Text>
           <Text style={styles.subtitle}>
             {patientDisplayName(patient)} · {ecgCase.caseNumber ?? ecgCase.caseId} · Lead {selectedLead}
           </Text>
@@ -325,6 +329,8 @@ export function EcgMonitorViewerFoundation({
         onOpenSettings={() => enterprise.setSettingsVisible(true)}
         onRhythmStrip={() => enterprise.setViewMode("monitor")}
         onToggleLeadFocus={() => enterprise.setLeadFocusMode((value) => !value)}
+        onToggleLeftPanel={() => setPanelLayout((current) => ({ ...current, leftCollapsed: !current.leftCollapsed }))}
+        onToggleRightPanel={() => setPanelLayout((current) => ({ ...current, rightCollapsed: !current.rightCollapsed }))}
         onToggleTheme={enterprise.toggleWorkstationTheme}
         onUpload={() => router.push("/upload-ecg" as never)}
         onViewModeChange={enterprise.setViewMode}
@@ -337,6 +343,16 @@ export function EcgMonitorViewerFoundation({
 
       <View style={styles.workspace}>
         <EcgViewerResizableWorkspace
+          layout={panelLayout}
+          onLayoutChange={(layout) =>
+            setPanelLayout({
+              bottomSize: layout.bottomSize,
+              leftCollapsed: layout.leftCollapsed ?? false,
+              leftSize: layout.leftSize,
+              rightCollapsed: layout.rightCollapsed ?? false,
+              rightSize: layout.rightSize,
+            })
+          }
           bottom={
             <View style={styles.bottomStack}>
               <EcgWaveformPlaybackTimeline durationMs={playbackDurationMs} playback={playback} />
@@ -471,6 +487,8 @@ export function EcgMonitorViewerFoundation({
               imageWidth={controls.viewport.imageWidth}
               onDigitize={() => digitizeMutation.mutate()}
               onOpenReview={() => router.push(`/ecg-cases/${ecgCase.id}/review` as never)}
+              caseNumber={ecgCase.caseNumber ?? ecgCase.caseId}
+              previousStudies={previousStudies}
               patient={{ age: patient.age, gender: patient.gender, id: patient.id, name: patientDisplayName(patient) }}
               studyDate={study.studyDate}
               workspace={workspace}

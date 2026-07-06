@@ -5,6 +5,7 @@ const LAYOUT_KEY = "ecg-insight:ecg-monitor-panel-layout";
 
 type SavedLayout = {
   bottomSize?: number;
+  leftCollapsed?: boolean;
   leftSize?: number;
   rightCollapsed?: boolean;
   rightSize?: number;
@@ -31,16 +32,23 @@ function saveLayout(layout: SavedLayout) {
 type Props = {
   bottom: ReactNode;
   center: ReactNode;
+  layout?: SavedLayout;
   left: ReactNode;
+  onLayoutChange?: (layout: SavedLayout) => void;
   right: ReactNode;
 };
 
-export function EcgViewerResizableWorkspace({ bottom, center, left, right }: Props) {
-  const [layout, setLayout] = useState<SavedLayout>(() => loadLayout());
+export function EcgViewerResizableWorkspace({ bottom, center, layout: controlledLayout, left, onLayoutChange, right }: Props) {
+  const [layout, setLayout] = useState<SavedLayout>(() => controlledLayout ?? loadLayout());
+
+  useEffect(() => {
+    if (controlledLayout) setLayout(controlledLayout);
+  }, [controlledLayout]);
 
   useEffect(() => {
     saveLayout(layout);
-  }, [layout]);
+    onLayoutChange?.(layout);
+  }, [layout, onLayoutChange]);
 
   if (Platform.OS === "web") {
     return <WebWorkspace bottom={bottom} center={center} layout={layout} left={left} onLayoutChange={setLayout} right={right} />;
@@ -89,13 +97,21 @@ function WebWorkspace({
 
   return (
     <Group id="ecg-monitor-workspace" orientation="vertical" style={styles.webRoot}>
-      <Panel defaultSize={88} id="ecg-monitor-main" minSize={62}>
+      <Panel defaultSize={90} id="ecg-monitor-main" minSize={68}>
         <Group orientation="horizontal" style={styles.webRoot}>
-          <Panel defaultSize={layout.leftSize ?? 18} id="ecg-monitor-left" maxSize={28} minSize={14}>
-            <View style={styles.panelFill}>{left}</View>
-          </Panel>
-          <Separator style={styles.separator} />
-          <Panel defaultSize={layout.rightCollapsed ? 82 : 58} id="ecg-monitor-center" minSize={40}>
+        {!layout.leftCollapsed ? (
+          <>
+            <Panel defaultSize={layout.leftSize ?? 16} id="ecg-monitor-left" maxSize={24} minSize={12}>
+              <View style={styles.panelFill}>{left}</View>
+            </Panel>
+            <Separator style={styles.separator} />
+          </>
+        ) : null}
+          <Panel
+            defaultSize={layout.leftCollapsed && layout.rightCollapsed ? 100 : layout.leftCollapsed || layout.rightCollapsed ? 78 : 58}
+            id="ecg-monitor-center"
+            minSize={44}
+          >
             <View style={styles.panelFill}>{center}</View>
           </Panel>
           {!layout.rightCollapsed ? (
@@ -109,7 +125,7 @@ function WebWorkspace({
         </Group>
       </Panel>
       <Separator style={styles.separatorHorizontal} />
-      <Panel defaultSize={12} id="ecg-monitor-bottom" maxSize={24} minSize={8}>
+      <Panel defaultSize={10} id="ecg-monitor-bottom" maxSize={18} minSize={6}>
         <View style={styles.panelFill}>{bottom}</View>
       </Panel>
     </Group>
@@ -125,5 +141,5 @@ const styles = StyleSheet.create({
   panelFill: { flex: 1, height: "100%", minHeight: 0, overflow: "hidden" },
   separator: { backgroundColor: "rgba(148,163,184,0.18)", width: 6 },
   separatorHorizontal: { backgroundColor: "rgba(148,163,184,0.18)", height: 6 },
-  webRoot: { display: "flex", flex: 1, height: "100%", minHeight: 0, width: "100%" },
+  webRoot: { display: "flex", flex: 1, height: "100%", minHeight: 0, overflow: "hidden", width: "100%" },
 });

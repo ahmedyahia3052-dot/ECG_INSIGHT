@@ -1,4 +1,4 @@
-import React, { createElement, memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, { createElement, memo, useEffect, useMemo, useRef, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import Svg, { Circle, Line, Path, Rect, Text as SvgText } from "react-native-svg";
 
@@ -6,6 +6,7 @@ import { medicalTheme, PrimaryButton } from "@/components/enterprise/EnterpriseU
 import type { DigitalEcgLead } from "@/services/ecgProcessing";
 
 import { drawMonitorCanvas } from "./ecgMonitorCanvas";
+import { EcgMonitorMiniNavigator } from "./EcgMonitorMiniNavigator";
 import { buildScrollingMonitorPath, durationMsForLead, msToSampleIndex } from "./ecgMonitorPath";
 import type { EcgLeadId } from "./types";
 import type { EcgWaveformPlaybackState } from "./useEcgWaveformPlayback";
@@ -16,6 +17,8 @@ const CANVAS_H = 280;
 
 function WebMonitorCanvas({
   alarmTone,
+  brightness,
+  controls,
   gainScale,
   height,
   lead,
@@ -24,6 +27,8 @@ function WebMonitorCanvas({
   width,
 }: {
   alarmTone: boolean;
+  brightness: number;
+  controls: EcgViewerControls;
   gainScale: number;
   height: number;
   lead: DigitalEcgLead;
@@ -32,33 +37,40 @@ function WebMonitorCanvas({
   width: number;
 }) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
-
-  const paint = useCallback(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-    const dpr = window.devicePixelRatio || 1;
-    canvas.width = Math.floor(width * dpr);
-    canvas.height = Math.floor(height * dpr);
-    canvas.style.width = `${width}px`;
-    canvas.style.height = `${height}px`;
-    drawMonitorCanvas(ctx, lead, width, height, {
-      alarmTone,
-      frozen: playback.frozen,
-      gainScale,
-      isPlaying: playback.isPlaying,
-      offsetIndex,
-      playheadMs: playback.playheadMs,
-    });
-  }, [alarmTone, gainScale, height, lead, offsetIndex, playback.frozen, playback.isPlaying, playback.playheadMs, width]);
+  const offsetRef = useRef(offsetIndex);
+  offsetRef.current = offsetIndex;
 
   useEffect(() => {
-    paint();
-  }, [paint]);
+    const canvas = canvasRef.current;
+    if (!canvas) return undefined;
+    let raf = 0;
+    const paint = () => {
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return;
+      const dpr = window.devicePixelRatio || 1;
+      canvas.width = Math.floor(width * dpr);
+      canvas.height = Math.floor(height * dpr);
+      canvas.style.width = `${width}px`;
+      canvas.style.height = `${height}px`;
+      drawMonitorCanvas(ctx, lead, width, height, {
+        alarmTone,
+        brightness,
+        frozen: playback.frozen,
+        gainScale,
+        isPlaying: playback.isPlaying,
+        offsetIndex: offsetRef.current,
+        paperSpeed: controls.grid.speed,
+        playheadMs: playback.playheadMs,
+        phosphorPersistence: playback.isPlaying && !playback.frozen ? 0.22 : 1,
+      });
+      raf = requestAnimationFrame(paint);
+    };
+    raf = requestAnimationFrame(paint);
+    return () => cancelAnimationFrame(raf);
+  }, [alarmTone, brightness, controls.grid.speed, gainScale, height, lead, playback.frozen, playback.isPlaying, playback.playheadMs, width]);
 
   return createElement("canvas", {
-    "data-testid": "sprint19-monitor-canvas",
+    "data-testid": "sprint22-hospital-monitor-canvas",
     ref: canvasRef,
     style: { display: "block", height: "100%", width: "100%" },
   });
@@ -87,6 +99,7 @@ export const EcgLiveMonitorView = memo(function EcgLiveMonitorView({
 }) {
   const [offsetIndex, setOffsetIndex] = useState(0);
   const [canvasSize, setCanvasSize] = useState({ height: CANVAS_H, width: CANVAS_W });
+  const [monitorBrightness, setMonitorBrightness] = useState(1);
   const frameTimes = useRef<number[]>([]);
   const gainScale = controls.grid.gain / 10;
 
@@ -135,13 +148,15 @@ export const EcgLiveMonitorView = memo(function EcgLiveMonitorView({
   }
 
   return (
-    <View style={styles.root} testID="sprint18-live-monitor">
+    <View style={styles.root} testID="sprint22-hospital-live-monitor">
       <View style={styles.header}>
-        <Text style={styles.title}>LIVE ECG MONITOR · LEAD {selectedLead}</Text>
+        <Text style={styles.title}>HOSPITAL DIGITAL ECG MONITOR · LEAD {selectedLead}</Text>
         <Text style={[styles.metric, alarmTone && styles.metricAlarm]}>HR {heartRate ?? "--"} BPM</Text>
         <Text style={styles.metric}>{rhythm ?? "Rhythm pending"}</Text>
         <Text style={styles.metric}>{controls.grid.speed} mm/s · {controls.grid.gain} mm/mV</Text>
         <Text style={styles.metric}>{playback.frozen ? "FROZEN" : playback.isPlaying ? "LIVE" : "PAUSED"}</Text>
+        <PrimaryButton label="Bright+" onPress={() => setMonitorBrightness((value) => Math.min(1.2, Number((value + 0.05).toFixed(2))))} variant="outline" />
+        <PrimaryButton label="Bright−" onPress={() => setMonitorBrightness((value) => Math.max(0.65, Number((value - 0.05).toFixed(2))))} variant="outline" />
       </View>
       <Pressable
         onLayout={(event) => {
@@ -154,6 +169,8 @@ export const EcgLiveMonitorView = memo(function EcgLiveMonitorView({
         {useWebCanvas ? (
           <WebMonitorCanvas
             alarmTone={alarmTone}
+            brightness={monitorBrightness}
+            controls={controls}
             gainScale={gainScale}
             height={canvasSize.height}
             lead={lead}
@@ -179,10 +196,13 @@ export const EcgLiveMonitorView = memo(function EcgLiveMonitorView({
           </Svg>
         )}
       </Pressable>
+      <EcgMonitorMiniNavigator gainScale={gainScale} lead={lead} offsetIndex={offsetIndex} />
       <View style={styles.controls}>
         <PrimaryButton label={playback.isPlaying ? "Pause" : "Play"} onPress={playback.togglePlay} variant="primary" />
         <PrimaryButton label={playback.frozen ? "Resume" : "Freeze"} onPress={() => playback.setFrozen(!playback.frozen)} variant="outline" />
         <PrimaryButton label={playback.loop ? "Loop On" : "Loop Off"} onPress={() => playback.setLoop(!playback.loop)} variant="outline" />
+        <PrimaryButton label="Step −" onPress={playback.previousBeat} variant="outline" />
+        <PrimaryButton label="Step +" onPress={playback.nextBeat} variant="outline" />
       </View>
     </View>
   );

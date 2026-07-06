@@ -4,6 +4,27 @@ All notable changes to this project are documented in this file.
 
 ---
 
+## [Sprint22] — 2026-07-06
+
+### Added
+
+- **Hospital ECG Workstation** rebuild at `/ecg-workspace`
+- Hospital-grade digital monitor: phosphor persistence, major/minor grid, glow waveform, PVC/pacing/R beat markers
+- `EcgMonitorMiniNavigator` timeline overview strip
+- Toolbar groups: FILE, VIEW, DIGITIZE, MEASURE, AI, EXPORT, DISPLAY, TOOLS
+- Collapsible left/right panels via toolbar toggles
+- Clinical sidebar sections: Case, Rate, Intervals, Axis, ST, Rhythm, Noise, Artifacts, History, Comparison
+- Tests: `sprint22-hospital-workstation.integration.ts`, `sprint22-hospital-workstation.spec.ts`
+
+### Changed
+
+- Workstation title: **Hospital ECG Workstation**
+- Layout: 90% viewer / 10% bottom panel with dockable side panels
+- Monitor canvas test IDs: `sprint22-hospital-monitor-canvas`
+- View mode label: Waveform → **Digitized**
+
+---
+
 ## [Sprint21] — 2026-07-06
 
 ### Added

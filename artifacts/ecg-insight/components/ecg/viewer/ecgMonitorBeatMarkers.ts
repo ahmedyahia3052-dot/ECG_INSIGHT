@@ -1,7 +1,13 @@
 import type { DigitalEcgLead } from "@/services/ecgProcessing";
 
-/** Detect local maxima as approximate R-peak beat indices for monitor markers. */
-export function detectBeatMarkerIndices(lead: DigitalEcgLead, maxMarkers = 24): number[] {
+export type MonitorBeatMarker = {
+  index: number;
+  kind: "pacing" | "pvc" | "r-peak";
+  x: number;
+  y: number;
+};
+
+export function detectBeatMarkerIndices(lead: DigitalEcgLead, maxMarkers = 48): number[] {
   const samples = lead.samples;
   if (samples.length < 8) return [];
 
@@ -23,6 +29,34 @@ export function detectBeatMarkerIndices(lead: DigitalEcgLead, maxMarkers = 24): 
   return indices;
 }
 
+export function detectPvcIndices(lead: DigitalEcgLead): number[] {
+  const rPeaks = detectBeatMarkerIndices(lead, 64);
+  if (rPeaks.length < 3) return [];
+
+  const intervals: number[] = [];
+  for (let i = 1; i < rPeaks.length; i += 1) {
+    intervals.push(rPeaks[i]! - rPeaks[i - 1]!);
+  }
+  const median = [...intervals].sort((a, b) => a - b)[Math.floor(intervals.length / 2)] ?? intervals[0]!;
+  const pvc: number[] = [];
+  for (let i = 1; i < rPeaks.length; i += 1) {
+    const interval = rPeaks[i]! - rPeaks[i - 1]!;
+    if (interval < median * 0.78) pvc.push(rPeaks[i]!);
+  }
+  return pvc;
+}
+
+export function detectPacingIndices(lead: DigitalEcgLead): number[] {
+  const samples = lead.samples;
+  const pacing: number[] = [];
+  for (let i = 1; i < samples.length - 1; i += 1) {
+    const spike = Math.abs(samples[i]! - samples[i - 1]!) > 0.65 && Math.abs(samples[i]!) > 0.4;
+    if (spike) pacing.push(i);
+    if (pacing.length >= 12) break;
+  }
+  return pacing;
+}
+
 export function beatMarkerPositions(
   lead: DigitalEcgLead,
   width: number,
@@ -30,20 +64,31 @@ export function beatMarkerPositions(
   gainScale: number,
   offsetIndex: number,
   windowSize = 520,
-) {
-  const padX = 30;
-  const padY = 18;
+): MonitorBeatMarker[] {
+  const padX = 36;
+  const padY = 22;
   const traceW = width - padX * 2;
   const traceH = height - padY * 2;
   const start = Math.max(0, Math.floor(offsetIndex) % Math.max(lead.samples.length, 1));
   const end = Math.min(start + windowSize, lead.samples.length);
 
-  return detectBeatMarkerIndices(lead)
+  const rPeaks = detectBeatMarkerIndices(lead)
     .filter((index) => index >= start && index < end)
     .map((index) => {
       const local = index - start;
       const x = padX + (local / Math.max(windowSize - 1, 1)) * traceW;
-      const y = padY + traceH / 2 - lead.samples[index]! * (traceH * 0.32) * gainScale;
-      return { index, x, y };
+      const y = padY + traceH / 2 - lead.samples[index]! * (traceH * 0.34) * gainScale;
+      return { index, kind: "r-peak" as const, x, y };
     });
+
+  const pacing = detectPacingIndices(lead)
+    .filter((index) => index >= start && index < end)
+    .map((index) => {
+      const local = index - start;
+      const x = padX + (local / Math.max(windowSize - 1, 1)) * traceW;
+      const y = padY + traceH / 2 - lead.samples[index]! * (traceH * 0.34) * gainScale;
+      return { index, kind: "pacing" as const, x, y };
+    });
+
+  return [...rPeaks, ...pacing];
 }
