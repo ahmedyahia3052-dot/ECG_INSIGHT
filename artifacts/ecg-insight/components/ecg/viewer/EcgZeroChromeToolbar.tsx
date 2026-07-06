@@ -123,6 +123,8 @@ function contextualGroups(input: {
   ];
 
   const viewBase: ToolAction[] = [
+    { icon: "folder", label: "Open", onPress: input.onOpenCases, shortcut: "Ctrl+O" },
+    { icon: "crop", label: "Crop", onPress: () => input.controls.applyFit("height") },
     { icon: "zoom-in", label: "Zoom In", onPress: () => input.controls.zoomBy(0.2) },
     { icon: "zoom-out", label: "Zoom Out", onPress: () => input.controls.zoomBy(-0.2) },
     { active: input.controls.panMode === "active", icon: "move", label: "Pan", onPress: input.controls.togglePanMode },
@@ -139,8 +141,10 @@ function contextualGroups(input: {
 
   const digitize: ToolAction[] = [
     { icon: "cpu", label: "Digitize", onPress: input.onDigitize, testID: "sprint18-digitize" },
-    { icon: "target", label: "Lead Detect", onPress: input.onLeadCycle },
-    { active: input.controls.grid.visible, icon: "grid", label: "Grid", onPress: input.controls.toggleGrid },
+    { icon: "target", label: "Lead Detection", onPress: input.onLeadCycle },
+    { icon: "grid", label: "Grid Detection", onPress: input.controls.toggleGrid },
+    { icon: "crosshair", label: "Calibration", onPress: input.controls.toggleCustomCalibration },
+    { icon: "activity", label: "Vectorization", onPress: input.onDigitize, testID: "sprint29-vectorize" },
     { icon: "bar-chart-2", label: `Gain ${input.controls.grid.gain}`, onPress: input.controls.cycleGain, testID: "sprint18-gain" },
     { icon: "activity", label: `Speed ${input.controls.grid.speed}`, onPress: input.controls.cycleSpeed, testID: "sprint18-speed" },
     { icon: "refresh-cw", label: "Baseline Reset", onPress: input.controls.resetView },
@@ -168,7 +172,8 @@ function contextualGroups(input: {
   const ai: ToolAction[] = [
     { active: input.viewMode === "ai-review" || input.viewMode === "overlay", icon: "eye", label: "AI Review", onPress: () => input.onViewModeChange?.("ai-review") },
     { active: overlayEnabled, icon: "aperture", label: "Heatmap", onPress: () => input.aiOverlay?.toggleOverlay() },
-    { icon: "activity", label: "Explain", onPress: () => input.aiOverlay?.setSettings({ showHeatmap: true, showLabels: true }) },
+    { icon: "activity", label: "Explainability", onPress: () => input.aiOverlay?.setSettings({ showHeatmap: true, showLabels: true }) },
+    { icon: "bar-chart", label: "Confidence", onPress: () => input.onViewModeChange?.("ai-review"), testID: "sprint29-ai-confidence" },
     { icon: "alert-triangle", label: "Severity", onPress: () => input.onViewModeChange?.("ai-review") },
   ];
 

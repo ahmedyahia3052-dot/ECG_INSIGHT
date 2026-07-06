@@ -18,10 +18,11 @@ const MIN_SCORE = 98;
 
 const VIEWPORTS = [
   { name: "1366x768", width: 1366, height: 768 },
-  { name: "1440x900", width: 1440, height: 900 },
-  { name: "1536x864", width: 1536, height: 864 },
+  { name: "1600x900", width: 1600, height: 900 },
   { name: "1920x1080", width: 1920, height: 1080 },
   { name: "2560x1440", width: 2560, height: 1440 },
+  { name: "3440x1440", width: 3440, height: 1440 },
+  { name: "3840x2160", width: 3840, height: 2160 },
 ];
 
 const MODES = [
@@ -70,6 +71,9 @@ function auditDomScript() {
       }
     });
     const tb = rect(toolbar);
+    if (tb.height > 52) {
+      issues.push({ module: "toolbar", severity: "medium", type: "toolbar_too_tall", detail: `Toolbar height ${Math.round(tb.height)}px exceeds 52px limit` });
+    }
     if (tb.bottom > viewport.h + 2) {
       issues.push({ module: "toolbar", severity: "high", type: "toolbar_clipped", detail: "Toolbar extends below viewport" });
     }
@@ -152,8 +156,19 @@ function auditDomScript() {
     issues.push({ module: "layout", severity: "low", type: "title_missing", detail: "Workstation identifier not visible" });
   }
 
-  // Empty unused main area
+  // Viewer must occupy ≥80% of workspace width
   const center = document.querySelector("#ecg-monitor-center, [data-panel-id='ecg-monitor-center']");
+  const layoutRoot = document.querySelector('[data-testid="sprint29-enterprise-layout"], [data-testid="sprint29-enterprise-layout-engine"]');
+  const centerPanel = center ?? layoutRoot;
+  if (layoutRoot && centerPanel) {
+    const lr = rect(layoutRoot);
+    const cr = rect(centerPanel);
+    if (lr.width > 0 && cr.width / lr.width < 0.78) {
+      issues.push({ module: "layout", severity: "high", type: "viewer_too_narrow", detail: `Center viewer ${Math.round((cr.width / lr.width) * 100)}% width (target ≥80%)` });
+    }
+  }
+
+  // Empty unused main area
   if (center) {
     const cr = rect(center);
     if (cr.width > 400 && cr.height > 300) {
@@ -232,6 +247,10 @@ async function login(context) {
   await context.route("**/api/auth/refresh", (route) =>
     route.fulfill({ contentType: "application/json", json: payload, status: 200 }),
   );
+  const bootstrap = await context.newPage();
+  await bootstrap.goto("/dashboard", { waitUntil: "domcontentloaded", timeout: 60_000 }).catch(() => undefined);
+  await bootstrap.waitForTimeout(800);
+  await bootstrap.close();
   return payload;
 }
 
@@ -288,7 +307,7 @@ export async function runVisualInspector(options = {}) {
       await page.getByTestId("ecg-workspace-loading").waitFor({ state: "detached", timeout: 45_000 }).catch(() => undefined);
       await page.getByTestId("ecg-enterprise-workspace-ready").waitFor({ timeout: 45_000 });
       await page.getByTestId("sprint29-zero-chrome-workstation-ready").or(page.getByTestId("sprint26-hospital-workstation-ready")).or(page.getByTestId("sprint25-hospital-workstation-ready")).or(page.getByTestId("sprint24-hospital-workstation-ready")).or(page.getByTestId("sprint23-visual-inspector-ready")).waitFor({ timeout: 20_000 }).catch(() => undefined);
-      await page.getByTestId("sprint22-clinical-right-panel").getByText("Patient", { exact: true }).waitFor({ timeout: 15_000 }).catch(() => undefined);
+      await page.getByTestId("sprint26-clinical-tab-patient").or(page.getByTestId("sprint22-clinical-right-panel").getByText("Patient", { exact: true })).waitFor({ timeout: 15_000 }).catch(() => undefined);
       await page.waitForTimeout(1200);
 
       const shotPath = join(ROOT, "test-results", "screenshots", "sprint23", `shell-${vp.name}.png`);

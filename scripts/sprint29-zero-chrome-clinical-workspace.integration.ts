@@ -41,6 +41,7 @@ async function main() {
     ["diagnostic mode F11 ESC", diagnostic.includes("F11") && diagnostic.includes("Escape")],
     ["diagnostic chrome in foundation", foundation.includes("sprint29-diagnostic-header") && foundation.includes("EcgFloatingToolPalette")],
     ["enterprise design tokens", design.includes("ECG_ENTERPRISE_DESIGN") && design.includes("animation")],
+    ["contextual mode tools", toolbar.includes("Crop") && toolbar.includes("Explainability") && toolbar.includes("Confidence")],
     ["sprint29 readiness", foundation.includes("sprint29-zero-chrome-workstation-ready")],
   ];
 

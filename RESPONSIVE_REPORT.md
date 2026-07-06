@@ -1,13 +1,35 @@
-# Responsive Report — Sprint 23
+# Responsive Report — Sprint 30
 
-Validated viewports: 1366×768, 1440×900, 1536×864, 1920×1080, 2560×1440
+## Viewports Verified
 
-| Viewport | Result |
-|----------|--------|
-| 1366x768 | Pass (0 notes) |
-| 1440x900 | Pass (0 notes) |
-| 1536x864 | Pass (0 notes) |
-| 1920x1080 | Pass (0 notes) |
-| 2560x1440 | Pass (0 notes) |
+| Resolution | Layout Behavior |
+|------------|-----------------|
+| 1366×768 | Ribbon horizontal scroll; panels collapsible |
+| 1600×900 | Full ribbon + side panels visible |
+| 1920×1080 | Optimal workstation layout |
+| 2K / 4K | Scales via existing resizable workspace |
+| UltraWide | Left/right rails resizable |
 
-Toolbar uses horizontal scroll on narrow widths — controls remain reachable (not clipped).
+## Responsive Patterns
+
+- **Workflow ribbon**: horizontal ScrollView prevents step clipping
+- **Clinical alerts**: horizontal scroll chips
+- **Right panel tabs**: flex wrap tab bar (existing Sprint 26)
+- **Report preview**: flex layout with min-height 520px
+- **Measurement studio**: 2-column metric grid with flexWrap
+
+## Collapse / Pin
+
+- Left nav: collapsible via existing `EcgWorkstationLeftNav`
+- Right panel: collapsible via toolbar toggle
+- Diagnostic mode (F11): fullscreen ECG hero
+
+## No Regressions
+
+- Zero overlap on chrome row (ribbon → alerts → view switcher stacked)
+- Toolbar remains below workflow chrome
+- Status bar fixed at bottom of center column
+
+## E2E Screenshot
+
+`test-results/screenshots/sprint30-clinical-workflow.png` — captured at 1920×1080 chromium-desktop profile.
