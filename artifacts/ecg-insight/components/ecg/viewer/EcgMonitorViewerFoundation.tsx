@@ -23,7 +23,6 @@ import { EcgEnterpriseStatusBar } from "./EcgEnterpriseStatusBar";
 import { EcgImageCanvas } from "./EcgImageCanvas";
 import { EcgLiveMonitorView } from "./EcgLiveMonitorView";
 import { EcgReportPreviewPanel } from "./EcgReportPreviewPanel";
-import { EcgRhythmStripPanel } from "./EcgRhythmStripPanel";
 import { EcgViewModeSwitcher } from "./EcgViewModeSwitcher";
 import { EcgViewerLeftRail } from "./EcgViewerLeftRail";
 import { EcgViewerResizableWorkspace } from "./EcgViewerResizableWorkspace";
@@ -291,14 +290,6 @@ export function EcgMonitorViewerFoundation({
   }, [aiOverlay.present, controls.adjustments, controls.grid, controls.transform, scheduleSave, workspace.present]);
 
   const waveFps = enterprise.viewMode === "monitor" ? renderFps : renderFps;
-  const monitorState =
-    enterprise.viewMode === "monitor"
-      ? playback.frozen
-        ? "Frozen"
-        : playback.isPlaying
-          ? "Live"
-          : "Paused"
-      : undefined;
 
   const statusMetrics = useEnterpriseStatusMetrics({
     aiOverlayEnabled: aiOverlay.present.settings.enabled,
@@ -323,16 +314,13 @@ export function EcgMonitorViewerFoundation({
 
   return (
     <View style={[styles.root, controls.fullscreen && styles.fullscreenRoot]} testID="sprint13-ecg-monitor-ready" nativeID="sprint22-hospital-workstation-ready">
-      <View nativeID="sprint24-hospital-workstation-ready" style={styles.inspectorReady} testID="sprint25-hospital-workstation-ready">
-      <View style={styles.topBar}>
-        <View style={styles.titleBlock}>
-          <Text style={styles.title}>Hospital ECG Workstation</Text>
-          <Text style={styles.subtitle}>
-            {patientDisplayName(patient)} · {ecgCase.caseNumber ?? ecgCase.caseId} · Lead {selectedLead}
-          </Text>
-        </View>
-        <EcgViewModeSwitcher onChange={enterprise.setViewMode} value={enterprise.viewMode} />
+      <View nativeID="sprint25-hospital-workstation-ready" style={styles.inspectorReady} testID="sprint26-hospital-workstation-ready">
+      <View style={styles.headerRow}>
+        <Text style={styles.title} numberOfLines={1}>
+          {patientDisplayName(patient)} · {ecgCase.caseNumber ?? ecgCase.caseId} · Lead {selectedLead}
+        </Text>
       </View>
+      <EcgViewModeSwitcher onChange={enterprise.setViewMode} value={enterprise.viewMode} />
 
       <EcgWorkstationToolbar
         aiOverlay={aiOverlay}
@@ -359,7 +347,13 @@ export function EcgMonitorViewerFoundation({
         showMagnifier={showMagnifier}
         onRhythmStrip={() => enterprise.setViewMode("monitor")}
         onToggleLeadFocus={() => enterprise.setLeadFocusMode((value) => !value)}
-        onToggleLeftPanel={() => setPanelLayout((current) => ({ ...current, leftCollapsed: !current.leftCollapsed }))}
+        onToggleLeftPanel={() =>
+          setPanelLayout((current) => {
+            const nextCollapsed = !current.leftCollapsed;
+            setLeftNavCollapsed(nextCollapsed);
+            return { ...current, leftCollapsed: nextCollapsed };
+          })
+        }
         onToggleRightPanel={() => setPanelLayout((current) => ({ ...current, rightCollapsed: !current.rightCollapsed }))}
         onToggleTheme={enterprise.toggleWorkstationTheme}
         onUpload={() => router.push("/upload-ecg" as never)}
@@ -386,46 +380,17 @@ export function EcgMonitorViewerFoundation({
           }
           bottom={
             <View style={styles.bottomStack}>
-              <EcgWaveformPlaybackTimeline durationMs={playbackDurationMs} playback={playback} />
-              {enterprise.leadLayout === "rhythm" && enterprise.viewMode !== "monitor" ? (
-                <EcgRhythmStripPanel controls={controls} leadWaveform={rhythmLead} onLeadChange={setSelectedLead} selectedLead={selectedLead} />
+              {enterprise.viewMode === "monitor" ? (
+                <EcgWaveformPlaybackTimeline durationMs={playbackDurationMs} playback={playback} />
               ) : null}
               <EcgEnterpriseStatusBar
-                aiStatus={statusMetrics.aiStatus}
                 apiStatus={statusMetrics.backendStatus === "healthy" ? "Online" : "Offline"}
-                autoRefresh="15s"
-                backendStatus={statusMetrics.backendStatus}
-                canvasStatus={enterprise.viewMode === "monitor" ? "Live Digital" : digitalEcg ? "Digitized" : "Image"}
-                coordinates={pointerCoords ? `${Math.round(pointerCoords.x)},${Math.round(pointerCoords.y)}` : undefined}
-                cpuUsage={statusMetrics.cpuUsage}
-                digitizationQuality={
-                  digitalEcg?.quality?.score != null
-                    ? `${Math.round(digitalEcg.quality.score)}%`
-                    : digitizeMutation.isPending
-                      ? "Processing"
-                      : digitalEcg
-                        ? "Available"
-                        : "Pending"
-                }
                 fps={waveFps}
                 gain={controls.grid.gain}
-                gpuRenderer={statusMetrics.gpuRenderer}
-                gridVisible={controls.grid.visible}
                 lead={selectedLead}
-                memory={statusMetrics.memory}
-                monitorState={monitorState}
                 paperSpeed={controls.grid.speed}
                 patientName={patientDisplayName(patient)}
-                renderTimeMs={statusMetrics.renderTimeMs}
-                renderingMode={enterprise.viewMode === "monitor" ? "Canvas Monitor" : enterprise.viewMode}
-                signalQuality={
-                  digitalEcg?.calibration?.confidence != null
-                    ? `${Math.round(digitalEcg.calibration.confidence * 100)}%`
-                    : analysis?.confidenceScore != null
-                      ? `${Math.round(analysis.confidenceScore * 100)}%`
-                      : "Pending"
-                }
-                transport={statusMetrics.transport}
+                renderingMode={enterprise.viewMode === "monitor" ? "Monitor" : enterprise.viewMode}
                 zoom={controls.transform.zoom}
               />
             </View>
@@ -445,6 +410,7 @@ export function EcgMonitorViewerFoundation({
                 aiOverlay={aiOverlay}
                 controls={controls}
                 currentLabel={study.caseNumber ?? "Current Study"}
+                digitalEcg={digitalEcg}
                 digitizedLeads={digitizedLeads}
                 explainability={explainability}
                 imageUrl={imageUrl}
@@ -483,6 +449,7 @@ export function EcgMonitorViewerFoundation({
                 compareThumbnailUrl={enterprise.compareStudy?.thumbnailUrl}
                 controls={controls}
                 currentLabel={study.caseNumber ?? "Current Study"}
+                digitalEcg={digitalEcg}
                 digitizedLeads={digitizedLeads}
                 explainability={explainability}
                 imageUrl={imageUrl}
@@ -500,40 +467,46 @@ export function EcgMonitorViewerFoundation({
           }
           left={
             <View style={styles.leftColumn}>
-              {!panelLayout.leftCollapsed ? (
-                <EcgWorkstationLeftNav
-                  collapsed={leftNavCollapsed}
-                  onToggleCollapse={() => setLeftNavCollapsed((value) => !value)}
-                  onTogglePin={() => setLeftNavPinned((value) => !value)}
-                  pinned={leftNavPinned}
-                />
-              ) : null}
-              <View style={styles.leftRailHost}>
-              <EcgClinicalWorkflowTimeline
-                analysis={analysis}
-                digitalEcg={digitalEcg}
-                digitizing={digitizeMutation.isPending}
-                hasReport={!!pdfUrl}
-                reviewed={!!ecgCase.reviewedBy}
+              <EcgWorkstationLeftNav
+                collapsed={panelLayout.leftCollapsed || leftNavCollapsed}
+                onToggleCollapse={() =>
+                  setPanelLayout((current) => {
+                    const next = !(current.leftCollapsed ?? false);
+                    setLeftNavCollapsed(next);
+                    return { ...current, leftCollapsed: next };
+                  })
+                }
+                onTogglePin={() => setLeftNavPinned((value) => !value)}
+                pinned={leftNavPinned}
               />
-              <EcgViewerLeftRail
-              compareCaseId={enterprise.compareCaseId}
-              leadFocusMode={enterprise.leadFocusMode}
-              notes={ecgCase.clinicalNotes ?? ecgCase.clinicalComments ?? undefined}
-              onSelectCompare={(caseId) => {
-                enterprise.setCompareCaseId(caseId);
-                enterprise.setCompareMode(true);
-                enterprise.setViewMode("compare");
-              }}
-              onSelectLead={setSelectedLead}
-              onSelectPrevious={openStudy}
-              onToggleLeadFocus={() => enterprise.setLeadFocusMode((value) => !value)}
-              patient={{ age: patient.age, gender: patient.gender, id: patient.id, name: patientDisplayName(patient) }}
-              previousStudies={previousStudies}
-              selectedLead={selectedLead}
-              study={study}
-            />
-              </View>
+              {!panelLayout.leftCollapsed ? (
+                <View style={styles.leftRailHost}>
+                  <EcgClinicalWorkflowTimeline
+                    analysis={analysis}
+                    digitalEcg={digitalEcg}
+                    digitizing={digitizeMutation.isPending}
+                    hasReport={!!pdfUrl}
+                    reviewed={!!ecgCase.reviewedBy}
+                  />
+                  <EcgViewerLeftRail
+                    compareCaseId={enterprise.compareCaseId}
+                    leadFocusMode={enterprise.leadFocusMode}
+                    notes={ecgCase.clinicalNotes ?? ecgCase.clinicalComments ?? undefined}
+                    onSelectCompare={(caseId) => {
+                      enterprise.setCompareCaseId(caseId);
+                      enterprise.setCompareMode(true);
+                      enterprise.setViewMode("compare");
+                    }}
+                    onSelectLead={setSelectedLead}
+                    onSelectPrevious={openStudy}
+                    onToggleLeadFocus={() => enterprise.setLeadFocusMode((value) => !value)}
+                    patient={{ age: patient.age, gender: patient.gender, id: patient.id, name: patientDisplayName(patient) }}
+                    previousStudies={previousStudies}
+                    selectedLead={selectedLead}
+                    study={study}
+                  />
+                </View>
+              ) : null}
             </View>
           }
           right={
@@ -573,16 +546,14 @@ const styles = StyleSheet.create({
   fullscreenRoot: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: "#040E1A",
-    padding: 8,
+    padding: 4,
     zIndex: 50,
   },
+  headerRow: { flexShrink: 0, minWidth: 0 },
   inspectorReady: { flex: 1, gap: ECG_WORKSTATION_VISUAL.workspaceGap, minHeight: 0, overflow: "hidden" },
-  leftColumn: { flex: 1, gap: 6, minHeight: 0, minWidth: 0, overflow: "hidden" },
+  leftColumn: { flex: 1, gap: 4, minHeight: 0, minWidth: 0, overflow: "hidden" },
   leftRailHost: { flex: 1, minHeight: 0, minWidth: 0, overflow: "hidden" },
   root: { backgroundColor: "#040E1A", flex: 1, gap: ECG_WORKSTATION_VISUAL.workspaceGap, minHeight: 0, overflow: "hidden", padding: ECG_WORKSTATION_VISUAL.workspacePadding },
-  subtitle: { color: medicalTheme.muted, fontSize: 12, fontWeight: "700" },
-  title: { color: medicalTheme.text, fontSize: 16, fontWeight: "900" },
-  titleBlock: { flex: 1, gap: 2, minWidth: 220 },
-  topBar: { alignItems: "center", flexDirection: "row", flexWrap: "wrap", gap: 10, justifyContent: "space-between" },
+  title: { color: medicalTheme.text, fontSize: 12, fontWeight: "800" },
   workspace: { flex: 1, minHeight: 0, overflow: "hidden" },
 });

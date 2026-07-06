@@ -27,6 +27,7 @@ export { EcgMiniNavigator } from "./EcgMiniNavigator";
 export { exportEcgViewerPng } from "./ecgViewerExport";
 export { estimateImageDpi, useViewerRuntimeMetrics } from "./useViewerRuntimeMetrics";
 export { EcgProViewerEngine } from "./EcgProViewerEngine";
+export { EcgRenderingEngineView } from "./EcgRenderingEngineView";
 export { EcgRhythmStripPanel } from "./EcgRhythmStripPanel";
 export { EcgViewerLeftRail } from "./EcgViewerLeftRail";
 export { EcgViewerResizableWorkspace } from "./EcgViewerResizableWorkspace";

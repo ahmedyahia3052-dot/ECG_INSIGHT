@@ -3,6 +3,7 @@ import { StyleSheet, View } from "react-native";
 
 import { medicalTheme } from "@/components/enterprise/EnterpriseUI";
 import type { AIExplainability } from "@/services/ai";
+import type { DigitalEcg } from "@/services/ecgProcessing";
 
 import { EcgAiClinicalOverlay } from "./EcgAiClinicalOverlay";
 import { EcgCompareViewer } from "./EcgCompareViewer";
@@ -10,6 +11,7 @@ import type { DigitizedWaveformLead } from "./EcgDigitizedWaveformLayer";
 import { EcgDigitizedWaveformLayer } from "./EcgDigitizedWaveformLayer";
 import { EcgPaperGrid } from "./EcgPaperGrid";
 import { EcgProViewerEngine } from "./EcgProViewerEngine";
+import { EcgRenderingEngineView } from "./EcgRenderingEngineView";
 import type { EcgCompareLayoutMode, EcgWorkstationViewMode } from "./types";
 import { useAuthenticatedEcgAsset } from "./useAuthenticatedEcgAsset";
 import type { EcgAiOverlayWorkspace } from "./useEcgAiOverlayWorkspace";
@@ -28,6 +30,7 @@ type Props = {
   compareThumbnailUrl?: string;
   controls: EcgViewerControls;
   currentLabel?: string;
+  digitalEcg?: DigitalEcg | null;
   digitizedLeads?: DigitizedWaveformLead[];
   explainability?: AIExplainability | null;
   imageUrl?: string;
@@ -55,6 +58,7 @@ export function EcgImageCanvas({
   compareThumbnailUrl,
   controls,
   currentLabel = "Current Study",
+  digitalEcg,
   digitizedLeads = [],
   explainability,
   imageUrl,
@@ -79,6 +83,20 @@ export function EcgImageCanvas({
   const rectH = controls.viewport.imageHeight || 1200;
 
   if (waveformOnly) {
+    if (digitalEcg?.leads?.length) {
+      return (
+        <View style={styles.waveformHost} testID="sprint18-waveform-view">
+          <EcgRenderingEngineView
+            activeLead={activeLead}
+            backend="svg"
+            controls={controls}
+            digitalEcg={digitalEcg}
+            layout="12-lead"
+            onFpsUpdate={onFpsUpdate}
+          />
+        </View>
+      );
+    }
     return (
       <View style={styles.waveformHost} testID="sprint18-waveform-view">
         <View style={[styles.waveformStage, { height: Math.max(rectH * 0.55, 420) }]}>

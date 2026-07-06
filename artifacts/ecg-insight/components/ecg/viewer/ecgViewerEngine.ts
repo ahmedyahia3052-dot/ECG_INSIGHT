@@ -8,6 +8,18 @@ export const VIEWER_LAYER = {
   measurements: 5,
 } as const;
 
+/** Sprint 27 — composited rendering layers (grid → waveform → measurement → AI → interaction) */
+export const RENDER_ENGINE_LAYER = {
+  ai: 40,
+  annotation: 50,
+  cursor: 70,
+  grid: 10,
+  measurement: 30,
+  selection: 60,
+  tooltip: 80,
+  waveform: 20,
+} as const;
+
 export function containScale(viewport: Pick<EcgViewerViewport, "containerHeight" | "containerWidth" | "imageHeight" | "imageWidth">) {
   if (!viewport.containerWidth || !viewport.containerHeight || !viewport.imageWidth || !viewport.imageHeight) return 1;
   return Math.min(viewport.containerWidth / viewport.imageWidth, viewport.containerHeight / viewport.imageHeight);
