@@ -17,21 +17,30 @@ function StatusChip({ label, testID, value }: { label: string; testID?: string; 
   );
 }
 
-/** Sprint 26 — compact 28px status bar with essential runtime metrics only. */
+/** Sprint 28 — enterprise status bar with clinical rendering telemetry. */
 export function EcgEnterpriseStatusBar({
   apiStatus,
+  canvasResolution,
+  cpuUsage,
   fps,
   gain,
+  gpuRenderer,
+  gridVisible,
   lead,
+  memory,
   paperSpeed,
   patientName,
+  renderMode,
+  renderTimeMs,
   renderingMode,
+  signalQuality,
   zoom,
 }: {
   aiStatus?: string;
   apiStatus?: string;
   autoRefresh?: string;
   backendStatus?: EnterpriseStatusMetrics["backendStatus"];
+  canvasResolution?: string;
   canvasStatus?: string;
   coordinates?: string;
   cpuUsage?: number;
@@ -45,22 +54,32 @@ export function EcgEnterpriseStatusBar({
   monitorState?: string;
   paperSpeed?: number;
   patientName?: string;
+  renderMode?: string;
   renderTimeMs?: number;
   renderingMode?: string;
   signalQuality?: string;
   transport?: string;
   zoom: number;
 }) {
+  const mode = renderMode ?? renderingMode ?? "SVG";
+  const memLabel = memory?.jsHeapMb ? `${memory.jsHeapMb}MB` : "—";
   return (
-    <View style={styles.bar} testID="sprint26-compact-status-bar" nativeID="sprint24-hospital-status-bar">
+    <View style={styles.bar} testID="sprint28-enterprise-status-bar" nativeID="sprint24-hospital-status-bar">
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.row}>
         {patientName ? <StatusChip label="Patient" testID="sprint24-status-patient" value={patientName} /> : null}
         <StatusChip label="Zoom" testID="sprint17-status-zoom" value={`${Math.round(zoom * 100)}%`} />
         {lead ? <StatusChip label="Lead" testID="sprint17-status-lead" value={lead} /> : null}
         <StatusChip label="Gain" testID="sprint17-status-gain" value={`${gain ?? 10}`} />
         <StatusChip label="Speed" testID="sprint17-status-paper-speed" value={`${paperSpeed ?? 25}`} />
+        <StatusChip label="Grid" testID="sprint28-status-grid" value={gridVisible === false ? "Off" : "On"} />
         {typeof fps === "number" ? <StatusChip label="FPS" testID="sprint17-status-fps" value={`${fps}`} /> : null}
-        {renderingMode ? <StatusChip label="Mode" testID="sprint24-status-render-mode" value={renderingMode} /> : null}
+        {gpuRenderer ? <StatusChip label="GPU" testID="sprint28-status-gpu" value={gpuRenderer} /> : null}
+        {typeof cpuUsage === "number" ? <StatusChip label="CPU" testID="sprint28-status-cpu" value={`${cpuUsage}%`} /> : null}
+        <StatusChip label="Mem" testID="sprint28-status-memory" value={memLabel} />
+        {canvasResolution ? <StatusChip label="Canvas" testID="sprint28-status-canvas" value={canvasResolution} /> : null}
+        {typeof renderTimeMs === "number" ? <StatusChip label="Frame" testID="sprint28-status-frame" value={`${renderTimeMs}ms`} /> : null}
+        <StatusChip label="Render" testID="sprint28-status-render-mode" value={mode} />
+        {signalQuality ? <StatusChip label="Signal" testID="sprint28-status-signal-quality" value={signalQuality} /> : null}
         <StatusChip label="API" testID="sprint24-status-api" value={apiStatus ?? "Online"} />
       </ScrollView>
     </View>

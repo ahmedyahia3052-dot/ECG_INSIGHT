@@ -11,6 +11,8 @@ import type { ApiECGCase } from "@/services/clinical";
 import { digitizeECG, getDigitalECG } from "@/services/ecgProcessing";
 import { downloadEcgViewerWorkspacePdf, downloadEcgViewerWorkspaceJson } from "@/services/ecgViewerWorkspace";
 import { buildSegmentAlignedDigitizedWaveformLeads } from "./ecgDigitizedWaveformSync";
+import { deriveSignalQualityFlags, signalQualityLabel } from "./clinical-visualization";
+import type { EcgRenderMetrics } from "./rendering-engine";
 
 import { detectImageFormat } from "./ecgImageEngine";
 import { exportMeasurements } from "./ecgMeasurementEngine";
@@ -64,6 +66,7 @@ export function EcgMonitorViewerFoundation({
   const [selectedLead, setSelectedLead] = useState<EcgLeadId>("II");
   const [pointerCoords, setPointerCoords] = useState<{ imageX: number; imageY: number; x: number; y: number } | null>(null);
   const [renderFps, setRenderFps] = useState(60);
+  const [renderMetrics, setRenderMetrics] = useState<EcgRenderMetrics | null>(null);
   const [panelLayout, setPanelLayout] = useState<{ bottomSize?: number; leftCollapsed: boolean; leftSize?: number; rightCollapsed: boolean; rightSize?: number }>({
     leftCollapsed: false,
     rightCollapsed: false,
@@ -289,7 +292,10 @@ export function EcgMonitorViewerFoundation({
     scheduleSave();
   }, [aiOverlay.present, controls.adjustments, controls.grid, controls.transform, scheduleSave, workspace.present]);
 
-  const waveFps = enterprise.viewMode === "monitor" ? renderFps : renderFps;
+  const signalQuality = signalQualityLabel(deriveSignalQualityFlags(digitalEcg));
+  const canvasResolution = `${Math.round(controls.viewport.containerWidth * controls.transform.zoom)}×${Math.round(controls.viewport.containerHeight * controls.transform.zoom)}`;
+  const waveFps = renderFps;
+  const renderModeLabel = renderMetrics?.backend?.toUpperCase() ?? (enterprise.viewMode === "monitor" ? "MONITOR" : enterprise.viewMode === "waveform" ? "CLINICAL" : enterprise.viewMode.toUpperCase());
 
   const statusMetrics = useEnterpriseStatusMetrics({
     aiOverlayEnabled: aiOverlay.present.settings.enabled,
@@ -385,12 +391,20 @@ export function EcgMonitorViewerFoundation({
               ) : null}
               <EcgEnterpriseStatusBar
                 apiStatus={statusMetrics.backendStatus === "healthy" ? "Online" : "Offline"}
+                canvasResolution={canvasResolution}
+                cpuUsage={statusMetrics.cpuUsage}
                 fps={waveFps}
                 gain={controls.grid.gain}
+                gpuRenderer={renderMetrics?.gpuAccelerated ? `${renderMetrics.backend.toUpperCase()} GPU` : statusMetrics.gpuRenderer}
+                gridVisible={controls.grid.visible}
                 lead={selectedLead}
+                memory={statusMetrics.memory}
                 paperSpeed={controls.grid.speed}
                 patientName={patientDisplayName(patient)}
+                renderMode={renderModeLabel}
+                renderTimeMs={renderMetrics?.frameMs ?? statusMetrics.renderTimeMs}
                 renderingMode={enterprise.viewMode === "monitor" ? "Monitor" : enterprise.viewMode}
+                signalQuality={signalQuality}
                 zoom={controls.transform.zoom}
               />
             </View>
@@ -416,6 +430,7 @@ export function EcgMonitorViewerFoundation({
                 imageUrl={imageUrl}
                 onPointerMove={setPointerCoords}
                 onFpsUpdate={setRenderFps}
+                onMetricsUpdate={setRenderMetrics}
                 pdfUrl={pdfUrl}
                 processedImageUrl={processedImageUrl}
                 showDigitizedWaveform={false}
@@ -455,6 +470,7 @@ export function EcgMonitorViewerFoundation({
                 imageUrl={imageUrl}
                 onPointerMove={setPointerCoords}
                 onFpsUpdate={setRenderFps}
+                onMetricsUpdate={setRenderMetrics}
                 pdfUrl={pdfUrl}
                 processedImageUrl={processedImageUrl}
                 showCrosshair={showCrosshair}

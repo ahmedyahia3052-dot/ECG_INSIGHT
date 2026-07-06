@@ -10,8 +10,8 @@ import { EcgCompareViewer } from "./EcgCompareViewer";
 import type { DigitizedWaveformLead } from "./EcgDigitizedWaveformLayer";
 import { EcgDigitizedWaveformLayer } from "./EcgDigitizedWaveformLayer";
 import { EcgPaperGrid } from "./EcgPaperGrid";
+import { EcgClinicalVisualizationCanvas } from "./EcgClinicalVisualizationCanvas";
 import { EcgProViewerEngine } from "./EcgProViewerEngine";
-import { EcgRenderingEngineView } from "./EcgRenderingEngineView";
 import type { EcgCompareLayoutMode, EcgWorkstationViewMode } from "./types";
 import { useAuthenticatedEcgAsset } from "./useAuthenticatedEcgAsset";
 import type { EcgAiOverlayWorkspace } from "./useEcgAiOverlayWorkspace";
@@ -35,6 +35,7 @@ type Props = {
   explainability?: AIExplainability | null;
   imageUrl?: string;
   onFpsUpdate?: (fps: number) => void;
+  onMetricsUpdate?: (metrics: import("./rendering-engine").EcgRenderMetrics) => void;
   onPointerMove?: (coords: { imageX: number; imageY: number; x: number; y: number }) => void;
   pdfUrl?: string;
   processedImageUrl?: string;
@@ -63,6 +64,7 @@ export function EcgImageCanvas({
   explainability,
   imageUrl,
   onFpsUpdate,
+  onMetricsUpdate,
   onPointerMove,
   pdfUrl,
   processedImageUrl,
@@ -86,13 +88,16 @@ export function EcgImageCanvas({
     if (digitalEcg?.leads?.length) {
       return (
         <View style={styles.waveformHost} testID="sprint18-waveform-view">
-          <EcgRenderingEngineView
+          <EcgClinicalVisualizationCanvas
             activeLead={activeLead}
-            backend="svg"
             controls={controls}
             digitalEcg={digitalEcg}
+            explainability={explainability}
             layout="12-lead"
             onFpsUpdate={onFpsUpdate}
+            onMetricsUpdate={onMetricsUpdate}
+            settings={{ leadFocusEnabled: true, showCrosshair, showMiniNavigator: true, showTimeline: true }}
+            showCrosshair={showCrosshair}
           />
         </View>
       );

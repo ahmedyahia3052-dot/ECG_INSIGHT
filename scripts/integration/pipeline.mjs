@@ -20,6 +20,8 @@ export const integrationScripts = [
   "scripts/patient-case-management.integration.ts",
   "scripts/sprint27-occupational-cardiology.integration.ts",
   "scripts/sprint27-ecg-rendering-engine.integration.ts",
+  "scripts/ecg-clinical-visualization.test.ts",
+  "scripts/sprint28-clinical-visualization.integration.ts",
   "scripts/sprint28-subscription-platform.integration.ts",
   "scripts/sprint29-production-infrastructure.integration.ts",
   "scripts/sprint30-mobile-pwa.integration.ts",
