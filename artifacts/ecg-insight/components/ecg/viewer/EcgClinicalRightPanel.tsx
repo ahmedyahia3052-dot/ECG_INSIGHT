@@ -1,4 +1,4 @@
-import React, { memo } from "react";
+import React, { memo, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
 import { Badge, formatDate, medicalTheme } from "@/components/enterprise/EnterpriseUI";
@@ -45,6 +45,16 @@ function PanelSection({ children, id, title }: { children: React.ReactNode; id: 
     </EcgClinicalCard>
   );
 }
+
+type ClinicalTab = "patient" | "measurements" | "ai" | "reports" | "history";
+
+const TABS: Array<{ id: ClinicalTab; label: string }> = [
+  { id: "patient", label: "Patient" },
+  { id: "measurements", label: "Measurements" },
+  { id: "ai", label: "AI" },
+  { id: "reports", label: "Reports" },
+  { id: "history", label: "History" },
+];
 
 export const EcgClinicalRightPanel = memo(function EcgClinicalRightPanel({
   aiOverlay,
@@ -107,8 +117,10 @@ export const EcgClinicalRightPanel = memo(function EcgClinicalRightPanel({
     digitalEcg?.validation?.warnings?.length ? `${digitalEcg.validation.warnings.length} validation flags` : null,
   ].filter(Boolean) as string[];
 
-  return (
-    <ScrollView contentContainerStyle={styles.scroll} style={styles.fill} testID="sprint25-clinical-right-panel" nativeID="sprint24-clinical-right-panel">
+  const [activeTab, setActiveTab] = useState<ClinicalTab>("patient");
+
+  const patientTab = (
+    <>
       {patient ? (
         <PanelSection id="patient" title="Patient">
           <Text style={styles.patientName}>{patient.name}</Text>
@@ -118,7 +130,6 @@ export const EcgClinicalRightPanel = memo(function EcgClinicalRightPanel({
           {studyDate ? <Text style={styles.patientMeta}>Study {formatDate(studyDate)}</Text> : null}
         </PanelSection>
       ) : null}
-
       {caseNumber ? (
         <PanelSection id="case" title="Case">
           <MetricRow label="Case Number" value={caseNumber} />
@@ -126,160 +137,88 @@ export const EcgClinicalRightPanel = memo(function EcgClinicalRightPanel({
           <MetricRow label="Leads" value={digitalEcg?.leads?.length ? `${digitalEcg.leads.length} leads` : "Pending"} />
         </PanelSection>
       ) : null}
-
-      <PanelSection id="measurements" title="Measurements">
-        <EcgMeasurementsPanel workspace={workspace} />
-      </PanelSection>
-
       <PanelSection id="rate" title="Heart Rate">
         <MetricRow label="Heart Rate" source={sourceLabel} value={findings.heartRate.value} />
-        <MetricRow
-          label="RR Interval"
-          source={digitalEcg ? "Digital ECG" : "Pending"}
-          value={digitalEcg?.measurements?.rrIntervalMs != null ? `${Math.round(digitalEcg.measurements.rrIntervalMs)} ms` : "Pending"}
-        />
+        <MetricRow label="RR Interval" source={digitalEcg ? "Digital ECG" : "Pending"} value={digitalEcg?.measurements?.rrIntervalMs != null ? `${Math.round(digitalEcg.measurements.rrIntervalMs)} ms` : "Pending"} />
       </PanelSection>
-
-      <PanelSection id="intervals" title="Intervals">
-        <MetricRow label="PR" source={findings.prInterval.source} value={findings.prInterval.value} />
-        <MetricRow label="QRS" source={findings.qrsDuration.source} value={findings.qrsDuration.value} />
-        <MetricRow label="QT" source={findings.qtInterval.source} value={findings.qtInterval.value} />
-        <MetricRow label="QTc" source={findings.qtcInterval.source} value={findings.qtcInterval.value} />
-      </PanelSection>
-
-      <PanelSection id="axis" title="Axis">
-        <MetricRow label="Mean QRS Axis" source={findings.axis.source} value={findings.axis.value} />
-        {engine?.axis?.electricalAxisDeg != null ? (
-          <MetricRow label="Electrical Axis" source="Digital ECG" value={`${Math.round(engine.axis.electricalAxisDeg)}°`} />
-        ) : null}
-      </PanelSection>
-
-      <PanelSection id="st" title="ST">
-        <MetricRow label="ST Deviation" source={engine ? "Digital ECG" : "Pending"} value={stDisplay} />
-        {engine?.morphology?.length ? (
-          <View style={styles.listBlock}>
-            <Text style={styles.listTitle}>Morphology</Text>
-            {engine.morphology.slice(0, 4).map((item) => (
-              <Text key={item} style={styles.listItem}>• {item}</Text>
-            ))}
-          </View>
-        ) : null}
-      </PanelSection>
-
       <PanelSection id="rhythm" title="Rhythm">
         <MetricRow label="Classification" source={findings.rhythm.source} value={findings.rhythm.value} />
         {engine?.rhythm ? <MetricRow label="Engine" source="Digital ECG" value={engine.rhythm.replace(/_/g, " ")} /> : null}
       </PanelSection>
-
       <PanelSection id="signal-quality" title="Signal Quality">
         <MetricRow label="Resolution" value={imageWidth && imageHeight ? `${imageWidth}×${imageHeight}` : "Pending"} />
         <MetricRow label="Signal Quality" tone={qualityTone} value={digitalEcg?.calibration?.confidence != null ? `${Math.round(digitalEcg.calibration.confidence * 100)}%` : "Pending"} />
         <MetricRow label="Digitization Score" tone={qualityTone} value={qualityScore != null ? `${qualityScore}/100` : digitalEcgLoading ? "Processing" : "Pending"} />
-        <MetricRow label="Grid Detection" value={digitalEcg?.calibration?.gridDetected ? "Detected" : "Pending"} />
         {!digitalEcg && onDigitize ? (
           <Pressable onPress={onDigitize} style={styles.actionButton}>
             <Text style={styles.actionLabel}>{digitalEcgLoading ? "Digitizing…" : "Run Digitization"}</Text>
           </Pressable>
         ) : null}
       </PanelSection>
+      <PanelSection id="notes" title="Clinical Notes">
+        <Text style={styles.notesText}>{clinicalNotes ?? "No clinical notes recorded for this study."}</Text>
+      </PanelSection>
+    </>
+  );
 
+  const measurementsTab = (
+    <>
+      <PanelSection id="measurements" title="Measurements">
+        <EcgMeasurementsPanel workspace={workspace} />
+      </PanelSection>
+      <PanelSection id="intervals" title="Intervals">
+        <MetricRow label="PR" source={findings.prInterval.source} value={findings.prInterval.value} />
+        <MetricRow label="QRS" source={findings.qrsDuration.source} value={findings.qrsDuration.value} />
+        <MetricRow label="QT" source={findings.qtInterval.source} value={findings.qtInterval.value} />
+        <MetricRow label="QTc" source={findings.qtcInterval.source} value={findings.qtcInterval.value} />
+      </PanelSection>
+      <PanelSection id="axis" title="Axis">
+        <MetricRow label="Mean QRS Axis" source={findings.axis.source} value={findings.axis.value} />
+        {engine?.axis?.electricalAxisDeg != null ? <MetricRow label="Electrical Axis" source="Digital ECG" value={`${Math.round(engine.axis.electricalAxisDeg)}°`} /> : null}
+      </PanelSection>
+      <PanelSection id="st" title="ST">
+        <MetricRow label="ST Deviation" source={engine ? "Digital ECG" : "Pending"} value={stDisplay} />
+      </PanelSection>
       <PanelSection id="noise" title="Noise Analysis">
         {noiseFlags.length ? noiseFlags.map((item) => <Text key={item} style={styles.listItem}>• {item}</Text>) : <Text style={styles.listItem}>No noise mitigation applied yet.</Text>}
       </PanelSection>
-
       <PanelSection id="artifacts" title="Artifact Detection">
         {artifactFlags.length ? artifactFlags.map((item) => <Text key={item} style={styles.listItem}>• {item}</Text>) : <Text style={styles.listItem}>No artifact flags detected.</Text>}
       </PanelSection>
+    </>
+  );
 
-      <PanelSection id="confidence" title="Confidence">
-        <MetricRow label="AI Confidence" value={findings.confidence.value} />
-        <MetricRow label="Digitization" tone={qualityTone} value={qualityScore != null ? `${qualityScore}/100` : "Pending"} />
-        <MetricRow label="Calibration" value={digitalEcg?.calibration?.confidence != null ? `${Math.round(digitalEcg.calibration.confidence * 100)}%` : "Pending"} />
-      </PanelSection>
-
+  const aiTab = (
+    <>
       <PanelSection id="diagnosis" title="AI Interpretation">
         <MetricRow label="Primary" tone={severity === "critical" || severity === "severe" ? "critical" : "primary"} value={analysis?.diagnosis ?? findings.interpretation.value} />
         <MetricRow label="Confidence" value={findings.confidence.value} />
       </PanelSection>
-
+      <PanelSection id="confidence" title="Confidence">
+        <MetricRow label="AI Confidence" value={findings.confidence.value} />
+        <MetricRow label="Digitization" tone={qualityTone} value={qualityScore != null ? `${qualityScore}/100` : "Pending"} />
+      </PanelSection>
       <PanelSection id="recommendations" title="Recommendations">
-        {analysis?.recommendations?.length ? (
-          analysis.recommendations.slice(0, 6).map((item) => (
-            <Text key={item} style={styles.listItem}>• {item}</Text>
-          ))
-        ) : (
-          <Text style={styles.listItem}>No recommendations generated yet.</Text>
-        )}
+        {analysis?.recommendations?.length ? analysis.recommendations.slice(0, 6).map((item) => <Text key={item} style={styles.listItem}>• {item}</Text>) : <Text style={styles.listItem}>No recommendations generated yet.</Text>}
       </PanelSection>
-
-      <PanelSection id="ai-findings" title="Findings">
-        <MetricRow label="Diagnosis" tone={severity === "critical" || severity === "severe" ? "critical" : "primary"} value={analysis?.diagnosis ?? findings.interpretation.value} />
-        <MetricRow label="Confidence" value={findings.confidence.value} />
-        <MetricRow label="Severity" tone={severity === "critical" ? "critical" : severity === "severe" ? "warning" : "success"} value={severity.toUpperCase()} />
-        {analysis?.recommendations?.length ? (
-          <View style={styles.listBlock}>
-            <Text style={styles.listTitle}>Recommendations</Text>
-            {analysis.recommendations.slice(0, 4).map((item) => (
-              <Text key={item} style={styles.listItem}>• {item}</Text>
-            ))}
-          </View>
-        ) : null}
-        {onOpenReview ? (
-          <Pressable onPress={onOpenReview} style={styles.actionButtonOutline}>
-            <Text style={styles.actionLabelOutline}>Open Doctor Review</Text>
-          </Pressable>
-        ) : null}
-      </PanelSection>
-
       <PanelSection id="clinical-alerts" title="Clinical Alerts">
         {warnings.map((warning) => (
           <Text key={warning} style={styles.warningText}>• {warning}</Text>
         ))}
       </PanelSection>
-
-      <PanelSection id="notes" title="Clinical Notes">
-        <Text style={styles.notesText}>{clinicalNotes ?? "No clinical notes recorded for this study."}</Text>
-      </PanelSection>
-
-      {previousStudies.length ? (
-        <PanelSection id="previous-ecg" title="Previous Comparison">
-          {previousStudies.slice(0, 4).map((item) => (
-            <View key={item.caseId} style={styles.historyRow}>
-              <Text style={styles.historyTitle}>{item.caseNumber ?? item.caseId}</Text>
-              <Text style={styles.historyMeta}>{item.studyDate ? formatDate(item.studyDate) : "Date pending"}</Text>
-            </View>
-          ))}
-        </PanelSection>
+      <EcgClinicalCard id="ai-inspector" title="AI Inspector">
+        <EcgAiAnnotationInspector workspace={aiOverlay} />
+      </EcgClinicalCard>
+      {onOpenReview ? (
+        <Pressable onPress={onOpenReview} style={styles.actionButtonOutline}>
+          <Text style={styles.actionLabelOutline}>Open Doctor Review</Text>
+        </Pressable>
       ) : null}
+    </>
+  );
 
-      <PanelSection id="history" title="History">
-        <MetricRow label="Prior Studies" value={previousStudies.length ? `${previousStudies.length} on record` : "None linked"} />
-        {previousStudies[0] ? (
-          <MetricRow label="Most Recent Prior" value={previousStudies[0].caseNumber ?? previousStudies[0].caseId} />
-        ) : null}
-      </PanelSection>
-
-      <PanelSection id="comparison" title="Comparison">
-        <MetricRow label="Compare Mode" value={previousStudies.length ? "Select prior study in left rail" : "No prior studies available"} />
-      </PanelSection>
-
-      <PanelSection id="timeline" title="Timeline">
-        {studyDate ? <MetricRow label="Current Study" value={formatDate(studyDate)} /> : null}
-        {previousStudies.slice(0, 3).map((item) => (
-          <MetricRow key={item.caseId} label={item.caseNumber ?? item.caseId} value={item.studyDate ? formatDate(item.studyDate) : "Pending"} />
-        ))}
-      </PanelSection>
-
-      <PanelSection id="bookmarks" title="Bookmarks">
-        <MetricRow label="Pinned Case" value={caseNumber ?? "Current study"} />
-        {previousStudies[0] ? <MetricRow label="Bookmark" value={previousStudies[0].caseNumber ?? previousStudies[0].caseId} /> : null}
-      </PanelSection>
-
-      <PanelSection id="status" title="Status">
-        <MetricRow label="Digitization" value={digitalEcg?.status === "available" ? "Complete" : digitalEcgLoading ? "Running" : "Pending"} />
-        <MetricRow label="Signal Engine" value={digitalEcg?.measurementEngine ? "Digital ECG" : "Awaiting"} />
-      </PanelSection>
-
+  const reportsTab = (
+    <>
       <PanelSection id="export" title="Export">
         {onExportPdf ? (
           <Pressable onPress={onExportPdf} style={styles.actionButtonOutline}>
@@ -292,11 +231,71 @@ export const EcgClinicalRightPanel = memo(function EcgClinicalRightPanel({
           </Pressable>
         ) : null}
       </PanelSection>
+      <PanelSection id="status" title="Status">
+        <MetricRow label="Digitization" value={digitalEcg?.status === "available" ? "Complete" : digitalEcgLoading ? "Running" : "Pending"} />
+        <MetricRow label="Signal Engine" value={digitalEcg?.measurementEngine ? "Digital ECG" : "Awaiting"} />
+      </PanelSection>
+    </>
+  );
 
-      <EcgClinicalCard id="ai-inspector" title="AI Inspector">
-        <EcgAiAnnotationInspector workspace={aiOverlay} />
-      </EcgClinicalCard>
-    </ScrollView>
+  const historyTab = (
+    <>
+      {previousStudies.length ? (
+        <PanelSection id="previous-ecg" title="Previous Comparison">
+          {previousStudies.slice(0, 4).map((item) => (
+            <View key={item.caseId} style={styles.historyRow}>
+              <Text style={styles.historyTitle}>{item.caseNumber ?? item.caseId}</Text>
+              <Text style={styles.historyMeta}>{item.studyDate ? formatDate(item.studyDate) : "Date pending"}</Text>
+            </View>
+          ))}
+        </PanelSection>
+      ) : null}
+      <PanelSection id="history" title="History">
+        <MetricRow label="Prior Studies" value={previousStudies.length ? `${previousStudies.length} on record` : "None linked"} />
+      </PanelSection>
+      <PanelSection id="comparison" title="Comparison">
+        <MetricRow label="Compare Mode" value={previousStudies.length ? "Select prior study in left rail" : "No prior studies available"} />
+      </PanelSection>
+      <PanelSection id="timeline" title="Timeline">
+        {studyDate ? <MetricRow label="Current Study" value={formatDate(studyDate)} /> : null}
+        {previousStudies.slice(0, 3).map((item) => (
+          <MetricRow key={item.caseId} label={item.caseNumber ?? item.caseId} value={item.studyDate ? formatDate(item.studyDate) : "Pending"} />
+        ))}
+      </PanelSection>
+    </>
+  );
+
+  const tabContent =
+    activeTab === "patient"
+      ? patientTab
+      : activeTab === "measurements"
+        ? measurementsTab
+        : activeTab === "ai"
+          ? aiTab
+          : activeTab === "reports"
+            ? reportsTab
+            : historyTab;
+
+  return (
+    <View style={styles.fill} testID="sprint26-clinical-tabbed-panel" nativeID="sprint25-clinical-right-panel">
+      <View style={styles.tabBar} testID="sprint26-clinical-tabs">
+        {TABS.map((tab) => (
+          <Pressable
+            accessibilityRole="tab"
+            accessibilityState={{ selected: activeTab === tab.id }}
+            key={tab.id}
+            onPress={() => setActiveTab(tab.id)}
+            style={[styles.tab, activeTab === tab.id && styles.tabActive]}
+            testID={`sprint26-clinical-tab-${tab.id}`}
+          >
+            <Text style={[styles.tabLabel, activeTab === tab.id && styles.tabLabelActive]}>{tab.label}</Text>
+          </Pressable>
+        ))}
+      </View>
+      <ScrollView contentContainerStyle={styles.scroll} style={styles.tabBody}>
+        {tabContent}
+      </ScrollView>
+    </View>
   );
 });
 
@@ -346,15 +345,25 @@ const styles = StyleSheet.create({
   notesText: { color: medicalTheme.text, fontSize: 12, fontWeight: "600", lineHeight: 18 },
   patientMeta: { color: medicalTheme.muted, fontSize: 11, fontWeight: "700" },
   patientName: { color: medicalTheme.text, fontSize: 14, fontWeight: "900" },
-  scroll: { gap: 10, paddingBottom: 16 },
-  section: {
-    backgroundColor: "#081625",
-    borderColor: medicalTheme.border,
-    borderRadius: 10,
-    borderWidth: 1,
-    gap: 2,
-    padding: 10,
+  scroll: { gap: 8, paddingBottom: 12 },
+  tab: {
+    alignItems: "center",
+    borderBottomColor: "transparent",
+    borderBottomWidth: 2,
+    flex: 1,
+    justifyContent: "center",
+    minHeight: 32,
+    paddingHorizontal: 4,
   },
-  sectionTitle: { color: medicalTheme.primary, fontSize: 11, fontWeight: "900", letterSpacing: 1, marginBottom: 4 },
+  tabActive: { borderBottomColor: medicalTheme.primary },
+  tabBar: {
+    borderBottomColor: medicalTheme.border,
+    borderBottomWidth: 1,
+    flexDirection: "row",
+    flexShrink: 0,
+  },
+  tabBody: { flex: 1, minHeight: 0 },
+  tabLabel: { color: medicalTheme.muted, fontSize: 10, fontWeight: "800" },
+  tabLabelActive: { color: medicalTheme.primary },
   warningText: { color: medicalTheme.warning, fontSize: 11, fontWeight: "700", lineHeight: 16 },
 });

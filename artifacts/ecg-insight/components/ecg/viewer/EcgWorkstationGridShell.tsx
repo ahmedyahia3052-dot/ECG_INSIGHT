@@ -1,23 +1,23 @@
 import React, { createElement, useCallback, useRef, type ReactNode } from "react";
 import { Platform, StyleSheet, View } from "react-native";
 
-const DEFAULT_LEFT = 260;
-const DEFAULT_RIGHT = 280;
-const MIN_SIDE = 180;
-const MAX_SIDE = 480;
+import { ECG_WORKSTATION_VISUAL } from "./ecgWorkstationVisualTokens";
 
-/** Sprint 25 — docking layout shell with drag-resize and ~70% center priority. */
+const MIN_SIDE = 180;
+const MAX_SIDE = 360;
+
+/** Sprint 26 — docking layout optimized for ≥80% center viewer area. */
 export function EcgWorkstationGridShell({
   bottom,
   center,
   left,
   leftCollapsed,
-  leftWidth = DEFAULT_LEFT,
+  leftWidth = ECG_WORKSTATION_VISUAL.leftExpandedWidth,
   onLeftWidthChange,
   onRightWidthChange,
   right,
   rightCollapsed,
-  rightWidth = DEFAULT_RIGHT,
+  rightWidth = ECG_WORKSTATION_VISUAL.rightExpandedWidth,
 }: {
   bottom: ReactNode;
   center: ReactNode;
@@ -61,11 +61,15 @@ export function EcgWorkstationGridShell({
     [leftWidth, onLeftWidthChange, onRightWidthChange, rightWidth],
   );
 
+  const gap = ECG_WORKSTATION_VISUAL.workspaceGap;
+  const leftCol = leftCollapsed ? `${ECG_WORKSTATION_VISUAL.leftCollapsedWidth}px` : `${leftWidth}px`;
+  const rightCol = rightCollapsed ? "0px" : `${rightWidth}px`;
+
   if (Platform.OS !== "web") {
     return (
       <View style={styles.nativeColumn}>
         <View style={styles.nativeRow}>
-          {!leftCollapsed ? <View style={[styles.nativeSide, { width: leftWidth }]}>{left}</View> : null}
+          <View style={[styles.nativeSide, { width: leftCollapsed ? ECG_WORKSTATION_VISUAL.leftCollapsedWidth : leftWidth }]}>{left}</View>
           <View style={styles.nativeCenter}>{center}</View>
           {!rightCollapsed ? <View style={[styles.nativeSide, { width: rightWidth }]}>{right}</View> : null}
         </View>
@@ -74,24 +78,20 @@ export function EcgWorkstationGridShell({
     );
   }
 
-  const leftCol = leftCollapsed ? "0px" : `${leftWidth}px`;
-  const rightCol = rightCollapsed ? "0px" : `${rightWidth}px`;
-  const centerCol = "minmax(0, 1fr)";
-
   return createElement(
     "div",
     {
-      "data-testid": "sprint25-workstation-dock",
-      nativeID: "sprint24-workstation-grid",
+      "data-testid": "sprint26-workstation-layout",
+      nativeID: "sprint25-workstation-dock",
       style: {
         boxSizing: "border-box",
         display: "grid",
-        gap: 6,
+        gap,
         gridTemplateAreas: `
           "left center right"
           "bottom bottom bottom"
         `,
-        gridTemplateColumns: `${leftCol} ${centerCol} ${rightCol}`,
+        gridTemplateColumns: `${leftCol} minmax(0, 1fr) ${rightCol}`,
         gridTemplateRows: "minmax(0, 1fr) auto",
         height: "100%",
         minHeight: 0,
@@ -103,29 +103,22 @@ export function EcgWorkstationGridShell({
       "div",
       {
         style: {
-          display: leftCollapsed ? "none" : "flex",
+          display: "flex",
           gridArea: "left",
           minHeight: 0,
           minWidth: 0,
           overflow: "hidden",
           position: "relative",
+          transition: "width 180ms ease",
         },
       },
       left,
       !leftCollapsed
         ? createElement("div", {
-            "data-testid": "sprint25-resize-left",
+            "data-testid": "sprint26-resize-left",
             onMouseDown: (event: React.MouseEvent) => startDrag("left", event),
             role: "separator",
-            style: {
-              bottom: 0,
-              cursor: "col-resize",
-              position: "absolute",
-              right: -3,
-              top: 0,
-              width: 6,
-              zIndex: 20,
-            },
+            style: { bottom: 0, cursor: "col-resize", position: "absolute", right: -2, top: 0, width: 4, zIndex: 20 },
           })
         : null,
     ),
@@ -144,18 +137,10 @@ export function EcgWorkstationGridShell({
       },
       !rightCollapsed
         ? createElement("div", {
-            "data-testid": "sprint25-resize-right",
+            "data-testid": "sprint26-resize-right",
             onMouseDown: (event: React.MouseEvent) => startDrag("right", event),
             role: "separator",
-            style: {
-              bottom: 0,
-              cursor: "col-resize",
-              left: -3,
-              position: "absolute",
-              top: 0,
-              width: 6,
-              zIndex: 20,
-            },
+            style: { bottom: 0, cursor: "col-resize", left: -2, position: "absolute", top: 0, width: 4, zIndex: 20 },
           })
         : null,
       right,
@@ -167,7 +152,7 @@ export function EcgWorkstationGridShell({
 const styles = StyleSheet.create({
   nativeBottom: { flexShrink: 0 },
   nativeCenter: { flex: 1, minWidth: 0 },
-  nativeColumn: { flex: 1, gap: 6, minHeight: 0 },
-  nativeRow: { flex: 1, flexDirection: "row", gap: 6, minHeight: 0 },
+  nativeColumn: { flex: 1, gap: ECG_WORKSTATION_VISUAL.workspaceGap, minHeight: 0 },
+  nativeRow: { flex: 1, flexDirection: "row", gap: ECG_WORKSTATION_VISUAL.workspaceGap, minHeight: 0 },
   nativeSide: { flexShrink: 0 },
 });

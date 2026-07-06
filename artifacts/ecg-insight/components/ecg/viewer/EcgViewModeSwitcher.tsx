@@ -5,15 +5,15 @@ import { medicalTheme } from "@/components/enterprise/EnterpriseUI";
 
 import type { EcgWorkstationViewMode } from "./types";
 
+/** Sprint 26 — compact single-row mode switcher (7 primary modes). */
 const MODES: Array<{ id: EcgWorkstationViewMode; label: string }> = [
   { id: "image", label: "Original" },
   { id: "processed", label: "Processed" },
   { id: "waveform", label: "Digitized" },
   { id: "monitor", label: "Live Monitor" },
-  { id: "overlay", label: "Overlay" },
   { id: "ai-review", label: "AI Review" },
   { id: "compare", label: "Compare" },
-  { id: "report", label: "Report" },
+  { id: "overlay", label: "Overlay" },
 ];
 
 export const EcgViewModeSwitcher = memo(function EcgViewModeSwitcher({
@@ -23,13 +23,13 @@ export const EcgViewModeSwitcher = memo(function EcgViewModeSwitcher({
   onChange: (mode: EcgWorkstationViewMode) => void;
   value: EcgWorkstationViewMode;
 }) {
-  const activeValue = value === "overlay" ? "ai-review" : value;
+  const activeValue = value === "overlay" ? "overlay" : value;
 
   return (
-    <View nativeID="sprint24-view-mode-switcher" style={styles.root} testID="sprint25-view-mode-switcher">
+    <View nativeID="sprint26-view-mode-switcher" style={styles.root} testID="sprint26-view-mode-switcher">
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.row}>
         {MODES.map((mode) => {
-          const active = activeValue === mode.id;
+          const active = activeValue === mode.id || (mode.id === "ai-review" && value === "overlay");
           return (
             <Pressable
               accessibilityLabel={`${mode.label} view mode`}
@@ -55,15 +55,15 @@ const styles = StyleSheet.create({
   chip: {
     backgroundColor: "rgba(12,26,45,0.92)",
     borderColor: medicalTheme.border,
-    borderRadius: 999,
+    borderRadius: 4,
     borderWidth: 1,
-    minHeight: 32,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
+    height: 28,
+    justifyContent: "center",
+    paddingHorizontal: 8,
   },
   chipActive: { backgroundColor: medicalTheme.primary, borderColor: medicalTheme.primary },
-  chipLabel: { color: medicalTheme.muted, fontSize: 11, fontWeight: "800" },
+  chipLabel: { color: medicalTheme.muted, fontSize: 10, fontWeight: "800" },
   chipLabelActive: { color: "#03131B" },
-  root: { flexShrink: 1, maxWidth: "100%", paddingVertical: 2 },
-  row: { alignItems: "center", gap: 6 },
+  root: { flex: 1, maxHeight: 32, minWidth: 0 },
+  row: { alignItems: "center", flexDirection: "row", gap: 4 },
 });

@@ -4,6 +4,21 @@ All notable changes to this project are documented in this file.
 
 ---
 
+## [Sprint26] — 2026-07-06
+
+### Changed
+
+- **Compact ribbon toolbar** — 40–44px icon buttons, horizontal scroll, overflow menus for secondary tools
+- **Mode switcher** — single compact row for all seven view modes
+- **Left sidebar** — collapsible 240px expanded / 60px collapsed icon rail with animated transition
+- **Right clinical panel** — tabbed UI (Patient, Measurements, AI, Reports, History); one section visible at a time
+- **Status bar** — reduced to 28px with essential runtime metrics only
+- **Grid layout** — viewer prioritized to occupy ≥80% of workspace; panels collapse to expand canvas
+- Visual tokens updated for hospital-grade density (`toolbarMaxHeight: 44`, `statusBarHeight: 28`)
+- Readiness testID `sprint26-hospital-workstation-ready`
+
+---
+
 ## [Sprint25] — 2026-07-06
 
 ### Added

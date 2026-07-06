@@ -1,12 +1,20 @@
-/** Shared visual tokens for pixel-perfect hospital workstation UI (Sprint 23). */
+/** Shared visual tokens — Sprint 26 compact hospital workstation. */
 export const ECG_WORKSTATION_VISUAL = {
-  monitorBorderRadius: 12,
-  panelBorderRadius: 10,
-  statusBarMinHeight: 36,
-  toolbarButtonHeight: 48,
-  toolbarButtonMinWidth: 50,
-  toolbarGroupGap: 4,
-  miniNavigatorHeight: 56,
-  workspaceGap: 6,
-  workspacePadding: 6,
+  leftCollapsedWidth: 60,
+  leftExpandedWidth: 240,
+  miniNavigatorHeight: 48,
+  monitorBorderRadius: 8,
+  panelBorderRadius: 8,
+  rightExpandedWidth: 220,
+  statusBarHeight: 28,
+  toolbarButtonSize: 42,
+  toolbarMaxHeight: 44,
+  toolbarGroupGap: 2,
+  workspaceGap: 4,
+  workspacePadding: 4,
+  /** @deprecated use toolbarButtonSize */
+  toolbarButtonHeight: 42,
+  /** @deprecated use toolbarButtonSize */
+  toolbarButtonMinWidth: 42,
+  statusBarMinHeight: 28,
 } as const;

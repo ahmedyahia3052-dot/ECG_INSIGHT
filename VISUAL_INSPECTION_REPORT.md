@@ -9,7 +9,7 @@
 
 | Module | Score |
 |--------|-------|
-| Layout | 100% |
+| Layout | 98% |
 | Toolbar | 100% |
 | Sidebar / Clinical Panel | 100% |
 | Monitor | 100% |
@@ -17,13 +17,14 @@
 | Responsiveness | 100% |
 | Typography | 100% |
 | Spacing | 100% |
-| Visual Consistency | 100% |
+| Visual Consistency | 97% |
 | Pixel Quality | 100% |
 | **Overall** | **100%** |
 
-## Issues Detected (0)
+## Issues Detected (2)
 
-- None
+- [medium] **status** — missing: Enterprise status bar not found
+- [low] **layout** — title_missing: Hospital ECG Workstation title not visible
 
 ## Screenshots
 

@@ -4,7 +4,7 @@
 
 | Category | Score |
 |----------|-------|
-| Layout | 100% |
+| Layout | 98% |
 | Toolbar | 100% |
 | Sidebar | 100% |
 | Monitor | 100% |
@@ -16,5 +16,5 @@
 | Accessibility | 100% |
 | Performance | 100% |
 | Animations | 100% |
-| Visual Consistency | 100% |
+| Visual Consistency | 97% |
 | Pixel Quality | 100% |

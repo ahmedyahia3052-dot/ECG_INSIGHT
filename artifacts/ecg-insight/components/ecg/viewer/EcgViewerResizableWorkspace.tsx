@@ -1,9 +1,10 @@
 import React, { type ReactNode, useEffect, useState } from "react";
 import { Platform, StyleSheet, View } from "react-native";
 
+import { ECG_WORKSTATION_VISUAL } from "./ecgWorkstationVisualTokens";
 import { EcgWorkstationGridShell } from "./EcgWorkstationGridShell";
 
-const LAYOUT_KEY = "ecg-insight:ecg-monitor-panel-layout-v2";
+const LAYOUT_KEY = "ecg-insight:ecg-monitor-panel-layout-v3";
 
 type SavedLayout = {
   bottomSize?: number;
@@ -14,12 +15,21 @@ type SavedLayout = {
 };
 
 function loadLayout(): SavedLayout {
-  if (typeof window === "undefined") return { leftSize: 260, rightSize: 280 };
+  if (typeof window === "undefined") {
+    return { leftSize: ECG_WORKSTATION_VISUAL.leftExpandedWidth, rightSize: ECG_WORKSTATION_VISUAL.rightExpandedWidth };
+  }
   try {
-    const raw = window.localStorage.getItem(LAYOUT_KEY) ?? window.localStorage.getItem("ecg-insight:ecg-monitor-panel-layout");
-    return { leftSize: 260, rightSize: 280, ...(JSON.parse(raw ?? "{}") as SavedLayout) };
+    const raw =
+      window.localStorage.getItem(LAYOUT_KEY) ??
+      window.localStorage.getItem("ecg-insight:ecg-monitor-panel-layout-v2") ??
+      window.localStorage.getItem("ecg-insight:ecg-monitor-panel-layout");
+    return {
+      leftSize: ECG_WORKSTATION_VISUAL.leftExpandedWidth,
+      rightSize: ECG_WORKSTATION_VISUAL.rightExpandedWidth,
+      ...(JSON.parse(raw ?? "{}") as SavedLayout),
+    };
   } catch {
-    return { leftSize: 260, rightSize: 280 };
+    return { leftSize: ECG_WORKSTATION_VISUAL.leftExpandedWidth, rightSize: ECG_WORKSTATION_VISUAL.rightExpandedWidth };
   }
 }
 
@@ -63,12 +73,12 @@ export function EcgViewerResizableWorkspace({ bottom, center, layout: controlled
           center={center}
           left={left}
           leftCollapsed={!!layout.leftCollapsed}
-          leftWidth={layout.leftSize ?? 260}
+          leftWidth={layout.leftSize ?? ECG_WORKSTATION_VISUAL.leftExpandedWidth}
           onLeftWidthChange={(leftSize) => updateLayout({ leftSize })}
           onRightWidthChange={(rightSize) => updateLayout({ rightSize })}
           right={right}
           rightCollapsed={!!layout.rightCollapsed}
-          rightWidth={layout.rightSize ?? 280}
+          rightWidth={layout.rightSize ?? ECG_WORKSTATION_VISUAL.rightExpandedWidth}
         />
       </View>
     );
@@ -77,9 +87,11 @@ export function EcgViewerResizableWorkspace({ bottom, center, layout: controlled
   return (
     <View style={styles.nativeColumn}>
       <View style={styles.nativeMainRow}>
-        {!layout.leftCollapsed ? <View style={[styles.nativeSide, { width: layout.leftSize ?? 280 }]}>{left}</View> : null}
+        <View style={[styles.nativeSide, { width: layout.leftCollapsed ? ECG_WORKSTATION_VISUAL.leftCollapsedWidth : layout.leftSize ?? 240 }]}>
+          {left}
+        </View>
         <View style={styles.nativeCenter}>{center}</View>
-        {!layout.rightCollapsed ? <View style={[styles.nativeSide, { width: layout.rightSize ?? 260 }]}>{right}</View> : null}
+        {!layout.rightCollapsed ? <View style={[styles.nativeSide, { width: layout.rightSize ?? 220 }]}>{right}</View> : null}
       </View>
       <View style={styles.nativeBottom}>{bottom}</View>
     </View>
@@ -87,10 +99,10 @@ export function EcgViewerResizableWorkspace({ bottom, center, layout: controlled
 }
 
 const styles = StyleSheet.create({
-  nativeBottom: { flexShrink: 0, marginTop: 10 },
+  nativeBottom: { flexShrink: 0 },
   nativeCenter: { flex: 1, minWidth: 0 },
-  nativeColumn: { flex: 1, gap: 10, minHeight: 0 },
-  nativeMainRow: { flex: 1, flexDirection: "row", gap: 10, minHeight: 0 },
+  nativeColumn: { flex: 1, gap: ECG_WORKSTATION_VISUAL.workspaceGap, minHeight: 0 },
+  nativeMainRow: { flex: 1, flexDirection: "row", gap: ECG_WORKSTATION_VISUAL.workspaceGap, minHeight: 0 },
   nativeSide: { flexShrink: 0 },
   webRoot: { display: "flex", flex: 1, height: "100%", minHeight: 0, overflow: "hidden", width: "100%" },
 });

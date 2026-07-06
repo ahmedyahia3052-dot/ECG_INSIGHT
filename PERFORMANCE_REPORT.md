@@ -1,20 +1,6 @@
-# Performance Report — Sprint 25
+# Performance Report — Sprint 23
 
-**Date:** 2026-07-06  
-**Status:** PASS
-
-| Metric | Target | Result |
-|--------|--------|--------|
-| Monitor canvas FPS | 60 FPS | Pass |
-| Layout resize | No full remount | Pass |
-| Panel persistence | localStorage debounced | Pass |
-| Command palette | Render on demand | Pass |
-| Crosshair overlay | pointer-events: none | Pass |
-| Clinical cards | Collapse reduces DOM | Pass |
-
-## Optimizations
-
-- Dock resize updates CSS grid columns only (no react-resizable-panels thrash)
-- Crosshair overlay does not intercept pointer events
-- Workflow timeline memoized stage computation
-- Command palette unmounts when closed
+- Canvas resize optimized (no buffer reset every frame unless size changes)
+- Visual inspector confirms monitor canvas fills host at 1920×1080
+- RAF loop retained for 60 FPS phosphor sweep
+- Status bar FPS/GPU/memory metrics available via `sprint21-enterprise-status-bar`

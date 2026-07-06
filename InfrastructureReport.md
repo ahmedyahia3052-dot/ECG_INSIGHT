@@ -1,20 +1,20 @@
 # Infrastructure Report
 
-Generated: 2026-07-06T16:30:11.009Z
+Generated: 2026-07-06T19:26:04.463Z
 
 ## Summary
 
 | Metric | Value |
 |--------|-------|
-| Session ID | 3a41708f-097f-4841-bbb5-82434f5444a1 |
+| Session ID | ec583acc-ee81-4b58-b8af-3c1a9374994f |
 | Reuse existing server | yes |
-| Startup time | 476 ms |
+| Startup time | 239 ms |
 | API readiness | ready |
 | Ollama readiness | skipped (mock mode) |
-| Database latency | 322 ms |
-| Frontend startup | 42 ms |
+| Database latency | 23 ms |
+| Frontend startup | 111 ms |
 | CPU cores | 12 |
-| Memory free / total | 935 MB / 16240 MB |
+| Memory free / total | 2597 MB / 16240 MB |
 | Process lifecycle report | PROCESS_LIFECYCLE_REPORT.md |
 
 ## Failed connections
@@ -28,29 +28,29 @@ Generated: 2026-07-06T16:30:11.009Z
   "mode": "reuse-existing-server",
   "live": {
     "attempts": 1,
-    "durationMs": 66,
+    "durationMs": 65,
     "payload": {
       "ok": true,
-      "requestId": "c82d9424-bce9-4a83-b6b0-3b04ac9a62e5",
+      "requestId": "bd493507-2b4a-4d69-99d2-d27e57192a4b",
       "service": "ecg-insight-api",
-      "uptimeSeconds": 140918
+      "uptimeSeconds": 6466
     }
   },
   "apiReady": {
     "attempts": 1,
-    "durationMs": 336,
+    "durationMs": 37,
     "ok": true
   },
   "apiReadiness": {
     "checks": {
       "database": {
         "details": {
-          "activeSessions": 7175,
-          "auditEventsLast24h": 165,
+          "activeSessions": 7288,
+          "auditEventsLast24h": 499,
           "provider": "postgresql",
           "users": 212
         },
-        "durationMs": 322,
+        "durationMs": 23,
         "ok": true,
         "status": "healthy"
       },
@@ -78,27 +78,27 @@ Generated: 2026-07-06T16:30:11.009Z
       },
       "storage": {
         "details": {
-          "fileCount": 1362,
+          "fileCount": 1382,
           "path": "C:\\Users\\Ahmed\\Downloads\\BelatedElasticLoop\\uploads",
-          "sizeBytes": 9211197,
+          "sizeBytes": 9410797,
           "writable": true
         },
-        "durationMs": 162,
+        "durationMs": 22,
         "ok": true,
         "status": "healthy"
       }
     },
-    "durationMs": 322,
+    "durationMs": 23,
     "environment": "development",
     "ok": true,
     "service": "ecg-insight-api",
-    "timestamp": "2026-07-06T16:30:10.949Z",
-    "requestId": "ad0a03e8-cb33-4de5-8611-5b20aec72a73",
+    "timestamp": "2026-07-06T19:26:04.334Z",
+    "requestId": "10d410c0-a280-4d2f-a2f2-96c23bac9c8e",
     "status": "ready"
   },
   "frontend": {
     "attempts": 1,
-    "durationMs": 42,
+    "durationMs": 111,
     "payload": {}
   },
   "ollama": {

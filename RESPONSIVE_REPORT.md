@@ -1,15 +1,13 @@
-# Responsive Report — Sprint 25
-
-**Date:** 2026-07-06
+# Responsive Report — Sprint 23
 
 Validated viewports: 1366×768, 1440×900, 1536×864, 1920×1080, 2560×1440
 
-| Viewport | Dock Layout | Ribbon Wrap | Clinical Cards | Result |
-|----------|-------------|-------------|----------------|--------|
-| 1366×768 | Pass | Pass | Pass | Pass |
-| 1440×900 | Pass | Pass | Pass | Pass |
-| 1536×864 | Pass | Pass | Pass | Pass |
-| 1920×1080 | Pass | Pass | Pass | Pass |
-| 2560×1440 | Pass | Pass | Pass | Pass |
+| Viewport | Result |
+|----------|--------|
+| 1366x768 | Pass (2 notes) |
+| 1440x900 | Pass (2 notes) |
+| 1536x864 | Pass (2 notes) |
+| 1920x1080 | Pass (2 notes) |
+| 2560x1440 | Pass (2 notes) |
 
-Command ribbon uses `flexWrap` — groups remain reachable without clipping. Side panels scroll independently at all tested sizes.
+Toolbar uses horizontal scroll on narrow widths — controls remain reachable (not clipped).
