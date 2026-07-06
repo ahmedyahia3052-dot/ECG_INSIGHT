@@ -1,6 +1,6 @@
 import { Feather } from "@expo/vector-icons";
 import React, { memo } from "react";
-import { Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Platform, Pressable, StyleSheet, Text, View } from "react-native";
 
 import { medicalTheme } from "@/components/enterprise/EnterpriseUI";
 
@@ -10,6 +10,7 @@ import type { EcgCompareLayoutMode, EcgLeadId, EcgLeadLayoutMode, EcgWorkstation
 import type { EcgAiOverlayWorkspace } from "./useEcgAiOverlayWorkspace";
 import type { EcgMeasurementWorkspace } from "./useEcgMeasurementWorkspace";
 import type { EcgViewerControls } from "./useEcgViewerControls";
+import type { EcgWaveformPlaybackState } from "./useEcgWaveformPlayback";
 
 type IconName = keyof typeof Feather.glyphMap;
 
@@ -55,7 +56,7 @@ function ToolButton({ action }: { action: ToolAction }) {
 
 function ToolGroupSection({ group }: { group: ToolGroup }) {
   return (
-    <View style={styles.group} testID={`sprint21-toolbar-group-${group.id}`}>
+    <View nativeID={`sprint24-ribbon-group-${group.id}`} style={styles.group} testID={`sprint21-toolbar-group-${group.id}`}>
       <Text style={styles.groupLabel}>{group.label}</Text>
       <View style={styles.groupRow}>
         {group.actions.map((action) => (
@@ -91,6 +92,7 @@ export const EcgWorkstationToolbar = memo(function EcgWorkstationToolbar({
   onToggleTheme,
   onUpload,
   onViewModeChange,
+  playback,
   recentCaseId,
   selectedLead,
   showDigitizedWaveform,
@@ -121,6 +123,7 @@ export const EcgWorkstationToolbar = memo(function EcgWorkstationToolbar({
   onToggleTheme?: () => void;
   onUpload?: () => void;
   onViewModeChange?: (mode: EcgWorkstationViewMode) => void;
+  playback?: EcgWaveformPlaybackState;
   recentCaseId?: string;
   selectedLead: EcgLeadId;
   showDigitizedWaveform: boolean;
@@ -158,34 +161,54 @@ export const EcgWorkstationToolbar = memo(function EcgWorkstationToolbar({
       ],
     },
     {
-      id: "digitize",
-      label: "DIGITIZE",
+      id: "grid",
+      label: "GRID",
       actions: [
-        { icon: "cpu", label: "Run", onPress: onDigitize, testID: "sprint18-digitize" },
-        { active: viewMode === "processed", icon: "filter", label: "Processed", onPress: () => onViewModeChange?.("processed") },
-        { active: viewMode === "waveform", icon: "activity", label: "Digitized", onPress: () => onViewModeChange?.("waveform") },
-        { active: viewMode === "monitor", icon: "monitor", label: "Monitor", onPress: () => onViewModeChange?.("monitor"), testID: "sprint18-monitor-mode" },
-        { icon: "chevrons-right", label: selectedLead, onPress: onLeadCycle },
-        { icon: "activity", label: `Speed ${controls.grid.speed}`, onPress: controls.cycleSpeed, testID: "sprint18-speed" },
         { icon: "bar-chart-2", label: `Gain ${controls.grid.gain}`, onPress: controls.cycleGain, testID: "sprint18-gain" },
+        { icon: "activity", label: `Speed ${controls.grid.speed}`, onPress: controls.cycleSpeed, testID: "sprint18-speed" },
+        { active: controls.grid.visible, icon: "grid", label: "Grid", onPress: controls.toggleGrid },
+        { icon: "sun", label: "Bright+", onPress: () => controls.adjustBrightness(8) },
+        { icon: "moon", label: "Bright−", onPress: () => controls.adjustBrightness(-8) },
+        { icon: "sliders", label: "Contrast", onPress: () => controls.adjustContrast(8) },
       ],
     },
     {
-      id: "measure",
-      label: "MEASURE",
+      id: "leads",
+      label: "LEADS",
       actions: [
-        { active: workspace?.present.toolMode === "caliper", icon: "maximize", label: "Caliper", onPress: () => workspace?.setToolMode("caliper") },
-        { active: measureActive, icon: "edit-3", label: "Manual", onPress: () => workspace?.setToolMode(measureActive ? "select" : "measurement") },
-        { active: viewMode === "measurement", icon: "sliders", label: "Mode", onPress: () => onViewModeChange?.("measurement"), testID: "sprint21-measurement-mode" },
-        { active: compareMode, icon: "columns", label: "Compare", onPress: onCompareToggle },
+        { icon: "chevrons-right", label: selectedLead, onPress: onLeadCycle },
+        {
+          active: leadLayout === "rhythm",
+          icon: "bar-chart",
+          label: "Rhythm",
+          onPress: () => {
+            onLeadLayoutChange?.("rhythm");
+            onRhythmStrip?.();
+          },
+        },
+        { active: leadLayout === "12-lead", icon: "layers", label: "12 Lead", onPress: () => onLeadLayoutChange?.("12-lead") },
+        { active: viewMode === "waveform", icon: "activity", label: "Waveform", onPress: () => onViewModeChange?.("waveform") },
+        { icon: "cpu", label: "Digitize", onPress: onDigitize, testID: "sprint18-digitize" },
+        { icon: "crosshair", label: "Focus", onPress: onToggleLeadFocus },
+      ],
+    },
+    {
+      id: "monitor",
+      label: "MONITOR",
+      actions: [
+        { active: viewMode === "monitor", icon: "monitor", label: "Live", onPress: () => onViewModeChange?.("monitor"), testID: "sprint18-monitor-mode" },
+        { icon: playback?.isPlaying ? "pause" : "play", label: playback?.isPlaying ? "Pause" : "Play", onPress: playback?.togglePlay },
+        { active: playback?.frozen, icon: "pause-circle", label: "Freeze", onPress: () => playback?.setFrozen(!playback?.frozen) },
+        { active: playback?.loop, icon: "repeat", label: "Loop", onPress: () => playback?.setLoop(!playback?.loop) },
+        { active: viewMode === "processed", icon: "filter", label: "Processed", onPress: () => onViewModeChange?.("processed") },
       ],
     },
     {
       id: "ai",
       label: "AI",
       actions: [
-        { active: viewMode === "ai-review" || viewMode === "overlay", icon: "eye", label: "Review", onPress: () => onViewModeChange?.("ai-review") },
-        { active: overlayEnabled, icon: "aperture", label: "Explain", onPress: () => aiOverlay?.toggleOverlay() },
+        { active: viewMode === "ai-review" || viewMode === "overlay", icon: "eye", label: "Interpret", onPress: () => onViewModeChange?.("ai-review") },
+        { active: overlayEnabled, icon: "aperture", label: "Overlay", onPress: () => aiOverlay?.toggleOverlay() },
         {
           active: heatmapEnabled,
           icon: "map",
@@ -196,65 +219,48 @@ export const EcgWorkstationToolbar = memo(function EcgWorkstationToolbar({
       ],
     },
     {
-      id: "export",
-      label: "EXPORT",
+      id: "compare",
+      label: "COMPARE",
       actions: [
-        { icon: "file-text", label: "PDF", onPress: onExportPdf, testID: "sprint18-export-pdf" },
-        { icon: "image", label: "PNG", onPress: onExportPng, testID: "sprint18-export-png" },
-        { icon: "grid", label: "CSV", onPress: onExportCsv },
-        { icon: "code", label: "JSON", onPress: onExportJson },
-        { icon: "file", label: "Report", onPress: () => onViewModeChange?.("report"), testID: "sprint21-open-report" },
+        { active: compareMode, icon: "columns", label: "Compare", onPress: onCompareToggle },
+        { active: compareLayout === "side-by-side", icon: "columns", label: "Side", onPress: () => onCompareLayoutChange?.("side-by-side") },
+        { active: compareLayout === "overlay", icon: "layers", label: "Overlay", onPress: () => onCompareLayoutChange?.("overlay") },
+        { active: compareLayout === "split", icon: "git-branch", label: "Diff", onPress: () => onCompareLayoutChange?.("split") },
       ],
     },
     {
-      id: "display",
-      label: "DISPLAY",
+      id: "report",
+      label: "REPORT",
       actions: [
-        { active: controls.grid.visible, icon: "grid", label: "Grid", onPress: controls.toggleGrid },
-        { icon: "sun", label: "Bright+", onPress: () => controls.adjustBrightness(8) },
-        { icon: "moon", label: "Bright−", onPress: () => controls.adjustBrightness(-8) },
-        { icon: "sliders", label: "Contrast", onPress: () => controls.adjustContrast(8) },
-        { icon: "settings", label: "Theme", onPress: onToggleTheme },
-        { active: leadLayout === "12-lead", icon: "layers", label: "12 Lead", onPress: () => onLeadLayoutChange?.("12-lead") },
-        { icon: "crosshair", label: "Focus", onPress: onToggleLeadFocus },
+        { icon: "file-text", label: "PDF", onPress: onExportPdf, testID: "sprint18-export-pdf" },
+        { icon: "image", label: "PNG", onPress: onExportPng, testID: "sprint18-export-png" },
+        { icon: "code", label: "JSON", onPress: onExportJson },
+        { icon: "grid", label: "CSV", onPress: onExportCsv },
+        { icon: "file", label: "Preview", onPress: () => onViewModeChange?.("report"), testID: "sprint21-open-report" },
       ],
     },
     {
       id: "tools",
       label: "TOOLS",
       actions: [
+        { active: workspace?.present.toolMode === "caliper", icon: "maximize", label: "Caliper", onPress: () => workspace?.setToolMode("caliper") },
+        { active: measureActive, icon: "edit-3", label: "Manual", onPress: () => workspace?.setToolMode(measureActive ? "select" : "measurement") },
+        { active: viewMode === "measurement", icon: "sliders", label: "Measure", onPress: () => onViewModeChange?.("measurement"), testID: "sprint21-measurement-mode" },
         { icon: "tool", label: "Settings", onPress: onOpenSettings },
-        {
-          icon: "layout",
-          label: compareLayout === "side-by-side" ? "Side" : compareLayout === "overlay" ? "Overlay" : "Split",
-          onPress: () => {
-            const next: EcgCompareLayoutMode =
-              compareLayout === "side-by-side" ? "overlay" : compareLayout === "overlay" ? "split" : "side-by-side";
-            onCompareLayoutChange?.(next);
-          },
-        },
-        {
-          active: leadLayout === "rhythm",
-          icon: "bar-chart",
-          label: "Rhythm",
-          onPress: () => {
-            onLeadLayoutChange?.("rhythm");
-            onRhythmStrip?.();
-          },
-        },
         { icon: "menu", label: "Left", onPress: onToggleLeftPanel, testID: "sprint22-toggle-left-panel" },
         { icon: "columns", label: "Right", onPress: onToggleRightPanel, testID: "sprint22-toggle-right-panel" },
+        { icon: "settings", label: "Theme", onPress: onToggleTheme },
       ],
     },
   ];
 
   return (
-    <View nativeID="sprint21-ecg-workstation-toolbar" style={styles.toolbar} testID="sprint23-visual-inspector-toolbar">
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.scroll}>
+    <View nativeID="sprint21-ecg-workstation-toolbar" style={styles.toolbar} testID="sprint24-hospital-ribbon-toolbar">
+      <View style={styles.ribbonWrap}>
         {groups.map((group) => (
           <ToolGroupSection key={group.id} group={group} />
         ))}
-      </ScrollView>
+      </View>
       {recentCaseId ? <Text style={styles.recentHint}>Recent case loaded</Text> : null}
     </View>
   );
@@ -275,9 +281,9 @@ const styles = StyleSheet.create({
     fontWeight: "900",
     letterSpacing: 1.2,
   },
-  groupRow: { flexDirection: "row", flexWrap: "nowrap", gap: ECG_WORKSTATION_VISUAL.toolbarGroupGap },
+  groupRow: { flexDirection: "row", flexWrap: "wrap", gap: ECG_WORKSTATION_VISUAL.toolbarGroupGap, maxWidth: 480 },
   recentHint: { color: medicalTheme.muted, fontSize: 9, fontWeight: "700", paddingHorizontal: 8, paddingBottom: 4 },
-  scroll: { alignItems: "stretch", gap: 2, paddingHorizontal: 4, paddingVertical: 2 },
+  ribbonWrap: { flexDirection: "row", flexWrap: "wrap", gap: 2, paddingHorizontal: 4, paddingVertical: 4 },
   toolButton: {
     alignItems: "center",
     backgroundColor: "rgba(12,26,45,0.92)",

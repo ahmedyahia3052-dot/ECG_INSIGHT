@@ -149,8 +149,14 @@ export function drawMonitorCanvas(
     ctx.lineCap = "round";
     ctx.beginPath();
     points.forEach((point, index) => {
-      if (index === 0) ctx.moveTo(point.x, point.y);
-      else ctx.lineTo(point.x, point.y);
+      if (index === 0) {
+        ctx.moveTo(point.x, point.y);
+        return;
+      }
+      const prev = points[index - 1]!;
+      const cx = (prev.x + point.x) / 2;
+      ctx.quadraticCurveTo(prev.x, prev.y, cx, (prev.y + point.y) / 2);
+      if (index === points.length - 1) ctx.lineTo(point.x, point.y);
     });
     ctx.stroke();
 

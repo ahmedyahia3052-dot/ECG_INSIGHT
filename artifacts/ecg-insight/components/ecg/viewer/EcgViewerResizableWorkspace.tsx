@@ -1,6 +1,8 @@
 import React, { type ReactNode, useEffect, useState } from "react";
 import { Platform, StyleSheet, View } from "react-native";
 
+import { EcgWorkstationGridShell } from "./EcgWorkstationGridShell";
+
 const LAYOUT_KEY = "ecg-insight:ecg-monitor-panel-layout";
 
 type SavedLayout = {
@@ -51,7 +53,18 @@ export function EcgViewerResizableWorkspace({ bottom, center, layout: controlled
   }, [layout, onLayoutChange]);
 
   if (Platform.OS === "web") {
-    return <WebWorkspace bottom={bottom} center={center} layout={layout} left={left} onLayoutChange={setLayout} right={right} />;
+    return (
+      <View style={styles.webRoot}>
+        <EcgWorkstationGridShell
+          bottom={bottom}
+          center={center}
+          left={left}
+          leftCollapsed={!!layout.leftCollapsed}
+          right={right}
+          rightCollapsed={!!layout.rightCollapsed}
+        />
+      </View>
+    );
   }
 
   return (
@@ -63,72 +76,6 @@ export function EcgViewerResizableWorkspace({ bottom, center, layout: controlled
       </View>
       <View style={styles.nativeBottom}>{bottom}</View>
     </View>
-  );
-}
-
-function WebWorkspace({
-  bottom,
-  center,
-  layout,
-  left,
-  onLayoutChange,
-  right,
-}: Props & { layout: SavedLayout; onLayoutChange: (layout: SavedLayout) => void }) {
-  const [panels, setPanels] = useState<null | typeof import("react-resizable-panels")>(null);
-
-  useEffect(() => {
-    void import("react-resizable-panels").then(setPanels);
-  }, []);
-
-  if (!panels) {
-    return (
-      <View style={styles.nativeColumn}>
-        <View style={styles.nativeMainRow}>
-          <View style={styles.nativeSide}>{left}</View>
-          <View style={styles.nativeCenter}>{center}</View>
-          <View style={styles.nativeSide}>{right}</View>
-        </View>
-        <View style={styles.nativeBottom}>{bottom}</View>
-      </View>
-    );
-  }
-
-  const { Group, Panel, Separator } = panels;
-
-  return (
-    <Group id="ecg-monitor-workspace" orientation="vertical" style={styles.webRoot}>
-      <Panel defaultSize={90} id="ecg-monitor-main" minSize={72}>
-        <Group orientation="horizontal" style={styles.webRoot}>
-        {!layout.leftCollapsed ? (
-          <>
-            <Panel defaultSize={layout.leftSize ?? 16} id="ecg-monitor-left" maxSize={24} minSize={12}>
-              <View style={styles.panelFill}>{left}</View>
-            </Panel>
-            <Separator style={styles.separator} />
-          </>
-        ) : null}
-          <Panel
-            defaultSize={layout.leftCollapsed && layout.rightCollapsed ? 100 : layout.leftCollapsed || layout.rightCollapsed ? 78 : 58}
-            id="ecg-monitor-center"
-            minSize={44}
-          >
-            <View style={styles.panelFill}>{center}</View>
-          </Panel>
-          {!layout.rightCollapsed ? (
-            <>
-              <Separator style={styles.separator} />
-              <Panel defaultSize={layout.rightSize ?? 24} id="ecg-monitor-right" maxSize={32} minSize={20}>
-                <View style={styles.panelFill}>{right}</View>
-              </Panel>
-            </>
-          ) : null}
-        </Group>
-      </Panel>
-      <Separator style={styles.separatorHorizontal} />
-      <Panel defaultSize={11} id="ecg-monitor-bottom" maxSize={16} minSize={8}>
-        <View style={styles.panelFill}>{bottom}</View>
-      </Panel>
-    </Group>
   );
 }
 

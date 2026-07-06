@@ -6,7 +6,7 @@ async function openEcgWorkspace(page: import("@playwright/test").Page, caseId: s
   await expect(page.getByTestId("ecg-workspace-loading")).toHaveCount(0, { timeout: 45_000 });
   await expect(page.getByTestId("ecg-enterprise-workspace-ready")).toBeVisible({ timeout: 45_000 });
   await expect(
-    page.getByTestId("sprint23-visual-inspector-toolbar").or(page.getByTestId("sprint22-hospital-workstation-toolbar")),
+    page.getByTestId("sprint24-hospital-ribbon-toolbar").or(page.getByTestId("sprint23-visual-inspector-toolbar")),
   ).toBeVisible({ timeout: 20_000 });
 }
 
@@ -32,15 +32,14 @@ test.describe("Sprint 22 Hospital ECG Workstation @sprint22", () => {
   test("hospital shell, toolbar groups, and clinical sidebar sections", async ({ page }) => {
     await openEcgWorkspace(page, caseId);
     await expect(page.getByText("Hospital ECG Workstation")).toBeVisible();
-    await expect(page.getByTestId("sprint23-visual-inspector-toolbar").or(page.getByTestId("sprint22-hospital-workstation-toolbar"))).toBeVisible();
+    await expect(page.getByTestId("sprint24-hospital-ribbon-toolbar").or(page.getByTestId("sprint23-visual-inspector-toolbar"))).toBeVisible();
     await expect(page.getByTestId("sprint21-toolbar-group-file")).toBeVisible();
-    const panel = page.getByTestId("sprint22-clinical-right-panel");
-    await expect(panel).toBeVisible();
-    await expect(panel.getByText("Patient", { exact: true })).toBeVisible();
-    await expect(panel.getByText("Case", { exact: true })).toBeVisible();
-    await expect(panel.getByText("Intervals", { exact: true })).toBeVisible();
-    await expect(panel.getByText("Rhythm", { exact: true })).toBeVisible();
-    await expect(page.getByTestId("sprint21-enterprise-status-bar")).toBeVisible();
+    await expect(page.getByTestId("sprint24-clinical-right-panel").or(page.getByTestId("sprint22-clinical-right-panel"))).toBeVisible();
+    await expect(page.getByTestId("sprint24-clinical-right-panel").or(page.getByTestId("sprint22-clinical-right-panel")).getByText("Patient", { exact: true })).toBeVisible();
+    await expect(page.getByTestId("sprint24-clinical-right-panel").or(page.getByTestId("sprint22-clinical-right-panel")).getByText("Case", { exact: true })).toBeVisible();
+    await expect(page.getByTestId("sprint24-clinical-right-panel").or(page.getByTestId("sprint22-clinical-right-panel")).getByText("Intervals", { exact: true })).toBeVisible();
+    await expect(page.getByTestId("sprint24-clinical-right-panel").or(page.getByTestId("sprint22-clinical-right-panel")).getByText("Rhythm", { exact: true })).toBeVisible();
+    await expect(page.getByTestId("sprint24-hospital-status-bar").or(page.getByTestId("sprint21-enterprise-status-bar"))).toBeVisible();
     await page.screenshot({ fullPage: true, path: "test-results/screenshots/sprint22-hospital-shell.png" });
   });
 
@@ -58,7 +57,7 @@ test.describe("Sprint 22 Hospital ECG Workstation @sprint22", () => {
 
   test("digitized waveform mode and view mode switcher", async ({ page }) => {
     await openEcgWorkspace(page, caseId);
-    await expect(page.getByTestId("sprint22-view-mode-switcher")).toBeVisible();
+    await expect(page.getByTestId("sprint24-view-mode-switcher").or(page.getByTestId("sprint22-view-mode-switcher"))).toBeVisible();
     await page.getByTestId("sprint21-view-mode-waveform").click();
     await expect(page.getByTestId("sprint18-waveform-view")).toBeVisible();
     await page.getByTestId("sprint21-view-mode-processed").click();

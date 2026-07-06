@@ -25,6 +25,7 @@ import { EcgRhythmStripPanel } from "./EcgRhythmStripPanel";
 import { EcgViewModeSwitcher } from "./EcgViewModeSwitcher";
 import { EcgViewerLeftRail } from "./EcgViewerLeftRail";
 import { EcgViewerResizableWorkspace } from "./EcgViewerResizableWorkspace";
+import { EcgWorkstationLeftNav } from "./EcgWorkstationLeftNav";
 import { EcgViewerSettingsPanel } from "./EcgViewerSettingsPanel";
 import { EcgWaveformPlaybackTimeline } from "./EcgWaveformPlaybackTimeline";
 import { EcgWorkstationToolbar } from "./EcgWorkstationToolbar";
@@ -66,6 +67,8 @@ export function EcgMonitorViewerFoundation({
     leftCollapsed: false,
     rightCollapsed: false,
   });
+  const [leftNavCollapsed, setLeftNavCollapsed] = useState(false);
+  const [leftNavPinned, setLeftNavPinned] = useState(true);
   const imageUrl = absoluteUrl(ecgCase.imagePath ?? ecgCase.originalFileUrl ?? ecgCase.files.find((file) => file.mimeType.startsWith("image/"))?.downloadUrl);
   const pdfUrl = absoluteUrl(ecgCase.pdfPath ?? ecgCase.files.find((file) => file.mimeType.includes("pdf"))?.downloadUrl);
   const controls = useEcgViewerControls();
@@ -299,7 +302,7 @@ export function EcgMonitorViewerFoundation({
 
   return (
     <View style={[styles.root, controls.fullscreen && styles.fullscreenRoot]} testID="sprint13-ecg-monitor-ready" nativeID="sprint22-hospital-workstation-ready">
-      <View style={styles.inspectorReady} testID="sprint23-visual-inspector-ready">
+      <View nativeID="sprint23-visual-inspector-ready" style={styles.inspectorReady} testID="sprint24-hospital-workstation-ready">
       <View style={styles.topBar}>
         <View style={styles.titleBlock}>
           <Text style={styles.title}>Hospital ECG Workstation</Text>
@@ -335,6 +338,7 @@ export function EcgMonitorViewerFoundation({
         onToggleTheme={enterprise.toggleWorkstationTheme}
         onUpload={() => router.push("/upload-ecg" as never)}
         onViewModeChange={enterprise.setViewMode}
+        playback={playback}
         recentCaseId={ecgCase.id}
         selectedLead={selectedLead}
         showDigitizedWaveform={enterprise.showDigitizedWaveform}
@@ -362,8 +366,12 @@ export function EcgMonitorViewerFoundation({
               ) : null}
               <EcgEnterpriseStatusBar
                 aiStatus={statusMetrics.aiStatus}
+                apiStatus={statusMetrics.backendStatus === "healthy" ? "Online" : "Offline"}
+                autoRefresh="15s"
                 backendStatus={statusMetrics.backendStatus}
-                coordinates={pointerCoords ? `${Math.round(pointerCoords.imageX)},${Math.round(pointerCoords.imageY)}` : undefined}
+                canvasStatus={enterprise.viewMode === "monitor" ? "Live Digital" : digitalEcg ? "Digitized" : "Image"}
+                coordinates={pointerCoords ? `${Math.round(pointerCoords.x)},${Math.round(pointerCoords.y)}` : undefined}
+                cpuUsage={statusMetrics.cpuUsage}
                 digitizationQuality={
                   digitalEcg?.quality?.score != null
                     ? `${Math.round(digitalEcg.quality.score)}%`
@@ -376,11 +384,14 @@ export function EcgMonitorViewerFoundation({
                 fps={waveFps}
                 gain={controls.grid.gain}
                 gpuRenderer={statusMetrics.gpuRenderer}
+                gridVisible={controls.grid.visible}
                 lead={selectedLead}
                 memory={statusMetrics.memory}
                 monitorState={monitorState}
                 paperSpeed={controls.grid.speed}
+                patientName={patientDisplayName(patient)}
                 renderTimeMs={statusMetrics.renderTimeMs}
+                renderingMode={enterprise.viewMode === "monitor" ? "Canvas Monitor" : enterprise.viewMode}
                 signalQuality={
                   digitalEcg?.calibration?.confidence != null
                     ? `${Math.round(digitalEcg.calibration.confidence * 100)}%`
@@ -458,7 +469,17 @@ export function EcgMonitorViewerFoundation({
             )
           }
           left={
-            <EcgViewerLeftRail
+            <View style={styles.leftColumn}>
+              {!panelLayout.leftCollapsed ? (
+                <EcgWorkstationLeftNav
+                  collapsed={leftNavCollapsed}
+                  onToggleCollapse={() => setLeftNavCollapsed((value) => !value)}
+                  onTogglePin={() => setLeftNavPinned((value) => !value)}
+                  pinned={leftNavPinned}
+                />
+              ) : null}
+              <View style={styles.leftRailHost}>
+              <EcgViewerLeftRail
               compareCaseId={enterprise.compareCaseId}
               leadFocusMode={enterprise.leadFocusMode}
               onSelectCompare={(caseId) => {
@@ -474,6 +495,8 @@ export function EcgMonitorViewerFoundation({
               selectedLead={selectedLead}
               study={study}
             />
+              </View>
+            </View>
           }
           right={
             <EcgClinicalRightPanel
@@ -487,6 +510,8 @@ export function EcgMonitorViewerFoundation({
               imageWidth={controls.viewport.imageWidth}
               onDigitize={() => digitizeMutation.mutate()}
               onOpenReview={() => router.push(`/ecg-cases/${ecgCase.id}/review` as never)}
+              onExportPdf={() => void exportPdf()}
+              onExportPng={() => void exportPng()}
               caseNumber={ecgCase.caseNumber ?? ecgCase.caseId}
               previousStudies={previousStudies}
               patient={{ age: patient.age, gender: patient.gender, id: patient.id, name: patientDisplayName(patient) }}
@@ -512,6 +537,8 @@ const styles = StyleSheet.create({
     zIndex: 50,
   },
   inspectorReady: { flex: 1, gap: ECG_WORKSTATION_VISUAL.workspaceGap, minHeight: 0, overflow: "hidden" },
+  leftColumn: { flex: 1, gap: 6, minHeight: 0, minWidth: 0, overflow: "hidden" },
+  leftRailHost: { flex: 1, minHeight: 0, minWidth: 0, overflow: "hidden" },
   root: { backgroundColor: "#040E1A", flex: 1, gap: ECG_WORKSTATION_VISUAL.workspaceGap, minHeight: 0, overflow: "hidden", padding: ECG_WORKSTATION_VISUAL.workspacePadding },
   subtitle: { color: medicalTheme.muted, fontSize: 12, fontWeight: "700" },
   title: { color: medicalTheme.text, fontSize: 16, fontWeight: "900" },

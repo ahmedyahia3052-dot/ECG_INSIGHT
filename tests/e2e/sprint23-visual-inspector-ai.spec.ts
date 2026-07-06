@@ -5,7 +5,7 @@ async function openEcgWorkspace(page: import("@playwright/test").Page, caseId: s
   await page.goto(`/ecg-workspace?caseId=${caseId}`, { waitUntil: "domcontentloaded" });
   await expect(page.getByTestId("ecg-workspace-loading")).toHaveCount(0, { timeout: 45_000 });
   await expect(page.getByTestId("ecg-enterprise-workspace-ready")).toBeVisible({ timeout: 45_000 });
-  await expect(page.getByTestId("sprint23-visual-inspector-ready")).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByTestId("sprint24-hospital-workstation-ready").or(page.getByTestId("sprint23-visual-inspector-ready"))).toBeVisible({ timeout: 20_000 });
 }
 
 test.describe("Sprint 23 Visual Inspector AI @sprint23", () => {
@@ -30,8 +30,8 @@ test.describe("Sprint 23 Visual Inspector AI @sprint23", () => {
   test("visual inspector readiness and hospital shell", async ({ page }) => {
     await openEcgWorkspace(page, caseId);
     await expect(page.getByText("Hospital ECG Workstation")).toBeVisible();
-    await expect(page.getByTestId("sprint23-visual-inspector-toolbar")).toBeVisible();
-    await expect(page.getByTestId("sprint22-clinical-right-panel")).toBeVisible();
+    await expect(page.getByTestId("sprint24-hospital-ribbon-toolbar").or(page.getByTestId("sprint23-visual-inspector-toolbar"))).toBeVisible();
+    await expect(page.getByTestId("sprint24-clinical-right-panel").or(page.getByTestId("sprint22-clinical-right-panel"))).toBeVisible();
     await page.screenshot({ fullPage: false, path: "test-results/screenshots/sprint23-inspector-shell.png" });
   });
 
@@ -45,13 +45,13 @@ test.describe("Sprint 23 Visual Inspector AI @sprint23", () => {
       const issues: Array<{ severity: string; type: string }> = [];
       const viewport = { h: window.innerHeight, w: window.innerWidth };
 
-      const toolbar = document.querySelector('[data-testid="sprint23-visual-inspector-toolbar"]');
+      const toolbar = document.querySelector('[data-testid="sprint24-hospital-ribbon-toolbar"], [data-testid="sprint23-visual-inspector-toolbar"]');
       if (!toolbar) issues.push({ severity: "critical", type: "missing_toolbar" });
 
-      const panel = document.querySelector('[data-testid="sprint22-clinical-right-panel"]');
+      const panel = document.querySelector('[data-testid="sprint24-clinical-right-panel"], [data-testid="sprint22-clinical-right-panel"]');
       if (!panel) issues.push({ severity: "critical", type: "missing_panel" });
 
-      const status = document.querySelector('[data-testid="sprint21-enterprise-status-bar"]');
+      const status = document.querySelector('[data-testid="sprint24-hospital-status-bar"], [data-testid="sprint21-enterprise-status-bar"]');
       if (!status) issues.push({ severity: "high", type: "missing_status" });
 
       const canvas = document.querySelector('[data-testid="sprint22-hospital-monitor-canvas"]');

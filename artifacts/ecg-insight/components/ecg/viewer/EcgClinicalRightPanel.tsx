@@ -57,6 +57,8 @@ export const EcgClinicalRightPanel = memo(function EcgClinicalRightPanel({
   imageHeight,
   imageWidth,
   onDigitize,
+  onExportPdf,
+  onExportPng,
   onOpenReview,
   patient,
   previousStudies = [],
@@ -73,6 +75,8 @@ export const EcgClinicalRightPanel = memo(function EcgClinicalRightPanel({
   imageHeight?: number;
   imageWidth?: number;
   onDigitize?: () => void;
+  onExportPdf?: () => void;
+  onExportPng?: () => void;
   onOpenReview?: () => void;
   patient?: { age?: number; gender?: string; id: string; name: string };
   previousStudies?: EcgViewerPreviousStudy[];
@@ -104,7 +108,7 @@ export const EcgClinicalRightPanel = memo(function EcgClinicalRightPanel({
   ].filter(Boolean) as string[];
 
   return (
-    <ScrollView contentContainerStyle={styles.scroll} style={styles.fill} testID="sprint22-clinical-right-panel" nativeID="sprint21-clinical-right-panel">
+    <ScrollView contentContainerStyle={styles.scroll} style={styles.fill} testID="sprint24-clinical-right-panel" nativeID="sprint22-clinical-right-panel">
       {patient ? (
         <PanelSection title="Patient">
           <Text style={styles.patientName}>{patient.name}</Text>
@@ -237,6 +241,36 @@ export const EcgClinicalRightPanel = memo(function EcgClinicalRightPanel({
 
       <PanelSection title="Comparison">
         <MetricRow label="Compare Mode" value={previousStudies.length ? "Select prior study in left rail" : "No prior studies available"} />
+      </PanelSection>
+
+      <PanelSection title="Timeline">
+        {studyDate ? <MetricRow label="Current Study" value={formatDate(studyDate)} /> : null}
+        {previousStudies.slice(0, 3).map((item) => (
+          <MetricRow key={item.caseId} label={item.caseNumber ?? item.caseId} value={item.studyDate ? formatDate(item.studyDate) : "Pending"} />
+        ))}
+      </PanelSection>
+
+      <PanelSection title="Bookmarks">
+        <MetricRow label="Pinned Case" value={caseNumber ?? "Current study"} />
+        {previousStudies[0] ? <MetricRow label="Bookmark" value={previousStudies[0].caseNumber ?? previousStudies[0].caseId} /> : null}
+      </PanelSection>
+
+      <PanelSection title="Status">
+        <MetricRow label="Digitization" value={digitalEcg?.status === "available" ? "Complete" : digitalEcgLoading ? "Running" : "Pending"} />
+        <MetricRow label="Signal Engine" value={digitalEcg?.measurementEngine ? "Digital ECG" : "Awaiting"} />
+      </PanelSection>
+
+      <PanelSection title="Export">
+        {onExportPdf ? (
+          <Pressable onPress={onExportPdf} style={styles.actionButtonOutline}>
+            <Text style={styles.actionLabelOutline}>Export PDF</Text>
+          </Pressable>
+        ) : null}
+        {onExportPng ? (
+          <Pressable onPress={onExportPng} style={styles.actionButtonOutline}>
+            <Text style={styles.actionLabelOutline}>Export PNG</Text>
+          </Pressable>
+        ) : null}
       </PanelSection>
 
       <EcgMeasurementsPanel workspace={workspace} />

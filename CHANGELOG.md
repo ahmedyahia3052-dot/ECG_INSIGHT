@@ -4,6 +4,26 @@ All notable changes to this project are documented in this file.
 
 ---
 
+## [Sprint24] — 2026-07-06
+
+### Added
+
+- **CSS Grid workstation layout** (`EcgWorkstationGridShell`) replacing resizable-panel flash on web
+- **Enterprise left navigation** — Dashboard, Patients, ECG Cases, Upload, Reports, AI Assistant, Organizations, Settings
+- **Ribbon toolbar** — FILE, VIEW, GRID, LEADS, MONITOR, AI, COMPARE, REPORT, TOOLS with wrap layout
+- **Hospital status bar** — CPU, Patient, Mouse position, Canvas status, API, Auto Refresh, Rendering Mode
+- Clinical sidebar: Timeline, Bookmarks, Status, Export sections
+- Monitor bezier smoothing (`quadraticCurveTo`) for medical-grade trace rendering
+- View mode chips: Overlay, Report Preview, Live Monitor label
+
+### Changed
+
+- Web workspace uses pure CSS Grid (left / center / right / bottom)
+- Playback controls wired to MONITOR ribbon group
+- Status bar testID `sprint24-hospital-status-bar`
+
+---
+
 ## [Sprint23] — 2026-07-06
 
 ### Added

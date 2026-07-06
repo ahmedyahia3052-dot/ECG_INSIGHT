@@ -56,7 +56,7 @@ function auditDomScript() {
   }
 
   // Toolbar buttons
-  const toolbar = document.querySelector('[data-testid="sprint23-visual-inspector-toolbar"], [data-testid="sprint22-hospital-workstation-toolbar"], [data-testid="sprint21-ecg-workstation-toolbar"]');
+  const toolbar = document.querySelector('[data-testid="sprint24-hospital-ribbon-toolbar"], [data-testid="sprint23-visual-inspector-toolbar"], [data-testid="sprint22-hospital-workstation-toolbar"]');
   if (toolbar) {
     const buttons = toolbar.querySelectorAll('[role="button"], button');
     buttons.forEach((btn, i) => {
@@ -96,7 +96,7 @@ function auditDomScript() {
   }
 
   // Clinical panel — measure host panel width (ScrollView may report narrow during layout)
-  const panel = document.querySelector('[data-testid="sprint22-clinical-right-panel"], [data-testid="sprint21-clinical-right-panel"]');
+  const panel = document.querySelector('[data-testid="sprint24-clinical-right-panel"], [data-testid="sprint22-clinical-right-panel"], [data-testid="sprint21-clinical-right-panel"]');
   const panelHost = document.querySelector('[data-panel-id="ecg-monitor-right"], #ecg-monitor-right');
   if (panel) {
     const hasContent = (panel.textContent ?? "").includes("Patient");
@@ -134,7 +134,7 @@ function auditDomScript() {
   }
 
   // Status bar
-  const status = document.querySelector('[data-testid="sprint21-enterprise-status-bar"]');
+  const status = document.querySelector('[data-testid="sprint24-hospital-status-bar"], [data-testid="sprint21-enterprise-status-bar"]');
   if (status) {
     const sr = rect(status);
     const bottomPanel = status.closest('[data-panel-id="ecg-monitor-bottom"]') ?? status.parentElement;
@@ -287,7 +287,7 @@ export async function runVisualInspector(options = {}) {
       await page.reload({ waitUntil: "domcontentloaded" });
       await page.getByTestId("ecg-workspace-loading").waitFor({ state: "detached", timeout: 45_000 }).catch(() => undefined);
       await page.getByTestId("ecg-enterprise-workspace-ready").waitFor({ timeout: 45_000 });
-      await page.getByTestId("sprint23-visual-inspector-ready").waitFor({ timeout: 20_000 }).catch(() => undefined);
+      await page.getByTestId("sprint24-hospital-workstation-ready").or(page.getByTestId("sprint23-visual-inspector-ready")).waitFor({ timeout: 20_000 }).catch(() => undefined);
       await page.getByTestId("sprint22-clinical-right-panel").getByText("Patient", { exact: true }).waitFor({ timeout: 15_000 }).catch(() => undefined);
       await page.waitForTimeout(1200);
 

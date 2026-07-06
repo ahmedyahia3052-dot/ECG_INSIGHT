@@ -105,7 +105,7 @@ export function EcgViewerLeftRail({
 
 const styles = StyleSheet.create({
   card: { gap: 8, marginBottom: 10 },
-  fill: { flex: 1 },
+  fill: { flex: 1, minHeight: 0, minWidth: 0 },
   infoLabel: { color: medicalTheme.muted, fontSize: 11, fontWeight: "800" },
   infoRow: { borderBottomColor: medicalTheme.border, borderBottomWidth: 1, gap: 2, paddingVertical: 6 },
   infoValue: { color: medicalTheme.text, fontSize: 13, fontWeight: "800" },

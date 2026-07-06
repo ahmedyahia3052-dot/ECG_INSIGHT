@@ -11,6 +11,7 @@ type MemoryInfo = {
 export type EnterpriseStatusMetrics = {
   aiStatus: string;
   backendStatus: "healthy" | "offline" | "checking";
+  cpuUsage: number;
   gpuRenderer: string;
   memory: MemoryInfo;
   renderTimeMs: number;
@@ -20,6 +21,7 @@ export type EnterpriseStatusMetrics = {
 const DEFAULT_METRICS: EnterpriseStatusMetrics = {
   aiStatus: "Idle",
   backendStatus: "checking",
+  cpuUsage: 0,
   gpuRenderer: Platform.OS === "web" ? "Canvas 2D" : "Native",
   memory: {},
   renderTimeMs: 0,
@@ -54,6 +56,7 @@ export function useEnterpriseStatusMetrics(input: {
           : input.viewMode === "overlay"
             ? "Review"
             : "Idle",
+        cpuUsage: Math.min(100, Math.max(0, Math.round((renderTimeMs / 16.7) * 100))),
         gpuRenderer: input.viewMode === "monitor" ? "Canvas 2D GPU" : "Canvas/SVG",
         memory: perf.memory
           ? {

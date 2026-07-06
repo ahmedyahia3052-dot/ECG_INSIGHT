@@ -67,6 +67,7 @@ export const integrationScripts = [
   "scripts/sprint21-ecg-workstation-ux-revolution.integration.ts",
   "scripts/sprint22-hospital-workstation.integration.ts",
   "scripts/sprint23-visual-inspector-ai.integration.ts",
+  "scripts/sprint24-hospital-workstation-rebuild.integration.ts",
   "scripts/copilot-workspace-foundation.integration.ts",
   "scripts/copilot-stabilization.integration.ts",
   "scripts/copilot-medical-knowledge-rag.integration.ts",

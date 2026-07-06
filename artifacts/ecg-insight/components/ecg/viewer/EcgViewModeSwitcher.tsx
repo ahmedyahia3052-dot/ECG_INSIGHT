@@ -9,9 +9,11 @@ const MODES: Array<{ id: EcgWorkstationViewMode; label: string }> = [
   { id: "image", label: "Original" },
   { id: "processed", label: "Processed" },
   { id: "waveform", label: "Digitized" },
-  { id: "monitor", label: "Monitor" },
+  { id: "monitor", label: "Live Monitor" },
+  { id: "overlay", label: "Overlay" },
   { id: "ai-review", label: "AI Review" },
   { id: "compare", label: "Compare" },
+  { id: "report", label: "Report" },
 ];
 
 export const EcgViewModeSwitcher = memo(function EcgViewModeSwitcher({
@@ -24,7 +26,7 @@ export const EcgViewModeSwitcher = memo(function EcgViewModeSwitcher({
   const activeValue = value === "overlay" ? "ai-review" : value;
 
   return (
-    <View style={styles.root} testID="sprint22-view-mode-switcher">
+    <View nativeID="sprint22-view-mode-switcher" style={styles.root} testID="sprint24-view-mode-switcher">
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.row}>
         {MODES.map((mode) => {
           const active = activeValue === mode.id;
