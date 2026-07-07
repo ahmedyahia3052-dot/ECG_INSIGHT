@@ -1,5 +1,33 @@
 # Changelog — Enterprise QA Infrastructure
 
+## Sprint 47 — ECG Acquisition & Digitization Engine — 2026-07-07
+
+### Added
+- **Smart ECG detection** (`acquisition/smart-ecg-detector.ts`) — borders, rotation, perspective, shadows, paper color
+- **Applied deskew** in preprocessing pipeline + morphology-preserving **signal reconstruction**
+- **Quality tiers** (Excellent/Good/Fair/Poor) with clinical reasons
+- **Background digitization jobs** — `POST/GET/DELETE /ecg/digitization/jobs`, cancelable with progress stages
+- **Grid overlay API** — `GET /ecg/digital/:caseId/grid-overlay`
+- **Frontend acquisition module** — capture panel, overlay/split studio, digitization bridge, job hook
+- **Acquisition tab** in clinical right panel (additive — no changes to Monitor/CDSS/Reports core)
+- Pipeline version: **ecg-digitization-v47.0**
+- Playwright: `tests/e2e/sprint47-acquisition-digitization.spec.ts`
+- Integration: `scripts/sprint47-acquisition-digitization.integration.ts`
+- Reports: `SPRINT47_FINAL_REPORT.md`, `DIGITIZATION_ENGINE_REPORT.md`, `IMAGE_PREPROCESSING_REPORT.md`, `SIGNAL_RECONSTRUCTION_REPORT.md`, `PERFORMANCE_REPORT.md`, `PLAYWRIGHT_REPORT.md`, `VISUAL_QA_REPORT.md`
+
+### Preserved
+- Live ECG Monitor, Diagnostic Workstation, Measurement Studio, AI Cardiologist, CDSS, Report Engine
+- Existing APIs, database, RC-1 stability, SAT compatibility
+
+### Validated
+- `npm run lint` / `typecheck` / `build` — PASS
+- Playwright Sprint 47 (4/4) + Sprint 16 regression (2/2) — PASS
+
+### Tag
+- `Sprint47-AcquisitionDigitization`
+
+---
+
 ## Sprint 46 — Diagnostic ECG Workstation — 2026-07-07
 
 ### Added
