@@ -117,7 +117,8 @@ export function zoomAtPoint(
 }
 
 /** Target canvas fill for hospital hero framing (Sprint 33.5). */
-export const ECG_HERO_FILL_TARGET = 0.9;
+/** Sprint 35 — ECG canvas fill target (75–80% of viewer column). */
+export const ECG_HERO_FILL_TARGET = 0.78;
 
 export function heroFitZoom(
   containerWidth: number,

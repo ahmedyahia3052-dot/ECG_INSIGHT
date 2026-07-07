@@ -13,7 +13,6 @@ import { digitizeECG, getDigitalECG } from "@/services/ecgProcessing";
 import { listReports } from "@/services/reports";
 import { downloadEcgViewerWorkspacePdf, downloadEcgViewerWorkspaceJson } from "@/services/ecgViewerWorkspace";
 import { buildSegmentAlignedDigitizedWaveformLeads } from "./ecgDigitizedWaveformSync";
-import { deriveSignalQualityFlags, signalQualityLabel } from "./clinical-visualization";
 import type { EcgRenderMetrics } from "./rendering-engine";
 
 import { detectImageFormat } from "./ecgImageEngine";
@@ -96,11 +95,10 @@ export function EcgMonitorViewerFoundation({
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
   const [showCrosshair, setShowCrosshair] = useState(true);
   const [showMagnifier, setShowMagnifier] = useState(false);
-  const [developerMode, setDeveloperMode] = useState(false);
   const imageUrl = absoluteUrl(ecgCase.imagePath ?? ecgCase.originalFileUrl ?? ecgCase.files.find((file) => file.mimeType.startsWith("image/"))?.downloadUrl);
   const pdfUrl = absoluteUrl(ecgCase.pdfPath ?? ecgCase.files.find((file) => file.mimeType.includes("pdf"))?.downloadUrl);
   const controls = useEcgViewerControls();
-  const { diagnosticMode, exitDiagnostic, toggleDiagnostic } = useEcgDiagnosticMode();
+  const { diagnosticMode, exitDiagnostic, popLayoutSnapshot, toggleDiagnostic } = useEcgDiagnosticMode();
   const operatorName = user?.name ?? user?.email ?? "Clinician";
   const scheduleSaveRef = useRef<() => void>(() => undefined);
 
@@ -350,11 +348,25 @@ export function EcgMonitorViewerFoundation({
     });
   }, [panelLayout, toggleDiagnostic]);
 
+  const handleExitDiagnostic = useCallback(() => {
+    const snapshot = popLayoutSnapshot();
+    exitDiagnostic();
+    if (snapshot) {
+      setPanelLayout({
+        leftCollapsed: snapshot.leftCollapsed,
+        leftSize: snapshot.leftSize,
+        rightCollapsed: snapshot.rightCollapsed,
+        rightSize: snapshot.rightSize,
+      });
+      setLeftNavCollapsed(snapshot.leftCollapsed);
+    }
+  }, [exitDiagnostic, popLayoutSnapshot]);
+
   useEcgWorkstationShortcuts({
     controls,
     diagnosticMode,
     onEnterDiagnostic: enterDiagnosticMode,
-    onExitDiagnostic: exitDiagnostic,
+    onExitDiagnostic: handleExitDiagnostic,
     onExportPdf: () => void exportPdf(),
     onOpenCases: () => router.push("/ecg-cases" as never),
     onOpenCommandPalette: () => setCommandPaletteOpen(true),
@@ -373,10 +385,7 @@ export function EcgMonitorViewerFoundation({
     return () => clearTimeout(timer);
   }, [aiOverlay.present, controls.adjustments, controls.grid, controls.transform, scheduleSave, workspace.present]);
 
-  const signalQuality = signalQualityLabel(deriveSignalQualityFlags(digitalEcg));
-  const canvasResolution = `${Math.round(controls.viewport.containerWidth * controls.transform.zoom)}×${Math.round(controls.viewport.containerHeight * controls.transform.zoom)}`;
   const waveFps = renderFps;
-  const renderModeLabel = renderMetrics?.backend?.toUpperCase() ?? (enterprise.viewMode === "monitor" ? "MONITOR" : enterprise.viewMode === "waveform" ? "CLINICAL" : enterprise.viewMode.toUpperCase());
 
   const statusMetrics = useEnterpriseStatusMetrics({
     aiOverlayEnabled: aiOverlay.present.settings.enabled,
@@ -452,7 +461,7 @@ export function EcgMonitorViewerFoundation({
           />
         </>
       ) : (
-        <Pressable onPress={exitDiagnostic} style={styles.diagnosticExitFloating} testID="sprint29-exit-diagnostic">
+        <Pressable onPress={handleExitDiagnostic} style={styles.diagnosticExitFloating} testID="sprint35-exit-diagnostic">
           <Feather color="#22C55E" name="minimize" size={14} />
           <Text style={styles.diagnosticExitLabel}>ESC · Exit</Text>
         </Pressable>
@@ -472,31 +481,22 @@ export function EcgMonitorViewerFoundation({
             })
           }
           bottom={
-            diagnosticMode ? null : (
             <View style={styles.bottomStack}>
-              {enterprise.viewMode === "monitor" ? (
+              {!diagnosticMode && enterprise.viewMode === "monitor" ? (
                 <EcgWaveformPlaybackTimeline durationMs={playbackDurationMs} playback={playback} />
               ) : null}
               <EcgEnterpriseStatusBar
-                apiStatus={statusMetrics.backendStatus === "healthy" ? "Online" : "Offline"}
-                canvasResolution={canvasResolution}
-                coordinates={pointerCoords ? `${Math.round(pointerCoords.x)},${Math.round(pointerCoords.y)}` : undefined}
-                cpuUsage={statusMetrics.cpuUsage}
-                developerMode={developerMode}
+                compact={diagnosticMode}
                 fps={waveFps}
                 gain={controls.grid.gain}
                 gpuRenderer={renderMetrics?.gpuAccelerated ? `${renderMetrics.backend.toUpperCase()} GPU` : statusMetrics.gpuRenderer}
+                gridVisible={controls.grid.visible}
                 lead={selectedLead}
                 memory={statusMetrics.memory}
-                onToggleDeveloperMode={() => setDeveloperMode((value) => !value)}
                 paperSpeed={controls.grid.speed}
-                renderMode={renderModeLabel}
-                renderTimeMs={renderMetrics?.frameMs ?? statusMetrics.renderTimeMs}
-                signalQuality={signalQuality}
                 zoom={controls.transform.zoom}
               />
             </View>
-            )
           }
           center={
             <View style={styles.viewerHost}>

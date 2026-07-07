@@ -4,7 +4,7 @@ import { Platform, StyleSheet, View } from "react-native";
 import { EcgEnterpriseLayoutEngine } from "./EcgEnterpriseLayoutEngine";
 import { ECG_WORKSTATION_VISUAL } from "./ecgWorkstationVisualTokens";
 
-const LAYOUT_KEY = "ecg-insight:ecg-monitor-panel-layout-v8";
+const LAYOUT_KEY = "ecg-insight:ecg-monitor-panel-layout-v9";
 
 type SavedLayout = {
   autoHidePanels?: boolean;

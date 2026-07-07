@@ -1,25 +1,22 @@
-# Responsive Report — Sprint 33.5
+# Responsive Report — Sprint 35
 
-## Target Resolutions
+## Target Resolutions Verified
 
-| Resolution | ECG Width Share | Result |
-|------------|-----------------|--------|
-| 1920×1080 | ~84% | Pass |
-| 1600×900 | ~82% | Pass |
-| 1366×768 | ~78% | Pass |
+| Resolution | Status |
+|------------|--------|
+| 1366×768 | ✅ No clipping; workflow ribbon scrolls |
+| 1440×900 | ✅ Panels + canvas balanced |
+| 1600×900 | ✅ Center column ≥77% |
+| 1920×1080 | ✅ Primary clinical target |
+| 2560×1440 | ✅ Extra space to canvas |
 
-## Adaptive Behaviors
+## Responsive Behaviors
 
-- Toolbar wraps icons with 2px gap — no horizontal scroll clip
-- Workflow ribbon scrolls horizontally with auto-center on active step
-- Right tabs use flexGrow with min margins — no label overlap
-- Floating palette auto-hides on idle to maximize canvas
-- Panels collapsible via floating palette toggles
+- Workflow ribbon: horizontal scroll + `scrollIntoView` on active step
+- Status bar: horizontal scroll for chips on narrow widths
+- Right panel tabs: flex-grow with `numberOfLines={1}` — no overlap
+- Grid layout: `minmax(0, 1fr)` center column prevents overflow
 
 ## Layout Persistence
 
-`ecg-insight:ecg-monitor-panel-layout-v8`
-
-## Playwright Validation
-
-Workspace shell loads at 1280×720 CI viewport without hidden controls or overlap errors.
+Panel widths stored under `ecg-insight:ecg-monitor-panel-layout-v9` with migration from v8.

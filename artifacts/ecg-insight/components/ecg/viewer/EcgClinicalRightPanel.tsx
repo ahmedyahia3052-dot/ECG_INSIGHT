@@ -10,12 +10,9 @@ import type { DigitalEcg } from "@/services/ecgProcessing";
 
 import { EcgAiAnnotationInspector } from "./EcgAiAnnotationInspector";
 import { EcgAiReviewWorkflowPanel } from "./EcgAiReviewWorkflowPanel";
-import { EcgCaseTimelinePanel } from "./EcgCaseTimelinePanel";
 import { EcgClinicalCard } from "./EcgClinicalCard";
-import { EcgClinicalNotesPanel } from "./EcgClinicalNotesPanel";
 import { EcgHistoryEnginePanel } from "./EcgHistoryEnginePanel";
 import { EcgMeasurementStudioPanel } from "./EcgMeasurementStudioPanel";
-import { EcgPatientWorkspacePanel } from "./EcgPatientWorkspacePanel";
 import type { CaseTimelineEvent } from "./clinical-workflow";
 import type { EcgClinicalFindingsModel, EcgViewerPreviousStudy } from "./types";
 import type { EcgAiOverlayWorkspace } from "./useEcgAiOverlayWorkspace";
@@ -55,10 +52,9 @@ function PanelSection({ children, id, title }: { children: React.ReactNode; id: 
   );
 }
 
-type ClinicalTab = "patient" | "measurements" | "ai" | "reports" | "history";
+type ClinicalTab = "measurements" | "ai" | "reports" | "history";
 
 const TABS: Array<{ id: ClinicalTab; label: string }> = [
-  { id: "patient", label: "Patient" },
   { id: "measurements", label: "Measurements" },
   { id: "ai", label: "AI Findings" },
   { id: "reports", label: "Reports" },
@@ -108,7 +104,7 @@ export const EcgClinicalRightPanel = memo(function EcgClinicalRightPanel({
   explainability?: AIExplainability | null;
   findings: EcgClinicalFindingsModel;
   focusSection?: "notes";
-  focusTab?: ClinicalTab;
+  focusTab?: ClinicalTab | "patient";
   hospital?: string;
   imageHeight?: number;
   imageWidth?: number;
@@ -128,79 +124,31 @@ export const EcgClinicalRightPanel = memo(function EcgClinicalRightPanel({
   visitId?: string;
   workspace: EcgMeasurementWorkspace;
 }) {
-  const qualityScore = digitalEcg?.quality?.score;
-  const qualityTone = qualityScore == null ? undefined : qualityScore >= 80 ? "success" : qualityScore >= 55 ? "warning" : "critical";
   const severity = analysis?.severity ?? "normal";
-  const warnings = digitalEcg?.quality?.warnings?.length
-    ? digitalEcg.quality.warnings
-    : analysis?.urgentActions?.length
-      ? analysis.urgentActions
-      : ["No active clinical warnings."];
 
-  const sourceLabel = digitalEcg?.measurementEngine ? "Digital ECG" : findings.heartRate.source === "measurement" ? "Manual" : "Case/AI";
-  const engine = digitalEcg?.measurementEngine;
-
-  const [activeTab, setActiveTab] = useState<ClinicalTab>("patient");
+  const [activeTab, setActiveTab] = useState<ClinicalTab>("measurements");
 
   useEffect(() => {
-    if (focusTab) setActiveTab(focusTab);
+    if (!focusTab) return;
+    if (focusTab === "patient") {
+      setActiveTab("measurements");
+      return;
+    }
+    setActiveTab(focusTab);
   }, [focusTab]);
 
   useEffect(() => {
-    if (focusSection === "notes") setActiveTab("patient");
+    if (focusSection === "notes") setActiveTab("history");
   }, [focusSection]);
 
-  const patientTab = (
-    <>
-      <EcgPatientWorkspacePanel
-        caseNumber={caseNumber}
-        clinicalNotes={clinicalNotes}
-        department={department}
-        hospital={hospital}
-        patient={patient}
-        previousDiagnosis={analysis?.diagnosis}
-        previousEcgCount={previousStudies.length}
-        referringPhysician={referringPhysician}
-        riskLevel={analysis?.severity ?? "Pending"}
-        studyDate={studyDate}
-        visitId={visitId}
-      />
-      <PanelSection id="warnings" title="Clinical Alerts">
-        {warnings.map((warning) => (
-          <Text key={warning} style={styles.warningText}>• {warning}</Text>
-        ))}
-      </PanelSection>
-      {timelineEvents.length ? (
-        <PanelSection id="case-timeline" title="Case Timeline">
-          <EcgCaseTimelinePanel events={timelineEvents} />
-        </PanelSection>
-      ) : null}
-      <PanelSection id="rate" title="Heart Rate">
-        <MetricRow label="Heart Rate" source={sourceLabel} value={findings.heartRate.value} />
-        <MetricRow label="RR Interval" source={digitalEcg ? "Digital ECG" : "Pending"} value={digitalEcg?.measurements?.rrIntervalMs != null ? `${Math.round(digitalEcg.measurements.rrIntervalMs)} ms` : "Pending"} />
-      </PanelSection>
-      <PanelSection id="signal-quality" title="Signal Quality">
-        <MetricRow label="Resolution" value={imageWidth && imageHeight ? `${imageWidth}×${imageHeight}` : "Pending"} />
-        <MetricRow label="Signal Quality" tone={qualityTone} value={digitalEcg?.calibration?.confidence != null ? `${Math.round(digitalEcg.calibration.confidence * 100)}%` : "Pending"} />
-        <MetricRow label="Digitization Score" tone={qualityTone} value={qualityScore != null ? `${qualityScore}/100` : digitalEcgLoading ? "Processing" : "Pending"} />
-        {!digitalEcg && onDigitize ? (
-          <Pressable onPress={onDigitize} style={styles.actionButton}>
-            <Text style={styles.actionLabel}>{digitalEcgLoading ? "Digitizing…" : "Run Digitization"}</Text>
-          </Pressable>
-        ) : null}
-      </PanelSection>
-      <PanelSection id="notes" title="Doctor Notes">
-        <EcgClinicalNotesPanel initialNotes={clinicalNotes ?? ""} onNotesChange={onNotesChange} operatorName={operatorName} />
-      </PanelSection>
-    </>
-  );
-
   const measurementsTab = (
-    <EcgMeasurementStudioPanel digitalEcg={digitalEcg} findings={findings} workspace={workspace} />
+    <View style={styles.measurementsPane} testID="sprint35-measurements-tab-pane">
+      <EcgMeasurementStudioPanel digitalEcg={digitalEcg} findings={findings} workspace={workspace} />
+    </View>
   );
 
   const aiTab = (
-    <>
+    <View style={styles.aiPane} testID="sprint35-ai-findings-tab-pane">
       <EcgAiReviewWorkflowPanel
         analysis={analysis}
         confirmed={aiConfirmed}
@@ -215,7 +163,7 @@ export const EcgClinicalRightPanel = memo(function EcgClinicalRightPanel({
       <EcgClinicalCard id="ai-inspector" title="AI Inspector">
         <EcgAiAnnotationInspector workspace={aiOverlay} />
       </EcgClinicalCard>
-    </>
+    </View>
   );
 
   const reportsTab = (
@@ -252,19 +200,17 @@ export const EcgClinicalRightPanel = memo(function EcgClinicalRightPanel({
   );
 
   const tabContent =
-    activeTab === "patient"
-      ? patientTab
-      : activeTab === "measurements"
-        ? measurementsTab
-        : activeTab === "ai"
-          ? aiTab
-          : activeTab === "reports"
-            ? reportsTab
-            : historyTab;
+    activeTab === "measurements"
+      ? measurementsTab
+      : activeTab === "ai"
+        ? aiTab
+        : activeTab === "reports"
+          ? reportsTab
+          : historyTab;
 
   return (
-    <View style={styles.fill} testID="sprint335-clinical-right-panel" nativeID="sprint25-clinical-right-panel">
-      <View accessibilityRole="tablist" style={styles.tabBar} testID="sprint335-clinical-tabs">
+    <View style={styles.fill} testID="sprint35-clinical-right-panel" nativeID="sprint25-clinical-right-panel">
+      <View accessibilityRole="tablist" style={styles.tabBar} testID="sprint35-clinical-tabs">
         {TABS.map((tab) => (
           <Pressable
             accessibilityRole="tab"
@@ -313,7 +259,9 @@ const styles = StyleSheet.create({
   },
   actionLabel: { color: ECG_COCKPIT_COLORS.bgDeep, fontSize: 11, fontWeight: "900" },
   actionLabelOutline: { color: ECG_COCKPIT_COLORS.accent, fontSize: 11, fontWeight: "900" },
+  aiPane: { gap: 8, paddingBottom: 4 },
   fill: { flex: 1, minWidth: 0, width: "100%" },
+  measurementsPane: { gap: 6 },
   metricCard: {
     alignItems: "center",
     backgroundColor: ECG_COCKPIT_COLORS.surface,

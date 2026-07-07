@@ -28,6 +28,7 @@ export const integrationScripts = [
   "scripts/sprint32-clinical-cockpit.integration.ts",
   "scripts/sprint33-enterprise-viewer-polish.integration.ts",
   "scripts/sprint335-enterprise-viewer-polish.integration.ts",
+  "scripts/sprint35-doctor-experience-polish.integration.ts",
   "scripts/sprint28-subscription-platform.integration.ts",
   "scripts/sprint29-production-infrastructure.integration.ts",
   "scripts/sprint29-zero-chrome-clinical-workspace.integration.ts",

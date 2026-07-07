@@ -118,7 +118,7 @@ export const EcgZeroChromeToolbar = memo(function EcgZeroChromeToolbar(props: {
   const actions = useMemo(() => primaryStrip(props), [props]);
 
   return (
-    <View nativeID="sprint335-compact-toolbar" style={styles.toolbar} testID="sprint29-zero-chrome-toolbar">
+    <View nativeID="sprint35-compact-toolbar" style={styles.toolbar} testID="sprint35-compact-toolbar">
       <View style={styles.row}>
         {actions.map((action) => (
           <CompactToolButton action={action} key={action.label} />

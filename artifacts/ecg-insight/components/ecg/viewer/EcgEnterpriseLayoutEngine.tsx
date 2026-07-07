@@ -78,7 +78,7 @@ export function EcgEnterpriseLayoutEngine({
   return (
     <View nativeID="sprint29-enterprise-layout-engine" style={styles.root} testID="sprint29-enterprise-layout-engine">
       <EcgWorkstationGridShell
-        bottom={diagnosticMode ? null : bottom}
+        bottom={bottom}
         center={center}
         diagnosticMode={diagnosticMode}
         left={left ? <View {...hoverProps("left")} style={styles.panelHost}>{left}</View> : null}

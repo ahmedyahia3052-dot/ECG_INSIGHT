@@ -1,6 +1,6 @@
 import { expect, test } from "./test";
 import { bootstrapAuthenticatedPage, createClinicalFixture } from "./utils/qa";
-import { ecgClinicalRightPanel, ecgStatusBar, ecgToolbar, openEcgWorkspace } from "./utils/ecg-workspace-locators";
+import { ecgClinicalRightPanel, ecgFloatingPalette, ecgStatusBar, ecgToolbar, openEcgWorkspace } from "./utils/ecg-workspace-locators";
 
 test.describe("Sprint 33.5 Enterprise Viewer Polish @sprint335", () => {
   test.describe.configure({ mode: "serial" });
@@ -30,11 +30,11 @@ test.describe("Sprint 33.5 Enterprise Viewer Polish @sprint335", () => {
   test("diagnostic mode and floating palette", async ({ page }) => {
     await openEcgWorkspace(page, caseId);
     await page.getByTestId("sprint29-diagnostic-mode").first().click();
-    await expect(page.getByTestId("sprint29-exit-diagnostic")).toBeVisible();
+    await expect(page.getByTestId("sprint35-exit-diagnostic").or(page.getByTestId("sprint29-exit-diagnostic"))).toBeVisible();
     await expect(ecgToolbar(page)).toHaveCount(0);
-    await expect(ecgStatusBar(page)).toHaveCount(0);
+    await expect(ecgStatusBar(page)).toBeVisible();
     await page.mouse.move(400, 300);
-    await expect(page.getByTestId("sprint335-floating-tool-palette")).toBeVisible();
+    await expect(ecgFloatingPalette(page)).toBeVisible();
     await page.screenshot({ fullPage: false, path: "test-results/screenshots/sprint335-diagnostic-after.png" });
     await page.keyboard.press("Escape");
     await expect(ecgToolbar(page)).toBeVisible({ timeout: 10_000 });

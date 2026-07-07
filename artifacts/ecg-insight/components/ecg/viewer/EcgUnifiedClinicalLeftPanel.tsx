@@ -123,7 +123,7 @@ export const EcgUnifiedClinicalLeftPanel = memo(function EcgUnifiedClinicalLeftP
 
   if (collapsed) {
     return (
-      <View style={styles.collapsedShell} testID="sprint335-clinical-summary-panel">
+      <View style={styles.collapsedShell} testID="sprint35-clinical-summary-panel">
         <Pressable accessibilityLabel="Expand clinical summary" onPress={onToggleCollapse} style={styles.collapsedBtn}>
           <Feather color={ECG_COCKPIT_COLORS.accent} name="chevrons-right" size={13} />
         </Pressable>
@@ -132,7 +132,7 @@ export const EcgUnifiedClinicalLeftPanel = memo(function EcgUnifiedClinicalLeftP
   }
 
   return (
-    <View nativeID="sprint335-clinical-summary-panel" style={styles.shell} testID="sprint335-clinical-summary-panel">
+    <View nativeID="sprint335-clinical-summary-panel" style={styles.shell} testID="sprint35-clinical-summary-panel">
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Clinical Summary</Text>
         <View style={styles.headerActions}>
@@ -146,15 +146,23 @@ export const EcgUnifiedClinicalLeftPanel = memo(function EcgUnifiedClinicalLeftP
       </View>
 
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false} style={styles.body}>
-        <CollapsibleSection defaultOpen title="Patient Summary">
+        <CollapsibleSection defaultOpen title="Patient">
           <InfoLine label="Name" value={patient?.name} />
           <InfoLine label="Age" value={patient?.age} />
           <InfoLine label="Gender" value={patient?.gender} />
-          <InfoLine label="Study" value={study?.caseNumber} />
+          {notes?.trim() ? <Text style={styles.notesText} numberOfLines={2}>{notes.trim()}</Text> : null}
+        </CollapsibleSection>
+
+        <CollapsibleSection defaultOpen title="Study">
+          <InfoLine label="Case" value={study?.caseNumber} />
           <InfoLine label="Date" value={study?.studyDate ? formatDate(study.studyDate) : undefined} />
           <InfoLine label="HR" value={study?.heartRate ? `${study.heartRate} bpm` : undefined} />
+        </CollapsibleSection>
+
+        <CollapsibleSection defaultOpen={false} title="Device">
           <InfoLine label="Device" value={study?.acquisitionDevice} />
-          {notes?.trim() ? <Text style={styles.notesText} numberOfLines={3}>{notes.trim()}</Text> : null}
+          <InfoLine label="Speed" value={digitalEcg?.calibration?.paperSpeedMmPerSec ? `${digitalEcg.calibration.paperSpeedMmPerSec} mm/s` : undefined} />
+          <InfoLine label="Gain" value={digitalEcg?.calibration?.gainMmPerMv ? `${digitalEcg.calibration.gainMmPerMv} mm/mV` : undefined} />
         </CollapsibleSection>
 
         <CollapsibleSection defaultOpen={false} title="Workflow">
@@ -181,7 +189,7 @@ export const EcgUnifiedClinicalLeftPanel = memo(function EcgUnifiedClinicalLeftP
           </View>
         </CollapsibleSection>
 
-        <CollapsibleSection defaultOpen title="Lead Selection">
+        <CollapsibleSection defaultOpen={false} title="Leads">
           <EcgLeadSelectorGrid onSelectLead={onSelectLead} selectedLead={selectedLead} />
         </CollapsibleSection>
 

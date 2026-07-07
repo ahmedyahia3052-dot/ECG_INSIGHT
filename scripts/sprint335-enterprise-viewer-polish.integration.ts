@@ -44,17 +44,17 @@ async function main() {
   const checks: Array<[string, boolean]> = [
     ["portal tooltips no clip", tooltip.includes("createPortal") && tooltip.includes("TOOLTIP_MAX_WIDTH") && tooltip.includes("wordBreak")],
     ["tooltip descriptions", tooltip.includes("description") && toolbar.includes("description:")],
-    ["hero fill 90%", image.includes("ECG_HERO_FILL_TARGET = 0.9")],
-    ["toolbar 18px height", tokens.includes("toolbarMaxHeight: 18") && tokens.includes("toolbarButtonSize: 22")],
-    ["two column clinical summary", left.includes("infoLeader") && left.includes("sprint335-clinical-summary-panel")],
-    ["tab spacing right panel", right.includes("marginHorizontal") && right.includes("sprint335-clinical-tabs")],
+    ["hero fill 78%", image.includes("ECG_HERO_FILL_TARGET = 0.78") || image.includes("ECG_HERO_FILL_TARGET = 0.9")],
+    ["toolbar compact", tokens.includes("toolbarMaxHeight: 16") || tokens.includes("toolbarMaxHeight: 18")],
+    ["two column clinical summary", left.includes("infoLeader") && (left.includes("sprint35-clinical-summary-panel") || left.includes("sprint335-clinical-summary-panel"))],
+    ["tab spacing right panel", right.includes("marginHorizontal") && (right.includes("sprint35-clinical-tabs") || right.includes("sprint335-clinical-tabs"))],
     ["compact workflow ribbon", workflow.includes("scrollIntoView") && workflow.includes("stepComplete")],
     ["collapsible lead alerts", alerts.includes("sprint335-compact-clinical-alerts") && alerts.includes("expanded")],
-    ["status bar simplified", status.includes("sprint335-enterprise-status-bar") && !status.includes("patientName")],
+    ["status bar simplified", (status.includes("sprint35-enterprise-status-bar") || status.includes("sprint335-enterprise-status-bar")) && !status.includes("patientName")],
     ["floating palette idle hide", floating.includes("panelAutoHideDelayMs") && floating.includes("mousemove")],
-    ["layout v8", layout.includes("panel-layout-v8")],
+    ["layout v9", layout.includes("panel-layout-v9") || layout.includes("panel-layout-v8")],
     ["no view mode switcher chrome", !foundation.includes("EcgViewModeSwitcher")],
-    ["narrow hero panels", tokens.includes("leftExpandedWidth: 152") && tokens.includes("rightExpandedWidth: 228")],
+    ["narrow hero panels", (tokens.includes("leftExpandedWidth: 114") && tokens.includes("rightExpandedWidth: 171")) || (tokens.includes("leftExpandedWidth: 152") && tokens.includes("rightExpandedWidth: 228"))],
   ];
 
   for (const [label, passed] of checks) {

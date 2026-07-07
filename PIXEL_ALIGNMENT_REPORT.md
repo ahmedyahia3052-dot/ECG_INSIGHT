@@ -1,38 +1,28 @@
-# Pixel Alignment Report — Sprint 33.5
+# Pixel Alignment Report — Sprint 35
 
-## Spacing System
+## Token Alignment
 
-New `ecgSpacingTokens.ts`:
-- Grid: 2 / 4 / 6 / 8 / 12px
-- Typography: caption 8 / label 9 / body 10 / title 11 / status 11
+| Element | Size |
+|---------|------|
+| Left panel (expanded) | 114px |
+| Right panel (expanded) | 171px |
+| Collapsed rails | 26px |
+| Toolbar strip | 16px max height |
+| Toolbar / floating buttons | 20px / 22px |
+| Status bar | 22px |
 
-## Alignment Audit
+## Grid Alignment
 
-| Element | Alignment Rule | Status |
-|---------|------------------|--------|
-| Left info rows | 54px label + dot leader + right value | ✓ |
-| Toolbar icons | 22×22 centered, 2px gap | ✓ |
-| Floating tools | 24×24 column, 2px gap | ✓ |
-| Right tabs | 4px horizontal margin per tab | ✓ |
-| Workflow steps | 4px gap, single-line labels | ✓ |
-| Status chips | 6px horizontal padding | ✓ |
-| Panel borders | 3px radius uniform | ✓ |
+- Workspace padding: 0px
+- Panel gap: 0px (CSS grid)
+- Two-column dot-leader rows in clinical summary (`infoLeader`)
+- Tab active indicator: 2px bottom border, accent color
 
-## Panel Dimensions
+## Hero Fill
 
-```
-Left:   152px expanded / 28px collapsed
-Right:  228px expanded / 28px collapsed
-Toolbar: 18px
-Status:  24px
-```
+`ECG_HERO_FILL_TARGET = 0.78` — ECG image centered within canvas at 75–80% fill.
 
-## Border Radius
+## Screenshots
 
-All clinical chrome uses **3px** (`ECG_WORKSTATION_VISUAL.panelBorderRadius`).
-
-## Icon Sizes
-
-- Toolbar: 11px Feather
-- Floating palette: 12px Feather
-- Left panel chevrons: 11px
+- `test-results/screenshots/sprint35-doctor-workspace.png`
+- `test-results/screenshots/sprint35-diagnostic-mode.png`

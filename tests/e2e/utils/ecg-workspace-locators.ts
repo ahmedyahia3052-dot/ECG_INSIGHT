@@ -3,16 +3,22 @@ import { expect, type Locator, type Page } from "@playwright/test";
 export const ECG_WORKSPACE_READY = "ecg-enterprise-workspace-ready";
 
 export function ecgToolbar(page: Page): Locator {
-  return page.getByTestId("sprint29-zero-chrome-toolbar");
+  return page
+    .getByTestId("sprint35-compact-toolbar")
+    .or(page.getByTestId("sprint29-zero-chrome-toolbar"));
 }
 
 export function ecgFloatingPalette(page: Page): Locator {
-  return page.getByTestId("sprint33-floating-tool-palette");
+  return page
+    .getByTestId("sprint35-floating-tool-palette")
+    .or(page.getByTestId("sprint335-floating-tool-palette"))
+    .or(page.getByTestId("sprint33-floating-tool-palette"));
 }
 
 export function ecgClinicalRightPanel(page: Page): Locator {
   return page
-    .getByTestId("sprint335-clinical-right-panel")
+    .getByTestId("sprint35-clinical-right-panel")
+    .or(page.getByTestId("sprint335-clinical-right-panel"))
     .or(page.getByTestId("sprint33-clinical-right-panel"))
     .or(page.getByTestId("sprint32-clinical-right-panel"))
     .or(page.getByTestId("sprint30-clinical-right-panel"));
@@ -20,22 +26,25 @@ export function ecgClinicalRightPanel(page: Page): Locator {
 
 export function ecgLeftRail(page: Page): Locator {
   return page
-    .getByTestId("sprint33-clinical-summary-panel")
+    .getByTestId("sprint35-clinical-summary-panel")
+    .or(page.getByTestId("sprint335-clinical-summary-panel"))
+    .or(page.getByTestId("sprint33-clinical-summary-panel"))
     .or(page.getByTestId("sprint32-clinical-summary-panel"))
     .or(page.getByTestId("sprint25-clinical-left-rail"))
     .or(page.getByTestId("sprint24-workstation-left-nav"));
 }
 
-export function ecgRightRail(page: Page): Locator {
-  return ecgClinicalRightPanel(page);
-}
-
 export function ecgStatusBar(page: Page): Locator {
   return page
-    .getByTestId("sprint335-enterprise-status-bar")
+    .getByTestId("sprint35-enterprise-status-bar")
+    .or(page.getByTestId("sprint335-enterprise-status-bar"))
     .or(page.getByTestId("sprint32-enterprise-status-bar"))
     .or(page.getByTestId("sprint29-enterprise-status-bar"))
     .or(page.getByTestId("sprint28-enterprise-status-bar"));
+}
+
+export function ecgRightRail(page: Page): Locator {
+  return ecgClinicalRightPanel(page);
 }
 
 export function ecgViewModeSwitcher(page: Page): Locator {
@@ -77,9 +86,11 @@ export async function clickViewControl(page: Page, label: "Zoom In" | "Zoom Out"
 }
 
 export async function enableDeveloperMetrics(page: Page) {
-  const toggle = page.getByTestId("sprint32-dev-mode-toggle");
-  if (await toggle.isVisible().catch(() => false)) {
-    await toggle.click();
+  const toggle = page
+    .getByTestId("sprint335-dev-mode-toggle")
+    .or(page.getByTestId("sprint32-dev-mode-toggle"));
+  if (await toggle.first().isVisible().catch(() => false)) {
+    await toggle.first().click();
   }
 }
 

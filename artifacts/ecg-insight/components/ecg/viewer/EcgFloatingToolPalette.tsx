@@ -95,26 +95,22 @@ export const EcgFloatingToolPalette = memo(function EcgFloatingToolPalette({
   }, [bumpVisibility, diagnosticMode]);
 
   const actions: PaletteAction[] = [
-    { description: "Increase ECG magnification.", icon: "zoom-in", label: "Zoom In", onPress: () => controls.zoomBy(0.2), shortcut: "Ctrl++" },
-    { description: "Decrease ECG magnification.", icon: "zoom-out", label: "Zoom Out", onPress: () => controls.zoomBy(-0.2), shortcut: "Ctrl+-" },
-    { description: "Automatically fit ECG into available viewport.", icon: "maximize-2", label: "Fit Image", onPress: () => controls.applyFit("hero"), shortcut: "F" },
-    { description: "Reset pan, zoom, and re-fit the tracing.", icon: "refresh-cw", label: "Reset View", onPress: () => { controls.resetView(); controls.applyFit("hero"); }, shortcut: "Ctrl+R" },
-    { active: controls.panMode === "active", description: "Drag to move the ECG image.", icon: "move", label: "Pan", onPress: controls.togglePanMode },
-    { active: measureActive, description: "Toggle manual measurement mode.", icon: "sliders", label: "Measure", onPress: () => workspace?.setToolMode(measureActive ? "select" : "measurement") },
+    { active: workspace?.present.toolMode === "select", description: "Select and navigate the tracing.", icon: "mouse-pointer", label: "Pointer", onPress: () => workspace?.setToolMode("select"), shortcut: "V" },
+    { description: "Increase ECG magnification.", icon: "zoom-in", label: "Zoom In", onPress: () => controls.zoomBy(0.2), shortcut: "+" },
+    { description: "Decrease ECG magnification.", icon: "zoom-out", label: "Zoom Out", onPress: () => controls.zoomBy(-0.2), shortcut: "-" },
+    { active: controls.panMode === "active", description: "Drag to move the ECG image.", icon: "move", label: "Pan", onPress: controls.togglePanMode, shortcut: "P" },
     { active: workspace?.present.toolMode === "caliper", description: "Place caliper measurement anchors.", icon: "maximize", label: "Caliper", onPress: () => workspace?.setToolMode("caliper") },
-    { active: showCrosshair, description: "Show precision crosshair cursor.", icon: "crosshair", label: "Crosshair", onPress: onToggleCrosshair, testID: "sprint25-toggle-crosshair" },
-    { active: showMagnifier, description: "Magnify area under cursor.", icon: "search", label: "Magnifier", onPress: onToggleMagnifier, testID: "sprint25-toggle-magnifier" },
-    { active: controls.grid.visible, description: "Toggle ECG paper grid overlay.", icon: "grid", label: "Grid", onPress: controls.toggleGrid },
+    { active: measureActive, description: "Toggle manual measurement mode.", icon: "sliders", label: "Measure", onPress: () => workspace?.setToolMode(measureActive ? "select" : "measurement") },
+    { active: workspace?.present.toolMode === "annotation", description: "Place clinical annotations on the tracing.", icon: "edit-3", label: "Annotate", onPress: () => workspace?.setToolMode("annotation") },
     { description: "Rotate tracing 90 degrees.", icon: "rotate-cw", label: "Rotate", onPress: controls.rotate },
-    { description: "Show or hide left clinical summary.", icon: "menu", label: "Left Panel", onPress: onToggleLeftPanel, testID: "sprint22-toggle-left-panel" },
-    { description: "Show or hide right clinical panel.", icon: "columns", label: "Right Panel", onPress: onToggleRightPanel, testID: "sprint22-toggle-right-panel" },
-    { description: "Enter diagnostic fullscreen mode.", icon: "maximize", label: "Fullscreen", onPress: onEnterDiagnostic, shortcut: "F11", testID: "sprint29-diagnostic-mode" },
+    { description: "Reset pan, zoom, and re-fit the tracing.", icon: "refresh-cw", label: "Reset", onPress: () => { controls.resetView(); controls.applyFit("hero"); }, shortcut: "Ctrl+R" },
+    { description: "Enter diagnostic fullscreen mode.", icon: "maximize", label: "Full Screen", onPress: onEnterDiagnostic, shortcut: "F11", testID: "sprint29-diagnostic-mode" },
   ];
 
   if (!visible && !diagnosticMode) return null;
 
   return (
-    <View pointerEvents="box-none" style={[styles.host, diagnosticMode && styles.hostDiagnostic]} testID="sprint335-floating-tool-palette">
+    <View pointerEvents="box-none" style={[styles.host, diagnosticMode && styles.hostDiagnostic]} testID="sprint35-floating-tool-palette">
       <View style={styles.palette}>
         {actions.map((action) => (
           <PaletteButton action={action} key={action.label} />

@@ -1,24 +1,22 @@
-# Visual QA Report — Sprint 34
+# Visual QA Report — Sprint 35
 
-## Test Matrix
+## Automated Tests
 
-| Scenario | Result |
-|----------|--------|
-| Live measurements panel visible | ✅ Playwright |
-| Measurement history panel visible | ✅ Playwright |
-| Floating toolbar on caliper mode | ✅ Playwright |
-| Overlay stable after caliper placement | ✅ Playwright |
-| Sync markers (multi-lead) | ✅ SVG dashed lines #38BDF8 |
-| Toolbar idle collapse | ✅ 2.4s opacity fade |
+| Test | Result |
+|------|--------|
+| Zero-clutter four-tab panel | ✅ Pass |
+| Diagnostic fullscreen + status bar | ✅ Pass |
+| AI / Measurements tab separation | ✅ Pass |
 
-## Visual Tokens
+## Visual Checks
 
-Floating toolbar reuses cockpit colors (`ECG_COCKPIT_COLORS`) and 22px buttons consistent with Sprint 33.5 palette.
+- [x] No Patient tab on right panel
+- [x] Workflow steps fully visible (scroll, no overlap)
+- [x] Tooltips portal-rendered
+- [x] Diagnostic mode shows exit chip + floating palette
+- [x] Status bar shows Grid/FPS/GPU/Mem without debug toggle
+- [x] Left summary grouped Patient/Study/Device/Workflow
 
-## Layout Compliance
+## Regression
 
-No changes to left/right panel widths, chrome row, or diagnostic fullscreen behavior.
-
-## Screenshots
-
-Captured during Playwright run in `test-results/` for overlay and measurements tab states.
+Sprint 33.5 integration updated for v9 layout compatibility.

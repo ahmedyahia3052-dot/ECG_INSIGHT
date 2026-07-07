@@ -23,6 +23,12 @@ export function useEcgDiagnosticMode() {
     }
   }, []);
 
+  const popLayoutSnapshot = useCallback((): DiagnosticLayoutSnapshot | null => {
+    const snapshot = snapshotRef.current;
+    snapshotRef.current = null;
+    return snapshot;
+  }, []);
+
   const exitDiagnostic = useCallback(() => {
     setDiagnosticMode(false);
     if (Platform.OS === "web" && typeof document !== "undefined" && document.fullscreenElement) {
@@ -61,21 +67,18 @@ export function useEcgDiagnosticMode() {
         toggleDiagnostic();
         return;
       }
-      if (event.key === "Escape" && diagnosticMode) {
-        event.preventDefault();
-        exitDiagnostic();
-      }
     };
 
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [diagnosticMode, exitDiagnostic, toggleDiagnostic]);
+  }, [toggleDiagnostic]);
 
   return {
     diagnosticMode,
     enterDiagnostic,
     exitDiagnostic,
     layoutSnapshot: snapshotRef.current,
+    popLayoutSnapshot,
     toggleDiagnostic,
   };
 }

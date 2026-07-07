@@ -1,48 +1,32 @@
-# UI Polish Report — Sprint 33.5
+# UI Polish Report — Sprint 35
 
-## ECG Dominance
+## Spacing & Typography
 
-Hero fit now targets **90% canvas fill** with narrower panels (152px left, 228px right). Canvas uses full flex height with zero min-height dead space.
+- Panel border radius: 2px
+- Toolbar height: 16px; buttons: 20×20px
+- Status bar: 22px; 9–10px chip typography
+- Tab bar: min-height 30px with horizontal margin spacing
+- Workflow steps: min-width 72px, max label width 120px — no cropped labels
 
-## Tooltip Fix (Critical)
+## Visual Clutter Reduction
 
-**Problem:** Tooltips clipped inside toolbar/palette overflow containers.
+- Removed Patient tab from right panel (content lives on left summary)
+- Removed developer-mode toggle and debug chips (Canvas, XY, CPU, API, Quality)
+- Floating palette trimmed to essential clinical tools
+- Collapsed lead selector by default on left panel
 
-**Solution:** `EcgWorkstationTooltip` renders via `createPortal` to `document.body` with:
-- Fixed positioning from anchor `getBoundingClientRect`
-- Min width 160px, max width 280px
-- Multi-line word wrap
-- z-index 999999
-- Title + description + shortcut blocks
+## Tooltips
 
-## Toolbar Compression
+All toolbar and floating palette icons include:
 
-| Metric | Sprint 33 | Sprint 33.5 |
-|--------|-----------|-------------|
-| Max height | 20px | 18px |
-| Button size | 24px | 22px |
-| Icon size | 12px | 11px |
+- Title (label)
+- Description
+- Keyboard shortcut where applicable
 
-Every button includes description text in tooltip.
+Rendered via `createPortal` to `document.body` — never clipped by panel overflow.
 
-## Clinical Workflow
+## Accessibility
 
-Horizontal scroll ribbon with compact 8px labels. Status colors:
-- **Complete:** green outline
-- **Current:** cyan fill
-- **Future/pending:** gray muted
-
-Auto-scrolls active step into view.
-
-## Lead Issues Alert
-
-Replaced full-width banner chips with compact collapsible:
-`⚠ Lead Issues (1) ▸` — expands on click only.
-
-## Floating Palette
-
-- Position: 4px from canvas edge
-- Background: 82% opacity charcoal
-- Auto-hides after 2.4s idle
-- Reappears on mouse movement
-- 24×24 uniform buttons
+- Consistent 20–22px touch targets on toolbars
+- Tab roles with `accessibilityState.selected`
+- Uniform Feather icon sizing (11–12px)

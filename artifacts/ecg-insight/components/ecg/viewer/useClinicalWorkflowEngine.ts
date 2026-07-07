@@ -75,8 +75,8 @@ export function useClinicalWorkflowEngine(input: {
       if (!step || !canNavigateToStep(step)) return false;
       setActiveStepId(id);
       const nav = navigateWorkflowStep(id);
-      if (nav.patientTab) input.onFocusPanel?.("patient");
-      if (nav.notesTab) input.onFocusPanel?.("patient", "notes");
+      if (nav.patientTab) input.onFocusPanel?.("measurements");
+      if (nav.notesTab) input.onFocusPanel?.("history", "notes");
       if (nav.measurementsTab) input.onFocusPanel?.("measurements");
       if (nav.aiTab) input.onFocusPanel?.("ai");
       if (nav.historyTab) input.onFocusPanel?.("history");

@@ -73,7 +73,7 @@ export function EcgWorkstationGridShell({
   const gap = ECG_WORKSTATION_VISUAL.workspaceGap;
   const hideLeft = diagnosticMode || !left;
   const hideRight = diagnosticMode || !right;
-  const hideBottom = diagnosticMode || !bottom;
+  const hideBottom = !bottom;
   const leftCol = hideLeft ? "0px" : leftCollapsed ? `${ECG_WORKSTATION_VISUAL.leftCollapsedWidth}px` : `${leftWidth}px`;
   const rightCol = hideRight ? "0px" : rightCollapsed ? `${ECG_WORKSTATION_VISUAL.rightCollapsedWidth}px` : `${rightWidth}px`;
 
@@ -100,8 +100,15 @@ export function EcgWorkstationGridShell({
         display: "grid",
         gap,
         gridTemplateAreas: hideBottom
-          ? `"center"`
-          : `
+          ? hideLeft && hideRight
+            ? `"center"`
+            : `"left center right"`
+          : hideLeft && hideRight
+            ? `
+          "center"
+          "bottom"
+        `
+            : `
           "left center right"
           "bottom bottom bottom"
         `,
