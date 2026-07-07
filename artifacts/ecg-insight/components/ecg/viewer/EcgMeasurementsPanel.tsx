@@ -54,7 +54,7 @@ export const EcgMeasurementsPanel = memo(function EcgMeasurementsPanel({ workspa
         <View style={styles.toolbar}>
           {CLINICAL_MEASUREMENT_PRESETS.map((preset) => (
             <PrimaryButton
-              key={preset.kind}
+              key={`${preset.kind}-${preset.caliperKind}-${preset.label}`}
               label={preset.label}
               onPress={() => workspace.selectMeasurementPreset(preset)}
               variant={workspace.present.activeMeasurementKind === preset.kind ? "primary" : "outline"}
@@ -119,13 +119,8 @@ function MeasurementRow({ item, workspace }: { item: EcgClinicalMeasurement; wor
   const selected = workspace.present.selectedMeasurementId === item.id;
 
   return (
-    <Pressable
-      accessibilityRole="button"
-      onPress={() => workspace.jumpToMeasurement(item.id)}
-      style={[styles.row, selected && styles.rowSelected]}
-      testID={`sprint14-measurement-row-${item.kind}`}
-    >
-      <View style={styles.rowMain}>
+    <View style={[styles.row, selected && styles.rowSelected]} testID={`sprint14-measurement-row-${item.kind}`}>
+      <Pressable accessibilityRole="button" onPress={() => workspace.jumpToMeasurement(item.id)} style={styles.rowMain}>
         {editing ? (
           <TextInput
             autoFocus
@@ -158,7 +153,7 @@ function MeasurementRow({ item, workspace }: { item: EcgClinicalMeasurement; wor
           value={comments}
         />
         <Text style={styles.meta}>Confidence: {item.confidence == null ? "Awaiting AI Analysis" : `${item.confidence}%`}</Text>
-      </View>
+      </Pressable>
       <Text style={styles.value}>{`${item.value} ${item.unit}`}</Text>
       <Text style={styles.amplitude}>{item.durationMs != null ? `${item.durationMs} ms` : item.amplitudeMv != null ? `${item.amplitudeMv} mV` : "—"}</Text>
       <Text style={styles.lead}>{item.lead ?? "—"}</Text>
@@ -178,7 +173,7 @@ function MeasurementRow({ item, workspace }: { item: EcgClinicalMeasurement; wor
         <PrimaryButton label="Lock" onPress={() => workspace.toggleCaliperLock(item.caliperId)} variant="outline" />
         <PrimaryButton label="Delete" onPress={() => workspace.deleteMeasurement(item.id)} variant="outline" />
       </View>
-    </Pressable>
+    </View>
   );
 }
 

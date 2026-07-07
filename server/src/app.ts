@@ -56,6 +56,7 @@ export function createApp() {
     helmet({
       contentSecurityPolicy: env.NODE_ENV === "production" ? undefined : false,
       crossOriginEmbedderPolicy: false,
+      crossOriginResourcePolicy: { policy: "cross-origin" },
       hsts: env.NODE_ENV === "production" ? { includeSubDomains: true, maxAge: 31_536_000, preload: true } : false,
     }),
   );

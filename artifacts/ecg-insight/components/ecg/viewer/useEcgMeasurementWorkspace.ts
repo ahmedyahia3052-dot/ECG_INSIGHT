@@ -117,17 +117,17 @@ export function useEcgMeasurementWorkspace(options: {
   const [draftCaliper, setDraftCaliper] = useState<{ end: ImagePoint; start: ImagePoint; vertex?: ImagePoint; waypoints?: ImagePoint[] } | null>(null);
   const [hoveredCaliperId, setHoveredCaliperId] = useState<string | null>(null);
 
-  const persist = useCallback(
-    (next: EcgViewerWorkspaceState) => {
-      options.onPersist?.({
-        ...next,
-        adjustments: controlsRef.current.adjustments,
-        grid: controlsRef.current.grid,
-        transform: controlsRef.current.transform,
-      });
-    },
-    [options.onPersist],
-  );
+  const onPersistRef = useRef(options.onPersist);
+  onPersistRef.current = options.onPersist;
+
+  const persist = useCallback((next: EcgViewerWorkspaceState) => {
+    onPersistRef.current?.({
+      ...next,
+      adjustments: controlsRef.current.adjustments,
+      grid: controlsRef.current.grid,
+      transform: controlsRef.current.transform,
+    });
+  }, []);
 
   const syncMeasurements = useCallback(
     (calipers: EcgCaliper[], existing: EcgViewerWorkspaceState["measurements"]) =>
@@ -143,9 +143,11 @@ export function useEcgMeasurementWorkspace(options: {
   const updateSlice = useCallback(
     (updater: (slice: WorkspaceSlice) => WorkspaceSlice) => {
       commit((current) => {
-        const nextSlice = updater(workspaceSlice(current));
+        const currentSlice = workspaceSlice(current);
+        const nextSlice = updater(currentSlice);
+        if (nextSlice === currentSlice) return current;
         const measurements =
-          nextSlice.calipers === current.calipers
+          nextSlice.calipers === currentSlice.calipers
             ? nextSlice.measurements
             : syncMeasurements(nextSlice.calipers, nextSlice.measurements);
         const next = { ...current, ...nextSlice, measurements };
@@ -158,7 +160,10 @@ export function useEcgMeasurementWorkspace(options: {
 
   const setToolMode = useCallback((toolMode: EcgViewerToolMode) => updateSlice((slice) => ({ ...slice, toolMode })), [updateSlice]);
 
-  const setActiveLead = useCallback((lead: string) => updateSlice((slice) => ({ ...slice, activeLead: lead })), [updateSlice]);
+  const setActiveLead = useCallback(
+    (lead: string) => updateSlice((slice) => (slice.activeLead === lead ? slice : { ...slice, activeLead: lead })),
+    [updateSlice],
+  );
 
   const selectMeasurementPreset = useCallback((preset: ClinicalMeasurementPreset) => {
     activePreset.current = preset;

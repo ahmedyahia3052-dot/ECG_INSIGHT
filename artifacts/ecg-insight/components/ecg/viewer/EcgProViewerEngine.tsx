@@ -4,6 +4,7 @@ import { PanGestureHandler, PinchGestureHandler, State } from "react-native-gest
 
 import { EmptyState } from "@/components/enterprise/EnterpriseUI";
 import { ECG_COCKPIT_COLORS } from "./ecgCockpitColors";
+import { ecgAnchorId, ecgNativeId } from "./ecgNativeId";
 import { emitRuntimeEvent } from "@/services/runtimeEvents";
 
 import { EcgAiOverlayLayer, type EcgAiOverlayRegion } from "./EcgAiOverlayLayer";
@@ -289,7 +290,7 @@ export const EcgProViewerEngine = memo(function EcgProViewerEngine({
 
   const canvasBody = (
     <View
-      nativeID={testID}
+      {...ecgAnchorId(testID)}
       onLayout={onLayout}
       onPointerMove={Platform.OS === "web" ? (handlePointerMove as never) : undefined}
       style={[
@@ -308,7 +309,7 @@ export const EcgProViewerEngine = memo(function EcgProViewerEngine({
       {isPdf ? (
         <View style={styles.pdfPane}>
           {Platform.OS === "web" && pdfUrl ? (
-            <View nativeID={`${testID}-pdf-frame`} style={styles.pdfFrame} />
+            <View {...ecgAnchorId(`${testID}-pdf-frame`)} style={styles.pdfFrame} />
           ) : (
             <EmptyState message="PDF preview is available on web. Open the document to review the original tracing." title="PDF ECG" />
           )}

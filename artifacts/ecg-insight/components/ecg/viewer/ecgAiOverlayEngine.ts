@@ -547,11 +547,19 @@ export function mergeGeneratedAnnotations(
   existing: EcgAiClinicalAnnotation[],
   generated: EcgAiClinicalAnnotation[],
 ): EcgAiClinicalAnnotation[] {
-  const manual = existing.filter((item) => item.doctorEdited || item.confirmed || item.rejected || item.doctorNotes);
-  const manualKeys = new Set(manual.map((item) => `${item.type}:${item.lead}`));
-  const merged = [...manual];
+  const locked = existing.filter((item) => item.doctorEdited || item.confirmed || item.rejected || item.doctorNotes);
+  const existingKeys = new Set(existing.map((item) => `${item.type}:${item.lead}`));
+  const merged = [...locked];
+  for (const item of existing) {
+    if (locked.includes(item)) continue;
+    merged.push(item);
+  }
   for (const item of generated) {
-    if (!manualKeys.has(`${item.type}:${item.lead}`)) merged.push(item);
+    const key = `${item.type}:${item.lead}`;
+    if (!existingKeys.has(key)) {
+      merged.push(item);
+      existingKeys.add(key);
+    }
   }
   return merged;
 }

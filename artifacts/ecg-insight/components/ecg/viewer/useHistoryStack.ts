@@ -7,13 +7,19 @@ export function useHistoryStack<T>(initial: T, limit = 200) {
   const futureRef = useRef<T[]>([]);
 
   const syncMeta = useCallback(() => {
-    setHistoryMeta({ future: futureRef.current.length, past: pastRef.current.length });
+    setHistoryMeta((current) => {
+      const future = futureRef.current.length;
+      const past = pastRef.current.length;
+      if (current.future === future && current.past === past) return current;
+      return { future, past };
+    });
   }, []);
 
   const commit = useCallback(
     (next: T | ((current: T) => T)) => {
       setPresent((current) => {
         const resolved = typeof next === "function" ? (next as (value: T) => T)(current) : next;
+        if (resolved === current) return current;
         pastRef.current = [...pastRef.current.slice(-limit + 1), current];
         futureRef.current = [];
         syncMeta();

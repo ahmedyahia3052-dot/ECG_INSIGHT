@@ -31,6 +31,7 @@ import { EcgLiveMonitorView } from "./EcgLiveMonitorView";
 import { EcgReportPreviewPanel } from "./EcgReportPreviewPanel";
 import { EcgViewerResizableWorkspace } from "./EcgViewerResizableWorkspace";
 import { EcgViewerSettingsPanel } from "./EcgViewerSettingsPanel";
+import { EcgViewModeSwitcher } from "./EcgViewModeSwitcher";
 import { EcgWaveformPlaybackTimeline } from "./EcgWaveformPlaybackTimeline";
 import { EcgWorkstationToolbar } from "./EcgWorkstationToolbar";
 import { ECG_COCKPIT_COLORS } from "./ecgCockpitColors";
@@ -101,6 +102,9 @@ export function EcgMonitorViewerFoundation({
   const { diagnosticMode, exitDiagnostic, popLayoutSnapshot, toggleDiagnostic } = useEcgDiagnosticMode();
   const operatorName = user?.name ?? user?.email ?? "Clinician";
   const scheduleSaveRef = useRef<() => void>(() => undefined);
+  const persistWorkspace = useCallback(() => {
+    scheduleSaveRef.current();
+  }, []);
 
   const analysisQuery = useQuery({
     enabled: !!token && !!ecgCase.id,
@@ -145,7 +149,7 @@ export function EcgMonitorViewerFoundation({
 
   const workspace = useEcgMeasurementWorkspace({
     controls,
-    onPersist: () => scheduleSaveRef.current(),
+    onPersist: persistWorkspace,
     operatorName,
   });
   const aiOverlay = useEcgAiOverlayWorkspace({
@@ -154,7 +158,7 @@ export function EcgMonitorViewerFoundation({
     controls,
     ecgCase,
     explainability,
-    onPersist: () => scheduleSaveRef.current(),
+    onPersist: persistWorkspace,
     operatorName,
   });
   const findings = useEcgClinicalFindings(ecgCase, workspace, analysis, explainability, digitalEcg);
@@ -288,33 +292,54 @@ export function EcgMonitorViewerFoundation({
     await exportEcgViewerPng({ accessToken: token, caseId: ecgCase.id, imageUrl });
   }, [ecgCase.id, imageUrl, token]);
 
+  const setActiveLead = workspace.setActiveLead;
+  const setToolMode = workspace.setToolMode;
+  const configureWaveDetection = workspace.configureWaveDetection;
+  const setOverlaySettings = aiOverlay.setSettings;
+
   useEffect(() => {
-    workspace.setActiveLead(selectedLead);
-  }, [selectedLead, workspace]);
+    setActiveLead(selectedLead);
+  }, [selectedLead, setActiveLead]);
 
   useEffect(() => {
     if (!digitalEcg?.calibration) return;
-    controls.setGrid((grid) => ({
-      ...grid,
-      gain: digitalEcg.calibration.gainMmPerMv,
-      speed: digitalEcg.calibration.paperSpeedMmPerSec,
-    }));
-  }, [controls.setGrid, digitalEcg?.calibration]);
+    controls.setGrid((grid) => {
+      if (
+        grid.gain === digitalEcg.calibration.gainMmPerMv &&
+        grid.speed === digitalEcg.calibration.paperSpeedMmPerSec
+      ) {
+        return grid;
+      }
+      return {
+        ...grid,
+        gain: digitalEcg.calibration.gainMmPerMv,
+        speed: digitalEcg.calibration.paperSpeedMmPerSec,
+      };
+    });
+  }, [controls.setGrid, digitalEcg?.calibration?.gainMmPerMv, digitalEcg?.calibration?.paperSpeedMmPerSec]);
 
   useEffect(() => {
     if (enterprise.viewMode === "overlay" || enterprise.viewMode === "ai-review") {
-      aiOverlay.setSettings({ enabled: true, showAnnotations: true, showHeatmap: true, showLabels: true });
+      setOverlaySettings({ enabled: true, showAnnotations: true, showHeatmap: true, showLabels: true });
     }
-  }, [aiOverlay, enterprise.viewMode]);
+  }, [enterprise.viewMode, setOverlaySettings]);
 
   useEffect(() => {
     if (enterprise.viewMode === "measurement") {
-      workspace.setToolMode("measurement");
+      setToolMode("measurement");
       if (digitalEcg && controls.viewport.imageWidth > 0 && controls.viewport.imageHeight > 0) {
-        workspace.configureWaveDetection(digitalEcg, workspace.present.activeLead ?? "II");
+        configureWaveDetection(digitalEcg, workspace.present.activeLead ?? "II");
       }
     }
-  }, [controls.viewport.imageHeight, controls.viewport.imageWidth, digitalEcg, enterprise.viewMode, workspace]);
+  }, [
+    configureWaveDetection,
+    controls.viewport.imageHeight,
+    controls.viewport.imageWidth,
+    digitalEcg,
+    enterprise.viewMode,
+    setToolMode,
+    workspace.present.activeLead,
+  ]);
 
   const measurementCount = workspace.present.measurements.length;
   const workflow = useClinicalWorkflowEngine({
@@ -380,10 +405,22 @@ export function EcgMonitorViewerFoundation({
 
   useEffect(() => {
     setUnsavedChanges(true);
-    scheduleSave();
+    scheduleSaveRef.current();
     const timer = setTimeout(() => setUnsavedChanges(false), 1500);
     return () => clearTimeout(timer);
-  }, [aiOverlay.present, controls.adjustments, controls.grid, controls.transform, scheduleSave, workspace.present]);
+  }, [
+    aiOverlay.present.annotations.length,
+    controls.adjustments.brightness,
+    controls.adjustments.contrast,
+    controls.grid.gain,
+    controls.grid.speed,
+    controls.transform.panX,
+    controls.transform.panY,
+    controls.transform.rotation,
+    controls.transform.zoom,
+    workspace.present.calipers.length,
+    workspace.present.measurements.length,
+  ]);
 
   const waveFps = renderFps;
 
@@ -421,6 +458,7 @@ export function EcgMonitorViewerFoundation({
               unsavedChanges={unsavedChanges}
             />
             <EcgClinicalAlertsBanner alerts={workflow.alerts} />
+            <EcgViewModeSwitcher onChange={enterprise.setViewMode} value={enterprise.viewMode} />
           </View>
           <EcgWorkstationToolbar
             aiOverlay={aiOverlay}

@@ -35,6 +35,10 @@ export function useEcgViewerPersistence(options: {
 }) {
   const hydratedRef = useRef(false);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const onHydrateRef = useRef(options.onHydrate);
+  const snapshotRef = useRef(options.snapshot);
+  onHydrateRef.current = options.onHydrate;
+  snapshotRef.current = options.snapshot;
 
   useEffect(() => {
     if (!options.enabled || hydratedRef.current) return undefined;
@@ -50,23 +54,23 @@ export function useEcgViewerPersistence(options: {
           state = null;
         }
       }
-      if (!cancelled && state) options.onHydrate(createWorkspaceState(state));
+      if (!cancelled && state) onHydrateRef.current(createWorkspaceState(state));
     })();
     return () => {
       cancelled = true;
     };
-  }, [options.accessToken, options.caseId, options.enabled, options.onHydrate, options.patientId]);
+  }, [options.accessToken, options.caseId, options.enabled, options.patientId]);
 
   const scheduleSave = useCallback(() => {
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
     saveTimerRef.current = setTimeout(() => {
-      const state = options.snapshot();
+      const state = snapshotRef.current();
       void writeLocalWorkspace(options.caseId, options.patientId, state);
       if (options.accessToken) {
         void saveEcgViewerWorkspace(options.accessToken, options.caseId, state).catch(() => undefined);
       }
     }, 1200);
-  }, [options]);
+  }, [options.accessToken, options.caseId, options.patientId]);
 
   useEffect(() => () => {
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);

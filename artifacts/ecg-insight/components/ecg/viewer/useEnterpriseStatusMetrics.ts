@@ -75,7 +75,7 @@ export function useEnterpriseStatusMetrics(input: {
               jsHeapLimitMb: Math.round(perf.memory.jsHeapSizeLimit / 1024 / 1024),
               jsHeapMb: Math.round(perf.memory.usedJSHeapSize / 1024 / 1024),
             }
-          : metrics.memory,
+          : latestRef.current.memory ?? {},
         renderTimeMs,
       };
       publish(now);
@@ -84,7 +84,7 @@ export function useEnterpriseStatusMetrics(input: {
 
     frame = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(frame);
-  }, [input.aiOverlayEnabled, input.annotationCount, input.viewMode, metrics.memory]);
+  }, [input.aiOverlayEnabled, input.annotationCount, input.viewMode]);
 
   useEffect(() => {
     if (Platform.OS !== "web") return undefined;

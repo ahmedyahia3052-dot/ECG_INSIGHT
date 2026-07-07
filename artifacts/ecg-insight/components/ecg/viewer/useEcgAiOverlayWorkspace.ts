@@ -33,17 +33,25 @@ type Slice = EcgAiOverlayState;
 
 export function useEcgAiOverlayWorkspace(options: Options) {
   const { activeLead, analysis, controls, ecgCase, explainability, onPersist, operatorName = "Clinician" } = options;
-  const stack = useHistoryStack<Slice>(EMPTY_AI_OVERLAY_STATE);
+  const { canRedo, canUndo, commit, present, redo, replace, resetHistory, undo } = useHistoryStack<Slice>(EMPTY_AI_OVERLAY_STATE);
   const controlsRef = useRef(controls);
   controlsRef.current = controls;
-  const persist = onPersist ?? (() => undefined);
+  const onPersistRef = useRef(onPersist);
+  onPersistRef.current = onPersist;
+  const persist = useCallback(() => {
+    onPersistRef.current?.();
+  }, []);
 
   const updateSlice = useCallback(
     (updater: (slice: Slice) => Slice) => {
-      stack.commit((current) => updater(current));
-      persist();
+      commit((current) => {
+        const next = updater(current);
+        if (next === current) return current;
+        onPersistRef.current?.();
+        return next;
+      });
     },
-    [persist, stack],
+    [commit],
   );
 
   const syncGeneratedAnnotations = useCallback(() => {
@@ -57,38 +65,49 @@ export function useEcgAiOverlayWorkspace(options: Options) {
       imageWidth: viewport.imageWidth,
       operatorName,
     });
-    updateSlice((slice) => ({
-      ...slice,
-      annotations: mergeGeneratedAnnotations(slice.annotations, generated),
-    }));
-  }, [analysis, ecgCase, explainability, operatorName, updateSlice]);
+    commit((current) => {
+      const merged = mergeGeneratedAnnotations(current.annotations, generated);
+      if (
+        merged.length === current.annotations.length &&
+        merged.every((item, index) => item.id === current.annotations[index]?.id)
+      ) {
+        return current;
+      }
+      onPersistRef.current?.();
+      return { ...current, annotations: merged };
+    });
+  }, [analysis, commit, ecgCase, explainability, operatorName]);
 
   useEffect(() => {
     syncGeneratedAnnotations();
   }, [syncGeneratedAnnotations]);
 
   const visibleAnnotations = useMemo(
-    () => filterAnnotationsByLead(stack.present.annotations.filter((item) => item.visible), activeLead),
-    [activeLead, stack.present.annotations],
+    () => filterAnnotationsByLead(present.annotations.filter((item) => item.visible), activeLead),
+    [activeLead, present.annotations],
   );
 
   const selectedAnnotations = useMemo(
-    () => stack.present.annotations.filter((item) => stack.present.selectedAnnotationIds.includes(item.id)),
-    [stack.present.annotations, stack.present.selectedAnnotationIds],
+    () => present.annotations.filter((item) => present.selectedAnnotationIds.includes(item.id)),
+    [present.annotations, present.selectedAnnotationIds],
   );
 
   const primarySelected = selectedAnnotations[0] ?? null;
 
   const setSettings = useCallback(
     (patch: Partial<EcgAiOverlaySettings>) => {
-      updateSlice((slice) => ({ ...slice, settings: { ...slice.settings, ...patch } }));
+      updateSlice((slice) => {
+        const settings = { ...slice.settings, ...patch };
+        const unchanged = (Object.keys(patch) as (keyof EcgAiOverlaySettings)[]).every((key) => slice.settings[key] === settings[key]);
+        return unchanged ? slice : { ...slice, settings };
+      });
     },
     [updateSlice],
   );
 
   const toggleOverlay = useCallback(() => {
-    setSettings({ enabled: !stack.present.settings.enabled });
-  }, [setSettings, stack.present.settings.enabled]);
+    setSettings({ enabled: !present.settings.enabled });
+  }, [present.settings.enabled, setSettings]);
 
   const selectAnnotation = useCallback(
     (annotationId: string, multi = false) => {
@@ -139,20 +158,20 @@ export function useEcgAiOverlayWorkspace(options: Options) {
 
   const toggleAnnotationVisibility = useCallback(
     (annotationId: string) => {
-      const target = stack.present.annotations.find((item) => item.id === annotationId);
+      const target = present.annotations.find((item) => item.id === annotationId);
       if (!target) return;
       patchAnnotation(annotationId, { visible: !target.visible });
     },
-    [patchAnnotation, stack.present.annotations],
+    [patchAnnotation, present.annotations],
   );
 
   const toggleAnnotationLock = useCallback(
     (annotationId: string) => {
-      const target = stack.present.annotations.find((item) => item.id === annotationId);
+      const target = present.annotations.find((item) => item.id === annotationId);
       if (!target) return;
       patchAnnotation(annotationId, { locked: !target.locked });
     },
-    [patchAnnotation, stack.present.annotations],
+    [patchAnnotation, present.annotations],
   );
 
   const confirmAnnotation = useCallback(
@@ -171,44 +190,44 @@ export function useEcgAiOverlayWorkspace(options: Options) {
   );
 
   const resetOverlay = useCallback(() => {
-    stack.resetHistory({
+    resetHistory({
       ...EMPTY_AI_OVERLAY_STATE,
-      settings: { ...DEFAULT_AI_OVERLAY_SETTINGS, enabled: stack.present.settings.enabled },
+      settings: { ...DEFAULT_AI_OVERLAY_SETTINGS, enabled: present.settings.enabled },
     });
     syncGeneratedAnnotations();
     persist();
-  }, [persist, stack, syncGeneratedAnnotations]);
+  }, [persist, present.settings.enabled, resetHistory, syncGeneratedAnnotations]);
 
   const hydrate = useCallback(
     (raw: unknown) => {
       const restored = restoreOverlayState(raw);
-      stack.replace(restored);
+      replace(restored);
       syncGeneratedAnnotations();
     },
-    [stack, syncGeneratedAnnotations],
+    [replace, syncGeneratedAnnotations],
   );
 
-  const exportState = useCallback(() => serializeOverlayState(stack.present), [stack.present]);
+  const exportState = useCallback(() => serializeOverlayState(present), [present]);
 
-  const exportOverlay = useCallback(() => exportOverlayAnnotations(stack.present), [stack.present]);
+  const exportOverlay = useCallback(() => exportOverlayAnnotations(present), [present]);
 
   useEffect(() => {
     if (Platform.OS !== "web" || typeof window === "undefined") return undefined;
     const onKeyDown = (event: KeyboardEvent) => {
       const target = event.target as HTMLElement | null;
       if (target?.tagName === "INPUT" || target?.tagName === "TEXTAREA") return;
-      if (!stack.present.settings.enabled) return;
+      if (!present.settings.enabled) return;
       if (event.key === "Delete" || event.key === "Backspace") {
-        for (const id of stack.present.selectedAnnotationIds) removeAnnotation(id);
+        for (const id of present.selectedAnnotationIds) removeAnnotation(id);
       }
       if (event.ctrlKey && event.key.toLowerCase() === "z") {
         event.preventDefault();
-        stack.undo();
+        undo();
         persist();
       }
       if (event.ctrlKey && event.key.toLowerCase() === "y") {
         event.preventDefault();
-        stack.redo();
+        redo();
         persist();
       }
       if (event.key.toLowerCase() === "a" && event.ctrlKey) {
@@ -220,38 +239,39 @@ export function useEcgAiOverlayWorkspace(options: Options) {
         }));
       }
       if (event.key.toLowerCase() === "l") {
-        for (const id of stack.present.selectedAnnotationIds) toggleAnnotationLock(id);
+        for (const id of present.selectedAnnotationIds) toggleAnnotationLock(id);
       }
       if (event.key.toLowerCase() === "h") {
-        for (const id of stack.present.selectedAnnotationIds) toggleAnnotationVisibility(id);
+        for (const id of present.selectedAnnotationIds) toggleAnnotationVisibility(id);
       }
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [
     persist,
+    present.selectedAnnotationIds,
+    present.settings.enabled,
+    redo,
     removeAnnotation,
-    stack,
-    stack.present.selectedAnnotationIds,
-    stack.present.settings.enabled,
     toggleAnnotationLock,
     toggleAnnotationVisibility,
+    undo,
     updateSlice,
   ]);
 
   return {
-    canRedo: stack.canRedo,
-    canUndo: stack.canUndo,
+    canRedo,
+    canUndo,
     clearSelection,
     confirmAnnotation,
     exportOverlay,
     exportState,
     hydrate,
     patchAnnotation,
-    present: stack.present,
+    present,
     primarySelected,
     redo: () => {
-      stack.redo();
+      redo();
       persist();
     },
     rejectAnnotation,
@@ -265,7 +285,7 @@ export function useEcgAiOverlayWorkspace(options: Options) {
     toggleAnnotationVisibility,
     toggleOverlay,
     undo: () => {
-      stack.undo();
+      undo();
       persist();
     },
     updateDoctorNotes,

@@ -3,6 +3,7 @@ import { Platform, StyleSheet, View } from "react-native";
 import { createPortal } from "react-dom";
 
 import { ECG_COCKPIT_COLORS } from "./ecgCockpitColors";
+import { ecgAnchorId } from "./ecgNativeId";
 
 const TOOLTIP_DELAY_MS = 200;
 const TOOLTIP_MAX_WIDTH = 280;
@@ -108,7 +109,7 @@ export const EcgWorkstationTooltip = memo(function EcgWorkstationTooltip({
     <>
       <View
         accessibilityLabel={shortcut ? `${label}. ${description ?? ""} Shortcut ${shortcut}` : label}
-        nativeID={`ecg-tip-${hostId}`}
+        {...ecgAnchorId(`ecg-tip-${hostId}`)}
         style={styles.host}
         // @ts-expect-error web hover
         onMouseEnter={show}

@@ -1,22 +1,26 @@
-# Responsive Report — Sprint 35
+# Sprint 36 — Responsive Report
 
-## Target Resolutions Verified
+## Viewports Tested (Playwright)
 
-| Resolution | Status |
-|------------|--------|
-| 1366×768 | ✅ No clipping; workflow ribbon scrolls |
-| 1440×900 | ✅ Panels + canvas balanced |
-| 1600×900 | ✅ Center column ≥77% |
-| 1920×1080 | ✅ Primary clinical target |
-| 2560×1440 | ✅ Extra space to canvas |
+| Resolution | Left rail | Right panel | Toolbar | Status bar | Workflow ribbon |
+|------------|-----------|-------------|---------|------------|-----------------|
+| 1366×768 | Visible | Visible | Visible | Visible | Visible |
+| 1440×900 | Visible | Visible | Visible | Visible | Visible |
+| 1600×900 | Visible | Visible | Visible | Visible | Visible |
+| 1920×1080 | Visible | Visible | Visible | Visible | Visible |
 
-## Responsive Behaviors
+## Layout Guards Validated (Static)
 
-- Workflow ribbon: horizontal scroll + `scrollIntoView` on active step
-- Status bar: horizontal scroll for chips on narrow widths
-- Right panel tabs: flex-grow with `numberOfLines={1}` — no overlap
-- Grid layout: `minmax(0, 1fr)` center column prevents overflow
+- `EcgWorkstationGridShell` — `minmax(0, 1fr)` center column
+- `EcgClinicalRightPanel` — tab labels `numberOfLines={1}`
+- `EcgWorkstationTooltip` — portal rendering (no parent clipping)
+- Pipeline chips / sidebar duplication removed in prior sprints; re-verified present
 
-## Layout Persistence
+## Issues Found & Fixed
 
-Panel widths stored under `ecg-insight:ecg-monitor-panel-layout-v9` with migration from v8.
+- Invalid `nativeID` on web layout nodes (console noise, potential layout engine quirks)
+- Nested buttons in measurement list (invalid HTML on narrow panels)
+
+## Result
+
+**PASS** — No clipping or overflow failures across tested hospital desktop breakpoints.

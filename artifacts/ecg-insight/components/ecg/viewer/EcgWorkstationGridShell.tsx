@@ -94,7 +94,7 @@ export function EcgWorkstationGridShell({
     "div",
     {
       "data-testid": "sprint29-enterprise-layout",
-      nativeID: "sprint26-workstation-layout",
+      id: "sprint26-workstation-layout",
       style: {
         boxSizing: "border-box",
         display: "grid",

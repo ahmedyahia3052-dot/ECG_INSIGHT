@@ -8,6 +8,10 @@ export function ecgToolbar(page: Page): Locator {
     .or(page.getByTestId("sprint29-zero-chrome-toolbar"));
 }
 
+export function ecgDiagnosticExit(page: Page): Locator {
+  return page.getByTestId("sprint35-exit-diagnostic").or(page.getByTestId("sprint29-exit-diagnostic"));
+}
+
 export function ecgFloatingPalette(page: Page): Locator {
   return page
     .getByTestId("sprint35-floating-tool-palette")
@@ -80,9 +84,17 @@ export async function expandToolbarGroup(_page: Page, _group?: string) {
   // Sprint 33 compact toolbar exposes primary actions inline.
 }
 
-export async function clickViewControl(page: Page, label: "Zoom In" | "Zoom Out" | "Fit Image" | "Reset View" | "Pan" | "Rotate" | "Grid") {
+const PALETTE_CONTROL_ALIASES: Record<string, string> = {
+  "Fit Image": "Reset",
+  "Reset View": "Reset",
+  Fit: "Reset",
+};
+
+export async function clickViewControl(page: Page, label: "Zoom In" | "Zoom Out" | "Fit Image" | "Reset View" | "Reset" | "Pan" | "Rotate" | "Grid") {
+  await page.mouse.move(480, 360);
   await expect(ecgFloatingPalette(page)).toBeVisible({ timeout: 15_000 });
-  await paletteButton(page, label).click();
+  const resolved = PALETTE_CONTROL_ALIASES[label] ?? label;
+  await paletteButton(page, resolved).click();
 }
 
 export async function enableDeveloperMetrics(page: Page) {

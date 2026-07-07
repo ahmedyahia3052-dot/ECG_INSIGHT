@@ -1,21 +1,28 @@
-# Performance Report — Sprint 34
+# Sprint 36 — Performance Report
 
-## Targets
+## Instrumentation Verified
 
-| Metric | Target | Implementation |
-|--------|--------|----------------|
-| Frame rate | 60 FPS | SVG overlay + memoized components |
-| Zoom/pan | Smooth | Existing transform stack unchanged |
-| Re-renders | Minimal | `memo()` on overlay, toolbar, panels |
-| Memory | No leaks | Ref-based draft state; history capped at 200 |
+- `useViewerRuntimeMetrics` — FPS sampling via `requestAnimationFrame`
+- `useEnterpriseStatusMetrics` — throttled status bar updates (≤2 Hz)
+- `EcgEnterpriseStatusBar` — zoom, FPS, memory, GPU renderer display
+- Server `/live` polling for backend health (15 s interval)
 
-## Optimizations
+## Observations (Playwright session)
 
-- `computeLiveMeasurements` memoized in studio panel
-- Sync markers computed via `useMemo` on timestamp change only
-- Floating toolbar idle hide reduces paint cost
-- Wave fiducials stored in ref (no re-render on detection)
+| Metric | Typical Range | Notes |
+|--------|---------------|-------|
+| Monitor load (ready) | 10–40 s | Includes auth, fixture, image load |
+| Status bar FPS | 11–60 | Depends on canvas activity |
+| JS heap (status bar) | ~65 MB | Chrome `performance.memory` when available |
+| Responsive re-layout | <15 s | Per viewport after warm cache |
 
-## Runtime
+## Fixes Impacting Performance
 
-Existing `useViewerRuntimeMetrics` continues FPS monitoring in pro viewer engine. No regression observed during Playwright caliper workflow (3 tests, ~2.1 min total).
+- Removed infinite re-render loops in status metrics and history stack (major CPU win)
+- Idempotent workspace commits reduce unnecessary React reconciliation
+- CORP header fix eliminates failed image retry storms
+
+## Recommendations
+
+- Keep status metrics throttled; do not add `present` objects to effect dependency arrays
+- Prefer keyboard shortcuts over repeated floating-palette DOM interaction in automation

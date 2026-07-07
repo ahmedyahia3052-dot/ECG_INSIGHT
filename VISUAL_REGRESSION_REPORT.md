@@ -1,7 +1,28 @@
-# Visual Regression Report — Sprint 28
+# Sprint 36 — Visual Regression Report
 
-Screenshot: `test-results/screenshots/sprint28-clinical-visualization.png`
+## Method
 
-Verified: no clipping, no overlap, all controls visible at 1920×1080 through 4K.
+- Playwright screenshots on failure (artifact retention)
+- Responsive layout assertions via test IDs (no pixel-diff baseline in CI for Sprint 36)
+- Static inspection of viewer tokens and overflow guards
 
-Run: `npm run qa:e2e -- tests/e2e/sprint28-clinical-visualization.spec.ts`
+## Areas Inspected
+
+| Surface | Status |
+|---------|--------|
+| Enterprise toolbar (compact) | PASS |
+| Clinical left summary panel | PASS |
+| Four-tab right panel | PASS |
+| Floating tool palette | PASS |
+| Diagnostic fullscreen + ESC restore | PASS |
+| AI findings tab (no overlap with measurements) | PASS |
+| Measurement overlay after zoom | PASS |
+
+## Known Visual Notes
+
+- Floating palette auto-hides when idle; mouse movement required for visibility (by design)
+- Diagnostic mode hides main toolbar; floating palette remains
+
+## Result
+
+**PASS** — No layout regressions detected in Sprint 36 automated visual checks.
