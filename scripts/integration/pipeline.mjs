@@ -107,6 +107,7 @@ export const integrationScripts = [
   "scripts/sprint45-live-monitor-v2.integration.ts",
   "scripts/sprint46-diagnostic-ecg-workstation.integration.ts",
   "scripts/sprint46-1-test-infrastructure.integration.ts",
+  "scripts/render-engine-2.integration.ts",
   "scripts/sprint47-acquisition-digitization.integration.ts",
 ];
 

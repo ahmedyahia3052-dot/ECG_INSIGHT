@@ -1,55 +1,48 @@
-# Performance Report — Sprint 46.1 Test Infrastructure
+# Performance Report — Render Engine 2.0
 
-## CI Runtime Strategy
+## Memory
 
-| Change | Runtime Impact |
-|--------|----------------|
-| Sequential Playwright suites | +suite startup overhead (~2s cooldown between suites) |
-| `workers: 1` | Longer per-suite wall time vs parallel, but fewer retries |
-| Process isolation per suite | Prevents hung workers requiring full CI restart |
-| `retries: 0` | Faster fail-fast; no double execution on flakes |
+| Component | Strategy |
+|-----------|----------|
+| Offscreen back buffer | Single allocation per canvas resize |
+| Circular scroll buffer | Fixed capacity (8192), no growth |
+| Waveform resampling | Ephemeral per-frame arrays (GC-friendly at 60 FPS) |
+| Lead renderer | Singleton `leadRenderer` instance |
 
-**Net expectation:** Slightly longer nominal Playwright wall time, significantly lower total CI time when accounting for eliminated flaky re-runs and worker hangs.
+## CPU / Paint Cost
 
-## Parallelism Model
+| Operation | Per-frame cost |
+|-----------|----------------|
+| CRT fade overlay | 1 fillRect |
+| Grid draw | O(cells visible) with clip rect |
+| Trace draw | O(samples) with bezier |
+| Clinical markers | O(markers in window) |
+| Buffer swap | 1 drawImage |
 
-| Layer | Parallelism |
-|-------|-------------|
-| GitHub Actions jobs | `static-gates`, `unit-tests`, `integration` run in parallel |
-| Playwright suites | **Sequential** (smoke → enterprise → …) |
-| Playwright workers | **1** per process |
-| Integration scripts | Sequential (existing `run-integration-suite.mjs`) |
+## Comparison vs Legacy Polyline Renderer
 
-Only independent jobs are parallelized — browser suites are never parallelized against a shared API.
+| Aspect | Legacy | Render Engine 2.0 |
+|--------|--------|-------------------|
+| Buffering | Direct paint | Offscreen double buffer |
+| Smoothing | Linear interpolate | Quadratic bezier + sub-pixel resample |
+| Grid | 0.5px aligned | RE2 `subPixelAlign` + zoom-aware |
+| Persistence | Alpha fade only | CRT profile + persistence control |
+| FPS telemetry | Inline frameTimes | `PerformanceMetricsMonitor` + drops |
+| Lead sync | Per-lead offset | Shared `updateSyncClock` |
 
-## Memory Leak Prevention
+## Validation Timings (local)
 
-1. `destroyBrowserSession` closes page after each test
-2. Sequential runner spawns **new process** per suite — OS reclaims Chromium memory
-3. `PLAYWRIGHT_SUITE_COOLDOWN_MS` (default 2000) between suites allows GC
-4. No persistent `storageState` file accumulation
-
-## Artifact Overhead
-
-| Artifact | Policy |
-|----------|--------|
-| Screenshots | `only-on-failure` |
-| Video | `retain-on-failure` |
-| Trace | `retain-on-failure` |
-| JSON/JUnit reporters | Always (minimal size) |
-
-## Validation Timings (local, 2026-07-07)
-
-| Gate | Duration |
+| Test | Duration |
 |------|----------|
-| `npm run lint` | ~38s |
-| `npm run typecheck` | ~44s |
-| `npm run build` | ~26s |
-| Sprint 46.1 markers | ~7s |
-| Full `npm test` | ~10m (stopped at pre-existing Sprint 21 failure) |
+| `render-engine-2.test.ts` | ~1s |
+| `render-engine-2.integration.ts` | ~1s |
+| Frontend lint (viewer) | PASS |
 
-## Recommendations
+## 60 FPS Guarantee
 
-1. Run `qa:smoke` only on PR; full `qa:regression` on main/nightly
-2. Keep `QA_INCLUDE_SPRINT38=0` in CI unless explicitly testing AI cardiologist
-3. Use `infra:health` before local Playwright to avoid cold-start timeouts
+Engine targets 60 FPS via:
+- `TARGET_FPS = 60` constant
+- `MIN_ACCEPTABLE_FPS = 55` quality gate
+- Benchmark harness in CI unit suite (`scripts/render-engine-2.test.ts`)
+
+Live FPS depends on device GPU and lead count; 12-lead mode uses thinnest traces to preserve budget.

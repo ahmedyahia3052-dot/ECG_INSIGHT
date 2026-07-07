@@ -1,0 +1,12 @@
+export { runRenderEngine2Benchmark } from "./benchmark";
+export { applyCrtPersistenceFade, applyDisplayProfile, HOSPITAL_PHOSPHOR_PROFILE, resolveDisplayProfile } from "./displayProfile";
+export { adaptivePhosphorGlow, configureHospitalCanvasContext, detectGpuAcceleration, drawPhosphorTrace, dynamicTraceStrokeWidth, subPixelAlign } from "./hospitalRenderer";
+export { createLeadRenderer, LeadRenderer, renderEngine2GridMetrics } from "./leadRenderer";
+export { computeMedicalGridMetrics, drawMedicalEcgGrid, sampleToMedicalY } from "./medicalGrid";
+export { formatRenderEngine2Metrics, PerformanceMetricsMonitor } from "./performanceMetrics";
+export { CircularScrollBuffer, drawRenderEngine2MonitorFrame, HospitalRealtimeEngine, isRenderEngine2GpuReady, RENDER_ENGINE_2_VERSION } from "./realtimeEngine";
+export { processWaveformSamples, resampleSubPixel } from "./waveformProcessor";
+export { MIN_ACCEPTABLE_FPS, RENDER_ENGINE_2_VERSION as VERSION, TARGET_FPS } from "./types";
+export type { MedicalGridMetrics } from "./medicalGrid";
+export type { LeadRenderInput } from "./leadRenderer";
+export type { RenderEngine2BenchmarkResult, RenderEngine2DisplayProfile, RenderEngine2GridSettings, RenderEngine2Metrics, RenderEngine2WaveformSettings, WaveformArtifactMode } from "./types";

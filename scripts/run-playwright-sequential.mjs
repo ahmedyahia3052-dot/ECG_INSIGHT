@@ -55,6 +55,10 @@ export const PLAYWRIGHT_SEQUENTIAL_SUITES = {
     command: `npx playwright test tests/e2e/visual-regression-enterprise.spec.ts --grep @visual-regression ${desktop}`,
     required: false,
   },
+  renderEngine2: {
+    command: `npx playwright test tests/e2e/render-engine-2-hospital-visualization.spec.ts --grep @render-engine-2 ${desktop}`,
+    required: false,
+  },
   full: {
     command: `npx playwright test ${excludeStress} ${desktop}`,
     required: false,

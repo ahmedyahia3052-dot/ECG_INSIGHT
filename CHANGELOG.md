@@ -1,5 +1,31 @@
 # Changelog — Enterprise QA Infrastructure
 
+## Render Engine 2.0 — Hospital Visualization Engine — 2026-07-07
+
+### Added (visualization only)
+- **Render Engine 2.0 module** (`render-engine-2/`): hospital phosphor renderer, medical grid, waveform processor, lead renderer, realtime offscreen engine
+- OffscreenCanvas double buffering + circular scroll buffer
+- Sub-pixel grid, anti-aliased phosphor trace, CRT persistence fade
+- Waveform artifact simulation (baseline wander, muscle, powerline, respiration, noise) with filter ON/OFF
+- Unit tests: `scripts/render-engine-2.test.ts`
+- Integration markers: `scripts/render-engine-2.integration.ts`
+- Playwright: `tests/e2e/render-engine-2-hospital-visualization.spec.ts`
+- Reports: `RENDER_ENGINE_2_REPORT.md`, `VISUAL_BENCHMARK.md`, `FPS_REPORT.md`, `PERFORMANCE_REPORT.md`
+
+### Changed (visualization only)
+- `ecgMonitorCanvas.ts` — delegates multi-lead paint to RE2
+- `EcgLiveMonitorView.tsx` — `HospitalRealtimeEngine` with metrics callback
+- `live-monitor-v2/ecgHospitalGrid.ts` — re-exports RE2 grid (backward compatible)
+
+### Preserved
+- No AI, backend, API, database, or report engine changes
+- Sprint 45/46 monitor shell and testIDs unchanged
+
+### Tag
+- `RenderEngine-2.0`
+
+---
+
 ## Sprint 46.1 — Enterprise Test Infrastructure Stabilization — 2026-07-07
 
 ### Added (infrastructure only)
