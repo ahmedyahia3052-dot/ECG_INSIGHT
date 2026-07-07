@@ -1,5 +1,10 @@
 import axios, { AxiosError, type AxiosRequestConfig, type AxiosResponse } from "axios";
-import { API_BASE_URL, API_ROOT_URL as CONFIG_API_ROOT_URL } from "@/src/config/api";
+import {
+  API_BASE_URL,
+  API_ROOT_URL as CONFIG_API_ROOT_URL,
+  resolveRuntimeApiBaseUrl,
+  resolveRuntimeLivenessUrls,
+} from "@/src/config/api";
 
 export const API_URL = API_BASE_URL;
 export const API_ROOT_URL = CONFIG_API_ROOT_URL;
@@ -49,6 +54,23 @@ export const apiClient = axios.create({
   timeout: API_TIMEOUT_MS,
   withCredentials: true,
 });
+
+apiClient.interceptors.request.use((config) => {
+  if (typeof window !== "undefined") {
+    config.baseURL = resolveRuntimeApiBaseUrl();
+  }
+  return config;
+});
+
+async function fetchWithTimeout(url: string, timeoutMs: number) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(url, { cache: "no-store", credentials: "include", signal: controller.signal });
+  } finally {
+    clearTimeout(timer);
+  }
+}
 
 export function setApiAccessToken(accessToken: string | null) {
   activeAccessToken = accessToken;
@@ -232,26 +254,29 @@ export async function apiRequest<T>(
 }
 
 export async function checkBackendHealth() {
-  const livenessUrl = `${API_URL.replace(/\/api\/?$/, "")}/liveness`;
+  const livenessUrls = resolveRuntimeLivenessUrls();
   let lastMessage = "Backend service unavailable.";
   for (let attempt = 0; attempt < 5; attempt += 1) {
-    try {
-      const response = await fetch(livenessUrl, { signal: AbortSignal.timeout(8_000) });
-      if (!response.ok) {
-        lastMessage = `Backend liveness returned ${response.status}.`;
-      } else {
+    for (const livenessUrl of livenessUrls) {
+      try {
+        const response = await fetchWithTimeout(livenessUrl, 8_000);
+        if (!response.ok) {
+          lastMessage = `Backend liveness returned ${response.status} for ${livenessUrl}.`;
+          continue;
+        }
         const payload = (await response.json()) as { ok?: boolean };
         if (payload.ok === true) {
           return {
             ok: true,
             message: "Backend service online.",
             service: "ecg-insight-api",
+            url: livenessUrl,
           };
         }
-        lastMessage = "Backend service unavailable.";
+        lastMessage = `Backend liveness payload invalid for ${livenessUrl}.`;
+      } catch (error) {
+        lastMessage = error instanceof Error ? `${error.message} (${livenessUrl})` : "Backend service unavailable.";
       }
-    } catch (error) {
-      lastMessage = error instanceof Error ? error.message : "Backend service unavailable.";
     }
     await new Promise((resolve) => setTimeout(resolve, 750 * (attempt + 1)));
   }

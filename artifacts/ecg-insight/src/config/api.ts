@@ -68,6 +68,48 @@ export function requiredApiUrl() {
 export const API_BASE_URL = requiredApiUrl();
 export const API_ROOT_URL = API_BASE_URL.replace(/\/api(?:\/v\d+)?$/i, "");
 
+/** Align loopback hostname with the browser (localhost vs 127.0.0.1) at request time. */
+export function resolveRuntimeApiBaseUrl() {
+  const configured = normalizeUrl(configuredEnvValue() || requiredApiUrl());
+  if (typeof window === "undefined") return configured;
+
+  try {
+    const url = new URL(configured);
+    const { hostname, protocol } = window.location;
+    const loopbackHost = hostname === "localhost" || hostname === "127.0.0.1";
+    const loopbackApi = url.hostname === "localhost" || url.hostname === "127.0.0.1";
+    if (loopbackHost && loopbackApi) {
+      url.protocol = protocol;
+      url.hostname = hostname;
+    }
+    return normalizeUrl(url.toString());
+  } catch {
+    return configured;
+  }
+}
+
+export function resolveRuntimeApiRootUrl() {
+  return resolveRuntimeApiBaseUrl().replace(/\/api(?:\/v\d+)?$/i, "");
+}
+
+export function resolveRuntimeLivenessUrls() {
+  const roots = new Set<string>([
+    resolveRuntimeApiRootUrl(),
+    API_ROOT_URL,
+    "http://localhost:3002",
+    "http://127.0.0.1:3002",
+  ]);
+
+  if (typeof window !== "undefined") {
+    roots.add(`${window.location.protocol}//${window.location.hostname}:3002`);
+  }
+
+  return [...roots]
+    .map((root) => root.replace(/\/+$/, ""))
+    .filter(Boolean)
+    .map((root) => `${root}/liveness`);
+}
+
 export function apiConfigurationWarning() {
   if (configuredEnvValue() || APP_ENV === "development") return null;
   return "API URL is not configured. Falling back to same-origin /api. Set EXPO_PUBLIC_API_URL, VITE_API_URL, or NEXT_PUBLIC_API_URL when the backend is on another origin.";

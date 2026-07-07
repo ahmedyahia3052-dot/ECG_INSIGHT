@@ -6,7 +6,6 @@ import { medicalTheme, PrimaryButton } from "@/components/enterprise/EnterpriseU
 import type { DigitalEcgLead } from "@/services/ecgProcessing";
 
 import { drawMultiLeadMonitorCanvas, drawRhythmStripCanvas } from "./ecgMonitorCanvas";
-import { HospitalRealtimeEngine } from "./render-engine-2";
 import { ECG_WORKSTATION_VISUAL } from "./ecgWorkstationVisualTokens";
 import { EcgMonitorMiniNavigator } from "./EcgMonitorMiniNavigator";
 import { buildScrollingMonitorPath, durationMsForLead, msToSampleIndex } from "./ecgMonitorPath";
@@ -30,6 +29,7 @@ function WebMonitorCanvas({
   engine,
   height,
   layoutMode,
+  layoutRevision = 0,
   measureMode,
   onFpsUpdate,
   playback,
@@ -46,6 +46,7 @@ function WebMonitorCanvas({
   engine?: EcgLiveMonitorEngine;
   height: number;
   layoutMode: MonitorLayoutMode;
+  layoutRevision?: number;
   measureMode: boolean;
   onFpsUpdate?: (fps: number) => void;
   playback: EcgWaveformPlaybackState & { reviewMode?: boolean };
@@ -57,8 +58,9 @@ function WebMonitorCanvas({
   const controlsRef = useRef(controls);
   const leadsRef = useRef(allLeads);
   const sizeRef = useRef({ dpr: 0, height: 0, width: 0 });
+  const frameTimes = useRef<number[]>([]);
   const playheadRef = useRef(playback.playheadMs);
-  const realtimeEngineRef = useRef<HospitalRealtimeEngine | null>(null);
+  const lastLayoutRevisionRef = useRef(layoutRevision);
   playbackRef.current = playback;
   controlsRef.current = controls;
   leadsRef.current = allLeads;
@@ -67,17 +69,17 @@ function WebMonitorCanvas({
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas || !leadsRef.current[0]) return undefined;
-    if (!realtimeEngineRef.current) {
-      realtimeEngineRef.current = new HospitalRealtimeEngine({
-        onMetrics: (metrics) => {
-          if (onFpsUpdate) onFpsUpdate(metrics.fps);
-        },
-      });
-    }
-    const engine2 = realtimeEngineRef.current;
     let raf = 0;
 
-    const paint = () => {
+    const paint = (now: number) => {
+      frameTimes.current.push(now);
+      if (frameTimes.current.length > 30) frameTimes.current.shift();
+      if (frameTimes.current.length >= 2 && onFpsUpdate) {
+        const elapsed = frameTimes.current[frameTimes.current.length - 1]! - frameTimes.current[0]!;
+        const frames = frameTimes.current.length - 1;
+        if (elapsed > 0) onFpsUpdate(Math.round((frames / elapsed) * 1000));
+      }
+
       const ctx = canvas.getContext("2d", { alpha: false, desynchronized: true } as CanvasRenderingContext2DSettings);
       if (!ctx) {
         raf = requestAnimationFrame(paint);
@@ -91,7 +93,6 @@ function WebMonitorCanvas({
         canvas.style.width = `${width}px`;
         canvas.style.height = `${height}px`;
         sizeRef.current = { dpr, height, width };
-        engine2.createBackBuffer(width, height, dpr);
       }
 
       const activeLead = leadsRef.current.find((l) => l.lead === selectedLead) ?? leadsRef.current[0]!;
@@ -99,10 +100,14 @@ function WebMonitorCanvas({
       const currentControls = controlsRef.current;
       const currentPlayback = playbackRef.current;
 
-      engine2.paintFrame(ctx, leadsRef.current, width, height, {
+      const forceFullClear = lastLayoutRevisionRef.current !== layoutRevision;
+      if (forceFullClear) lastLayoutRevisionRef.current = layoutRevision;
+
+      drawMultiLeadMonitorCanvas(ctx, leadsRef.current, width, height, {
         alarmTone,
         brightness,
         customLeads,
+        forceFullClear,
         frozen: currentPlayback.frozen,
         gainMmPerMv: currentControls.grid.gain,
         gridVisible: currentControls.grid.visible,
@@ -121,7 +126,7 @@ function WebMonitorCanvas({
         reviewMode,
         selectedLead,
         zoom: currentControls.transform.zoom,
-      }, dpr);
+      });
 
       raf = requestAnimationFrame(paint);
     };
@@ -137,6 +142,7 @@ function WebMonitorCanvas({
     engine?.isolatedLead,
     height,
     layoutMode,
+    layoutRevision,
     measureMode,
     onFpsUpdate,
     reviewMode,
@@ -145,7 +151,6 @@ function WebMonitorCanvas({
   ]);
 
   return createElement("canvas", {
-    "data-render-engine": "2.0",
     "data-testid": "sprint22-hospital-monitor-canvas",
     ref: canvasRef,
     style: { display: "block", height: "100%", width: "100%" },
@@ -221,6 +226,7 @@ export const EcgLiveMonitorView = memo(function EcgLiveMonitorView({
   highlightedLead,
   isDigitizing,
   layoutMode = "single",
+  layoutRevision = 0,
   lead,
   measureMode = false,
   onDigitize,
@@ -246,6 +252,7 @@ export const EcgLiveMonitorView = memo(function EcgLiveMonitorView({
   highlightedLead?: EcgLeadId;
   isDigitizing?: boolean;
   layoutMode?: MonitorLayoutMode;
+  layoutRevision?: number;
   lead?: DigitalEcgLead | null;
   measureMode?: boolean;
   onDigitize?: () => void;
@@ -357,8 +364,8 @@ export const EcgLiveMonitorView = memo(function EcgLiveMonitorView({
           const { height, width } = event.nativeEvent.layout;
           if (width > 0 && height > 0) {
             const rhythmOffset = rhythmStripMode ? RHYTHM_STRIP_H + 4 : 0;
-            const nextHeight = autoFit ? Math.max(height - rhythmOffset, 240) : Math.max(height - rhythmOffset, CANVAS_H);
-            setCanvasSize({ height: nextHeight, width: Math.max(width, 640) });
+            const nextHeight = autoFit ? Math.max(height - rhythmOffset, 180) : Math.max(height - rhythmOffset, CANVAS_H);
+            setCanvasSize({ height: nextHeight, width: Math.max(width, 480) });
           }
         }}
         onPress={panActive ? undefined : playback.togglePlay}
@@ -375,6 +382,7 @@ export const EcgLiveMonitorView = memo(function EcgLiveMonitorView({
             engine={engine}
             height={canvasSize.height}
             layoutMode={layoutMode}
+            layoutRevision={layoutRevision}
             measureMode={measureMode}
             onFpsUpdate={onFpsUpdate}
             playback={playback}

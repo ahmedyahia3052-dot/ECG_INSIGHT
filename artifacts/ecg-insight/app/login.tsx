@@ -20,7 +20,7 @@ export default function LoginScreen() {
   const { force } = useLocalSearchParams<{ force?: string }>();
   const forceLogin = force === "1";
   const { isAuthenticated, isLoading, login } = useAuth();
-  const { configuredProviders: rawConfiguredProviders, serverUnavailable } = useAuthOAuthProviders();
+  const { checkingBackend, configuredProviders: rawConfiguredProviders, serverUnavailable } = useAuthOAuthProviders();
   const configuredProviders = safeArray(rawConfiguredProviders);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -89,7 +89,10 @@ export default function LoginScreen() {
           <Text style={styles.subtitle}>Use your ECG Insight account credentials.</Text>
         </View>
 
-        {serverUnavailable ? <AuthMessage message="Server unavailable" tone="error" /> : null}
+        {checkingBackend ? <AuthMessage message="Connecting to server..." tone="info" /> : null}
+        {!checkingBackend && serverUnavailable ? (
+          <AuthMessage message="Server unavailable. Start the API on port 3002, then wait for automatic reconnect." tone="error" />
+        ) : null}
 
         <AuthTextField
           autoCapitalize="none"
@@ -126,13 +129,19 @@ export default function LoginScreen() {
 
         {error ? <AuthMessage message={error} tone="error" /> : null}
 
-        <AuthPrimaryButton disabled={submitting} icon="log-in" label={submitting ? "Signing in..." : "Sign In"} onPress={submit} />
+        <AuthPrimaryButton
+          disabled={submitting}
+          icon="log-in"
+          label={submitting ? "Signing in..." : "Sign In"}
+          onPress={submit}
+          testID="auth-sign-in-button"
+        />
 
         {configuredProviders.length ? (
           <View style={styles.oauthGrid}>
             {configuredProviders.map(({ provider }) => (
               <AuthPrimaryButton
-                disabled={oauthLoading !== null || serverUnavailable}
+                disabled={oauthLoading !== null || checkingBackend || serverUnavailable}
                 key={provider}
                 label={oauthLoading === provider ? "Checking..." : provider === "GOOGLE" ? "Google" : provider === "APPLE" ? "Apple" : "Microsoft"}
                 onPress={() => void startOAuth(provider)}

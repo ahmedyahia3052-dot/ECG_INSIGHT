@@ -3,9 +3,10 @@
   "version": "0.0.0",
   "license": "MIT",
   "scripts": {
-    "dev": "npm run dev:api",
+    "dev": "node scripts/start-dev-stack.mjs",
     "dev:api": "node scripts/start-api-dev.mjs",
     "dev:frontend": "node scripts/start-frontend-dev.mjs",
+    "dev:stack": "node scripts/start-dev-stack.mjs",
     "build": "npm run prisma:generate && npm run typecheck",
     "build:frontend": "cd artifacts/ecg-insight && npx expo export --platform web --output-dir ../../dist",
     "build:production": "npm run build && npm run build:frontend",

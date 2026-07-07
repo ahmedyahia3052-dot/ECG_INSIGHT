@@ -1,7 +1,6 @@
 import type { DigitalEcgLead } from "@/services/ecgProcessing";
 
 import { buildClinicalMarkers, drawClinicalMarker } from "./live-monitor-v2/ecgClinicalMarkers";
-import { drawRenderEngine2MonitorFrame } from "./render-engine-2";
 import { adaptiveTraceStrokeWidth, computeHospitalGridMetrics, drawHospitalEcgGrid, sampleToClinicalY } from "./live-monitor-v2/ecgHospitalGrid";
 import { pixelsPerSmallBox } from "./ecgMonitorGridMath";
 import type { MonitorLayoutMode } from "./monitorLayout";
@@ -13,6 +12,7 @@ export type MonitorCanvasState = {
   alarmTone: boolean;
   brightness: number;
   customLeads?: string[];
+  forceFullClear?: boolean;
   frozen: boolean;
   gainMmPerMv: EcgGridGain;
   gridVisible: boolean;
@@ -157,7 +157,79 @@ export function drawMultiLeadMonitorCanvas(
   height: number,
   state: MonitorCanvasState,
 ) {
-  drawRenderEngine2MonitorFrame(ctx, leads, width, height, state);
+  const dpr = typeof window !== "undefined" ? window.devicePixelRatio || 1 : 1;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+  const fade = state.forceFullClear
+    ? 1
+    : state.isPlaying && !state.frozen && !state.reviewMode
+      ? Math.min(0.32, Math.max(0.08, state.phosphorPersistence))
+      : 1;
+  ctx.fillStyle = `rgba(0, 0, 0, ${fade})`;
+  ctx.fillRect(0, 0, width, height);
+
+  ctx.fillStyle = "#000000";
+  ctx.globalAlpha = state.brightness;
+  ctx.fillRect(0, 0, width, height);
+  ctx.globalAlpha = 1;
+
+  ctx.save();
+  ctx.translate(state.panX, state.panY);
+  ctx.scale(state.zoom, state.zoom);
+
+  const regions = buildMonitorLayoutRegions(
+    width,
+    height,
+    state.layoutMode,
+    state.selectedLead as never,
+    (state.customLeads ?? []) as never,
+  );
+  const visibleRegions = state.isolatedLead
+    ? regions.filter((region) => region.lead === state.isolatedLead)
+    : regions;
+
+  const leadMap = new Map(leads.map((l) => [l.lead, l]));
+  const traceColor = state.alarmTone ? "#FACC15" : "#22C55E";
+
+  visibleRegions.forEach((region) => {
+    drawHospitalEcgGrid(ctx, region.x, region.y, region.width, region.height, state.paperSpeed, state.gainMmPerMv, state.gridVisible, state.zoom, 0.97);
+    const leadData = leadMap.get(region.lead as never);
+    if (leadData) {
+      drawLeadWaveform(
+        ctx,
+        leadData,
+        region,
+        state,
+        traceColor,
+        state.layoutMode === "single" || visibleRegions.length === 1,
+        visibleRegions.length,
+      );
+    }
+  });
+
+  if (state.measureMode) {
+    ctx.strokeStyle = "rgba(250,204,21,0.75)";
+    ctx.setLineDash([4, 4]);
+    ctx.beginPath();
+    ctx.moveTo(width / 2, 0);
+    ctx.lineTo(width / 2, height);
+    ctx.moveTo(0, height / 2);
+    ctx.lineTo(width, height / 2);
+    ctx.stroke();
+    ctx.setLineDash([]);
+  }
+
+  ctx.restore();
+
+  const gridMetrics = computeHospitalGridMetrics(width, height, state.paperSpeed, state.gainMmPerMv);
+  ctx.fillStyle = "#64748B";
+  ctx.font = "9px system-ui, sans-serif";
+  const status = state.reviewMode ? "REVIEW" : state.frozen ? "FROZEN" : state.isPlaying ? "LIVE SWEEP" : "PAUSED";
+  ctx.fillText(
+    `${status} · ${state.layoutMode.toUpperCase()} · ${state.paperSpeed} mm/s · ${state.gainMmPerMv} mm/mV · grid ${gridMetrics.minorPx.toFixed(1)}px`,
+    8,
+    height - 6,
+  );
 }
 
 export function drawRhythmStripCanvas(
