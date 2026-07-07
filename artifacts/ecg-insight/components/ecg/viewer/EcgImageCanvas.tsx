@@ -30,6 +30,8 @@ type Props = {
   compareThumbnailUrl?: string;
   controls: EcgViewerControls;
   currentLabel?: string;
+  differenceHighlight?: boolean;
+  differenceRegions?: Array<{ endX: number; severity: "high" | "low" | "medium"; startX: number }>;
   digitalEcg?: DigitalEcg | null;
   digitizedLeads?: DigitizedWaveformLead[];
   explainability?: AIExplainability | null;
@@ -59,6 +61,8 @@ export function EcgImageCanvas({
   compareThumbnailUrl,
   controls,
   currentLabel = "Current Study",
+  differenceHighlight = false,
+  differenceRegions = [],
   digitalEcg,
   digitizedLeads = [],
   explainability,
@@ -126,6 +130,8 @@ export function EcgImageCanvas({
           currentDigitizedLeads={showDigitizedWaveform ? digitizedLeads : []}
           currentImageUrl={asset.url}
           currentLabel={currentLabel}
+          differenceHighlight={differenceHighlight}
+          differenceRegions={differenceRegions}
         />
       ) : (
         <EcgProViewerEngine

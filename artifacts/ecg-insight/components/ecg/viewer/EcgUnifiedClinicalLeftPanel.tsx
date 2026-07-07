@@ -205,7 +205,7 @@ export const EcgUnifiedClinicalLeftPanel = memo(function EcgUnifiedClinicalLeftP
                     Open {item.caseNumber ?? item.caseId}
                   </Text>
                 </Pressable>
-                <Pressable onPress={() => onSelectCompare?.(item.caseId)} style={[styles.actionBtn, compareCaseId === item.caseId && styles.actionBtnActive]}>
+                <Pressable onPress={() => onSelectCompare?.(item.caseId)} style={[styles.actionBtn, compareCaseId === item.caseId && styles.actionBtnActive]} testID={`sprint46-compare-${item.caseId}`}>
                   <Text style={[styles.actionBtnText, compareCaseId === item.caseId && styles.actionBtnTextActive]} numberOfLines={1}>
                     Compare
                   </Text>

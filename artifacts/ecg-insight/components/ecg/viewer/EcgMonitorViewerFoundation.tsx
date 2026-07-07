@@ -51,6 +51,11 @@ import { useEcgViewerPersistence } from "./useEcgViewerPersistence";
 import { useEcgWaveformPlayback } from "./useEcgWaveformPlayback";
 import { useEcgWorkstationShortcuts } from "./useEcgWorkstationShortcuts";
 import { useEnterpriseStatusMetrics } from "./useEnterpriseStatusMetrics";
+import {
+  computeDiagnosticDifferenceRegions,
+  EcgDiagnosticWorkstationShell,
+  useDiagnosticWorkstationEngine,
+} from "./diagnostic-workstation";
 
 function absoluteUrl(path?: string | null) {
   if (!path) return undefined;
@@ -203,18 +208,20 @@ export function EcgMonitorViewerFoundation({
   );
 
   const enterprise = useEcgEnterpriseViewerState({ caseId: ecgCase.id, historyStudies: previousStudies });
+  const diagnostic = useDiagnosticWorkstationEngine({ selectedLead });
 
   const handleFocusFinding = useCallback(
     (finding: CardiologistStructuredFinding) => {
+      const link = diagnostic.linkFromFinding(finding, workspace.present.measurements);
       setSelectedFindingId(finding.id);
-      const lead = finding.affectedLeads[0];
-      if (lead) setSelectedLead(lead);
+      if (link.lead) setSelectedLead(link.lead);
       enterprise.setViewMode("ai-review");
-      aiOverlay.highlightLeads(finding.affectedLeads);
-      workspace.setActiveLead(finding.affectedLeads[0] ?? "II");
+      aiOverlay.highlightLeads([link.lead, ...finding.affectedLeads]);
+      workspace.setActiveLead(link.lead);
       setRightPanelTab("ai");
+      diagnostic.setActivePanel("ai-findings");
     },
-    [aiOverlay, enterprise, workspace],
+    [aiOverlay, diagnostic, enterprise, workspace],
   );
 
   const rhythmLead = useMemo(
@@ -276,6 +283,26 @@ export function EcgMonitorViewerFoundation({
     compareCase?.imagePath ?? compareCase?.originalFileUrl ?? compareCase?.files.find((file) => file.mimeType.startsWith("image/"))?.downloadUrl,
   );
   const processedImageUrl = absoluteUrl(digitalEcg?.enhancedImageUrl ?? digitalEcg?.originalImageUrl);
+  const compareDifferenceRegions = useMemo(
+    () =>
+      diagnostic.compareSync.differenceHighlight && enterprise.compareMode
+        ? computeDiagnosticDifferenceRegions(
+            digitizedLeads,
+            [],
+            diagnostic.compareSync.leadSync ? selectedLead : "II",
+            controls.viewport.imageWidth || 1600,
+          )
+        : [],
+    [
+      controls.viewport.imageWidth,
+      diagnostic.compareSync.differenceHighlight,
+      diagnostic.compareSync.leadSync,
+      digitizedLeads,
+      enterprise.compareMode,
+      selectedLead,
+    ],
+  );
+  const effectiveMagnifier = showMagnifier || diagnostic.leadMagnifier;
 
   const openStudy = (nextCaseId: string) => router.push(`/ecg-workspace?caseId=${nextCaseId}` as never);
 
@@ -487,6 +514,7 @@ export function EcgMonitorViewerFoundation({
   return (
     <View style={[styles.root, (controls.fullscreen || diagnosticMode) && styles.fullscreenRoot]} testID="sprint13-ecg-monitor-ready" nativeID="sprint22-hospital-workstation-ready">
       <View nativeID="sprint30-clinical-workflow-ready" style={styles.inspectorReady} testID="sprint29-zero-chrome-workstation-ready">
+      <View nativeID="sprint46-diagnostic-workstation-ready" style={styles.inspectorReady}>
       {!diagnosticMode ? (
         <>
           <View style={styles.chromeRow}>
@@ -592,28 +620,6 @@ export function EcgMonitorViewerFoundation({
                 patientName={patientDisplayName(patient)}
                 processedImageUrl={processedImageUrl}
               />
-            ) : enterprise.viewMode === "ai-review" ? (
-              <EcgImageCanvas
-                accessToken={token}
-                activeLead={selectedLead}
-                aiOverlay={aiOverlay}
-                controls={controls}
-                currentLabel={study.caseNumber ?? "Current Study"}
-                digitalEcg={digitalEcg}
-                digitizedLeads={digitizedLeads}
-                explainability={explainability}
-                imageUrl={imageUrl}
-                onPointerMove={setPointerCoords}
-                onFpsUpdate={handleFpsUpdate}
-                onMetricsUpdate={setRenderMetrics}
-                pdfUrl={pdfUrl}
-                processedImageUrl={processedImageUrl}
-                showDigitizedWaveform={false}
-                showCrosshair={showCrosshair}
-                showMagnifier={showMagnifier}
-                viewMode="ai-review"
-                workspace={workspace}
-              />
             ) : enterprise.viewMode === "monitor" ? (
               <EcgLiveMonitorView
                 controls={controls}
@@ -627,33 +633,69 @@ export function EcgMonitorViewerFoundation({
                 selectedLead={selectedLead}
               />
             ) : (
-              <EcgImageCanvas
-                accessToken={token}
-                activeLead={selectedLead}
-                aiOverlay={aiOverlay}
-                compareImageUrl={compareImageUrl}
-                compareLabel={enterprise.compareStudy?.caseNumber ?? "Comparison Study"}
-                compareLayout={enterprise.compareLayout}
-                compareMode={enterprise.compareMode}
-                compareOpacity={enterprise.compareOpacity}
-                compareThumbnailUrl={enterprise.compareStudy?.thumbnailUrl}
+              <EcgDiagnosticWorkstationShell
                 controls={controls}
-                currentLabel={study.caseNumber ?? "Current Study"}
-                digitalEcg={digitalEcg}
-                digitizedLeads={digitizedLeads}
-                explainability={explainability}
-                imageUrl={imageUrl}
-                onPointerMove={setPointerCoords}
-                onFpsUpdate={handleFpsUpdate}
-                onMetricsUpdate={setRenderMetrics}
-                pdfUrl={pdfUrl}
-                processedImageUrl={processedImageUrl}
-                showCrosshair={showCrosshair}
-                showDigitizedWaveform={enterprise.showDigitizedWaveform}
-                showMagnifier={showMagnifier}
-                viewMode={enterprise.viewMode}
-                workspace={workspace}
-              />
+                diagnostic={diagnostic}
+                onSelectLead={setSelectedLead}
+                playback={playback}
+                rhythmLead={rhythmLead}
+                selectedLead={selectedLead}
+                showRhythmStrip
+              >
+                {enterprise.viewMode === "ai-review" ? (
+                  <EcgImageCanvas
+                    accessToken={token}
+                    activeLead={diagnostic.effectiveLead}
+                    aiOverlay={aiOverlay}
+                    controls={controls}
+                    currentLabel={study.caseNumber ?? "Current Study"}
+                    digitalEcg={digitalEcg}
+                    digitizedLeads={digitizedLeads}
+                    explainability={explainability}
+                    imageUrl={imageUrl}
+                    onPointerMove={setPointerCoords}
+                    onFpsUpdate={handleFpsUpdate}
+                    onMetricsUpdate={setRenderMetrics}
+                    pdfUrl={pdfUrl}
+                    processedImageUrl={processedImageUrl}
+                    showDigitizedWaveform={false}
+                    showCrosshair={showCrosshair}
+                    showMagnifier={effectiveMagnifier}
+                    viewMode="ai-review"
+                    workspace={workspace}
+                  />
+                ) : (
+                  <EcgImageCanvas
+                    accessToken={token}
+                    activeLead={diagnostic.effectiveLead}
+                    aiOverlay={aiOverlay}
+                    compareImageUrl={compareImageUrl}
+                    compareLabel={enterprise.compareStudy?.caseNumber ?? "Comparison Study"}
+                    compareLayout={enterprise.compareLayout}
+                    compareMode={enterprise.compareMode}
+                    compareOpacity={enterprise.compareOpacity}
+                    compareThumbnailUrl={enterprise.compareStudy?.thumbnailUrl}
+                    controls={controls}
+                    currentLabel={study.caseNumber ?? "Current Study"}
+                    differenceHighlight={diagnostic.compareSync.differenceHighlight}
+                    differenceRegions={compareDifferenceRegions}
+                    digitalEcg={digitalEcg}
+                    digitizedLeads={digitizedLeads}
+                    explainability={explainability}
+                    imageUrl={imageUrl}
+                    onPointerMove={setPointerCoords}
+                    onFpsUpdate={handleFpsUpdate}
+                    onMetricsUpdate={setRenderMetrics}
+                    pdfUrl={pdfUrl}
+                    processedImageUrl={processedImageUrl}
+                    showCrosshair={showCrosshair}
+                    showDigitizedWaveform={enterprise.showDigitizedWaveform}
+                    showMagnifier={effectiveMagnifier}
+                    viewMode={enterprise.viewMode}
+                    workspace={workspace}
+                  />
+                )}
+              </EcgDiagnosticWorkstationShell>
             )}
               <EcgFloatingToolPalette
                 controls={controls}
@@ -754,6 +796,7 @@ export function EcgMonitorViewerFoundation({
             )
           }
         />
+      </View>
       </View>
       </View>
 

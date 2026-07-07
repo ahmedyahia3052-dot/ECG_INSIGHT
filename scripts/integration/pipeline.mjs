@@ -105,6 +105,7 @@ export const integrationScripts = [
   "scripts/sprint43-clinical-report-engine.integration.ts",
   "scripts/sprint44-cdss-workspace.integration.ts",
   "scripts/sprint45-live-monitor-v2.integration.ts",
+  "scripts/sprint46-diagnostic-ecg-workstation.integration.ts",
 ];
 
 export const releaseE2eSpecs = [

@@ -1,5 +1,28 @@
 # Changelog — Enterprise QA Infrastructure
 
+## Sprint 46 — Diagnostic ECG Workstation — 2026-07-07
+
+### Added
+- **Diagnostic workstation module** (`diagnostic-workstation/`): shell, lead tools, rhythm strip, panels ribbon
+- **Compare enhancements**: difference highlighting, lead/beat sync toggles
+- **Report linking**: AI finding → lead highlight + diagnostic panel focus
+- Playwright: `tests/e2e/sprint46-diagnostic-ecg-workstation.spec.ts` (6 tests)
+- Integration: `scripts/sprint46-diagnostic-ecg-workstation.integration.ts`
+- Reports: `SPRINT46_FINAL_REPORT.md`, `DIAGNOSTIC_WORKSTATION_REPORT.md`, `ECG_COMPARISON_REPORT.md`, `VISUAL_QA_REPORT.md`, `PLAYWRIGHT_REPORT.md`, `PERFORMANCE_REPORT.md`
+
+### Preserved
+- Live ECG Monitor route and `EcgLiveMonitorView` (Sprints 41/45)
+- RC-1 stability, measurement studio (Sprint 42), AI cardiologist, reports, CDSS
+
+### Validated
+- `npm run lint` / `typecheck` / `build` — PASS
+- Integration markers — PASS
+
+### Tag
+- `Sprint46-DiagnosticWorkstation`
+
+---
+
 ## Sprint 45 — Hospital Grade ECG Monitor V2 — 2026-07-07
 
 ### Added

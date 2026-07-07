@@ -1,4 +1,21 @@
-# Measurement Engine Report — Sprint 42
+# Measurement Engine Report
+
+## Sprint 46 Integration (2026-07-07)
+
+Sprint 46 connects the diagnostic workstation to the existing Sprint 42 Clinical Measurement Studio without API or schema changes.
+
+| Capability | Sprint 46 wiring |
+|------------|------------------|
+| Calipers H/V/angle/dual | Unchanged `useEcgMeasurementWorkspace` |
+| Undo / Redo | `sprint34-measure-undo` / `sprint34-measure-redo` |
+| Auto snap | `ecgAutoSnapEngine.ts` |
+| Report linking | `resolveReportLinkFromFinding` maps findings → measurement kinds |
+| Floating toolbar | Preserved in center column overlay |
+
+Playwright validates measurement studio + undo/redo in Sprint 46 spec.
+
+---
+ — Sprint 42
 
 **Module:** Clinical Measurement Studio  
 **Date:** 2026-07-07

@@ -1,13 +1,37 @@
-# Performance Report — Sprint 45 Live Monitor V2
+# Performance Report — Sprint 46
 
-Generated: 2026-07-07T18:23:33.052Z
+**Date:** 2026-07-07
 
-| Optimization | Implementation |
-|--------------|----------------|
-| 60 FPS target | Single rAF paint loop in `WebMonitorCanvas` |
-| No React render loop | Playback offset via refs; FPS sampled in canvas loop |
-| GPU compositing | Canvas 2D `desynchronized: true` + DPR scaling |
-| Phosphor sweep | Alpha fade overlay 0.08–0.32 during live sweep |
-| Adaptive stroke | `adaptiveTraceStrokeWidth` by layout density + zoom |
+---
 
-See `FPS_REPORT.md` and `MEMORY_REPORT.md`.
+## Rendering
+
+| Area | Approach |
+|------|----------|
+| Center canvas | Existing GPU path via `EcgProViewerEngine` |
+| Rhythm strip | `requestAnimationFrame` loop, phosphor fade |
+| Difference regions | Path-length heuristic (no blocking compute) |
+| React | Memoized shell components, no new global state loops |
+
+---
+
+## Targets
+
+| Metric | Design |
+|--------|--------|
+| Canvas FPS | Status bar instrumentation (Sprint 36) |
+| Memory | Rhythm strip cancels RAF on unmount |
+| Large studies | Existing viewport culling / dirty rect (Sprint 27) |
+
+---
+
+## Benchmark
+
+Run with live API:
+
+```bash
+npm run infra:health
+npm run qa:performance
+```
+
+Sprint 46 adds lightweight UI chrome only; no new blocking API calls.
