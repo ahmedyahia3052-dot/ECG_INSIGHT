@@ -3798,3 +3798,120 @@ model MedicalDiagnosisFinding {
   @@index([diagnosisCode])
   @@index([severity])
 }
+
+// Sprint 40 — Medical Intelligence Core (MIC) normalized catalog
+model MicDiagnosisEntry {
+  id                    String   @id @default(cuid())
+  code                  String   @unique
+  name                  String
+  category              String
+  definition            String
+  diagnosticCriteria    String[]
+  typicalFindings       String[]
+  clinicalSignificance  String
+  differentialDiagnosis String[]
+  possibleCauses        String[]
+  associatedSymptoms    String[]
+  severity              String
+  emergencyLevel        String
+  recommendedNextSteps  String[]
+  references            Json
+  icd10Code             String?
+  snomedCode            String?
+  libraryTags           String[]
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  @@index([category])
+  @@index([name])
+}
+
+model MicArrhythmiaEntity {
+  id             String   @id @default(cuid())
+  code           String   @unique
+  name           String
+  diagnosisCode  String
+  description    String
+  keyFeatures    String[]
+  emergencyLevel String
+  treatmentNotes String[]
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([diagnosisCode])
+}
+
+model MicIschemiaEntity {
+  id             String   @id @default(cuid())
+  code           String   @unique
+  name           String
+  pattern        String
+  territory      String?
+  diagnosisCode  String
+  description    String
+  affectedLeads  String[]
+  stCriteria     String[]
+  emergencyLevel String
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([pattern])
+  @@index([diagnosisCode])
+}
+
+model MicMeasurementReference {
+  id                  String   @id @default(cuid())
+  parameter           String   @unique
+  unit                String
+  normalMin           Float?
+  normalMax           Float?
+  borderlineLow       Float?
+  borderlineHigh      Float?
+  notes               String[]
+  hypertrophyCriteria String[]
+  references          Json
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+}
+
+model MicGuidelineEntry {
+  id                   String   @id
+  organization         String
+  title                String
+  version              String?
+  year                 Int?
+  url                  String?
+  applicableCategories String[]
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  @@index([organization])
+}
+
+model MicRecommendationMapping {
+  id            String   @id @default(cuid())
+  diagnosisCode String
+  type          String
+  action        String
+  priority      String
+  rationale     String
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([diagnosisCode])
+  @@index([type])
+}
+
+model MicRiskRule {
+  id           String   @id @default(cuid())
+  ruleId       String   @unique
+  level        String
+  rationale    String
+  criteriaJson Json
+  enabled      Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([level])
+  @@index([enabled])
+}

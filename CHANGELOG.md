@@ -1,5 +1,32 @@
 # Changelog
 
+## Sprint 40 — Medical Intelligence Core (2026-07-07)
+
+### Added
+
+- **Medical Intelligence Core (MIC)** — independent server module at `server/src/modules/medical-intelligence-core/`
+- Structured ECG diagnosis catalog (26 entries) with ICD-10/SNOMED placeholders, references, and full clinical metadata
+- Arrhythmia library (12 entities), STEMI/ischemia library (9 entities), measurement reference (8 parameters)
+- Clinical engines: recommendations, differential diagnosis, risk stratification, guideline registry
+- REST API at `/api/mic` for diagnosis, recommendation, risk, guideline, and reference lookup
+- Prisma models: `MicDiagnosisEntry`, `MicArrhythmiaEntity`, `MicIschemiaEntity`, `MicMeasurementReference`, `MicGuidelineEntry`, `MicRecommendationMapping`, `MicRiskRule`
+- Migration: `20260707180000_medical_intelligence_core`
+- Database seed pipeline: `persist/seed.ts`
+- Integration test: `scripts/sprint40-medical-intelligence-core.integration.ts`
+- Documentation: `MIC_ARCHITECTURE.md`, `KNOWLEDGE_BASE_REPORT.md`, `DATABASE_SCHEMA.md`, `API_REPORT.md`
+
+### Unchanged (by design)
+
+- ECG Viewer, AI Cardiologist Workspace, Live ECG Monitor, measurements UI
+- Playwright specs, regression suite, authentication, frontend routing
+- Sprint 38 `medical-intelligence` analysis orchestration (separate from MIC)
+
+### Tag
+
+`Sprint40-MedicalIntelligenceCore`
+
+---
+
 ## Sprint38-AICardiologistWorkspace (2026-07-07)
 
 ### Added

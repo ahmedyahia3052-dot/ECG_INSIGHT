@@ -27,6 +27,7 @@ import { fhirRouter, pacsRouter, telecardiologyRouter } from "./hospital-integra
 import { healthRouter } from "./health/health.routes";
 import { knowledgeRouter } from "./knowledge/knowledge.routes";
 import { medicalIntelligenceRouter } from "./medical-intelligence/medical-intelligence.routes";
+import { micRouter } from "./medical-intelligence-core/mic.routes";
 import { notificationsRouter } from "../notifications/notifications.routes";
 import { ocrRouter } from "./ocr/ocr.routes";
 import { patientsRouter } from "../patients/patients.routes";
@@ -90,6 +91,7 @@ modulesRouter.use("/enterprise", enterpriseRouter);
 modulesRouter.use("/fitness-assessments", fitnessAssessmentsRouter);
 modulesRouter.use("/knowledge", knowledgeRouter);
 modulesRouter.use("/medical-intelligence", medicalIntelligenceRouter);
+modulesRouter.use("/mic", micRouter);
 modulesRouter.use("/notifications", notificationsRouter);
 modulesRouter.use("/ocr", ocrRouter);
 modulesRouter.use("/occupational-risk", occupationalRiskRouter);
