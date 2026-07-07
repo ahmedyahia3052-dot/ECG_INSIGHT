@@ -1,22 +1,48 @@
-# Visual QA Report — Sprint 35
+# Visual QA Report — Sprint 37 Live Monitor
 
-## Automated Tests
+**Date:** 2026-07-07  
+**Environment:** Playwright chromium-desktop + managed dev servers
 
-| Test | Result |
-|------|--------|
-| Zero-clutter four-tab panel | ✅ Pass |
-| Diagnostic fullscreen + status bar | ✅ Pass |
-| AI / Measurements tab separation | ✅ Pass |
+## Visual Theme Checklist
 
-## Visual Checks
+| Element | Expected | Verified |
+|---------|----------|----------|
+| Background | Deep monitor black (`#010409` / `#020617`) | ✅ |
+| Waveform color | Green phosphor (`#22C55E`) | ✅ |
+| Status typography | Uppercase labels, hospital weight | ✅ |
+| Lead strip | Horizontal 12-lead + Rhythm Strip chip | ✅ |
+| Alarm HR styling | Yellow highlight <50 or >120 BPM | ✅ |
+| Canvas grid | Optional ECG grid via grid toggle | ✅ |
 
-- [x] No Patient tab on right panel
-- [x] Workflow steps fully visible (scroll, no overlap)
-- [x] Tooltips portal-rendered
-- [x] Diagnostic mode shows exit chip + floating palette
-- [x] Status bar shows Grid/FPS/GPU/Mem without debug toggle
-- [x] Left summary grouped Patient/Study/Device/Workflow
+## Layout Validation
 
-## Regression
+| Scenario | Result |
+|----------|--------|
+| Live Monitor opens without review ribbon/toolbar | ✅ PASS |
+| Status panel visible with HR + playback state | ✅ PASS |
+| Lead V5 label updates monitor header | ✅ PASS |
+| Rhythm Strip mode updates header copy | ✅ PASS |
+| Diagnostic mode hides header and lead strip | ✅ PASS |
+| ESC restores standard monitor chrome | ✅ PASS |
+| Review workspace still shows workflow ribbon | ✅ PASS |
 
-Sprint 33.5 integration updated for v9 layout compatibility.
+## Playwright Evidence
+
+- Suite: `tests/e2e/sprint37-live-monitor.spec.ts`
+- Result: **4/4 passed**
+- Screenshots captured on failure path (none in final run)
+
+## Accessibility Notes
+
+- Diagnostic exit chip exposes `accessibilityLabel="Exit diagnostic monitor"`
+- Transport buttons use visible text labels (Play, Freeze, Record, etc.)
+- Keyboard shortcuts documented in controls hint row
+
+## Known Limitations
+
+- Native (non-web) fallback uses SVG monitor path (no GPU canvas)
+- Recording indicator is UI state only (no file export in this sprint)
+
+## Sign-off
+
+Visual QA criteria for Sprint 37 Live Monitor Workspace: **APPROVED**

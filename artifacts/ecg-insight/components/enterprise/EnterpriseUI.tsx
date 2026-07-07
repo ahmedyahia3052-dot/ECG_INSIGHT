@@ -45,6 +45,7 @@ const NAV_ITEMS: NavItem[] = [
   { group: "CLINICAL", href: "/ecg-cases", icon: "clipboard", title: "ECG Cases" },
   { group: "CLINICAL", href: "/upload-ecg", icon: "upload-cloud", title: "Upload ECG" },
   { group: "CLINICAL", href: "/ecg-workspace", icon: "image", title: "ECG Workspace" },
+  { group: "CLINICAL", href: "/ecg-live-monitor", icon: "monitor", title: "Live Monitor" },
   { group: "CLINICAL", href: "/patients", icon: "users", title: "Patients" },
   { group: "CLINICAL", href: "/reports", icon: "file-text", title: "Reports" },
   { group: "WORKSPACE", href: "/copilot", icon: "message-square", title: "AI Copilot" },
@@ -69,6 +70,7 @@ const PAGE_TITLES: Record<string, { subtitle: string; title: string }> = {
   "/ecg-benchmark": { subtitle: "Clinical validation benchmark against PTB-XL, PhysioNet, and CPSC datasets.", title: "ECG Benchmark" },
   "/audit-log": { subtitle: "Enterprise audit trail with actor, action, and old/new clinical values.", title: "Audit Trail" },
   "/clinical-workspace/[caseId]": { subtitle: "Unified split-screen patient, ECG viewer, AI findings, measurements, notes, and timeline.", title: "Clinical Workspace" },
+  "/ecg-live-monitor/[caseId]": { subtitle: "Hospital-grade bedside live ECG monitor with diagnostic fullscreen, lead selection, and transport controls.", title: "Live ECG Monitor" },
   "/ecg-monitor/[caseId]": { subtitle: "Enterprise PACS-style ECG image viewer with grid, transforms, and dockable panels.", title: "ECG Monitor Workspace" },
   "/billing-subscription": { subtitle: "Subscription plan, quota, billing, and license status.", title: "Billing & Subscription" },
   "/copilot": { subtitle: "Enterprise medical AI chat workspace with real conversation persistence.", title: "AI Clinical Copilot" },
@@ -85,6 +87,7 @@ const PAGE_TITLES: Record<string, { subtitle: string; title: string }> = {
   "/settings": { subtitle: "Workspace preferences, accessibility, and clinical defaults.", title: "Settings" },
   "/team-management": { subtitle: "Manage users, roles, access, and clinical workspace membership.", title: "Team Management" },
   "/upload-ecg": { subtitle: "Capture, upload, preview, analyze, validate, and save ECG records.", title: "Upload ECG" },
+  "/ecg-live-monitor": { subtitle: "Dedicated hospital bedside live ECG monitor workspace — separate from the clinical review workstation.", title: "Live ECG Monitor" },
   "/ecg-workspace": { subtitle: "Hospital-grade ECG clinical workstation with digitization, live monitor, measurements, AI review, and export.", title: "Hospital ECG Workstation" },
 };
 
@@ -100,6 +103,7 @@ function pageMeta(pathname: string) {
   const exact = PAGE_TITLES[pathname];
   if (exact) return exact;
   if (pathname.startsWith("/patients/")) return { title: "Patient Profile", subtitle: "Demographics, ECG history, documents, and timeline." };
+  if (pathname.startsWith("/ecg-live-monitor/")) return PAGE_TITLES["/ecg-live-monitor/[caseId]"] ?? { title: "Live ECG Monitor", subtitle: "Hospital bedside live ECG monitor workspace." };
   if (pathname.startsWith("/ecg-cases/")) return { title: "ECG Case", subtitle: "Viewer, measurements, AI findings, doctor review, and report workflow." };
   if (pathname.startsWith("/reports/")) return { title: "Report Detail", subtitle: "Clinical report review, finalization, signing, and export." };
   return { title: "ECG Insight", subtitle: "Enterprise Medical AI Platform." };
@@ -156,7 +160,8 @@ export function EnterpriseShell({ children }: PropsWithChildren) {
   const sidebarCompact = !isMobile && sidebarCollapsed;
   const meta = pageMeta(pathname);
   const isCopilotWorkspace = pathname.startsWith("/copilot");
-  const isEcgMonitorWorkspace = pathname.startsWith("/ecg-monitor") || pathname.startsWith("/ecg-workspace");
+  const isEcgMonitorWorkspace =
+    pathname.startsWith("/ecg-monitor") || pathname.startsWith("/ecg-workspace") || pathname.startsWith("/ecg-live-monitor");
   const isFullBleedWorkspace = isCopilotWorkspace || isEcgMonitorWorkspace;
   const navItems = useMemo(() => NAV_ITEMS.filter((item) => {
     if (item.ownerOnly && user?.email?.toLowerCase() !== "ahmedyahia3052@gmail.com") return false;

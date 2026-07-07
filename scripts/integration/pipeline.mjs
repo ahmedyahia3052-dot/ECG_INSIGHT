@@ -43,6 +43,7 @@ export const integrationScripts = [
   "scripts/sprint35-longitudinal-ecg.integration.ts",
   "scripts/sprint36-security-hardening.integration.ts",
   "scripts/sprint37-release-candidate.integration.ts",
+  "scripts/sprint37-live-monitor-workspace.integration.ts",
   "scripts/auth-session-hardening.integration.ts",
   "scripts/dashboard-production-lockdown.integration.ts",
   "scripts/copilot-conversation-pipeline.integration.ts",

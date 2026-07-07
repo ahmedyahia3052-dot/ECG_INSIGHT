@@ -164,6 +164,13 @@ export async function openEcgWorkspace(page: Page, caseId?: string) {
   }
 }
 
+export async function openEcgLiveMonitor(page: Page, caseId: string) {
+  await page.goto(`/ecg-live-monitor/${caseId}`, { waitUntil: "domcontentloaded" });
+  await expect(page.getByTestId("sprint37-live-monitor-loading")).toHaveCount(0, { timeout: 45_000 });
+  await expect(page.getByTestId("sprint37-live-monitor-workspace-ready")).toBeVisible({ timeout: 45_000 });
+  await expect(page.getByTestId("sprint37-live-monitor-ready")).toBeVisible({ timeout: 20_000 });
+}
+
 export async function openEcgMonitor(page: Page, caseId: string) {
   await page.goto(`/ecg-monitor/${caseId}`, { waitUntil: "domcontentloaded" });
   await expect(page.getByTestId("sprint13-ecg-monitor-loading")).toHaveCount(0, { timeout: 45_000 });

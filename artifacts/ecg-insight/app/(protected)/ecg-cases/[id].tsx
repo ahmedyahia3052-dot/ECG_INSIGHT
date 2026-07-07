@@ -111,7 +111,8 @@ export default function EcgCaseDetailScreen() {
           <PrimaryButton disabled={!canFinalize} label="Finalize" onPress={() => finalizeMutation.mutate()} variant="outline" />
           <PrimaryButton disabled={readOnly} label="Generate Report" onPress={() => reportMutation.mutate()} variant="outline" />
           <PrimaryButton label="Clinical Workspace" onPress={() => router.push(`/clinical-workspace/${ecgCase.id}` as never)} />
-          <PrimaryButton label="ECG Monitor" onPress={() => router.push(`/ecg-workspace?caseId=${ecgCase.id}` as never)} variant="outline" />
+          <PrimaryButton label="Live Monitor" onPress={() => router.push(`/ecg-live-monitor/${ecgCase.id}` as never)} />
+          <PrimaryButton label="ECG Workspace" onPress={() => router.push(`/ecg-workspace?caseId=${ecgCase.id}` as never)} variant="outline" />
           <PrimaryButton label={showAdvancedPanels ? "Hide Advanced Panels" : "Load Advanced Panels"} onPress={() => setShowAdvancedPanels((value) => !value)} variant="outline" />
           {readOnly || ecgCase.status === "approved" || ecgCase.status === "rejected" ? <PrimaryButton label="Create New Revision" onPress={() => revisionMutation.mutate()} variant="outline" /> : null}
         </View>

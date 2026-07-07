@@ -82,6 +82,7 @@ function WebMonitorCanvas({
 }
 
 export const EcgLiveMonitorView = memo(function EcgLiveMonitorView({
+  chrome = "full",
   controls,
   heartRate,
   isDigitizing,
@@ -90,8 +91,10 @@ export const EcgLiveMonitorView = memo(function EcgLiveMonitorView({
   onFpsUpdate,
   playback,
   rhythm,
+  rhythmStripMode = false,
   selectedLead,
 }: {
+  chrome?: "canvas-only" | "full" | "workspace";
   controls: EcgViewerControls;
   heartRate?: number;
   isDigitizing?: boolean;
@@ -100,6 +103,7 @@ export const EcgLiveMonitorView = memo(function EcgLiveMonitorView({
   onFpsUpdate?: (fps: number) => void;
   playback: EcgWaveformPlaybackState;
   rhythm?: string;
+  rhythmStripMode?: boolean;
   selectedLead: EcgLeadId;
 }) {
   const [offsetIndex, setOffsetIndex] = useState(0);
@@ -140,6 +144,10 @@ export const EcgLiveMonitorView = memo(function EcgLiveMonitorView({
   const alarmTone = heartRate != null && (heartRate < 50 || heartRate > 120);
   const useWebCanvas = typeof document !== "undefined";
 
+  const showChrome = chrome === "full";
+  const showWorkspaceChrome = chrome === "workspace";
+  const canvasOnly = chrome === "canvas-only";
+
   if (!lead) {
     return (
       <View style={styles.empty} testID="sprint18-live-monitor">
@@ -153,16 +161,27 @@ export const EcgLiveMonitorView = memo(function EcgLiveMonitorView({
   }
 
   return (
-    <View style={styles.root} testID="sprint22-hospital-live-monitor">
-      <View style={styles.header}>
-        <Text style={styles.title}>HOSPITAL DIGITAL ECG MONITOR · LEAD {selectedLead}</Text>
-        <Text style={[styles.metric, alarmTone && styles.metricAlarm]}>HR {heartRate ?? "--"} BPM</Text>
-        <Text style={styles.metric}>{rhythm ?? "Rhythm pending"}</Text>
-        <Text style={styles.metric}>{controls.grid.speed} mm/s · {controls.grid.gain} mm/mV</Text>
-        <Text style={styles.metric}>{playback.frozen ? "FROZEN" : playback.isPlaying ? "LIVE" : "PAUSED"}</Text>
-        <PrimaryButton label="Bright+" onPress={() => setMonitorBrightness((value) => Math.min(1.2, Number((value + 0.05).toFixed(2))))} variant="outline" />
-        <PrimaryButton label="Bright−" onPress={() => setMonitorBrightness((value) => Math.max(0.65, Number((value - 0.05).toFixed(2))))} variant="outline" />
-      </View>
+    <View
+      style={[styles.root, canvasOnly && styles.rootCanvasOnly, showWorkspaceChrome && styles.rootWorkspace]}
+      testID={canvasOnly ? "sprint37-live-monitor-canvas-host" : "sprint22-hospital-live-monitor"}
+    >
+      {showChrome || showWorkspaceChrome ? (
+        <View style={styles.header}>
+          <Text style={styles.title}>
+            {rhythmStripMode ? "RHYTHM STRIP · LEAD II" : `HOSPITAL DIGITAL ECG MONITOR · LEAD ${selectedLead}`}
+          </Text>
+          {!showWorkspaceChrome ? (
+            <>
+              <Text style={[styles.metric, alarmTone && styles.metricAlarm]}>HR {heartRate ?? "--"} BPM</Text>
+              <Text style={styles.metric}>{rhythm ?? "Rhythm pending"}</Text>
+              <Text style={styles.metric}>{controls.grid.speed} mm/s · {controls.grid.gain} mm/mV</Text>
+              <Text style={styles.metric}>{playback.frozen ? "FROZEN" : playback.isPlaying ? "LIVE" : "PAUSED"}</Text>
+              <PrimaryButton label="Bright+" onPress={() => setMonitorBrightness((value) => Math.min(1.2, Number((value + 0.05).toFixed(2))))} variant="outline" />
+              <PrimaryButton label="Bright−" onPress={() => setMonitorBrightness((value) => Math.max(0.65, Number((value - 0.05).toFixed(2))))} variant="outline" />
+            </>
+          ) : null}
+        </View>
+      ) : null}
       <Pressable
         onLayout={(event) => {
           const { height, width } = event.nativeEvent.layout;
@@ -201,14 +220,16 @@ export const EcgLiveMonitorView = memo(function EcgLiveMonitorView({
           </Svg>
         )}
       </Pressable>
-      <EcgMonitorMiniNavigator gainScale={gainScale} lead={lead} offsetIndex={offsetIndex} />
-      <View style={styles.controls}>
-        <PrimaryButton label={playback.isPlaying ? "Pause" : "Play"} onPress={playback.togglePlay} variant="primary" />
-        <PrimaryButton label={playback.frozen ? "Resume" : "Freeze"} onPress={() => playback.setFrozen(!playback.frozen)} variant="outline" />
-        <PrimaryButton label={playback.loop ? "Loop On" : "Loop Off"} onPress={() => playback.setLoop(!playback.loop)} variant="outline" />
-        <PrimaryButton label="Step −" onPress={playback.previousBeat} variant="outline" />
-        <PrimaryButton label="Step +" onPress={playback.nextBeat} variant="outline" />
-      </View>
+      {!canvasOnly ? <EcgMonitorMiniNavigator gainScale={gainScale} lead={lead} offsetIndex={offsetIndex} /> : null}
+      {showChrome ? (
+        <View style={styles.controls}>
+          <PrimaryButton label={playback.isPlaying ? "Pause" : "Play"} onPress={playback.togglePlay} variant="primary" />
+          <PrimaryButton label={playback.frozen ? "Resume" : "Freeze"} onPress={() => playback.setFrozen(!playback.frozen)} variant="outline" />
+          <PrimaryButton label={playback.loop ? "Loop On" : "Loop Off"} onPress={() => playback.setLoop(!playback.loop)} variant="outline" />
+          <PrimaryButton label="Step −" onPress={playback.previousBeat} variant="outline" />
+          <PrimaryButton label="Step +" onPress={playback.nextBeat} variant="outline" />
+        </View>
+      ) : null}
     </View>
   );
 });
@@ -243,5 +264,7 @@ const styles = StyleSheet.create({
     overflow: "hidden",
     padding: 10,
   },
+  rootCanvasOnly: { backgroundColor: "#010409", borderWidth: 0, borderRadius: 0, padding: 0 },
+  rootWorkspace: { backgroundColor: "#010409", borderColor: "#14532D", minHeight: 360 },
   title: { color: "#86EFAC", flex: 1, fontSize: 13, fontWeight: "900", letterSpacing: 1.1 },
 });

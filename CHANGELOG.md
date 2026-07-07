@@ -1,3 +1,24 @@
+# Changelog
+
+## Sprint37-LiveMonitor (2026-07-07)
+
+### Added
+- Dedicated **Live ECG Monitor Workspace** at `/ecg-live-monitor` and `/ecg-live-monitor/[caseId]`
+- `EcgLiveMonitorShell`, status panel, lead strip, transport controls, engine, and keyboard shortcuts
+- Diagnostic Monitor fullscreen mode (ESC exit) with floating controls
+- Sidebar nav item **Live Monitor** and case detail **Live Monitor** button
+- Integration test `scripts/sprint37-live-monitor-workspace.integration.ts`
+- Playwright suite `tests/e2e/sprint37-live-monitor.spec.ts` (`@sprint37`, 4 tests)
+
+### Changed
+- `EcgLiveMonitorView` supports `chrome` variants for standalone workspace embedding
+- Enterprise shell full-bleed includes `/ecg-live-monitor` routes
+
+### Unchanged
+- ECG Review Workspace (`/ecg-workspace`, `EcgMonitorViewerFoundation`) — no functional changes
+
+---
+
 # Changelog — Sprint 36 Clinical Validation
 
 ## Sprint36-QA (2026-07-07)
