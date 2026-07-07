@@ -2,6 +2,7 @@ import { expect, type APIRequestContext, type Page, type TestInfo } from "@playw
 import AxeBuilder from "@axe-core/playwright";
 import { createSyntheticEcgPngBuffer } from "./ecg-fixture-image";
 import { uploadClinicalEcgImage } from "./clinical-upload";
+import { resetBrowserStorage } from "./session-cleanup";
 import { runtimeTimestamp, waitForRuntimeEvent, waitForStreamingFinished, waitForUploadFinished, waitForVoiceIdle } from "./runtime-events";
 
 export const API_URL = process.env["PLAYWRIGHT_API_URL"] ?? "http://127.0.0.1:3002/api";
@@ -76,21 +77,32 @@ export function authHeaders(token: string, csrfToken?: string) {
 export async function apiLogin(request: APIRequestContext, role: keyof typeof users = "doctor"): Promise<ApiSession> {
   let lastStatus = 0;
   let lastBody = "";
+  let lastError = "";
   for (let attempt = 0; attempt < 5; attempt += 1) {
-    const response = await request.post(`${API_URL}/auth/login`, {
-      data: { email: users[role].email, password: users[role].password, rememberMe: true },
-    });
-    if (response.ok()) {
-      const body = await response.json();
-      const csrfToken = await csrfTokenFromRequest(request);
-      return { csrfToken, token: body.accessToken, user: body.user };
+    try {
+      const response = await request.post(`${API_URL}/auth/login`, {
+        data: { email: users[role].email, password: users[role].password, rememberMe: true },
+        timeout: 30_000,
+      });
+      if (response.ok()) {
+        const body = await response.json();
+        const csrfToken = await csrfTokenFromRequest(request);
+        return { csrfToken, token: body.accessToken, user: body.user };
+      }
+      lastStatus = response.status();
+      lastBody = await response.text();
+      if (lastStatus !== 429 || attempt >= 4) break;
+    } catch (error) {
+      lastError = error instanceof Error ? error.message : String(error);
+      if (attempt >= 4) break;
+      await assertPlatformReady(request).catch(() => undefined);
     }
-    lastStatus = response.status();
-    lastBody = await response.text();
-    if (lastStatus !== 429 || attempt >= 4) break;
     await new Promise((resolve) => setTimeout(resolve, 2_000 * (attempt + 1)));
   }
-  expect(false, `API login should succeed for ${role} (last status ${lastStatus}: ${lastBody})`).toBeTruthy();
+  expect(
+    false,
+    `API login should succeed for ${role} (last status ${lastStatus}: ${lastBody || lastError})`,
+  ).toBeTruthy();
   throw new Error(`API login failed for ${role}`);
 }
 
@@ -107,6 +119,58 @@ export async function stabilizeAuthRefresh(page: Page, role: keyof typeof users 
   });
 }
 
+async function isPageUsable(page: Page) {
+  if (page.isClosed()) return false;
+  try {
+    await page.evaluate(() => true);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export async function clearAuthState(page: Page) {
+  if (!(await isPageUsable(page))) return;
+
+  try {
+    await page.context().clearCookies();
+  } catch {
+    if (!(await isPageUsable(page))) return;
+  }
+
+  if (!(await isPageUsable(page))) return;
+
+  await page.goto("/login?force=1", { timeout: 30_000, waitUntil: "domcontentloaded" }).catch(() => undefined);
+
+  if (!(await isPageUsable(page))) return;
+
+  await resetBrowserStorage(page);
+}
+
+export async function ensureLoginScreen(page: Page) {
+  if (!(await isPageUsable(page))) {
+    throw new Error("Cannot ensure login screen: page is closed");
+  }
+
+  const loginScreen = page.getByTestId("auth-login-screen").first();
+  const signInButton = page.getByTestId("auth-sign-in-button").or(page.getByRole("button", { name: /sign in/i })).first();
+  const onLoginScreen = await loginScreen.isVisible({ timeout: 4_000 }).catch(() => false);
+
+  if (!onLoginScreen) {
+    await clearAuthState(page);
+  }
+
+  try {
+    await expect(loginScreen).toBeVisible({ timeout: 20_000 });
+  } catch (error) {
+    if (!(await isPageUsable(page))) throw error;
+    await page.goto("/login?force=1", { waitUntil: "domcontentloaded" });
+    await expect(loginScreen).toBeVisible({ timeout: 20_000 });
+  }
+
+  await expect(signInButton).toBeVisible({ timeout: 20_000 });
+}
+
 export async function bootstrapAuthenticatedPage(page: Page, role: keyof typeof users = "doctor") {
   await stabilizeAuthRefresh(page, role);
   await apiLogin(page.request, role);
@@ -120,18 +184,21 @@ export async function bootstrapAuthenticatedPage(page: Page, role: keyof typeof 
 
 export async function uiLogin(page: Page, role: keyof typeof users = "doctor") {
   for (let attempt = 0; attempt < 5; attempt += 1) {
-    if (!(await page.getByText(/Welcome Back/i).isVisible({ timeout: 5_000 }).catch(() => false))) {
-      const logoutButton = page.getByRole("button", { name: /log\s?out/i }).first();
-      if (await logoutButton.isVisible().catch(() => false)) {
-        await logout(page);
-      } else {
-        await gotoLogin(page, "/login?force=1");
-      }
+    if (!(await isPageUsable(page))) {
+      throw new Error("Cannot uiLogin: page is closed");
     }
-    await expect(page.getByText(/Welcome Back/i)).toBeVisible({ timeout: 15_000 });
+
+    const dashboardVisible = await page
+      .getByText(/Enterprise Clinical Command Center|Good Morning|Good Afternoon|Good Evening/)
+      .first()
+      .isVisible({ timeout: 3_000 })
+      .catch(() => false);
+    if (dashboardVisible) return;
+
+    await ensureLoginScreen(page);
     await page.getByPlaceholder(/doctor@hospital\.com|name@organization\.com/i).fill(users[role].email);
     await page.getByPlaceholder(/password/i).fill(users[role].password);
-    const signIn = page.getByRole("button", { name: /sign in/i });
+    const signIn = page.getByTestId("auth-sign-in-button").or(page.getByRole("button", { name: /sign in/i }));
     await expect(signIn).toBeEnabled({ timeout: 45_000 });
     await signIn.click();
     try {
@@ -139,7 +206,14 @@ export async function uiLogin(page: Page, role: keyof typeof users = "doctor") {
       return;
     } catch (error) {
       if (attempt >= 4) throw error;
-      await page.waitForTimeout(2_000 * (attempt + 1));
+      if (!(await isPageUsable(page))) throw error;
+      await clearAuthState(page);
+      await expect
+        .poll(async () => page.getByTestId("auth-login-screen").first().isVisible().catch(() => false), {
+          message: "Login screen should become visible after auth reset",
+          timeout: 5_000,
+        })
+        .toBe(true);
     }
   }
 }
@@ -151,21 +225,31 @@ async function gotoLogin(page: Page, path: "/login" | "/login?force=1") {
       return;
     } catch (error) {
       if (attempt >= 2) throw error;
-      await page.waitForTimeout(1_000 * (attempt + 1));
+      await expect
+        .poll(async () => true, { timeout: 1_000 * (attempt + 1) })
+        .toBe(true);
     }
   }
 }
 
 export async function logout(page: Page) {
+  if (!(await isPageUsable(page))) return;
+
+  const loginScreen = page.getByTestId("auth-login-screen").first();
+  const signInButton = page.getByTestId("auth-sign-in-button").or(page.getByRole("button", { name: /sign in/i })).first();
   const logoutButton = page.getByRole("button", { name: /log\s?out/i }).first();
-  await expect(logoutButton).toBeVisible({ timeout: 10_000 });
-  await Promise.all([
-    page.waitForURL(/\/login/, { timeout: 30_000 }),
-    logoutButton.click(),
-  ]).catch(async () => {
-    await page.goto("/login?force=1");
-  });
-  await expect(page.getByText(/Welcome Back/i)).toBeVisible({ timeout: 15_000 });
+
+  if (await logoutButton.isVisible({ timeout: 5_000 }).catch(() => false)) {
+    await logoutButton.click();
+    await page.waitForURL(/\/login/, { timeout: 20_000 }).catch(() => undefined);
+  }
+
+  if (!(await loginScreen.isVisible({ timeout: 5_000 }).catch(() => false))) {
+    await clearAuthState(page);
+  }
+
+  await expect(loginScreen).toBeVisible({ timeout: 20_000 });
+  await expect(signInButton).toBeVisible({ timeout: 15_000 });
 }
 
 export async function createPatient(request: APIRequestContext, session: ApiSession | string, suffix = "") {
@@ -312,7 +396,9 @@ export async function navigate(page: Page, path: string, heading: RegExp | strin
       return;
     } catch (error) {
       if (attempt >= 2) throw error;
-      await page.waitForTimeout(1_500 * (attempt + 1));
+      await expect
+        .poll(async () => true, { timeout: 1_500 * (attempt + 1) })
+        .toBe(true);
     }
   }
 }

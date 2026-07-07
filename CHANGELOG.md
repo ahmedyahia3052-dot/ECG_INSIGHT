@@ -1,5 +1,37 @@
 # Changelog — Enterprise QA Infrastructure
 
+## Sprint 46.1 — Enterprise Test Infrastructure Stabilization — 2026-07-07
+
+### Added (infrastructure only)
+- **Sequential Playwright runner** (`scripts/run-playwright-sequential.mjs`) — isolated processes per suite
+- **Session cleanup** (`tests/e2e/utils/session-cleanup.ts`) — localStorage, sessionStorage, IndexedDB wipe
+- **Auth infrastructure** (`tests/e2e/utils/auth-infrastructure.ts`) — fresh login/logout, token validation
+- **Network monitor** (`tests/e2e/utils/network-stability.ts`) — 5xx detection, API recovery polling
+- **CI pipeline orchestrator** (`scripts/run-enterprise-ci-pipeline.mjs`, `npm run qa:pipeline`)
+- **Artifact collector** (`scripts/qa/generate-pipeline-artifacts.mjs`)
+- Integration markers: `scripts/sprint46-1-test-infrastructure.integration.ts`
+- Reports: `SPRINT46_1_FINAL_REPORT.md`, `PLAYWRIGHT_STABILIZATION_REPORT.md`, `CI_PIPELINE_REPORT.md`, `AUTH_REPORT.md`, `FLAKY_TEST_REPORT.md`, `PERFORMANCE_REPORT.md`
+
+### Changed (test infrastructure only)
+- `tests/e2e/test.ts` — per-test isolated request, storage reset, network monitor, session destroy
+- `tests/e2e/utils/qa.ts` — `resetBrowserStorage` in `clearAuthState`; explicit poll waits replace `waitForTimeout`
+- `playwright.config.ts` — JSON reporter, `storageState: undefined`
+- `package.json` — `qa:playwright:sequential`, `qa:pipeline`; `qa:smoke`/`qa:e2e` use sequential runner
+- `scripts/sat-system-acceptance.mjs`, `run-full-regression.mjs`, `run-enterprise-qa.mjs` — sequential Playwright
+- `.github/workflows/enterprise-qa.yml` — sequential smoke/enterprise/accessibility/visual/mobile
+
+### Preserved
+- All Sprint 1–46 product features, UI, APIs, and database schema unchanged
+
+### Validated
+- `npm run lint` / `typecheck` / `build` — PASS
+- Sprint 46.1 integration markers — PASS
+
+### Tag
+- `Sprint46-1-TestInfrastructure`
+
+---
+
 ## Sprint 47 — ECG Acquisition & Digitization Engine — 2026-07-07
 
 ### Added

@@ -15,7 +15,9 @@ export default defineConfig({
     ["list"],
     ["html", { open: "never", outputFolder: "playwright-report" }],
     ["junit", { outputFile: "test-results/playwright-junit.xml" }],
+    ["json", { outputFile: "test-results/playwright-report.json" }],
   ],
+  snapshotPathTemplate: "{testDir}/__snapshots__/{testFilePath}/{arg}{ext}",
   retries: 0,
   // Copilot E2E shares one API instance; parallel workers cause stream timeouts.
   workers: 1,
@@ -27,6 +29,7 @@ export default defineConfig({
     screenshot: "only-on-failure",
     trace: "retain-on-failure",
     video: "retain-on-failure",
+    storageState: undefined,
   },
   projects: [
     {
