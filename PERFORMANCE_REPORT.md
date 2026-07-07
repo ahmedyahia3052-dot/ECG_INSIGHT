@@ -1,36 +1,29 @@
-# Performance Report — Sprint 30
+# Performance Report — Sprint 33.5
 
-## Target: 60 FPS ECG Rendering
+## Targets
 
-Sprint 30 is **additive UI orchestration** — no changes to rendering pipeline.
+- 60 FPS viewer
+- Smooth zoom/pan/resize
+- No unnecessary re-renders
 
-| Layer | Engine | Status |
-|-------|--------|--------|
-| Waveform | Sprint 28 Clinical Visualization Canvas | Unchanged |
-| Rendering | Sprint 27 SVG/Canvas2D/WebGL | Preserved |
-| Monitor | EcgLiveMonitorView | Unchanged |
+## Optimizations
 
-## Sprint 30 Performance Characteristics
+| Change | Impact |
+|--------|--------|
+| Portal tooltips | Only mount when visible; no layout thrash in toolbar |
+| Floating palette idle hide | Removes 14 DOM nodes when idle |
+| Hero fit once | `initialFitRef` guard preserved |
+| Memoized panels | All major panels remain memoized |
+| Throttled status bar | 500ms interval unchanged |
 
-- Workflow ribbon: horizontal ScrollView, no heavy re-renders
-- `useClinicalWorkflowEngine`: memoized steps/alerts/timeline
-- Right panel tabs: lazy content by active tab
-- Auto-save: 1.2s debounce prevents save storms
-- Alerts banner: computed from context, memoized in hook
+## GPU
 
-## Measured (E2E Session)
+- Layer stack retains `translateZ(0)` compositing hint
+- Crosshair overlay uses fixed 1px lines
 
-- Workflow ribbon render: < 100ms after workspace load
-- Tab switch (patient → measurements → AI): instant (< 16ms perceived)
-- Report preview iframe: async load, non-blocking
+## Validation
 
-## Optimizations Applied
-
-- `memo()` on all new panel components
-- Workflow context object memoized in hook
-- No additional API polling beyond existing queries
-
-## Memory
-
-- No new intervals or listeners beyond existing shortcut handler
-- Notes panel local state only; persisted via existing auto-save path
+```
+npm run build     → pass
+Playwright 2/2    → pass (no timeout retries)
+```

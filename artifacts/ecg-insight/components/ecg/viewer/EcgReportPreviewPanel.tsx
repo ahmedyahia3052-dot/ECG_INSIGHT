@@ -5,9 +5,11 @@ import { Platform, ScrollView, StyleSheet, Text, View } from "react-native";
 import { Badge, formatDate, medicalTheme, PrimaryButton, SectionHeader } from "@/components/enterprise/EnterpriseUI";
 import {
   downloadReportPdf,
+  finalizeReport,
   generateReport,
   listReports,
   reportHtmlUrl,
+  signReport,
   type ClinicalReport,
 } from "@/services/reports";
 
@@ -86,6 +88,20 @@ export const EcgReportPreviewPanel = memo(function EcgReportPreviewPanel({
     },
   });
 
+  const finalizeMutation = useMutation({
+    mutationFn: (reportId: string) => finalizeReport(accessToken!, reportId),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["ecg-workspace-reports", accessToken, caseId] });
+    },
+  });
+
+  const signMutation = useMutation({
+    mutationFn: (reportId: string) => signReport(accessToken!, reportId),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["ecg-workspace-reports", accessToken, caseId] });
+    },
+  });
+
   const reports = reportsQuery.data?.reports ?? [];
   const activeReport: ClinicalReport | undefined =
     reports.find((item) => item.id === selectedReportId) ?? reports[0];
@@ -115,7 +131,27 @@ export const EcgReportPreviewPanel = memo(function EcgReportPreviewPanel({
             variant="primary"
           />
           {activeReport ? (
-            <PrimaryButton label="Download PDF" onPress={() => void exportPdf()} variant="outline" />
+            <>
+              <PrimaryButton label="Download PDF" onPress={() => void exportPdf()} variant="outline" />
+              {activeReport.status === "draft" || activeReport.status === "under_review" ? (
+                <PrimaryButton
+                  disabled={finalizeMutation.isPending}
+                  label={finalizeMutation.isPending ? "Finalizing…" : "Finalize"}
+                  onPress={() => finalizeMutation.mutate(activeReport.id)}
+                  testID="sprint30-finalize-report"
+                  variant="outline"
+                />
+              ) : null}
+              {activeReport.status === "finalized" ? (
+                <PrimaryButton
+                  disabled={signMutation.isPending}
+                  label={signMutation.isPending ? "Signing…" : "Sign Report"}
+                  onPress={() => signMutation.mutate(activeReport.id)}
+                  testID="sprint30-sign-report"
+                  variant="primary"
+                />
+              ) : null}
+            </>
           ) : null}
         </View>
       </View>

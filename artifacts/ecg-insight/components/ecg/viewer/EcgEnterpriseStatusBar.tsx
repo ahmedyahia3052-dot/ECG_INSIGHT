@@ -1,109 +1,105 @@
-import React from "react";
-import { ScrollView, StyleSheet, Text, View } from "react-native";
+import React, { memo } from "react";
+import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
-import { medicalTheme } from "@/components/enterprise/EnterpriseUI";
-
+import { ECG_COCKPIT_COLORS } from "./ecgCockpitColors";
+import { ECG_SPACING, ECG_TYPOGRAPHY } from "./ecgSpacingTokens";
 import { ECG_WORKSTATION_VISUAL } from "./ecgWorkstationVisualTokens";
-import type { EnterpriseStatusMetrics } from "./useEnterpriseStatusMetrics";
 
 function StatusChip({ label, testID, value }: { label: string; testID?: string; value: string }) {
   return (
     <View style={styles.chip}>
       <Text style={styles.chipLabel}>{label}</Text>
-      <Text style={styles.chipValue} numberOfLines={1} testID={testID}>
+      <Text numberOfLines={1} style={styles.chipValue} testID={testID}>
         {value}
       </Text>
     </View>
   );
 }
 
-/** Sprint 28 — enterprise status bar with clinical rendering telemetry. */
-export function EcgEnterpriseStatusBar({
+/** Sprint 33.5 — simplified doctor status bar; developer metrics gated. */
+export const EcgEnterpriseStatusBar = memo(function EcgEnterpriseStatusBar({
   apiStatus,
   canvasResolution,
   coordinates,
   cpuUsage,
+  developerMode = false,
   fps,
   gain,
   gpuRenderer,
-  gridVisible,
   lead,
   memory,
+  onToggleDeveloperMode,
   paperSpeed,
-  patientName,
   renderMode,
   renderTimeMs,
-  renderingMode,
   signalQuality,
   zoom,
 }: {
-  aiStatus?: string;
   apiStatus?: string;
-  autoRefresh?: string;
-  backendStatus?: EnterpriseStatusMetrics["backendStatus"];
   canvasResolution?: string;
   coordinates?: string;
   cpuUsage?: number;
-  digitizationQuality?: string;
+  developerMode?: boolean;
   fps?: number;
   gain?: number;
   gpuRenderer?: string;
-  gridVisible?: boolean;
   lead?: string;
   memory?: { jsHeapMb?: number; jsHeapLimitMb?: number };
-  monitorState?: string;
+  onToggleDeveloperMode?: () => void;
   paperSpeed?: number;
-  patientName?: string;
   renderMode?: string;
   renderTimeMs?: number;
-  renderingMode?: string;
   signalQuality?: string;
-  transport?: string;
   zoom: number;
 }) {
-  const mode = renderMode ?? renderingMode ?? "SVG";
   const memLabel = memory?.jsHeapMb ? `${memory.jsHeapMb}MB` : "—";
   return (
-    <View style={styles.bar} testID="sprint29-enterprise-status-bar" nativeID="sprint28-enterprise-status-bar">
+    <View style={styles.bar} testID="sprint335-enterprise-status-bar" nativeID="sprint28-enterprise-status-bar">
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.row}>
-        {patientName ? <StatusChip label="Patient" testID="sprint24-status-patient" value={patientName} /> : null}
-        <StatusChip label="Zoom" testID="sprint17-status-zoom" value={`${Math.round(zoom * 100)}%`} />
         {lead ? <StatusChip label="Lead" testID="sprint17-status-lead" value={lead} /> : null}
-        <StatusChip label="Gain" testID="sprint17-status-gain" value={`${gain ?? 10}`} />
         <StatusChip label="Speed" testID="sprint17-status-paper-speed" value={`${paperSpeed ?? 25}`} />
-        <StatusChip label="Grid" testID="sprint28-status-grid" value={gridVisible === false ? "Off" : "On"} />
-        {typeof fps === "number" ? <StatusChip label="FPS" testID="sprint17-status-fps" value={`${fps}`} /> : null}
-        {gpuRenderer ? <StatusChip label="GPU" testID="sprint28-status-gpu" value={gpuRenderer} /> : null}
-        {typeof cpuUsage === "number" ? <StatusChip label="CPU" testID="sprint28-status-cpu" value={`${cpuUsage}%`} /> : null}
-        <StatusChip label="Mem" testID="sprint28-status-memory" value={memLabel} />
-        {canvasResolution ? <StatusChip label="Canvas" testID="sprint28-status-canvas" value={canvasResolution} /> : null}
-        {coordinates ? <StatusChip label="XY" testID="sprint29-status-coordinates" value={coordinates} /> : null}
-        {typeof renderTimeMs === "number" ? <StatusChip label="Frame" testID="sprint28-status-frame" value={`${renderTimeMs}ms`} /> : null}
-        <StatusChip label="Render" testID="sprint28-status-render-mode" value={mode} />
-        {signalQuality ? <StatusChip label="Signal" testID="sprint28-status-signal-quality" value={signalQuality} /> : null}
-        <StatusChip label="API" testID="sprint24-status-api" value={apiStatus ?? "Online"} />
+        <StatusChip label="Gain" testID="sprint17-status-gain" value={`${gain ?? 10}`} />
+        <StatusChip label="Zoom" testID="sprint17-status-zoom" value={`${Math.round(zoom * 100)}%`} />
+        {signalQuality ? <StatusChip label="Quality" testID="sprint32-status-quality" value={signalQuality} /> : null}
+        {developerMode ? (
+          <>
+            {typeof fps === "number" ? <StatusChip label="FPS" testID="sprint17-status-fps" value={`${fps}`} /> : null}
+            {typeof cpuUsage === "number" ? <StatusChip label="CPU" testID="sprint28-status-cpu" value={`${cpuUsage}%`} /> : null}
+            {gpuRenderer ? <StatusChip label="GPU" testID="sprint28-status-gpu" value={gpuRenderer} /> : null}
+            <StatusChip label="Mem" testID="sprint28-status-memory" value={memLabel} />
+            {canvasResolution ? <StatusChip label="Canvas" testID="sprint28-status-canvas" value={canvasResolution} /> : null}
+            {coordinates ? <StatusChip label="XY" testID="sprint29-status-coordinates" value={coordinates} /> : null}
+            {typeof renderTimeMs === "number" ? <StatusChip label="Frame" testID="sprint28-status-frame" value={`${renderTimeMs}ms`} /> : null}
+            {renderMode ? <StatusChip label="Render" testID="sprint28-status-render-mode" value={renderMode} /> : null}
+            <StatusChip label="API" testID="sprint24-status-api" value={apiStatus ?? "Online"} />
+          </>
+        ) : null}
       </ScrollView>
+      <Pressable accessibilityLabel="Toggle developer metrics" onPress={onToggleDeveloperMode} style={styles.devToggle} testID="sprint32-dev-mode-toggle">
+        <Text style={[styles.devToggleLabel, developerMode && styles.devToggleLabelActive]}>{developerMode ? "DEV" : "DR"}</Text>
+      </Pressable>
     </View>
   );
-}
+});
 
 const styles = StyleSheet.create({
   bar: {
-    backgroundColor: "#06111F",
-    borderColor: medicalTheme.border,
-    borderRadius: 4,
-    borderWidth: 1,
+    alignItems: "center",
+    backgroundColor: ECG_COCKPIT_COLORS.bgPanel,
+    flexDirection: "row",
     height: ECG_WORKSTATION_VISUAL.statusBarHeight,
-    justifyContent: "center",
     overflow: "hidden",
   },
-  chip: {
-    alignItems: "center",
-    flexDirection: "row",
-    gap: 4,
-    paddingHorizontal: 6,
+  chip: { alignItems: "center", flexDirection: "row", gap: ECG_SPACING.xs, paddingHorizontal: ECG_SPACING.md },
+  chipLabel: { ...ECG_TYPOGRAPHY.label, color: ECG_COCKPIT_COLORS.textMuted },
+  chipValue: { ...ECG_TYPOGRAPHY.status, color: ECG_COCKPIT_COLORS.text, maxWidth: 120 },
+  devToggle: {
+    borderColor: ECG_COCKPIT_COLORS.border,
+    borderLeftWidth: 1,
+    paddingHorizontal: ECG_SPACING.md,
+    paddingVertical: ECG_SPACING.xs,
   },
-  chipLabel: { color: medicalTheme.muted, fontSize: 8, fontWeight: "900" },
-  chipValue: { color: medicalTheme.text, fontSize: 10, fontWeight: "900", maxWidth: 120 },
-  row: { alignItems: "center", flexDirection: "row", gap: 6, paddingHorizontal: 6 },
+  devToggleLabel: { ...ECG_TYPOGRAPHY.caption, color: ECG_COCKPIT_COLORS.textMuted },
+  devToggleLabelActive: { color: ECG_COCKPIT_COLORS.accent },
+  row: { alignItems: "center", flex: 1, flexDirection: "row", gap: ECG_SPACING.md, paddingHorizontal: ECG_SPACING.sm },
 });

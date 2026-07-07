@@ -1,13 +1,22 @@
-import React, { memo, useState } from "react";
+import React, { memo, useEffect, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
-import { Badge, formatDate, medicalTheme } from "@/components/enterprise/EnterpriseUI";
-import type { AIAnalysisResult } from "@/services/ai";
+import { formatDate } from "@/components/enterprise/EnterpriseUI";
+
+import { ECG_COCKPIT_COLORS } from "./ecgCockpitColors";
+import { ECG_SPACING, ECG_TYPOGRAPHY } from "./ecgSpacingTokens";
+import type { AIAnalysisResult, AIExplainability } from "@/services/ai";
 import type { DigitalEcg } from "@/services/ecgProcessing";
 
 import { EcgAiAnnotationInspector } from "./EcgAiAnnotationInspector";
+import { EcgAiReviewWorkflowPanel } from "./EcgAiReviewWorkflowPanel";
+import { EcgCaseTimelinePanel } from "./EcgCaseTimelinePanel";
 import { EcgClinicalCard } from "./EcgClinicalCard";
-import { EcgMeasurementsPanel } from "./EcgMeasurementsPanel";
+import { EcgClinicalNotesPanel } from "./EcgClinicalNotesPanel";
+import { EcgHistoryEnginePanel } from "./EcgHistoryEnginePanel";
+import { EcgMeasurementStudioPanel } from "./EcgMeasurementStudioPanel";
+import { EcgPatientWorkspacePanel } from "./EcgPatientWorkspacePanel";
+import type { CaseTimelineEvent } from "./clinical-workflow";
 import type { EcgClinicalFindingsModel, EcgViewerPreviousStudy } from "./types";
 import type { EcgAiOverlayWorkspace } from "./useEcgAiOverlayWorkspace";
 import type { EcgMeasurementWorkspace } from "./useEcgMeasurementWorkspace";
@@ -24,14 +33,14 @@ function MetricRow({
   value: string;
 }) {
   const color =
-    tone === "critical" ? medicalTheme.critical : tone === "warning" ? medicalTheme.warning : tone === "success" ? medicalTheme.success : medicalTheme.text;
+    tone === "critical" ? ECG_COCKPIT_COLORS.critical : tone === "warning" ? ECG_COCKPIT_COLORS.warning : tone === "success" ? ECG_COCKPIT_COLORS.success : ECG_COCKPIT_COLORS.text;
   return (
-    <View style={styles.metricRow}>
+    <View style={styles.metricCard}>
       <View style={styles.metricLeft}>
         <Text style={styles.metricLabel}>{label}</Text>
         {source ? <Text style={styles.metricSource}>{source}</Text> : null}
       </View>
-      <Text style={[styles.metricValue, { color }]} numberOfLines={2}>
+      <Text style={[styles.metricValue, { color }]} numberOfLines={3}>
         {value}
       </Text>
     </View>
@@ -51,46 +60,72 @@ type ClinicalTab = "patient" | "measurements" | "ai" | "reports" | "history";
 const TABS: Array<{ id: ClinicalTab; label: string }> = [
   { id: "patient", label: "Patient" },
   { id: "measurements", label: "Measurements" },
-  { id: "ai", label: "AI" },
+  { id: "ai", label: "AI Findings" },
   { id: "reports", label: "Reports" },
   { id: "history", label: "History" },
 ];
 
 export const EcgClinicalRightPanel = memo(function EcgClinicalRightPanel({
+  aiConfirmed = false,
   aiOverlay,
   analysis,
   caseNumber,
   clinicalNotes,
+  department,
   digitalEcg,
   digitalEcgLoading,
+  explainability,
   findings,
+  focusSection,
+  focusTab,
+  hospital,
   imageHeight,
   imageWidth,
+  onCompareStudy,
+  onConfirmAi,
   onDigitize,
   onExportPdf,
   onExportPng,
+  onNotesChange,
   onOpenReview,
+  operatorName,
   patient,
   previousStudies = [],
+  referringPhysician,
   studyDate,
+  timelineEvents = [],
+  visitId,
   workspace,
 }: {
+  aiConfirmed?: boolean;
   aiOverlay: EcgAiOverlayWorkspace;
   analysis?: AIAnalysisResult | null;
   caseNumber?: string;
   clinicalNotes?: string;
+  department?: string;
   digitalEcg?: DigitalEcg | null;
   digitalEcgLoading?: boolean;
+  explainability?: AIExplainability | null;
   findings: EcgClinicalFindingsModel;
+  focusSection?: "notes";
+  focusTab?: ClinicalTab;
+  hospital?: string;
   imageHeight?: number;
   imageWidth?: number;
+  onCompareStudy?: (caseId: string) => void;
+  onConfirmAi?: () => void;
   onDigitize?: () => void;
   onExportPdf?: () => void;
   onExportPng?: () => void;
+  onNotesChange?: (notes: string) => void;
   onOpenReview?: () => void;
+  operatorName?: string;
   patient?: { age?: number; gender?: string; id: string; name: string };
   previousStudies?: EcgViewerPreviousStudy[];
+  referringPhysician?: string;
   studyDate?: string;
+  timelineEvents?: CaseTimelineEvent[];
+  visitId?: string;
   workspace: EcgMeasurementWorkspace;
 }) {
   const qualityScore = digitalEcg?.quality?.score;
@@ -104,46 +139,45 @@ export const EcgClinicalRightPanel = memo(function EcgClinicalRightPanel({
 
   const sourceLabel = digitalEcg?.measurementEngine ? "Digital ECG" : findings.heartRate.source === "measurement" ? "Manual" : "Case/AI";
   const engine = digitalEcg?.measurementEngine;
-  const stMm = engine?.stDeviation ?? engine?.amplitudes?.stDeviationMm;
-  const stDisplay = stMm != null ? `${stMm > 0 ? "+" : ""}${Number(stMm).toFixed(1)} mm` : "Pending";
-  const noiseFlags = [
-    digitalEcg?.preprocessing?.noiseReduced ? "Noise reduced" : null,
-    digitalEcg?.preprocessing?.shadowRemoved ? "Shadow removed" : null,
-    digitalEcg?.preprocessing?.contrastEnhanced ? "Contrast enhanced" : null,
-  ].filter(Boolean) as string[];
-  const artifactFlags = [
-    digitalEcg?.preprocessing?.perspectiveCorrected ? "Perspective corrected" : null,
-    digitalEcg?.preprocessing?.deskewDegrees ? `Deskew ${digitalEcg.preprocessing.deskewDegrees.toFixed(1)}°` : null,
-    digitalEcg?.validation?.warnings?.length ? `${digitalEcg.validation.warnings.length} validation flags` : null,
-  ].filter(Boolean) as string[];
 
   const [activeTab, setActiveTab] = useState<ClinicalTab>("patient");
 
+  useEffect(() => {
+    if (focusTab) setActiveTab(focusTab);
+  }, [focusTab]);
+
+  useEffect(() => {
+    if (focusSection === "notes") setActiveTab("patient");
+  }, [focusSection]);
+
   const patientTab = (
     <>
-      {patient ? (
-        <PanelSection id="patient" title="Patient">
-          <Text style={styles.patientName}>{patient.name}</Text>
-          <Text style={styles.patientMeta}>
-            {patient.gender ?? "Gender N/A"} · Age {patient.age ?? "N/A"} · ID {patient.id.slice(0, 8)}
-          </Text>
-          {studyDate ? <Text style={styles.patientMeta}>Study {formatDate(studyDate)}</Text> : null}
-        </PanelSection>
-      ) : null}
-      {caseNumber ? (
-        <PanelSection id="case" title="Case">
-          <MetricRow label="Case Number" value={caseNumber} />
-          <MetricRow label="Status" value={digitalEcg?.status === "available" ? "Digitized" : digitalEcgLoading ? "Processing" : "Awaiting Digitization"} />
-          <MetricRow label="Leads" value={digitalEcg?.leads?.length ? `${digitalEcg.leads.length} leads` : "Pending"} />
+      <EcgPatientWorkspacePanel
+        caseNumber={caseNumber}
+        clinicalNotes={clinicalNotes}
+        department={department}
+        hospital={hospital}
+        patient={patient}
+        previousDiagnosis={analysis?.diagnosis}
+        previousEcgCount={previousStudies.length}
+        referringPhysician={referringPhysician}
+        riskLevel={analysis?.severity ?? "Pending"}
+        studyDate={studyDate}
+        visitId={visitId}
+      />
+      <PanelSection id="warnings" title="Clinical Alerts">
+        {warnings.map((warning) => (
+          <Text key={warning} style={styles.warningText}>• {warning}</Text>
+        ))}
+      </PanelSection>
+      {timelineEvents.length ? (
+        <PanelSection id="case-timeline" title="Case Timeline">
+          <EcgCaseTimelinePanel events={timelineEvents} />
         </PanelSection>
       ) : null}
       <PanelSection id="rate" title="Heart Rate">
         <MetricRow label="Heart Rate" source={sourceLabel} value={findings.heartRate.value} />
         <MetricRow label="RR Interval" source={digitalEcg ? "Digital ECG" : "Pending"} value={digitalEcg?.measurements?.rrIntervalMs != null ? `${Math.round(digitalEcg.measurements.rrIntervalMs)} ms` : "Pending"} />
-      </PanelSection>
-      <PanelSection id="rhythm" title="Rhythm">
-        <MetricRow label="Classification" source={findings.rhythm.source} value={findings.rhythm.value} />
-        {engine?.rhythm ? <MetricRow label="Engine" source="Digital ECG" value={engine.rhythm.replace(/_/g, " ")} /> : null}
       </PanelSection>
       <PanelSection id="signal-quality" title="Signal Quality">
         <MetricRow label="Resolution" value={imageWidth && imageHeight ? `${imageWidth}×${imageHeight}` : "Pending"} />
@@ -155,65 +189,32 @@ export const EcgClinicalRightPanel = memo(function EcgClinicalRightPanel({
           </Pressable>
         ) : null}
       </PanelSection>
-      <PanelSection id="notes" title="Clinical Notes">
-        <Text style={styles.notesText}>{clinicalNotes ?? "No clinical notes recorded for this study."}</Text>
+      <PanelSection id="notes" title="Doctor Notes">
+        <EcgClinicalNotesPanel initialNotes={clinicalNotes ?? ""} onNotesChange={onNotesChange} operatorName={operatorName} />
       </PanelSection>
     </>
   );
 
   const measurementsTab = (
-    <>
-      <PanelSection id="measurements" title="Measurements">
-        <EcgMeasurementsPanel workspace={workspace} />
-      </PanelSection>
-      <PanelSection id="intervals" title="Intervals">
-        <MetricRow label="PR" source={findings.prInterval.source} value={findings.prInterval.value} />
-        <MetricRow label="QRS" source={findings.qrsDuration.source} value={findings.qrsDuration.value} />
-        <MetricRow label="QT" source={findings.qtInterval.source} value={findings.qtInterval.value} />
-        <MetricRow label="QTc" source={findings.qtcInterval.source} value={findings.qtcInterval.value} />
-      </PanelSection>
-      <PanelSection id="axis" title="Axis">
-        <MetricRow label="Mean QRS Axis" source={findings.axis.source} value={findings.axis.value} />
-        {engine?.axis?.electricalAxisDeg != null ? <MetricRow label="Electrical Axis" source="Digital ECG" value={`${Math.round(engine.axis.electricalAxisDeg)}°`} /> : null}
-      </PanelSection>
-      <PanelSection id="st" title="ST">
-        <MetricRow label="ST Deviation" source={engine ? "Digital ECG" : "Pending"} value={stDisplay} />
-      </PanelSection>
-      <PanelSection id="noise" title="Noise Analysis">
-        {noiseFlags.length ? noiseFlags.map((item) => <Text key={item} style={styles.listItem}>• {item}</Text>) : <Text style={styles.listItem}>No noise mitigation applied yet.</Text>}
-      </PanelSection>
-      <PanelSection id="artifacts" title="Artifact Detection">
-        {artifactFlags.length ? artifactFlags.map((item) => <Text key={item} style={styles.listItem}>• {item}</Text>) : <Text style={styles.listItem}>No artifact flags detected.</Text>}
-      </PanelSection>
-    </>
+    <EcgMeasurementStudioPanel digitalEcg={digitalEcg} findings={findings} workspace={workspace} />
   );
 
   const aiTab = (
     <>
+      <EcgAiReviewWorkflowPanel
+        analysis={analysis}
+        confirmed={aiConfirmed}
+        explainability={explainability}
+        onConfirm={onConfirmAi}
+        onOpenReview={onOpenReview}
+      />
       <PanelSection id="diagnosis" title="AI Interpretation">
         <MetricRow label="Primary" tone={severity === "critical" || severity === "severe" ? "critical" : "primary"} value={analysis?.diagnosis ?? findings.interpretation.value} />
         <MetricRow label="Confidence" value={findings.confidence.value} />
       </PanelSection>
-      <PanelSection id="confidence" title="Confidence">
-        <MetricRow label="AI Confidence" value={findings.confidence.value} />
-        <MetricRow label="Digitization" tone={qualityTone} value={qualityScore != null ? `${qualityScore}/100` : "Pending"} />
-      </PanelSection>
-      <PanelSection id="recommendations" title="Recommendations">
-        {analysis?.recommendations?.length ? analysis.recommendations.slice(0, 6).map((item) => <Text key={item} style={styles.listItem}>• {item}</Text>) : <Text style={styles.listItem}>No recommendations generated yet.</Text>}
-      </PanelSection>
-      <PanelSection id="clinical-alerts" title="Clinical Alerts">
-        {warnings.map((warning) => (
-          <Text key={warning} style={styles.warningText}>• {warning}</Text>
-        ))}
-      </PanelSection>
       <EcgClinicalCard id="ai-inspector" title="AI Inspector">
         <EcgAiAnnotationInspector workspace={aiOverlay} />
       </EcgClinicalCard>
-      {onOpenReview ? (
-        <Pressable onPress={onOpenReview} style={styles.actionButtonOutline}>
-          <Text style={styles.actionLabelOutline}>Open Doctor Review</Text>
-        </Pressable>
-      ) : null}
     </>
   );
 
@@ -231,32 +232,17 @@ export const EcgClinicalRightPanel = memo(function EcgClinicalRightPanel({
           </Pressable>
         ) : null}
       </PanelSection>
-      <PanelSection id="status" title="Status">
+      <PanelSection id="status" title="Report Status">
         <MetricRow label="Digitization" value={digitalEcg?.status === "available" ? "Complete" : digitalEcgLoading ? "Running" : "Pending"} />
-        <MetricRow label="Signal Engine" value={digitalEcg?.measurementEngine ? "Digital ECG" : "Awaiting"} />
+        <MetricRow label="AI Review" value={analysis?.diagnosis ?? "Pending"} />
       </PanelSection>
     </>
   );
 
   const historyTab = (
     <>
-      {previousStudies.length ? (
-        <PanelSection id="previous-ecg" title="Previous Comparison">
-          {previousStudies.slice(0, 4).map((item) => (
-            <View key={item.caseId} style={styles.historyRow}>
-              <Text style={styles.historyTitle}>{item.caseNumber ?? item.caseId}</Text>
-              <Text style={styles.historyMeta}>{item.studyDate ? formatDate(item.studyDate) : "Date pending"}</Text>
-            </View>
-          ))}
-        </PanelSection>
-      ) : null}
-      <PanelSection id="history" title="History">
-        <MetricRow label="Prior Studies" value={previousStudies.length ? `${previousStudies.length} on record` : "None linked"} />
-      </PanelSection>
-      <PanelSection id="comparison" title="Comparison">
-        <MetricRow label="Compare Mode" value={previousStudies.length ? "Select prior study in left rail" : "No prior studies available"} />
-      </PanelSection>
-      <PanelSection id="timeline" title="Timeline">
+      <EcgHistoryEnginePanel currentDiagnosis={analysis?.diagnosis} onCompare={onCompareStudy} previousStudies={previousStudies} />
+      <PanelSection id="timeline" title="Study Timeline">
         {studyDate ? <MetricRow label="Current Study" value={formatDate(studyDate)} /> : null}
         {previousStudies.slice(0, 3).map((item) => (
           <MetricRow key={item.caseId} label={item.caseNumber ?? item.caseId} value={item.studyDate ? formatDate(item.studyDate) : "Pending"} />
@@ -277,23 +263,31 @@ export const EcgClinicalRightPanel = memo(function EcgClinicalRightPanel({
             : historyTab;
 
   return (
-    <View style={styles.fill} testID="sprint26-clinical-tabbed-panel" nativeID="sprint25-clinical-right-panel">
-      <View style={styles.tabBar} testID="sprint26-clinical-tabs">
+    <View style={styles.fill} testID="sprint335-clinical-right-panel" nativeID="sprint25-clinical-right-panel">
+      <View accessibilityRole="tablist" style={styles.tabBar} testID="sprint335-clinical-tabs">
         {TABS.map((tab) => (
           <Pressable
             accessibilityRole="tab"
             accessibilityState={{ selected: activeTab === tab.id }}
             key={tab.id}
             onPress={() => setActiveTab(tab.id)}
-            style={[styles.tab, activeTab === tab.id && styles.tabActive]}
+            style={({ hovered, pressed }) => [
+              styles.tab,
+              activeTab === tab.id && styles.tabActive,
+              (hovered || pressed) && styles.tabHover,
+            ]}
             testID={`sprint26-clinical-tab-${tab.id}`}
           >
-            <Text style={[styles.tabLabel, activeTab === tab.id && styles.tabLabelActive]}>{tab.label}</Text>
+            <Text style={[styles.tabLabel, activeTab === tab.id && styles.tabLabelActive]} numberOfLines={1}>
+              {tab.label}
+            </Text>
           </Pressable>
         ))}
       </View>
-      <ScrollView contentContainerStyle={styles.scroll} style={styles.tabBody}>
-        {tabContent}
+      <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false} style={styles.tabBody}>
+        <View key={activeTab} style={styles.tabPane}>
+          {tabContent}
+        </View>
       </ScrollView>
     </View>
   );
@@ -302,68 +296,66 @@ export const EcgClinicalRightPanel = memo(function EcgClinicalRightPanel({
 const styles = StyleSheet.create({
   actionButton: {
     alignItems: "center",
-    backgroundColor: medicalTheme.primary,
-    borderRadius: 8,
-    marginTop: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
+    backgroundColor: ECG_COCKPIT_COLORS.accent,
+    borderRadius: 4,
+    marginTop: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
   },
   actionButtonOutline: {
     alignItems: "center",
-    borderColor: medicalTheme.primary,
-    borderRadius: 8,
+    borderColor: ECG_COCKPIT_COLORS.accentMuted,
+    borderRadius: 4,
     borderWidth: 1,
-    marginTop: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
+    marginTop: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
   },
-  actionLabel: { color: "#03131B", fontSize: 12, fontWeight: "900" },
-  actionLabelOutline: { color: medicalTheme.primary, fontSize: 12, fontWeight: "900" },
+  actionLabel: { color: ECG_COCKPIT_COLORS.bgDeep, fontSize: 11, fontWeight: "900" },
+  actionLabelOutline: { color: ECG_COCKPIT_COLORS.accent, fontSize: 11, fontWeight: "900" },
   fill: { flex: 1, minWidth: 0, width: "100%" },
-  historyMeta: { color: medicalTheme.muted, fontSize: 10, fontWeight: "700" },
-  historyRow: {
-    borderBottomColor: "rgba(30,58,74,0.55)",
-    borderBottomWidth: 1,
-    gap: 2,
-    paddingVertical: 6,
-  },
-  historyTitle: { color: medicalTheme.text, fontSize: 12, fontWeight: "900" },
-  listBlock: { gap: 4, marginTop: 6 },
-  listItem: { color: medicalTheme.muted, fontSize: 11, fontWeight: "700", lineHeight: 16 },
-  listTitle: { color: medicalTheme.text, fontSize: 11, fontWeight: "900" },
-  metricLabel: { color: medicalTheme.muted, fontSize: 11, fontWeight: "800" },
-  metricLeft: { flex: 1, gap: 2, paddingRight: 8 },
-  metricRow: {
-    borderBottomColor: "rgba(30,58,74,0.55)",
-    borderBottomWidth: 1,
+  metricCard: {
+    alignItems: "center",
+    backgroundColor: ECG_COCKPIT_COLORS.surface,
+    borderRadius: 3,
     flexDirection: "row",
+    gap: 4,
     justifyContent: "space-between",
-    paddingVertical: 6,
+    paddingHorizontal: 5,
+    paddingVertical: 4,
   },
-  metricSource: { color: medicalTheme.primary, fontSize: 9, fontWeight: "800" },
-  metricValue: { color: medicalTheme.text, fontSize: 12, fontWeight: "900", maxWidth: "46%", textAlign: "right" },
-  notesText: { color: medicalTheme.text, fontSize: 12, fontWeight: "600", lineHeight: 18 },
-  patientMeta: { color: medicalTheme.muted, fontSize: 11, fontWeight: "700" },
-  patientName: { color: medicalTheme.text, fontSize: 14, fontWeight: "900" },
-  scroll: { gap: 8, paddingBottom: 12 },
+  metricLabel: { color: ECG_COCKPIT_COLORS.textMuted, fontSize: 8, fontWeight: "800", width: 72 },
+  metricLeft: { flex: 1, minWidth: 0 },
+  metricSource: { color: ECG_COCKPIT_COLORS.accent, fontSize: 7, fontWeight: "800" },
+  metricValue: { color: ECG_COCKPIT_COLORS.text, flexShrink: 0, fontSize: 10, fontWeight: "900", maxWidth: "52%", textAlign: "right" },
+  scroll: { gap: 4, paddingBottom: 6, paddingHorizontal: 2 },
   tab: {
     alignItems: "center",
     borderBottomColor: "transparent",
     borderBottomWidth: 2,
-    flex: 1,
+    flexGrow: 1,
+    flexShrink: 1,
     justifyContent: "center",
-    minHeight: 32,
-    paddingHorizontal: 4,
-  },
-  tabActive: { borderBottomColor: medicalTheme.primary },
+    marginHorizontal: ECG_SPACING.xs,
+    minHeight: 30,
+    minWidth: 0,
+    paddingHorizontal: ECG_SPACING.sm,
+    transitionDuration: "150ms",
+  } as never,
+  tabActive: { borderBottomColor: ECG_COCKPIT_COLORS.accent },
   tabBar: {
-    borderBottomColor: medicalTheme.border,
+    borderBottomColor: ECG_COCKPIT_COLORS.border,
     borderBottomWidth: 1,
     flexDirection: "row",
     flexShrink: 0,
+    gap: ECG_SPACING.xs,
+    paddingHorizontal: ECG_SPACING.xs,
+    paddingTop: ECG_SPACING.xs,
   },
   tabBody: { flex: 1, minHeight: 0 },
-  tabLabel: { color: medicalTheme.muted, fontSize: 10, fontWeight: "800" },
-  tabLabelActive: { color: medicalTheme.primary },
-  warningText: { color: medicalTheme.warning, fontSize: 11, fontWeight: "700", lineHeight: 16 },
+  tabHover: { backgroundColor: "rgba(20,221,230,0.06)" },
+  tabLabel: { ...ECG_TYPOGRAPHY.label, color: ECG_COCKPIT_COLORS.textMuted, textAlign: "center" },
+  tabLabelActive: { color: ECG_COCKPIT_COLORS.accent },
+  tabPane: { gap: 6 },
+  warningText: { color: ECG_COCKPIT_COLORS.warning, fontSize: 10, fontWeight: "700", lineHeight: 14 },
 });

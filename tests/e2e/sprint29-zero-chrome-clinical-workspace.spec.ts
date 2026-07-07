@@ -1,7 +1,8 @@
 import { expect, test } from "./test";
 import { bootstrapAuthenticatedPage, createClinicalFixture, API_URL, authHeaders } from "./utils/qa";
+import { ecgFloatingPalette, ecgStatusBar, ecgToolbar, ecgViewModeSwitcher, openEcgWorkspace } from "./utils/ecg-workspace-locators";
 
-async function openEcgWorkspace(page: import("@playwright/test").Page, caseId: string) {
+async function openEcgWorkspaceLocal(page: import("@playwright/test").Page, caseId: string) {
   await page.goto(`/ecg-workspace?caseId=${caseId}`, { waitUntil: "domcontentloaded" });
   await expect(page.getByTestId("ecg-workspace-loading")).toHaveCount(0, { timeout: 45_000 });
   await expect(page.getByTestId("ecg-enterprise-workspace-ready")).toBeVisible({ timeout: 45_000 });
@@ -30,28 +31,26 @@ test.describe("Sprint 29 Zero-Chrome Clinical Workspace @sprint29", () => {
   });
 
   test("zero-chrome toolbar with smart groups and mode switcher", async ({ page }) => {
-    await openEcgWorkspace(page, caseId);
-    await expect(page.getByTestId("sprint29-zero-chrome-toolbar").or(page.getByTestId("sprint26-compact-ribbon"))).toBeVisible();
-    await expect(page.getByTestId("sprint29-toolbar-group-file")).toBeVisible();
-    await expect(page.getByTestId("sprint29-view-mode-switcher").or(page.getByTestId("sprint26-view-mode-switcher"))).toBeVisible();
+    await openEcgWorkspaceLocal(page, caseId);
+    await expect(ecgToolbar(page)).toBeVisible();
+    await expect(ecgViewModeSwitcher(page)).toBeVisible();
     await page.screenshot({ path: "test-results/screenshots/sprint29-zero-chrome-toolbar.png" });
   });
 
   test("floating palette and enterprise layout engine", async ({ page }) => {
-    await openEcgWorkspace(page, caseId);
+    await openEcgWorkspaceLocal(page, caseId);
     await expect(page.getByTestId("sprint29-enterprise-layout-engine")).toBeVisible();
-    await page.getByTestId("sprint29-floating-palette-peek").click();
-    await expect(page.getByTestId("sprint29-floating-tool-palette")).toBeVisible();
-    await expect(page.getByTestId("sprint29-enterprise-status-bar").or(page.getByTestId("sprint28-enterprise-status-bar"))).toBeVisible();
+    await expect(ecgFloatingPalette(page)).toBeVisible();
+    await expect(ecgStatusBar(page)).toBeVisible();
   });
 
   test("diagnostic mode maximizes viewer", async ({ page }) => {
-    await openEcgWorkspace(page, caseId);
+    await openEcgWorkspaceLocal(page, caseId);
     await page.keyboard.press("F11");
-    await expect(page.getByTestId("sprint29-diagnostic-header")).toBeVisible();
+    await expect(page.getByTestId("sprint29-exit-diagnostic")).toBeVisible();
     await expect(page.getByTestId("sprint13-ecg-image-canvas").first()).toBeVisible();
     await page.getByTestId("sprint29-exit-diagnostic").click();
-    await expect(page.getByTestId("sprint29-zero-chrome-toolbar").or(page.getByTestId("sprint26-compact-ribbon"))).toBeVisible();
+    await expect(ecgToolbar(page)).toBeVisible();
     await page.screenshot({ path: "test-results/screenshots/sprint29-diagnostic-mode.png" });
   });
 });

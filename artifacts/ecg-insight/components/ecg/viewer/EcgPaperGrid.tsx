@@ -29,7 +29,7 @@ export const EcgPaperGrid = memo(function EcgPaperGrid({ grid, height, width, zo
           <Line
             key={`v-${index}`}
             stroke={index % 5 === 0 ? major : minor}
-            strokeWidth={index % 5 === 0 ? 0.9 : 0.35}
+            strokeWidth={index % 5 === 0 ? 0.55 : 0.2}
             x1={index * spacing}
             x2={index * spacing}
             y1={0}
@@ -40,7 +40,7 @@ export const EcgPaperGrid = memo(function EcgPaperGrid({ grid, height, width, zo
           <Line
             key={`h-${index}`}
             stroke={index % 5 === 0 ? major : minor}
-            strokeWidth={index % 5 === 0 ? 0.9 : 0.35}
+            strokeWidth={index % 5 === 0 ? 0.55 : 0.2}
             x1={0}
             x2={width}
             y1={index * spacing}

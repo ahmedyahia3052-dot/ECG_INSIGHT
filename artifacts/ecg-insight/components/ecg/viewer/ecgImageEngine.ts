@@ -116,18 +116,41 @@ export function zoomAtPoint(
   };
 }
 
+/** Target canvas fill for hospital hero framing (Sprint 33.5). */
+export const ECG_HERO_FILL_TARGET = 0.9;
+
+export function heroFitZoom(
+  containerWidth: number,
+  containerHeight: number,
+  imageWidth: number,
+  imageHeight: number,
+  targetFill = ECG_HERO_FILL_TARGET,
+) {
+  if (!containerWidth || !containerHeight || !imageWidth || !imageHeight) return 1;
+  const contain = Math.min(containerWidth / imageWidth, containerHeight / imageHeight);
+  const displayWidth = imageWidth * contain;
+  const displayHeight = imageHeight * contain;
+  const fillW = displayWidth / containerWidth;
+  const fillH = displayHeight / containerHeight;
+  const minFill = Math.min(fillW, fillH);
+  if (minFill >= targetFill) return clampZoom(contain);
+  return clampZoom(contain * (targetFill / Math.max(minFill, 0.01)));
+}
+
 export function fitZoomForDimensions(
   containerWidth: number,
   containerHeight: number,
   imageWidth: number,
   imageHeight: number,
-  mode: "width" | "height" | "100",
+  mode: "width" | "height" | "contain" | "hero" | "100",
 ) {
   if (!containerWidth || !containerHeight || !imageWidth || !imageHeight) return 1;
   if (mode === "100") return 1;
+  if (mode === "hero") return heroFitZoom(containerWidth, containerHeight, imageWidth, imageHeight);
   const contain = Math.min(containerWidth / imageWidth, containerHeight / imageHeight);
   const displayWidth = imageWidth * contain;
   const displayHeight = imageHeight * contain;
+  if (mode === "contain") return clampZoom(contain);
   if (mode === "width") return containerWidth / Math.max(displayWidth, 1);
   return containerHeight / Math.max(displayHeight, 1);
 }

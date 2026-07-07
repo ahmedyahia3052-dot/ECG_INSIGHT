@@ -2,7 +2,8 @@ import React, { memo, useCallback, useEffect, useMemo, useRef } from "react";
 import { ActivityIndicator, Image, LayoutChangeEvent, Platform, StyleSheet, Text, View } from "react-native";
 import { PanGestureHandler, PinchGestureHandler, State } from "react-native-gesture-handler";
 
-import { EmptyState, medicalTheme } from "@/components/enterprise/EnterpriseUI";
+import { EmptyState } from "@/components/enterprise/EnterpriseUI";
+import { ECG_COCKPIT_COLORS } from "./ecgCockpitColors";
 import { emitRuntimeEvent } from "@/services/runtimeEvents";
 
 import { EcgAiOverlayLayer, type EcgAiOverlayRegion } from "./EcgAiOverlayLayer";
@@ -33,6 +34,7 @@ type Props = {
   showCrosshair?: boolean;
   showDigitizedWaveform?: boolean;
   showMagnifier?: boolean;
+  showMiniNavigator?: boolean;
   testID?: string;
   workspace?: EcgMeasurementWorkspace;
 };
@@ -51,6 +53,7 @@ export const EcgProViewerEngine = memo(function EcgProViewerEngine({
   showDigitizedWaveform = true,
   showCrosshair = false,
   showMagnifier = false,
+  showMiniNavigator = true,
   testID = "sprint13-ecg-pro-viewer-engine",
   onFpsUpdate,
   onPointerMove,
@@ -68,6 +71,8 @@ export const EcgProViewerEngine = memo(function EcgProViewerEngine({
   const format = detectImageFormat(imageUrl ?? pdfUrl ?? "");
   const isPdf = format === "pdf" || (!imageUrl && !!pdfUrl);
   const viewport = controls.viewport;
+
+  const initialFitRef = useRef(false);
 
   useEffect(() => {
     if (!imageUrl) {
@@ -87,6 +92,13 @@ export const EcgProViewerEngine = memo(function EcgProViewerEngine({
     }
     setLoading(assetLoading);
   }, [assetHeight, assetLoading, assetWidth, controls.setViewportDimensions, imageUrl]);
+
+  useEffect(() => {
+    if (initialFitRef.current) return;
+    if (!viewport.containerWidth || !viewport.containerHeight || !viewport.imageWidth || !viewport.imageHeight) return;
+    initialFitRef.current = true;
+    controls.applyFit("hero");
+  }, [controls, viewport.containerHeight, viewport.containerWidth, viewport.imageHeight, viewport.imageWidth]);
 
   useEffect(() => {
     if (!pdfUrl || Platform.OS !== "web" || typeof document === "undefined") return undefined;
@@ -244,7 +256,7 @@ export const EcgProViewerEngine = memo(function EcgProViewerEngine({
           transform: layerTransform as never,
           width: rect.displayWidth,
         },
-        Platform.OS === "web" ? ({ willChange: "transform" } as never) : null,
+        Platform.OS === "web" ? ({ willChange: "transform", transform: "translateZ(0)" } as never) : null,
       ]}
     >
       {imageUrl ? (
@@ -288,7 +300,7 @@ export const EcgProViewerEngine = memo(function EcgProViewerEngine({
     >
       {loading && imageUrl ? (
         <View pointerEvents="none" style={styles.loadingOverlay} testID="sprint13-ecg-image-loading">
-          <ActivityIndicator color={medicalTheme.primary} size="large" />
+          <ActivityIndicator color={ECG_COCKPIT_COLORS.accent} size="large" />
           <Text style={styles.loadingText}>Loading ECG image…</Text>
         </View>
       ) : null}
@@ -319,7 +331,7 @@ export const EcgProViewerEngine = memo(function EcgProViewerEngine({
           />
         </View>
       ) : null}
-      {imageUrl && !isPdf ? (
+      {imageUrl && !isPdf && showMiniNavigator && viewport.containerWidth > 0 && viewport.imageWidth > 0 ? (
         <EcgMiniNavigator controls={controls} imageUrl={imageUrl} />
       ) : null}
       {imageUrl && !isPdf ? (
@@ -342,15 +354,9 @@ export const EcgProViewerEngine = memo(function EcgProViewerEngine({
       <View style={styles.wrapper} testID="sprint13-ecg-pro-viewer-engine">
         <View
           // @ts-expect-error web only
-          onDoubleClick={(event: MouseEvent) => {
-            const target = event.currentTarget as HTMLElement;
-            const rect = target.getBoundingClientRect();
-            const anchor = { x: event.clientX - rect.left, y: event.clientY - rect.top };
-            if (controls.transform.zoom >= 1.8) {
-              controls.applyFit("100");
-              return;
-            }
-            controls.zoomAtAnchor(anchor, 0.6);
+          onDoubleClick={() => {
+            controls.resetView();
+            controls.applyFit("hero");
           }}
           style={styles.wrapper}
         >
@@ -393,12 +399,10 @@ export const EcgProViewerEngine = memo(function EcgProViewerEngine({
 
 const styles = StyleSheet.create({
   canvas: {
-    backgroundColor: "#040E1A",
-    borderColor: medicalTheme.border,
-    borderRadius: 12,
-    borderWidth: 1,
+    backgroundColor: ECG_COCKPIT_COLORS.bgDeep,
+    borderRadius: 0,
     flex: 1,
-    minHeight: 320,
+    minHeight: 0,
     overflow: "hidden",
     position: "relative",
   },
@@ -425,26 +429,27 @@ const styles = StyleSheet.create({
     zIndex: 20,
   },
   loadingText: {
-    color: medicalTheme.muted,
-    fontSize: 13,
+    color: ECG_COCKPIT_COLORS.textMuted,
+    fontSize: 12,
     fontWeight: "700",
-    marginTop: 8,
+    marginTop: 6,
   },
   pdfFrame: {
     flex: 1,
-    minHeight: 320,
+    minHeight: 0,
   },
   pdfPane: {
     flex: 1,
-    minHeight: 320,
+    minHeight: 0,
   },
   stage: {
     alignItems: "center",
     flex: 1,
     justifyContent: "center",
+    minHeight: 0,
   },
   wrapper: {
     flex: 1,
-    minHeight: 320,
+    minHeight: 0,
   },
 });

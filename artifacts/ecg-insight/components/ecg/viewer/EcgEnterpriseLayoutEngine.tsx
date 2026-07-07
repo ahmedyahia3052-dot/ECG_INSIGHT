@@ -24,10 +24,10 @@ export function EcgEnterpriseLayoutEngine({
   rightWidth,
 }: {
   autoHidePanels?: boolean;
-  bottom: ReactNode;
-  center: ReactNode;
+  bottom: React.ReactNode | null;
+  center: React.ReactNode;
   diagnosticMode?: boolean;
-  left: ReactNode;
+  left: React.ReactNode | null;
   leftCollapsed: boolean;
   leftPinned?: boolean;
   leftWidth?: number;
@@ -35,7 +35,7 @@ export function EcgEnterpriseLayoutEngine({
   onLeftWidthChange?: (width: number) => void;
   onRightCollapsedChange?: (collapsed: boolean) => void;
   onRightWidthChange?: (width: number) => void;
-  right: ReactNode;
+  right: React.ReactNode | null;
   rightCollapsed: boolean;
   rightPinned?: boolean;
   rightWidth?: number;
@@ -60,8 +60,8 @@ export function EcgEnterpriseLayoutEngine({
     if (hideTimerRef.current) clearTimeout(hideTimerRef.current);
   }, []);
 
-  const effectiveLeftCollapsed = diagnosticMode ? true : leftCollapsed;
-  const effectiveRightCollapsed = diagnosticMode ? true : rightCollapsed;
+  const effectiveLeftCollapsed = diagnosticMode || !left ? true : leftCollapsed;
+  const effectiveRightCollapsed = diagnosticMode || !right ? true : rightCollapsed;
 
   const hoverProps = (edge: "left" | "right") =>
     Platform.OS === "web"
@@ -78,14 +78,15 @@ export function EcgEnterpriseLayoutEngine({
   return (
     <View nativeID="sprint29-enterprise-layout-engine" style={styles.root} testID="sprint29-enterprise-layout-engine">
       <EcgWorkstationGridShell
-        bottom={bottom}
+        bottom={diagnosticMode ? null : bottom}
         center={center}
-        left={<View {...hoverProps("left")} style={styles.panelHost}>{left}</View>}
+        diagnosticMode={diagnosticMode}
+        left={left ? <View {...hoverProps("left")} style={styles.panelHost}>{left}</View> : null}
         leftCollapsed={effectiveLeftCollapsed}
         leftWidth={leftWidth}
         onLeftWidthChange={onLeftWidthChange}
         onRightWidthChange={onRightWidthChange}
-        right={<View {...hoverProps("right")} style={styles.panelHost}>{right}</View>}
+        right={right ? <View {...hoverProps("right")} style={styles.panelHost}>{right}</View> : null}
         rightCollapsed={effectiveRightCollapsed}
         rightWidth={rightWidth}
       />

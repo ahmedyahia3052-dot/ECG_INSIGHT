@@ -1,7 +1,9 @@
 import React, { memo } from "react";
 import { Platform, StyleSheet, View } from "react-native";
 
-/** Sprint 25 — crosshair cursor and magnifier lens overlay for ECG viewer. */
+import { ECG_COCKPIT_COLORS } from "./ecgCockpitColors";
+
+/** Sprint 33 — smooth medical crosshair overlay. */
 export const EcgViewerCrosshairOverlay = memo(function EcgViewerCrosshairOverlay({
   containerHeight,
   containerWidth,
@@ -23,9 +25,9 @@ export const EcgViewerCrosshairOverlay = memo(function EcgViewerCrosshairOverlay
 }) {
   if (Platform.OS !== "web" || !pointer || (!showCrosshair && !magnifierEnabled)) return null;
 
-  const lensSize = 120;
-  const lensLeft = Math.min(Math.max(pointer.x + 16, 8), Math.max(containerWidth - lensSize - 8, 8));
-  const lensTop = Math.min(Math.max(pointer.y + 16, 8), Math.max(containerHeight - lensSize - 8, 8));
+  const lensSize = 108;
+  const lensLeft = Math.min(Math.max(pointer.x + 12, 6), Math.max(containerWidth - lensSize - 6, 6));
+  const lensTop = Math.min(Math.max(pointer.y + 12, 6), Math.max(containerHeight - lensSize - 6, 6));
   const bgX = pointer.imageX * zoom * 2 - lensSize / 2;
   const bgY = pointer.imageY * zoom * 2 - lensSize / 2;
 
@@ -35,20 +37,12 @@ export const EcgViewerCrosshairOverlay = memo(function EcgViewerCrosshairOverlay
         <>
           <View style={[styles.lineV, { left: pointer.x }]} />
           <View style={[styles.lineH, { top: pointer.y }]} />
-          <View style={[styles.dot, { left: pointer.x - 3, top: pointer.y - 3 }]} />
+          <View style={[styles.dot, { left: pointer.x - 2.5, top: pointer.y - 2.5 }]} />
         </>
       ) : null}
       {magnifierEnabled && imageWidth > 0 && imageHeight > 0 ? (
         <View
-          style={[
-            styles.lens,
-            {
-              height: lensSize,
-              left: lensLeft,
-              top: lensTop,
-              width: lensSize,
-            },
-          ]}
+          style={[styles.lens, { height: lensSize, left: lensLeft, top: lensTop, width: lensSize }]}
           testID="sprint25-viewer-magnifier"
         >
           <View
@@ -68,36 +62,33 @@ export const EcgViewerCrosshairOverlay = memo(function EcgViewerCrosshairOverlay
 
 const styles = StyleSheet.create({
   dot: {
-    backgroundColor: "#22C55E",
+    backgroundColor: ECG_COCKPIT_COLORS.accent,
     borderRadius: 999,
-    height: 6,
+    height: 5,
     position: "absolute",
-    width: 6,
+    width: 5,
   },
   lens: {
-    borderColor: "#22C55E",
+    borderColor: ECG_COCKPIT_COLORS.accent,
     borderRadius: 999,
-    borderWidth: 2,
+    borderWidth: 1,
     overflow: "hidden",
     position: "absolute",
-    shadowColor: "#22C55E",
-    shadowOpacity: 0.35,
-    shadowRadius: 8,
   },
   lensInner: {
-    backgroundColor: "#020617",
+    backgroundColor: ECG_COCKPIT_COLORS.bgDeep,
     height: "100%",
     width: "100%",
   },
   lineH: {
-    backgroundColor: "rgba(34,197,94,0.55)",
+    backgroundColor: "rgba(20,221,230,0.45)",
     height: 1,
     left: 0,
     position: "absolute",
     right: 0,
   },
   lineV: {
-    backgroundColor: "rgba(34,197,94,0.55)",
+    backgroundColor: "rgba(20,221,230,0.45)",
     bottom: 0,
     position: "absolute",
     top: 0,

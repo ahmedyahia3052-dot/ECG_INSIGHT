@@ -134,19 +134,16 @@ export function EcgEnterpriseWorkspaceScreen({
 
   return (
     <View style={styles.page} testID="ecg-enterprise-workspace-ready">
-      <PageSection style={styles.pageInner}>
-        <EcgMonitorViewerFoundation
-          ecgCase={caseQuery.data.case}
-          historyCases={historyQuery.data?.cases ?? []}
-          patient={patientQuery.data.patient}
-        />
-      </PageSection>
+      <EcgMonitorViewerFoundation
+        ecgCase={caseQuery.data.case}
+        historyCases={historyQuery.data?.cases ?? []}
+        patient={patientQuery.data.patient}
+      />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  loadingRoot: { flex: 1, minHeight: 720 },
-  page: { flex: 1, minHeight: 720 },
-  pageInner: { flex: 1, minHeight: 720 },
+  loadingRoot: { flex: 1, minHeight: 0 },
+  page: { flex: 1, minHeight: 0 },
 });

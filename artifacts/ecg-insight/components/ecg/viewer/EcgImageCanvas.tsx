@@ -104,9 +104,9 @@ export function EcgImageCanvas({
     }
     return (
       <View style={styles.waveformHost} testID="sprint18-waveform-view">
-        <View style={[styles.waveformStage, { height: Math.max(rectH * 0.55, 420) }]}>
-          <EcgPaperGrid grid={controls.grid} height={rectH * 0.55} width={rectW} zoom={controls.transform.zoom} />
-          <EcgDigitizedWaveformLayer height={rectH * 0.55} leads={digitizedLeads} width={rectW} />
+        <View style={styles.waveformStage}>
+          <EcgPaperGrid grid={controls.grid} height={rectH} width={rectW} zoom={controls.transform.zoom} />
+          <EcgDigitizedWaveformLayer height={rectH} leads={digitizedLeads} width={rectW} />
         </View>
       </View>
     );
@@ -164,16 +164,12 @@ export function EcgImageCanvas({
 }
 
 const styles = StyleSheet.create({
-  host: { backgroundColor: "#040E1A", flex: 1, minHeight: 320, position: "relative" },
+  host: { backgroundColor: "#040E1A", flex: 1, minHeight: 0, position: "relative" },
   waveformHost: {
     backgroundColor: "#020617",
-    borderColor: medicalTheme.border,
-    borderRadius: 12,
-    borderWidth: 1,
     flex: 1,
     minHeight: 320,
     overflow: "hidden",
-    padding: 8,
   },
-  waveformStage: { overflow: "hidden", position: "relative", width: "100%" },
+  waveformStage: { flex: 1, overflow: "hidden", position: "relative", width: "100%" },
 });

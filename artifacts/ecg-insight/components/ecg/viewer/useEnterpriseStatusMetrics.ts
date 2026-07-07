@@ -1,7 +1,9 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Platform } from "react-native";
 
 import { API_URL } from "@/services/api";
+
+import { ECG_WORKSTATION_VISUAL } from "./ecgWorkstationVisualTokens";
 
 type MemoryInfo = {
   jsHeapMb?: number;
@@ -28,18 +30,29 @@ const DEFAULT_METRICS: EnterpriseStatusMetrics = {
   transport: "REST",
 };
 
+/** Sprint 31 — throttled status metrics (max 2 updates/sec). */
 export function useEnterpriseStatusMetrics(input: {
   aiOverlayEnabled?: boolean;
   annotationCount?: number;
   viewMode?: string;
 }) {
   const [metrics, setMetrics] = useState<EnterpriseStatusMetrics>(DEFAULT_METRICS);
+  const latestRef = useRef<Partial<EnterpriseStatusMetrics>>({});
+  const lastPublishRef = useRef(0);
 
   useEffect(() => {
     if (Platform.OS !== "web" || typeof window === "undefined") return undefined;
 
     let frame = 0;
     let last = performance.now();
+    const interval = ECG_WORKSTATION_VISUAL.statusBarUpdateIntervalMs;
+
+    const publish = (now: number) => {
+      if (now - lastPublishRef.current < interval) return;
+      lastPublishRef.current = now;
+      setMetrics((current) => ({ ...current, ...latestRef.current }));
+    };
+
     const tick = () => {
       const now = performance.now();
       const renderTimeMs = Math.round(now - last);
@@ -49,8 +62,7 @@ export function useEnterpriseStatusMetrics(input: {
         memory?: { jsHeapSizeLimit: number; usedJSHeapSize: number };
       };
 
-      setMetrics((current) => ({
-        ...current,
+      latestRef.current = {
         aiStatus: input.aiOverlayEnabled
           ? `Active (${input.annotationCount ?? 0})`
           : input.viewMode === "overlay"
@@ -63,15 +75,16 @@ export function useEnterpriseStatusMetrics(input: {
               jsHeapLimitMb: Math.round(perf.memory.jsHeapSizeLimit / 1024 / 1024),
               jsHeapMb: Math.round(perf.memory.usedJSHeapSize / 1024 / 1024),
             }
-          : current.memory,
+          : metrics.memory,
         renderTimeMs,
-      }));
+      };
+      publish(now);
       frame = requestAnimationFrame(tick);
     };
 
     frame = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(frame);
-  }, [input.aiOverlayEnabled, input.annotationCount, input.viewMode]);
+  }, [input.aiOverlayEnabled, input.annotationCount, input.viewMode, metrics.memory]);
 
   useEffect(() => {
     if (Platform.OS !== "web") return undefined;

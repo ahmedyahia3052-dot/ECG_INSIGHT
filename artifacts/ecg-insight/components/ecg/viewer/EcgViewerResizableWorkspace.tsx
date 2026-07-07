@@ -4,7 +4,7 @@ import { Platform, StyleSheet, View } from "react-native";
 import { EcgEnterpriseLayoutEngine } from "./EcgEnterpriseLayoutEngine";
 import { ECG_WORKSTATION_VISUAL } from "./ecgWorkstationVisualTokens";
 
-const LAYOUT_KEY = "ecg-insight:ecg-monitor-panel-layout-v4";
+const LAYOUT_KEY = "ecg-insight:ecg-monitor-panel-layout-v8";
 
 type SavedLayout = {
   autoHidePanels?: boolean;
@@ -24,6 +24,9 @@ function loadLayout(): SavedLayout {
   try {
     const raw =
       window.localStorage.getItem(LAYOUT_KEY) ??
+      window.localStorage.getItem("ecg-insight:ecg-monitor-panel-layout-v7") ??
+      window.localStorage.getItem("ecg-insight:ecg-monitor-panel-layout-v6") ??
+      window.localStorage.getItem("ecg-insight:ecg-monitor-panel-layout-v5") ??
       window.localStorage.getItem("ecg-insight:ecg-monitor-panel-layout-v3") ??
       window.localStorage.getItem("ecg-insight:ecg-monitor-panel-layout-v2");
     return {
@@ -49,13 +52,13 @@ function saveLayout(layout: SavedLayout) {
 }
 
 type Props = {
-  bottom: ReactNode;
+  bottom: ReactNode | null;
   center: ReactNode;
   diagnosticMode?: boolean;
   layout?: SavedLayout;
-  left: ReactNode;
+  left: ReactNode | null;
   onLayoutChange?: (layout: SavedLayout) => void;
-  right: ReactNode;
+  right: ReactNode | null;
 };
 
 export function EcgViewerResizableWorkspace({ bottom, center, diagnosticMode = false, layout: controlledLayout, left, onLayoutChange, right }: Props) {

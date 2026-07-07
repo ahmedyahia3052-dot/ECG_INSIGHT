@@ -352,7 +352,7 @@ export function EnterpriseShell({ children }: PropsWithChildren) {
 
   return (
     <View style={styles.shellRoot}>
-      {!isMobile ? sidebar : null}
+      {!isEcgMonitorWorkspace && !isMobile ? sidebar : null}
       {isMobile && drawerOpen ? (
         <View style={styles.mobileOverlay}>
           <Pressable style={styles.backdrop} onPress={closeDrawer} />

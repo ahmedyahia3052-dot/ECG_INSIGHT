@@ -7,6 +7,7 @@ import { ECG_WORKSTATION_VISUAL } from "./ecgWorkstationVisualTokens";
 export function EcgWorkstationGridShell({
   bottom,
   center,
+  diagnosticMode = false,
   left,
   leftCollapsed,
   leftWidth = ECG_WORKSTATION_VISUAL.leftExpandedWidth,
@@ -16,14 +17,15 @@ export function EcgWorkstationGridShell({
   rightCollapsed,
   rightWidth = ECG_WORKSTATION_VISUAL.rightExpandedWidth,
 }: {
-  bottom: ReactNode;
+  bottom: ReactNode | null;
   center: ReactNode;
-  left: ReactNode;
+  diagnosticMode?: boolean;
+  left: ReactNode | null;
   leftCollapsed: boolean;
   leftWidth?: number;
   onLeftWidthChange?: (width: number) => void;
   onRightWidthChange?: (width: number) => void;
-  right: ReactNode;
+  right: ReactNode | null;
   rightCollapsed: boolean;
   rightWidth?: number;
 }) {
@@ -69,8 +71,11 @@ export function EcgWorkstationGridShell({
   );
 
   const gap = ECG_WORKSTATION_VISUAL.workspaceGap;
-  const leftCol = leftCollapsed ? `${ECG_WORKSTATION_VISUAL.leftCollapsedWidth}px` : `${leftWidth}px`;
-  const rightCol = rightCollapsed ? `${ECG_WORKSTATION_VISUAL.rightCollapsedWidth}px` : `${rightWidth}px`;
+  const hideLeft = diagnosticMode || !left;
+  const hideRight = diagnosticMode || !right;
+  const hideBottom = diagnosticMode || !bottom;
+  const leftCol = hideLeft ? "0px" : leftCollapsed ? `${ECG_WORKSTATION_VISUAL.leftCollapsedWidth}px` : `${leftWidth}px`;
+  const rightCol = hideRight ? "0px" : rightCollapsed ? `${ECG_WORKSTATION_VISUAL.rightCollapsedWidth}px` : `${rightWidth}px`;
 
   if (Platform.OS !== "web") {
     return (
@@ -94,19 +99,23 @@ export function EcgWorkstationGridShell({
         boxSizing: "border-box",
         display: "grid",
         gap,
-        gridTemplateAreas: `
+        gridTemplateAreas: hideBottom
+          ? `"center"`
+          : `
           "left center right"
           "bottom bottom bottom"
         `,
-        gridTemplateColumns: `${leftCol} minmax(0, 1fr) ${rightCol}`,
-        gridTemplateRows: "minmax(0, 1fr) auto",
+        gridTemplateColumns: hideLeft && hideRight ? "minmax(0, 1fr)" : `${leftCol} minmax(0, 1fr) ${rightCol}`,
+        gridTemplateRows: hideBottom ? "minmax(0, 1fr)" : "minmax(0, 1fr) auto",
         height: "100%",
         minHeight: 0,
         overflow: "hidden",
         width: "100%",
       },
     },
-    createElement(
+    hideLeft
+      ? null
+      : createElement(
       "div",
       {
         style: {
@@ -131,7 +140,9 @@ export function EcgWorkstationGridShell({
         : null,
     ),
     createElement("div", { style: { display: "flex", gridArea: "center", minHeight: 0, minWidth: 0, overflow: "hidden" } }, center),
-    createElement(
+    hideRight
+      ? null
+      : createElement(
       "div",
       {
         style: {
@@ -155,7 +166,7 @@ export function EcgWorkstationGridShell({
         : null,
       right,
     ),
-    createElement("div", { style: { gridArea: "bottom", minHeight: 0, minWidth: 0, overflow: "hidden" } }, bottom),
+    hideBottom ? null : createElement("div", { style: { gridArea: "bottom", minHeight: 0, minWidth: 0, overflow: "hidden" } }, bottom),
   );
 }
 

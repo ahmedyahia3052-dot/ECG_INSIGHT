@@ -30,9 +30,16 @@ assertContains("artifacts/ecg-insight/components/ecg/viewer/useEcgWorkspaceCaseR
 ]);
 
 assertContains("artifacts/ecg-insight/components/ecg/viewer/EcgMonitorViewerFoundation.tsx", [
-  'title="ECG Pro Clinical Workstation 2.0"',
+  "sprint30-clinical-workflow-ready",
   "sprint13-ecg-monitor-ready",
-  "EcgViewerToolbar",
+  "EcgWorkstationToolbar",
+  "EcgClinicalRightPanel",
+  "useClinicalWorkflowEngine",
+]);
+
+assertContains("artifacts/ecg-insight/components/ecg/viewer/EcgClinicalRightPanel.tsx", [
+  "sprint33-clinical-right-panel",
+  "EcgMeasurementStudioPanel",
 ]);
 
 assertContains("artifacts/ecg-insight/components/ecg/viewer/EcgViewerRightRail.tsx", [

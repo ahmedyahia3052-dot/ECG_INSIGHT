@@ -3,7 +3,7 @@ export type EcgGridGain = 5 | 10 | 20;
 
 export type EcgImageFormat = "png" | "jpg" | "jpeg" | "webp" | "tiff" | "bmp" | "pdf" | "unknown";
 
-export type EcgViewerFitMode = "none" | "width" | "height" | "100";
+export type EcgViewerFitMode = "none" | "width" | "height" | "contain" | "hero" | "100";
 
 export type EcgImageAdjustments = {
   brightness: number;

@@ -3,6 +3,12 @@ import { API_URL, apiLogin, authHeaders, attachA11yScan, bootstrapAuthenticatedP
 import { createPipelineFixture, validateCopilotStream, validateEcgPipeline, validatePdfParse } from "./utils/enterprise-pipeline";
 import { createSyntheticEcgPngBuffer } from "./utils/ecg-fixture-image";
 import { installCopilotVoiceMocks } from "./utils/voice-mocks";
+import {
+  assertWorkspaceShell,
+  ecgRightRail,
+  ensureLeftPanelOpen,
+  openEcgWorkspace,
+} from "./utils/ecg-workspace-locators";
 
 test.describe("ECG Insight Enterprise — Full Validation @enterprise @e2e", () => {
   test("API: complete ECG pipeline — preprocessing, digitization, measurement, interpretation, AI diagnosis", async ({ request }) => {
@@ -79,15 +85,11 @@ test.describe("ECG Insight Enterprise — Full Validation @enterprise @e2e", () 
 
   test("UI: ECG workspace route loads enterprise clinical viewer", async ({ page }) => {
     await bootstrapAuthenticatedPage(page, "doctor");
-    await page.goto("/ecg-workspace", { waitUntil: "domcontentloaded" });
-    await expect(
-      page.getByTestId("ecg-enterprise-workspace-ready").or(page.getByTestId("ecg-workspace-no-demo")),
-    ).toBeVisible({ timeout: 60_000 });
+    await openEcgWorkspace(page);
     if (await page.getByTestId("ecg-enterprise-workspace-ready").isVisible()) {
-      await expect(page.getByText("ECG Pro Clinical Workspace")).toBeVisible();
-      await expect(page.getByTestId("sprint13-ecg-viewer-toolbar")).toBeVisible();
-      await expect(page.getByTestId("sprint165-ecg-left-rail")).toBeVisible();
-      await expect(page.getByTestId("sprint165-ecg-right-rail")).toBeVisible();
+      await assertWorkspaceShell(page);
+      await ensureLeftPanelOpen(page);
+      await expect(ecgRightRail(page)).toBeVisible();
     }
   });
 
@@ -201,7 +203,12 @@ test.describe("ECG Insight Enterprise — Full Validation @enterprise @e2e", () 
       await attachA11yScan(page, testInfo, `enterprise-${path.replace(/\W+/g, "-")}`);
     }
     await page.goto("/ecg-workspace", { waitUntil: "domcontentloaded" });
-    await expect(page.getByText("ECG Pro Clinical Workspace")).toBeVisible({ timeout: 60_000 });
+    await expect(page.getByTestId("ecg-enterprise-workspace-ready").or(page.getByTestId("ecg-workspace-no-demo"))).toBeVisible({
+      timeout: 60_000,
+    });
+    if (await page.getByTestId("ecg-enterprise-workspace-ready").isVisible()) {
+      await assertWorkspaceShell(page);
+    }
     await attachA11yScan(page, testInfo, "enterprise-ecg-workspace");
   });
 

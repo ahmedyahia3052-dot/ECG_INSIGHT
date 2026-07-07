@@ -314,7 +314,6 @@ export const EcgMeasurementOverlay = memo(function EcgMeasurementOverlay({
   return (
     <View
       {...panResponder.panHandlers}
-      accessibilityLabel="ECG measurement overlay"
       pointerEvents={interactive ? "auto" : "none"}
       style={StyleSheet.absoluteFill}
       testID="sprint13-ecg-measurement-overlay"

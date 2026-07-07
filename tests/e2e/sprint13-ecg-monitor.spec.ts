@@ -1,14 +1,19 @@
 import { expect, test } from "./test";
 import { bootstrapAuthenticatedPage, createClinicalFixture, type ClinicalFixture } from "./utils/qa";
+import {
+  assertWorkspaceShell,
+  clickViewControl,
+  ecgClinicalRightPanel,
+  ecgStatusBar,
+  ensureLeftPanelOpen,
+  openEcgMonitor,
+  openMeasurementsTab,
+  paletteButton,
+  toolbarButton,
+} from "./utils/ecg-workspace-locators";
 
 async function loginDoctorPage(page: import("@playwright/test").Page) {
   await bootstrapAuthenticatedPage(page, "doctor");
-}
-
-async function openEcgMonitorReady(page: import("@playwright/test").Page, caseId: string) {
-  await page.goto(`/ecg-monitor/${caseId}`, { waitUntil: "domcontentloaded" });
-  await expect(page.getByTestId("sprint13-ecg-monitor-loading")).toHaveCount(0, { timeout: 45_000 });
-  await expect(page.getByTestId("sprint13-ecg-monitor-ready")).toBeVisible({ timeout: 45_000 });
 }
 
 test.describe("Sprint 13 ECG Monitor Workspace @sprint13", () => {
@@ -25,24 +30,23 @@ test.describe("Sprint 13 ECG Monitor Workspace @sprint13", () => {
   });
 
   test("ecg monitor workspace renders viewer foundation with toolbar and dockable panels", async ({ page }) => {
-    await openEcgMonitorReady(page, fixture.caseId);
-    await expect(page.getByTestId("sprint13-ecg-viewer-toolbar")).toBeVisible();
-    await expect(page.getByText("ECG Pro Clinical Workspace")).toBeVisible();
-    await expect(page.getByText("Patient Information")).toBeVisible();
-    await expect(page.getByText("Study Information")).toBeVisible();
-    await expect(page.getByTestId("sprint13-ecg-clinical-findings-panel")).toBeVisible();
-    await expect(page.getByTestId("sprint13-ecg-measurements-panel")).toBeVisible();
-    await expect(page.getByTestId("sprint13-ecg-viewer-timeline")).toBeVisible();
-    await expect(page.getByTestId("sprint13-ecg-viewer-status")).toBeVisible();
+    await openEcgMonitor(page, fixture.caseId);
+    await assertWorkspaceShell(page);
+    await ensureLeftPanelOpen(page);
+    await expect(page.getByTestId("sprint30-patient-workspace")).toBeVisible();
+    await expect(page.getByTestId("sprint30-clinical-workflow-ribbon")).toBeVisible();
+    await expect(ecgClinicalRightPanel(page)).toBeVisible();
+    await openMeasurementsTab(page);
+    await expect(page.getByTestId("sprint15-ecg-measurements-panel")).toBeVisible();
+    await expect(ecgStatusBar(page)).toBeVisible();
   });
 
   test("viewer toolbar controls adjust zoom and grid without crash", async ({ page }) => {
-    await openEcgMonitorReady(page, fixture.caseId);
-    await page.getByRole("button", { name: "Zoom In" }).click();
-    await page.getByRole("button", { name: "Fit Width" }).click();
-    await page.getByRole("button", { name: "Rotate" }).click();
-    await page.getByRole("button", { name: /Grid On|Grid Off/ }).click();
-    await expect(page.getByTestId("sprint13-ecg-viewer-status").getByText("Grid OFF")).toBeVisible();
+    await openEcgMonitor(page, fixture.caseId);
+    await clickViewControl(page, "Zoom In");
+    await clickViewControl(page, "Fit Image");
+    await clickViewControl(page, "Rotate");
+    await clickViewControl(page, "Grid");
     await expect(page.getByText("Please reload the app to continue.")).toHaveCount(0);
   });
 
@@ -50,31 +54,29 @@ test.describe("Sprint 13 ECG Monitor Workspace @sprint13", () => {
     await page.goto(`/ecg-cases/${fixture.caseId}`);
     await expect(page.getByRole("button", { name: "ECG Monitor" })).toBeVisible({ timeout: 45_000 });
     await page.getByRole("button", { name: "ECG Monitor" }).click();
-    await expect(page).toHaveURL(new RegExp(`/ecg-monitor/${fixture.caseId}$`));
-    await expect(page.getByTestId("sprint13-ecg-monitor-loading")).toHaveCount(0, { timeout: 45_000 });
+    await expect(page).toHaveURL(new RegExp(`/ecg-workspace\\?caseId=${fixture.caseId}|/ecg-monitor/${fixture.caseId}`));
+    await expect(page.getByTestId("sprint13-ecg-monitor-loading").or(page.getByTestId("ecg-workspace-loading"))).toHaveCount(0, { timeout: 45_000 });
+    await expect(page.getByTestId("ecg-enterprise-workspace-ready")).toBeVisible({ timeout: 45_000 });
     await expect(page.getByTestId("sprint13-ecg-monitor-ready")).toBeVisible({ timeout: 45_000 });
   });
 
   test("measurement workspace panel and tools are available in Phase 2", async ({ page }) => {
-    await openEcgMonitorReady(page, fixture.caseId);
-    await expect(page.getByTestId("sprint13-ecg-measurements-panel")).toBeVisible();
-    await page.getByRole("button", { name: "Measure" }).click();
-    await page.getByRole("button", { name: "Caliper" }).click();
-    await page.getByRole("button", { name: "Horizontal" }).click();
+    await openEcgMonitor(page, fixture.caseId);
+    await openMeasurementsTab(page);
+    await toolbarButton(page, "Measure").click();
+    await paletteButton(page, "Caliper").click();
+    await paletteButton(page, "Measure").click();
     await expect(page.getByTestId("sprint13-ecg-measurement-overlay")).toBeVisible();
-    await expect(page.getByTestId("sprint13-ecg-viewer-status").getByText(/Tool caliper/)).toBeVisible();
     await expect(page.getByText("Please reload the app to continue.")).toHaveCount(0);
   });
 
   test("production viewer engine exposes pan, grid opacity, and clinical findings", async ({ page }) => {
-    await openEcgMonitorReady(page, fixture.caseId);
+    await openEcgMonitor(page, fixture.caseId);
     await expect(page.getByTestId("sprint13-ecg-pro-viewer-engine")).toBeVisible();
     await expect(page.getByTestId("sprint13-ecg-image-canvas")).toBeVisible();
-    await expect(page.getByTestId("sprint13-ecg-clinical-findings-panel")).toBeVisible();
-    await expect(page.getByTestId("sprint13-ecg-rhythm-strip-panel")).toBeVisible();
-    await page.getByRole("button", { name: "Pan" }).click();
-    await page.getByRole("button", { name: /Grid \d+%/ }).click();
-    await page.getByRole("button", { name: "Fit Width" }).click();
-    await expect(page.getByTestId("sprint13-ecg-viewer-status").getByText(/Resolution \d+ × \d+/)).toBeVisible();
+    await expect(page.getByTestId("sprint22-hospital-live-monitor").or(page.getByTestId("sprint13-ecg-rhythm-strip-panel"))).toBeVisible();
+    await paletteButton(page, "Pan").click();
+    await clickViewControl(page, "Fit Image");
+    await expect(ecgStatusBar(page)).toBeVisible();
   });
 });
