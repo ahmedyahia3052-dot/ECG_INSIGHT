@@ -4,6 +4,7 @@ export const HMI_LAYOUT = {
   bottomBarHeight: 44,
   canvasViewportRatio: 0.94,
   chromeCompact: 20,
+  diagnosticViewportRatio: 0.95,
   leftRailExpanded: 168,
   leftRailCollapsed: 36,
   rightRailExpanded: 200,

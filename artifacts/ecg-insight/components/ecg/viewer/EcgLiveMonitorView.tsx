@@ -315,7 +315,7 @@ export const EcgLiveMonitorView = memo(function EcgLiveMonitorView({
   const showWorkspaceChrome = chrome === "workspace";
   const canvasOnly = chrome === "canvas-only";
 
-  const layoutLabel = layoutModeLabel(layoutMode, selectedLead, rhythmStripMode, String(rhythmStripLead));
+  const layoutLabel = layoutModeLabel(layoutMode, selectedLead, rhythmStripMode, String(rhythmStripLead), engine?.isolatedLead ?? null);
 
   if (!lead && !leadsForRender.length) {
     return (

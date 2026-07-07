@@ -10,12 +10,14 @@ export function useEcgLiveMonitorShortcuts({
   engine,
   onDiagnostic,
   onExitMonitor,
+  onToggleAudioMute,
 }: {
   controls: EcgViewerControls;
   enabled?: boolean;
   engine: EcgLiveMonitorEngine;
   onDiagnostic?: () => void;
   onExitMonitor: () => void;
+  onToggleAudioMute?: () => void;
 }) {
   useEffect(() => {
     if (!enabled || Platform.OS !== "web" || typeof window === "undefined") return undefined;
@@ -48,6 +50,11 @@ export function useEcgLiveMonitorShortcuts({
         case "L":
           event.preventDefault();
           engine.setLoop(!engine.loop);
+          break;
+        case "m":
+        case "M":
+          event.preventDefault();
+          onToggleAudioMute?.();
           break;
         case "F11":
           event.preventDefault();
@@ -115,5 +122,5 @@ export function useEcgLiveMonitorShortcuts({
 
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [controls, enabled, engine, onDiagnostic, onExitMonitor]);
+  }, [controls, enabled, engine, onDiagnostic, onExitMonitor, onToggleAudioMute]);
 }

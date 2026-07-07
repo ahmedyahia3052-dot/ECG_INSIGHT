@@ -1,5 +1,31 @@
 # Changelog — Enterprise QA Infrastructure
 
+## Sprint 50 — Real Hospital ECG Monitor Experience — 2026-07-07
+
+### Added
+- **Live Monitor Audio module** (`live-monitor-audio/`) — R-wave synced Web Audio beeps (adult/pediatric/silent/mute), PVC tone, volume control, `M` shortcut
+- **Professional interval HUD** (`live-monitor-pro/`) — HR, RR, PR, QRS, QT, QTc plus acquisition telemetry
+- **Hospital layout modes** — 6×2, 3×4, dual, quad (extends Sprint 45 monitor layouts)
+- **Lead focus mode** — instant full-monitor focus on any standard lead
+- **Comparison presets** — II vs V5, inferior, anterior, lateral
+- **Rhythm strip windows** — 10s, 20s, 30s, continuous selector
+- Diagnostic viewport ratio **95%** (Sprint 49 HMI preserved)
+- Playwright: `tests/e2e/sprint50-real-hospital-monitor.spec.ts`
+- Integration: `scripts/sprint50-real-hospital-monitor.integration.ts`
+- Reports: `SPRINT50_FINAL_REPORT.md`, `ECG_AUDIO_ENGINE_REPORT.md`, `TWELVE_LEAD_MONITOR_REPORT.md`, `LEAD_FOCUS_REPORT.md`, `RHYTHM_STRIP_REPORT.md`, `PERFORMANCE_REPORT.md`, `PLAYWRIGHT_REPORT.md`, `VISUAL_QA_REPORT.md`
+
+### Preserved
+- Render Engine 2.0, `EcgLiveMonitorView` canvas internals, backend, AI, digitization, reports
+- All Sprint 37/41/45/49 testIDs and live monitor shortcuts
+
+### Validated
+- `npm run lint` / `typecheck` / `build` — PASS
+
+### Tag
+- `Sprint50-HospitalMonitorExperience`
+
+---
+
 ## Sprint 49 — Hospital ECG Monitor HMI — 2026-07-07
 
 ### Added

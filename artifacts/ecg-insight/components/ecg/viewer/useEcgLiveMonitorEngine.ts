@@ -1,8 +1,13 @@
 import { useCallback, useState } from "react";
 
 import { playbackRateForPaperSpeed } from "./ecgMonitorGridMath";
-import type { MonitorLayoutMode } from "./monitorLayout";
-import { MONITOR_CUSTOM_DEFAULT } from "./monitorLayout";
+import {
+  COMPARISON_PRESETS,
+  MONITOR_CUSTOM_DEFAULT,
+  type MonitorComparisonPreset,
+  type MonitorLayoutMode,
+  type RhythmStripWindow,
+} from "./monitorLayout";
 import { useEcgWaveformPlayback, type EcgWaveformPlaybackState } from "./useEcgWaveformPlayback";
 import type { EcgLeadId, EcgPaperSpeed } from "./types";
 
@@ -13,9 +18,11 @@ export type MonitorFilter = "100Hz" | "150Hz" | "40Hz" | "Diagnostic" | "Monitor
 const FILTER_CYCLE: MonitorFilter[] = ["Monitor", "Diagnostic", "40Hz", "100Hz", "150Hz"];
 
 export type EcgLiveMonitorEngine = EcgWaveformPlaybackState & {
+  comparisonPreset: MonitorComparisonPreset;
   customLeads: EcgLeadId[];
   cycleFilter: () => void;
   filter: MonitorFilter;
+  focusLead: (lead: EcgLeadId) => void;
   frameStepBackward: () => void;
   frameStepForward: () => void;
   horizontalScroll: number;
@@ -31,6 +38,8 @@ export type EcgLiveMonitorEngine = EcgWaveformPlaybackState & {
   reviewMode: boolean;
   rhythmStripLead: string;
   rhythmStripMode: boolean;
+  rhythmStripWindowSec: RhythmStripWindow;
+  setComparisonPreset: (preset: MonitorComparisonPreset) => void;
   setCustomLeads: (leads: EcgLeadId[]) => void;
   setHorizontalScroll: (value: number) => void;
   setIsolatedLead: (lead: EcgLeadId | null) => void;
@@ -39,6 +48,7 @@ export type EcgLiveMonitorEngine = EcgWaveformPlaybackState & {
   setReviewMode: (value: boolean) => void;
   setRhythmStripLead: (lead: string) => void;
   setRhythmStripMode: (value: boolean) => void;
+  setRhythmStripWindowSec: (seconds: RhythmStripWindow) => void;
   toggleRecord: () => void;
   toggleReviewMode: () => void;
 };
@@ -48,6 +58,7 @@ export function useEcgLiveMonitorEngine(durationMs: number, beatIntervalMs = 850
   const [recording, setRecording] = useState(false);
   const [rhythmStripMode, setRhythmStripMode] = useState(false);
   const [rhythmStripLead, setRhythmStripLead] = useState("II");
+  const [rhythmStripWindowSec, setRhythmStripWindowSec] = useState<RhythmStripWindow>(10);
   const [reviewMode, setReviewMode] = useState(false);
   const [layoutMode, setLayoutMode] = useState<MonitorLayoutMode>("single");
   const [paperSpeed, setPaperSpeedState] = useState<EcgPaperSpeed>(25);
@@ -55,6 +66,7 @@ export function useEcgLiveMonitorEngine(durationMs: number, beatIntervalMs = 850
   const [horizontalScroll, setHorizontalScroll] = useState(0);
   const [isolatedLead, setIsolatedLead] = useState<EcgLeadId | null>(null);
   const [customLeads, setCustomLeads] = useState<EcgLeadId[]>(MONITOR_CUSTOM_DEFAULT);
+  const [comparisonPreset, setComparisonPresetState] = useState<MonitorComparisonPreset>(null);
 
   const setPaperSpeed = useCallback(
     (speed: EcgPaperSpeed) => {
@@ -63,6 +75,23 @@ export function useEcgLiveMonitorEngine(durationMs: number, beatIntervalMs = 850
     },
     [playback],
   );
+
+  const setComparisonPreset = useCallback((preset: MonitorComparisonPreset) => {
+    setComparisonPresetState(preset);
+    if (!preset) return;
+    const leads = preset === "custom" ? customLeads : COMPARISON_PRESETS[preset];
+    setCustomLeads(leads);
+    setLayoutMode("custom");
+    setRhythmStripMode(false);
+    setIsolatedLead(null);
+  }, [customLeads]);
+
+  const focusLead = useCallback((lead: EcgLeadId) => {
+    setIsolatedLead(lead);
+    setLayoutMode("single");
+    setRhythmStripMode(false);
+    setComparisonPresetState(null);
+  }, []);
 
   const cycleFilter = useCallback(() => {
     setFilter((current) => {
@@ -106,9 +135,11 @@ export function useEcgLiveMonitorEngine(durationMs: number, beatIntervalMs = 850
 
   return {
     ...playback,
+    comparisonPreset,
     customLeads,
     cycleFilter,
     filter,
+    focusLead,
     frameStepBackward,
     frameStepForward,
     horizontalScroll,
@@ -124,6 +155,8 @@ export function useEcgLiveMonitorEngine(durationMs: number, beatIntervalMs = 850
     reviewMode,
     rhythmStripLead,
     rhythmStripMode,
+    rhythmStripWindowSec,
+    setComparisonPreset,
     setCustomLeads,
     setHorizontalScroll,
     setIsolatedLead,
@@ -132,6 +165,7 @@ export function useEcgLiveMonitorEngine(durationMs: number, beatIntervalMs = 850
     setReviewMode,
     setRhythmStripLead,
     setRhythmStripMode,
+    setRhythmStripWindowSec,
     toggleRecord,
     toggleReviewMode,
   };

@@ -6,7 +6,7 @@ import { PrimaryButton } from "@/components/enterprise/EnterpriseUI";
 import { EcgLiveMonitorClinicalToolbar, exportMonitorCanvas } from "../EcgLiveMonitorClinicalToolbar";
 import { EcgLiveMonitorLeadStrip } from "../EcgLiveMonitorLeadStrip";
 import { ECG_LIVE_MONITOR } from "../ecgLiveMonitorTokens";
-import type { MonitorLayoutMode } from "../monitorLayout";
+import type { MonitorComparisonPreset, MonitorLayoutMode, RhythmStripWindow } from "../monitorLayout";
 import type { EcgLiveMonitorEngine } from "../useEcgLiveMonitorEngine";
 import type { EcgViewerControls } from "../useEcgViewerControls";
 import type { EcgLeadId } from "../types";
@@ -23,6 +23,7 @@ function RailButton({ label, onPress }: { label: string; onPress?: () => void })
 export const EcgLiveMonitorHmiLeftRail = memo(function EcgLiveMonitorHmiLeftRail({
   canvasRef,
   collapsed,
+  comparisonPreset,
   controls,
   customLeads,
   engine,
@@ -30,16 +31,21 @@ export const EcgLiveMonitorHmiLeftRail = memo(function EcgLiveMonitorHmiLeftRail
   layoutMode,
   measureMode,
   onCollapseToggle,
+  onComparisonPreset,
   onCustomLeadsChange,
+  onFocusLead,
   onLayoutModeChange,
   onLeadChange,
   onMeasureToggle,
   onResetView,
   onRhythmStripToggle,
+  onRhythmWindowChange,
+  rhythmStripWindowSec,
   selectedLead,
 }: {
   canvasRef: React.RefObject<HTMLCanvasElement | null>;
   collapsed: boolean;
+  comparisonPreset?: MonitorComparisonPreset;
   controls: EcgViewerControls;
   customLeads: EcgLeadId[];
   engine: EcgLiveMonitorEngine;
@@ -47,12 +53,16 @@ export const EcgLiveMonitorHmiLeftRail = memo(function EcgLiveMonitorHmiLeftRail
   layoutMode: MonitorLayoutMode;
   measureMode: boolean;
   onCollapseToggle: () => void;
+  onComparisonPreset?: (preset: MonitorComparisonPreset) => void;
   onCustomLeadsChange: (leads: EcgLeadId[]) => void;
+  onFocusLead?: (lead: EcgLeadId) => void;
   onLayoutModeChange: (mode: MonitorLayoutMode) => void;
   onLeadChange: (lead: EcgLeadId) => void;
   onMeasureToggle: () => void;
   onResetView: () => void;
   onRhythmStripToggle: () => void;
+  onRhythmWindowChange?: (seconds: RhythmStripWindow) => void;
+  rhythmStripWindowSec?: RhythmStripWindow;
   selectedLead: EcgLeadId;
 }) {
   const handleSnapshot = () => exportMonitorCanvas(canvasRef.current, exportFilename);
@@ -80,16 +90,21 @@ export const EcgLiveMonitorHmiLeftRail = memo(function EcgLiveMonitorHmiLeftRail
       </View>
       <ScrollView contentContainerStyle={styles.body} showsVerticalScrollIndicator={false}>
         <EcgLiveMonitorLeadStrip
-            compact
-            customLeads={customLeads}
-            layoutMode={layoutMode}
-            onCustomLeadsChange={onCustomLeadsChange}
-            onLayoutModeChange={onLayoutModeChange}
-            onLeadChange={onLeadChange}
-            onRhythmStripToggle={onRhythmStripToggle}
-            rhythmStripMode={engine.rhythmStripMode}
-            selectedLead={selectedLead}
-          />
+          compact
+          comparisonPreset={comparisonPreset}
+          customLeads={customLeads}
+          layoutMode={layoutMode}
+          onComparisonPreset={onComparisonPreset}
+          onCustomLeadsChange={onCustomLeadsChange}
+          onFocusLead={onFocusLead}
+          onLayoutModeChange={onLayoutModeChange}
+          onLeadChange={onLeadChange}
+          onRhythmStripToggle={onRhythmStripToggle}
+          onRhythmWindowChange={onRhythmWindowChange}
+          rhythmStripMode={engine.rhythmStripMode}
+          rhythmStripWindowSec={rhythmStripWindowSec ?? engine.rhythmStripWindowSec}
+          selectedLead={selectedLead}
+        />
           <EcgLiveMonitorClinicalToolbar
             compact
             controls={controls}

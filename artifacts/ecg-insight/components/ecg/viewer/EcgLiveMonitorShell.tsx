@@ -18,6 +18,8 @@ import {
   HMI_LAYOUT,
   useLiveMonitorHmiLayout,
 } from "./live-monitor-hmi";
+import { useLiveMonitorAudioEngine, audioModeLabel } from "./live-monitor-audio";
+import { EcgLiveMonitorAudioControls, EcgLiveMonitorProHud, computeMonitorIntervals } from "./live-monitor-pro";
 import { useMonitorPaletteVisibility, useMonitorTelemetry } from "./live-monitor-v2";
 import type { MonitorLayoutMode } from "./monitorLayout";
 import { type EcgLeadId } from "./types";
@@ -67,6 +69,19 @@ export const EcgLiveMonitorShell = memo(function EcgLiveMonitorShell({
   const playbackDurationMs = useMemo(() => (activeLeadData ? durationMsForLead(activeLeadData) : 10_000), [activeLeadData]);
   const engine = useEcgLiveMonitorEngine(playbackDurationMs);
 
+  const heartRate = ecgCase.heartRate ?? undefined;
+  const rhythm = ecgCase.rhythm ?? "Pending";
+
+  const audio = useLiveMonitorAudioEngine({
+    activeLead: activeLeadData,
+    enabled: !diagnosticMode,
+    frozen: engine.frozen,
+    heartRate,
+    playheadMs: engine.playheadMs,
+  });
+
+  const intervals = useMemo(() => computeMonitorIntervals(activeLeadData), [activeLeadData]);
+
   useEffect(() => {
     engine.setPaperSpeed(controls.grid.speed);
   }, [controls.grid.speed, engine]);
@@ -99,8 +114,6 @@ export const EcgLiveMonitorShell = memo(function EcgLiveMonitorShell({
     return () => window.removeEventListener("wheel", onWheel);
   }, [controls]);
 
-  const heartRate = ecgCase.heartRate ?? undefined;
-  const rhythm = ecgCase.rhythm ?? "Pending";
   const signalQuality =
     digitalEcg?.validation?.signalContinuityPercent != null
       ? `${Math.round(digitalEcg.validation.signalContinuityPercent)}%`
@@ -153,6 +166,7 @@ export const EcgLiveMonitorShell = memo(function EcgLiveMonitorShell({
       engine.setLayoutMode(mode);
       engine.setRhythmStripMode(false);
       engine.setIsolatedLead(null);
+      engine.setComparisonPreset(null);
     },
     [engine],
   );
@@ -163,6 +177,7 @@ export const EcgLiveMonitorShell = memo(function EcgLiveMonitorShell({
     enabled: true,
     onDiagnostic: enterDiagnostic,
     onExitMonitor: handleExitMonitor,
+    onToggleAudioMute: () => audio.setMode(audio.mode === "mute" ? "adult" : "mute"),
   });
 
   useEffect(() => {
@@ -186,7 +201,8 @@ export const EcgLiveMonitorShell = memo(function EcgLiveMonitorShell({
 
   const canvasMinHeight = Math.max(
     360,
-    Math.floor(viewportHeight * HMI_LAYOUT.canvasViewportRatio) - (diagnosticMode ? 0 : hmi.chromeHeight),
+    Math.floor(viewportHeight * (diagnosticMode ? HMI_LAYOUT.diagnosticViewportRatio : HMI_LAYOUT.canvasViewportRatio)) -
+      (diagnosticMode ? 0 : hmi.chromeHeight),
   );
 
   const patientName = `${patient.lastName}, ${patient.firstName}`.slice(0, 32);
@@ -219,9 +235,10 @@ export const EcgLiveMonitorShell = memo(function EcgLiveMonitorShell({
 
   return (
     <View style={[styles.root, diagnosticMode && styles.rootDiagnostic]} testID="sprint37-live-monitor-ready">
-      <View nativeID="sprint49-hmi-workspace-ready" style={styles.fill} testID="sprint49-hmi-workspace-ready">
+      <View nativeID="sprint50-monitor-experience-ready" style={styles.fill} testID="sprint49-hmi-workspace-ready">
         {!diagnosticMode ? (
-          <EcgLiveMonitorHmiStatusBar
+          <>
+            <EcgLiveMonitorHmiStatusBar
             age={age}
             alarmState={alarmState}
             controls={controls}
@@ -241,6 +258,28 @@ export const EcgLiveMonitorShell = memo(function EcgLiveMonitorShell({
             signalQuality={signalQuality}
             telemetry={telemetry}
           />
+            <EcgLiveMonitorProHud
+              audioMode={audioModeLabel(audio.mode)}
+              battery={telemetry.batteryLevel != null ? `${telemetry.batteryLevel}%` : "AC"}
+              filter={engine.filter}
+              fps={fps}
+              gain={controls.grid.gain}
+              heartRate={heartRate}
+              intervals={intervals}
+              noise={noiseLevel.toUpperCase()}
+              recording={engine.recording}
+              samplingRate={digitalEcg?.leads[0]?.samplingRate ? `${digitalEcg.leads[0].samplingRate} Hz` : "500 Hz"}
+              signalQuality={signalQuality}
+              speed={controls.grid.speed}
+              timestamp={telemetry.clock}
+            />
+            <EcgLiveMonitorAudioControls
+              mode={audioModeLabel(audio.mode)}
+              onCycleMode={audio.cycleMode}
+              onToggleMute={() => audio.setMode(audio.mode === "mute" ? "adult" : "mute")}
+              volume={audio.volume}
+            />
+          </>
         ) : (
           <EcgLiveMonitorHmiDiagnosticHud
             clock={telemetry.clock}
@@ -290,6 +329,7 @@ export const EcgLiveMonitorShell = memo(function EcgLiveMonitorShell({
                   <EcgLiveMonitorHmiLeftRail
                     canvasRef={canvasRef}
                     collapsed={hmi.leftCollapsed}
+                    comparisonPreset={engine.comparisonPreset}
                     controls={controls}
                     customLeads={engine.customLeads}
                     engine={engine}
@@ -297,17 +337,19 @@ export const EcgLiveMonitorShell = memo(function EcgLiveMonitorShell({
                     layoutMode={engine.layoutMode}
                     measureMode={measureMode}
                     onCollapseToggle={hmi.toggleLeft}
+                    onComparisonPreset={engine.setComparisonPreset}
                     onCustomLeadsChange={engine.setCustomLeads}
+                    onFocusLead={engine.focusLead}
                     onLayoutModeChange={handleLayoutModeChange}
                     onLeadChange={(lead) => {
-                      engine.setLayoutMode("single");
-                      engine.setRhythmStripMode(false);
-                      engine.setIsolatedLead(null);
+                      engine.focusLead(lead);
                       setSelectedLead(lead);
                     }}
                     onMeasureToggle={() => setMeasureMode((v) => !v)}
                     onResetView={handleResetView}
                     onRhythmStripToggle={handleRhythmStripToggle}
+                    onRhythmWindowChange={engine.setRhythmStripWindowSec}
+                    rhythmStripWindowSec={engine.rhythmStripWindowSec}
                     selectedLead={selectedLead}
                   />
                 </View>

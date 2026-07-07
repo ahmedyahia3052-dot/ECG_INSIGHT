@@ -1,3 +1,3 @@
-# Performance Report — Sprint 49
+# Performance Report — Sprint 50
 
-HMI panels are lightweight React Native views — no additional canvas work. Mouse wheel zoom delegates to existing controls.zoomBy. Panel collapse reduces layout chrome without affecting RAF render loop.
+Audio runs outside RAF loop. Layout geometry is pure CPU math. Canvas/rendering unchanged — 60 FPS target preserved via RE2.

@@ -1,3 +1,3 @@
-# Visual QA Report — Sprint 49
+# Visual QA Report — Sprint 50
 
-Validates ICU-style phosphor monitor chrome: patient identity row, hospital HUD telemetry, collapsible acquisition/clinical rails, bottom timeline track, diagnostic HUD with ESC exit.
+Validates pro HUD intervals, audio controls, 6×2/dual/quad layouts, lead focus, comparison preset, rhythm strip windows, Sprint 45/49 regression.

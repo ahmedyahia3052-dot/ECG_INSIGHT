@@ -1,5 +1,13 @@
-# Playwright Report — Sprint 49
+# Playwright Report — Sprint 50
 
-Spec: tests/e2e/sprint49-live-monitor-hmi.spec.ts (@sprint49 @enterprise)
+**Spec:** `tests/e2e/sprint50-real-hospital-monitor.spec.ts` (@sprint50 @enterprise)  
+**Result:** 6/6 PASS (2026-07-07)
 
-Coverage: HMI status bar, left/right rails, bottom transport, canvas ratio, diagnostic fullscreen, Sprint 45 transport regression.
+| Test | Status |
+|------|--------|
+| Professional HUD interval metrics | ✅ |
+| Hospital layout modes (6×2, dual, quad) | ✅ |
+| Lead focus full monitor | ✅ |
+| Comparison preset II vs V5 | ✅ |
+| Rhythm strip window controls | ✅ |
+| Sprint 45/49 regression smoke | ✅ |
