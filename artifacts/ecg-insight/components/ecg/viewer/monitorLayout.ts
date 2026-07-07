@@ -15,6 +15,22 @@ export type MonitorLayoutMode =
   | "12-lead"
   | "custom";
 
+export type MonitorDisplayPreset = "bedside" | "central-station" | "diagnostic" | null;
+
+/** Hospital view presets map to canonical multi-lead layouts. */
+export const DISPLAY_PRESET_LAYOUT: Record<Exclude<MonitorDisplayPreset, null>, MonitorLayoutMode> = {
+  bedside: "dual",
+  "central-station": "6x2",
+  diagnostic: "12-lead",
+};
+
+export function displayPresetLabel(preset: MonitorDisplayPreset): string | null {
+  if (!preset) return null;
+  if (preset === "bedside") return "BEDSIDE MONITOR";
+  if (preset === "central-station") return "CENTRAL STATION";
+  return "DIAGNOSTIC MONITOR";
+}
+
 export type MonitorComparisonPreset = "anterior" | "custom" | "II-V5" | "inferior" | "lateral" | null;
 
 export type RhythmStripWindow = 0 | 10 | 20 | 30;
@@ -100,7 +116,10 @@ export function layoutModeLabel(
   rhythmStrip: boolean,
   rhythmLead: string,
   focusLead?: EcgLeadId | null,
+  displayPreset?: MonitorDisplayPreset | null,
 ): string {
+  const presetLabel = displayPresetLabel(displayPreset ?? null);
+  if (presetLabel) return presetLabel;
   if (focusLead) return `LEAD FOCUS · ${focusLead}`;
   if (rhythmStrip) return `RHYTHM STRIP · LEAD ${rhythmLead}`;
   if (mode === "single") return `LEAD ${selectedLead}`;
@@ -113,6 +132,21 @@ export function layoutModeLabel(
   if (mode === "6-lead") return "6-LEAD MONITOR";
   if (mode === "custom") return "CUSTOM MONITOR";
   return "12-LEAD MONITOR";
+}
+
+/** True when the monitor should render multiple leads simultaneously (not lead-focus). */
+export function isMultiLeadLayoutMode(mode: MonitorLayoutMode) {
+  return (
+    mode === "12-lead"
+    || mode === "6x2"
+    || mode === "3x4"
+    || mode === "6-lead"
+    || mode === "5-lead"
+    || mode === "3-lead"
+    || mode === "dual"
+    || mode === "quad"
+    || mode === "custom"
+  );
 }
 
 export function comparisonPresetLabel(preset: MonitorComparisonPreset) {

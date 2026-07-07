@@ -1,12 +1,14 @@
 /** Sprint 49 — professional bedside monitor HMI tokens */
 
 export const HMI_LAYOUT = {
+  audioControlsHeight: 28,
   bottomBarHeight: 44,
   canvasViewportRatio: 0.94,
   chromeCompact: 20,
   diagnosticViewportRatio: 0.95,
   leftRailExpanded: 168,
   leftRailCollapsed: 36,
+  proHudHeight: 26,
   rightRailExpanded: 200,
   rightRailCollapsed: 36,
   statusBarHeight: 32,

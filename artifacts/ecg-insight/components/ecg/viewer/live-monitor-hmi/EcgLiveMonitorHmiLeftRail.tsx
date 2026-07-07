@@ -6,7 +6,7 @@ import { PrimaryButton } from "@/components/enterprise/EnterpriseUI";
 import { EcgLiveMonitorClinicalToolbar, exportMonitorCanvas } from "../EcgLiveMonitorClinicalToolbar";
 import { EcgLiveMonitorLeadStrip } from "../EcgLiveMonitorLeadStrip";
 import { ECG_LIVE_MONITOR } from "../ecgLiveMonitorTokens";
-import type { MonitorComparisonPreset, MonitorLayoutMode, RhythmStripWindow } from "../monitorLayout";
+import type { MonitorComparisonPreset, MonitorDisplayPreset, MonitorLayoutMode, RhythmStripWindow } from "../monitorLayout";
 import type { EcgLiveMonitorEngine } from "../useEcgLiveMonitorEngine";
 import type { EcgViewerControls } from "../useEcgViewerControls";
 import type { EcgLeadId } from "../types";
@@ -26,6 +26,7 @@ export const EcgLiveMonitorHmiLeftRail = memo(function EcgLiveMonitorHmiLeftRail
   comparisonPreset,
   controls,
   customLeads,
+  displayPreset,
   engine,
   exportFilename,
   layoutMode,
@@ -33,6 +34,7 @@ export const EcgLiveMonitorHmiLeftRail = memo(function EcgLiveMonitorHmiLeftRail
   onCollapseToggle,
   onComparisonPreset,
   onCustomLeadsChange,
+  onDisplayPreset,
   onFocusLead,
   onLayoutModeChange,
   onLeadChange,
@@ -48,6 +50,7 @@ export const EcgLiveMonitorHmiLeftRail = memo(function EcgLiveMonitorHmiLeftRail
   comparisonPreset?: MonitorComparisonPreset;
   controls: EcgViewerControls;
   customLeads: EcgLeadId[];
+  displayPreset?: MonitorDisplayPreset;
   engine: EcgLiveMonitorEngine;
   exportFilename: string;
   layoutMode: MonitorLayoutMode;
@@ -55,6 +58,7 @@ export const EcgLiveMonitorHmiLeftRail = memo(function EcgLiveMonitorHmiLeftRail
   onCollapseToggle: () => void;
   onComparisonPreset?: (preset: MonitorComparisonPreset) => void;
   onCustomLeadsChange: (leads: EcgLeadId[]) => void;
+  onDisplayPreset?: (preset: MonitorDisplayPreset) => void;
   onFocusLead?: (lead: EcgLeadId) => void;
   onLayoutModeChange: (mode: MonitorLayoutMode) => void;
   onLeadChange: (lead: EcgLeadId) => void;
@@ -93,9 +97,11 @@ export const EcgLiveMonitorHmiLeftRail = memo(function EcgLiveMonitorHmiLeftRail
           compact
           comparisonPreset={comparisonPreset}
           customLeads={customLeads}
+          displayPreset={displayPreset}
           layoutMode={layoutMode}
           onComparisonPreset={onComparisonPreset}
           onCustomLeadsChange={onCustomLeadsChange}
+          onDisplayPreset={onDisplayPreset}
           onFocusLead={onFocusLead}
           onLayoutModeChange={onLayoutModeChange}
           onLeadChange={onLeadChange}

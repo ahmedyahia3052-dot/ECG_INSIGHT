@@ -5,7 +5,8 @@ import Svg, { Circle, Line, Path, Rect, Text as SvgText } from "react-native-svg
 import { medicalTheme, PrimaryButton } from "@/components/enterprise/EnterpriseUI";
 import type { DigitalEcgLead } from "@/services/ecgProcessing";
 
-import { drawMultiLeadMonitorCanvas, drawRhythmStripCanvas } from "./ecgMonitorCanvas";
+import { drawRhythmStripCanvas } from "./ecgMonitorCanvas";
+import { paintHospitalMonitorFrame } from "./hospital-monitor/hospitalMonitorRenderer";
 import { ECG_WORKSTATION_VISUAL } from "./ecgWorkstationVisualTokens";
 import { EcgMonitorMiniNavigator } from "./EcgMonitorMiniNavigator";
 import { buildScrollingMonitorPath, durationMsForLead, msToSampleIndex } from "./ecgMonitorPath";
@@ -103,7 +104,7 @@ function WebMonitorCanvas({
       const forceFullClear = lastLayoutRevisionRef.current !== layoutRevision;
       if (forceFullClear) lastLayoutRevisionRef.current = layoutRevision;
 
-      drawMultiLeadMonitorCanvas(ctx, leadsRef.current, width, height, {
+      paintHospitalMonitorFrame(ctx, leadsRef.current, width, height, {
         alarmTone,
         brightness,
         customLeads,
@@ -322,7 +323,14 @@ export const EcgLiveMonitorView = memo(function EcgLiveMonitorView({
   const showWorkspaceChrome = chrome === "workspace";
   const canvasOnly = chrome === "canvas-only";
 
-  const layoutLabel = layoutModeLabel(layoutMode, selectedLead, rhythmStripMode, String(rhythmStripLead), engine?.isolatedLead ?? null);
+  const layoutLabel = layoutModeLabel(
+    layoutMode,
+    selectedLead,
+    rhythmStripMode,
+    String(rhythmStripLead),
+    engine?.isolatedLead ?? null,
+    engine?.displayPreset ?? null,
+  );
 
   if (!lead && !leadsForRender.length) {
     return (

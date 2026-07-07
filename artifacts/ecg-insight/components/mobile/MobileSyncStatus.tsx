@@ -14,11 +14,16 @@ export function MobileSyncStatus() {
   const lastBackendToastRef = useRef("");
   const hasPending = snapshot.pendingActions + snapshot.pendingUploads > 0;
 
+  const offlineStreakRef = useRef(0);
+
   useEffect(() => {
     if (snapshot.backendReachable) {
+      offlineStreakRef.current = 0;
       lastBackendToastRef.current = "";
       return;
     }
+    offlineStreakRef.current += 1;
+    if (offlineStreakRef.current < 2) return;
     const toastKey = `${snapshot.backendHealthStatus}:${snapshot.lastHealthCheckAt}`;
     if (lastBackendToastRef.current === toastKey) return;
     lastBackendToastRef.current = toastKey;

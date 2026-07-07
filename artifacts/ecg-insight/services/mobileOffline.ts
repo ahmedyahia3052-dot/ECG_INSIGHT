@@ -124,39 +124,45 @@ type BackendHealthResult = {
 export async function backendHealthCheck(): Promise<BackendHealthResult> {
   const timestamp = new Date().toISOString();
   if (typeof fetch === "undefined") return { message: "fetch unavailable in this runtime", ok: true, status: "runtime-no-fetch", timestamp };
-  const controller = typeof AbortController !== "undefined" ? new AbortController() : null;
-  const timeout = setTimeout(() => controller?.abort(), 4_000);
-  try {
-    const response = await fetch(`${API_ROOT_URL}/health`, {
-      cache: "no-store",
-      credentials: "include",
-      headers: { accept: "application/json" },
-      signal: controller?.signal,
-    });
-    const contentType = response.headers.get("content-type") ?? "";
-    if (contentType.includes("text/html")) {
-      return { message: `health returned HTML from ${API_ROOT_URL}/health`, ok: false, status: "html-response", timestamp };
+
+  let lastMessage = "backend health fetch failed";
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    const controller = typeof AbortController !== "undefined" ? new AbortController() : null;
+    const timeout = setTimeout(() => controller?.abort(), 8_000);
+    try {
+      const response = await fetch(`${API_ROOT_URL}/live`, {
+        cache: "no-store",
+        credentials: "include",
+        headers: { accept: "application/json" },
+        signal: controller?.signal,
+      });
+      const contentType = response.headers.get("content-type") ?? "";
+      if (contentType.includes("text/html")) {
+        lastMessage = `live returned HTML from ${API_ROOT_URL}/live`;
+      } else {
+        const payload = await response.clone().json().catch(() => null) as { code?: string; ok?: boolean; status?: string } | null;
+        if (payload?.code === "BACKEND_UNAVAILABLE") {
+          lastMessage = "backend unavailable response";
+        } else if (response.ok && payload?.ok !== false) {
+          return {
+            message: `HTTP ${response.status}${payload?.status ? ` ${payload.status}` : ""}`,
+            ok: true,
+            status: payload?.status ?? String(response.status),
+            timestamp,
+          };
+        } else {
+          lastMessage = `HTTP ${response.status}${payload?.status ? ` ${payload.status}` : ""}`;
+        }
+      }
+    } catch (error) {
+      lastMessage = error instanceof Error ? error.message : "backend health fetch failed";
+    } finally {
+      clearTimeout(timeout);
     }
-    const payload = await response.clone().json().catch(() => null) as { code?: string; ok?: boolean; status?: string } | null;
-    if (payload?.code === "BACKEND_UNAVAILABLE") {
-      return { message: "backend unavailable response", ok: false, status: payload.code, timestamp };
-    }
-    return {
-      message: `HTTP ${response.status}${payload?.status ? ` ${payload.status}` : ""}`,
-      ok: response.ok && payload?.ok !== false,
-      status: payload?.status ?? String(response.status),
-      timestamp,
-    };
-  } catch (error) {
-    return {
-      message: error instanceof Error ? error.message : "backend health fetch failed",
-      ok: false,
-      status: "fetch-failed",
-      timestamp,
-    };
-  } finally {
-    clearTimeout(timeout);
+    await new Promise((resolve) => setTimeout(resolve, 500 * (attempt + 1)));
   }
+
+  return { message: lastMessage, ok: false, status: "fetch-failed", timestamp };
 }
 
 /** Unregister legacy service workers and clear PWA caches from prior offline mode. */

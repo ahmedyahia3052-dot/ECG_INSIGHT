@@ -526,7 +526,7 @@ export function EcgMonitorViewerFoundation({
   );
 
   return (
-    <View style={[styles.root, (controls.fullscreen || diagnosticMode) && styles.fullscreenRoot]} testID="sprint13-ecg-monitor-ready" nativeID="sprint22-hospital-workstation-ready">
+    <View style={[styles.root, (controls.fullscreen || diagnosticMode) && styles.fullscreenRoot]} nativeID="hospital-grade-workspace-ready" testID="sprint13-ecg-monitor-ready">
       <View nativeID="sprint30-clinical-workflow-ready" style={styles.inspectorReady} testID="sprint29-zero-chrome-workstation-ready">
       <View nativeID="sprint46-diagnostic-workstation-ready" style={styles.inspectorReady}>
       {!diagnosticMode ? (

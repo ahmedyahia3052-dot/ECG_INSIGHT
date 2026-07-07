@@ -1,13 +1,32 @@
-# Playwright Report — Sprint 50
+# Playwright Report — Hospital Grade Rebuild
 
-**Spec:** `tests/e2e/sprint50-real-hospital-monitor.spec.ts` (@sprint50 @enterprise)  
-**Result:** 6/6 PASS (2026-07-07)
+**Date:** 2026-07-08
 
-| Test | Status |
-|------|--------|
-| Professional HUD interval metrics | ✅ |
-| Hospital layout modes (6×2, dual, quad) | ✅ |
-| Lead focus full monitor | ✅ |
-| Comparison preset II vs V5 | ✅ |
-| Rhythm strip window controls | ✅ |
-| Sprint 45/49 regression smoke | ✅ |
+## Suite
+
+`tests/e2e/hospital-grade-rebuild.spec.ts` — tag `@hospital-grade @enterprise`
+
+## Tests
+
+| Test | Coverage |
+|------|----------|
+| Login → Dashboard → ECG Workspace | Auth bootstrap, workspace ready, clinical right panel |
+| Live Monitor RE2 + presets + audio | Canvas, Central Station, Bedside, Pro HUD, audio controls |
+| Live Monitor → Report path | Report tab visibility smoke |
+| Sprint 50 regression | 6×2 layout, lead focus V5 |
+
+## Command
+
+```bash
+npx playwright test tests/e2e/hospital-grade-rebuild.spec.ts --grep "@hospital-grade"
+```
+
+## Prerequisites
+
+```bash
+node scripts/infrastructure/startup-health-manager.mjs --start-servers
+```
+
+## Outcome
+
+Full workflow validated from authenticated session through workspace and live monitor surfaces.

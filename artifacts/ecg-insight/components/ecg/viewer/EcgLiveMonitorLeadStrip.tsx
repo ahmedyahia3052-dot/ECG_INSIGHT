@@ -4,16 +4,18 @@ import { ScrollView, StyleSheet, Text, View } from "react-native";
 import { PrimaryButton } from "@/components/enterprise/EnterpriseUI";
 
 import { ECG_LIVE_MONITOR } from "./ecgLiveMonitorTokens";
-import type { MonitorComparisonPreset, MonitorLayoutMode, RhythmStripWindow } from "./monitorLayout";
+import { isMultiLeadLayoutMode, type MonitorComparisonPreset, type MonitorDisplayPreset, type MonitorLayoutMode, type RhythmStripWindow } from "./monitorLayout";
 import { STANDARD_ECG_LEADS, type EcgLeadId } from "./types";
 
 export const EcgLiveMonitorLeadStrip = memo(function EcgLiveMonitorLeadStrip({
   compact = false,
   comparisonPreset,
   customLeads = [],
+  displayPreset,
   layoutMode,
   onComparisonPreset,
   onCustomLeadsChange,
+  onDisplayPreset,
   onFocusLead,
   onLayoutModeChange,
   onLeadChange,
@@ -26,9 +28,11 @@ export const EcgLiveMonitorLeadStrip = memo(function EcgLiveMonitorLeadStrip({
   compact?: boolean;
   comparisonPreset?: MonitorComparisonPreset;
   customLeads?: EcgLeadId[];
+  displayPreset?: MonitorDisplayPreset;
   layoutMode: MonitorLayoutMode;
   onComparisonPreset?: (preset: MonitorComparisonPreset) => void;
   onCustomLeadsChange?: (leads: EcgLeadId[]) => void;
+  onDisplayPreset?: (preset: MonitorDisplayPreset) => void;
   onFocusLead?: (lead: EcgLeadId) => void;
   onLayoutModeChange: (mode: MonitorLayoutMode) => void;
   onLeadChange: (lead: EcgLeadId) => void;
@@ -51,6 +55,14 @@ export const EcgLiveMonitorLeadStrip = memo(function EcgLiveMonitorLeadStrip({
         <PrimaryButton label="3 Lead" onPress={() => onLayoutModeChange("3-lead")} variant={layoutMode === "3-lead" ? "primary" : "outline"} />
         <PrimaryButton label="5 Lead" onPress={() => onLayoutModeChange("5-lead")} variant={layoutMode === "5-lead" ? "primary" : "outline"} />
         <PrimaryButton label="Single" onPress={() => onLayoutModeChange("single")} variant={layoutMode === "single" ? "primary" : "outline"} />
+        {onDisplayPreset ? (
+          <>
+            <View style={styles.divider} />
+            <PrimaryButton label="Bedside" onPress={() => onDisplayPreset("bedside")} variant={displayPreset === "bedside" ? "primary" : "outline"} />
+            <PrimaryButton label="Central Station" onPress={() => onDisplayPreset("central-station")} variant={displayPreset === "central-station" ? "primary" : "outline"} />
+            <PrimaryButton label="Hospital Mode" onPress={() => onDisplayPreset("diagnostic")} variant={displayPreset === "diagnostic" ? "primary" : "outline"} />
+          </>
+        ) : null}
         <PrimaryButton
           label="Custom"
           onPress={() => {
@@ -74,6 +86,10 @@ export const EcgLiveMonitorLeadStrip = memo(function EcgLiveMonitorLeadStrip({
             key={lead}
             label={lead}
             onPress={() => {
+              if (isMultiLeadLayoutMode(layoutMode) && !rhythmStripMode) {
+                onLeadChange(lead);
+                return;
+              }
               if (onFocusLead) onFocusLead(lead);
               else onLeadChange(lead);
             }}

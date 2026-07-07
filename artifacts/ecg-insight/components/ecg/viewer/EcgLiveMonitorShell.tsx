@@ -72,14 +72,6 @@ export const EcgLiveMonitorShell = memo(function EcgLiveMonitorShell({
   const heartRate = ecgCase.heartRate ?? undefined;
   const rhythm = ecgCase.rhythm ?? "Pending";
 
-  const audio = useLiveMonitorAudioEngine({
-    activeLead: activeLeadData,
-    enabled: !diagnosticMode,
-    frozen: engine.frozen,
-    heartRate,
-    playheadMs: engine.playheadMs,
-  });
-
   const intervals = useMemo(() => computeMonitorIntervals(activeLeadData), [activeLeadData]);
 
   useEffect(() => {
@@ -148,6 +140,17 @@ export const EcgLiveMonitorShell = memo(function EcgLiveMonitorShell({
     [activeLeadData, digitalEcg?.leads.length, engine.frozen, engine.isPlaying, engine.reviewMode, heartRate, noiseLevel, signalQuality],
   );
 
+  const audio = useLiveMonitorAudioEngine({
+    activeLead: activeLeadData,
+    alarmEnabled: true,
+    enabled: !diagnosticMode,
+    frozen: engine.frozen,
+    heartRate,
+    leadOff: alarmState.leadOff,
+    playheadMs: engine.playheadMs,
+    rhythm,
+  });
+
   const handleExitMonitor = useCallback(() => {
     if (diagnosticMode) {
       exitDiagnostic();
@@ -167,9 +170,27 @@ export const EcgLiveMonitorShell = memo(function EcgLiveMonitorShell({
       engine.setRhythmStripMode(false);
       engine.setIsolatedLead(null);
       engine.setComparisonPreset(null);
+      controls.resetView();
+      engine.setHorizontalScroll(0);
     },
-    [engine],
+    [controls, engine],
   );
+
+  useEffect(() => {
+    if (!digitalEcg?.leads.length || engine.reviewMode) return;
+    engine.setFrozen(false);
+    if (!engine.isPlaying) engine.play();
+  }, [digitalEcg?.leads.length, engine]);
+
+  useEffect(() => {
+    if (Platform.OS !== "web" || typeof document === "undefined") return undefined;
+    const onVisibility = () => {
+      if (document.visibilityState !== "visible" || !digitalEcg?.leads.length || engine.reviewMode) return;
+      if (!engine.isPlaying) engine.play();
+    };
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => document.removeEventListener("visibilitychange", onVisibility);
+  }, [digitalEcg?.leads.length, engine]);
 
   useEcgLiveMonitorShortcuts({
     controls,
@@ -200,9 +221,9 @@ export const EcgLiveMonitorShell = memo(function EcgLiveMonitorShell({
   }, [engine]);
 
   const canvasMinHeight = Math.max(
-    360,
+    320,
     Math.floor(viewportHeight * (diagnosticMode ? HMI_LAYOUT.diagnosticViewportRatio : HMI_LAYOUT.canvasViewportRatio)) -
-      (diagnosticMode ? 0 : hmi.chromeHeight),
+      hmi.chromeHeight,
   );
 
   const patientName = `${patient.lastName}, ${patient.firstName}`.slice(0, 32);
@@ -234,11 +255,10 @@ export const EcgLiveMonitorShell = memo(function EcgLiveMonitorShell({
   const bottomVisible = paletteVisible || hmi.controlsPinned;
 
   return (
-    <View style={[styles.root, diagnosticMode && styles.rootDiagnostic]} testID="sprint37-live-monitor-ready">
+    <View style={[styles.root, diagnosticMode && styles.rootDiagnostic]} nativeID="hospital-grade-rebuild-ready" testID="sprint37-live-monitor-ready">
       <View nativeID="sprint50-monitor-experience-ready" style={styles.fill} testID="sprint49-hmi-workspace-ready">
         {!diagnosticMode ? (
-          <>
-            <EcgLiveMonitorHmiStatusBar
+          <EcgLiveMonitorHmiStatusBar
             age={age}
             alarmState={alarmState}
             controls={controls}
@@ -258,28 +278,6 @@ export const EcgLiveMonitorShell = memo(function EcgLiveMonitorShell({
             signalQuality={signalQuality}
             telemetry={telemetry}
           />
-            <EcgLiveMonitorProHud
-              audioMode={audioModeLabel(audio.mode)}
-              battery={telemetry.batteryLevel != null ? `${telemetry.batteryLevel}%` : "AC"}
-              filter={engine.filter}
-              fps={fps}
-              gain={controls.grid.gain}
-              heartRate={heartRate}
-              intervals={intervals}
-              noise={noiseLevel.toUpperCase()}
-              recording={engine.recording}
-              samplingRate={digitalEcg?.leads[0]?.samplingRate ? `${digitalEcg.leads[0].samplingRate} Hz` : "500 Hz"}
-              signalQuality={signalQuality}
-              speed={controls.grid.speed}
-              timestamp={telemetry.clock}
-            />
-            <EcgLiveMonitorAudioControls
-              mode={audioModeLabel(audio.mode)}
-              onCycleMode={audio.cycleMode}
-              onToggleMute={() => audio.setMode(audio.mode === "mute" ? "adult" : "mute")}
-              volume={audio.volume}
-            />
-          </>
         ) : (
           <EcgLiveMonitorHmiDiagnosticHud
             clock={telemetry.clock}
@@ -308,6 +306,7 @@ export const EcgLiveMonitorShell = memo(function EcgLiveMonitorShell({
               highlightedLead={selectedLead}
               isDigitizing={isDigitizing}
               layoutMode={engine.layoutMode}
+              layoutRevision={engine.layoutRevision}
               lead={activeLeadData}
               measureMode={measureMode}
               onDigitize={onDigitize}
@@ -332,6 +331,7 @@ export const EcgLiveMonitorShell = memo(function EcgLiveMonitorShell({
                     comparisonPreset={engine.comparisonPreset}
                     controls={controls}
                     customLeads={engine.customLeads}
+                    displayPreset={engine.displayPreset}
                     engine={engine}
                     exportFilename={`ecg-monitor-${ecgCase.caseNumber ?? ecgCase.id}.png`}
                     layoutMode={engine.layoutMode}
@@ -339,10 +339,10 @@ export const EcgLiveMonitorShell = memo(function EcgLiveMonitorShell({
                     onCollapseToggle={hmi.toggleLeft}
                     onComparisonPreset={engine.setComparisonPreset}
                     onCustomLeadsChange={engine.setCustomLeads}
+                    onDisplayPreset={engine.setDisplayPreset}
                     onFocusLead={engine.focusLead}
                     onLayoutModeChange={handleLayoutModeChange}
                     onLeadChange={(lead) => {
-                      engine.focusLead(lead);
                       setSelectedLead(lead);
                     }}
                     onMeasureToggle={() => setMeasureMode((v) => !v)}
@@ -365,6 +365,33 @@ export const EcgLiveMonitorShell = memo(function EcgLiveMonitorShell({
                     quickImpression={ecgCase.clinicalIndication ?? rhythm}
                     rhythm={rhythm}
                     signalQuality={signalQuality}
+                  />
+                </View>
+                <View pointerEvents="box-none" style={styles.proHudOverlay}>
+                  <EcgLiveMonitorProHud
+                    audioMode={audioModeLabel(audio.mode)}
+                    battery={telemetry.batteryLevel != null ? `${telemetry.batteryLevel}%` : "AC"}
+                    filter={engine.filter}
+                    fps={fps}
+                    gain={controls.grid.gain}
+                    heartRate={heartRate}
+                    intervals={intervals}
+                    noise={noiseLevel.toUpperCase()}
+                    recording={engine.recording}
+                    samplingRate={digitalEcg?.leads[0]?.samplingRate ? `${digitalEcg.leads[0].samplingRate} Hz` : "500 Hz"}
+                    signalQuality={signalQuality}
+                    speed={controls.grid.speed}
+                    timestamp={telemetry.clock}
+                  />
+                  <EcgLiveMonitorAudioControls
+                    alarmVolume={audio.alarmVolume}
+                    audioEnabled={audio.audioEnabled}
+                    mode={audioModeLabel(audio.mode)}
+                    onCycleMode={audio.cycleMode}
+                    onToggleEnabled={() => audio.setAudioEnabled(!audio.audioEnabled)}
+                    onToggleMute={() => audio.setMode(audio.mode === "mute" ? "adult" : "mute")}
+                    profileLabel={audio.profileLabel}
+                    volume={audio.volume}
                   />
                 </View>
               </>
@@ -411,6 +438,15 @@ const styles = StyleSheet.create({
   leftRailOverlay: { bottom: 0, left: 0, pointerEvents: "box-none", position: "absolute", top: 0, zIndex: 20 },
   monitorStage: { flex: 1, minHeight: 0, minWidth: 0, position: "relative" },
   monitorStageDiagnostic: { paddingBottom: 0 },
+  proHudOverlay: {
+    backgroundColor: "rgba(0,0,0,0.72)",
+    bottom: 52,
+    left: 8,
+    maxWidth: "72%",
+    pointerEvents: "box-none",
+    position: "absolute",
+    zIndex: 18,
+  },
   rightRailOverlay: { bottom: 0, pointerEvents: "box-none", position: "absolute", right: 0, top: 0, zIndex: 20 },
   root: { backgroundColor: ECG_LIVE_MONITOR.background, flex: 1, minHeight: 0 },
   rootDiagnostic: { backgroundColor: "#000000" },

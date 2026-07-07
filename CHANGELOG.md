@@ -1,5 +1,27 @@
 # Changelog — Enterprise QA Infrastructure
 
+## Hospital Grade Rebuild — 2026-07-08
+
+### Phase 1 — Live Monitor
+- **Render Engine 2.0 integration** — `hospital-monitor/hospitalMonitorRenderer.ts` routes live canvas through RE2 phosphor pipeline with legacy fallback
+- **Hospital display presets** — Bedside (dual), Central Station (6×2), Hospital Mode (12-lead diagnostic grid)
+- **Extended bedside audio** — Normal, PVC, Bradycardia, Tachycardia, VF, VT, Asystole, Lead Off profiles; mute/volume/alarm volume/enable controls
+- **Live monitor stabilization** (from prior session) — connection telemetry, 6×2 layout fix, canvas viewport ratio, instant layout redraw
+
+### Phase 2 — ECG Workspace
+- **Enterprise workstation preserved** — `EcgMonitorViewerFoundation` orchestrates left/center/right/bottom clinical layout (Sprint 24–35 stack)
+- **Ready markers** — `#hospital-grade-workspace-ready`, `#hospital-grade-rebuild-ready` for full-workflow validation
+
+### Validation
+- Integration: `scripts/hospital-grade-rebuild.integration.ts`
+- Playwright: `tests/e2e/hospital-grade-rebuild.spec.ts`
+- Reports: `ROOT_CAUSE_REPORT.md`, `ARCHITECTURE_REPORT.md`, `WORKSPACE_REPORT.md`, `LIVE_MONITOR_REPORT.md`, `PERFORMANCE_REPORT.md`, `VISUAL_QA_REPORT.md`, `PLAYWRIGHT_REPORT.md`, `REGRESSION_REPORT.md`
+
+### Tag
+- `HospitalGradeRebuild-v1`
+
+---
+
 ## Sprint 50 — Real Hospital ECG Monitor Experience — 2026-07-07
 
 ### Added

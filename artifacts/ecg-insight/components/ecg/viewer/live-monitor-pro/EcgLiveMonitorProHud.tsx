@@ -88,14 +88,22 @@ const styles = StyleSheet.create({
 });
 
 export const EcgLiveMonitorAudioControls = memo(function EcgLiveMonitorAudioControls({
+  alarmVolume,
+  audioEnabled,
   mode,
   onCycleMode,
+  onToggleEnabled,
   onToggleMute,
+  profileLabel,
   volume,
 }: {
+  alarmVolume: number;
+  audioEnabled: boolean;
   mode: string;
   onCycleMode: () => void;
+  onToggleEnabled: () => void;
   onToggleMute: () => void;
+  profileLabel?: string;
   volume: number;
 }) {
   return (
@@ -106,6 +114,20 @@ export const EcgLiveMonitorAudioControls = memo(function EcgLiveMonitorAudioCont
       <Pressable onPress={onToggleMute} style={audioStyles.chip}>
         <Text style={audioStyles.chipText}>{volume > 0 ? "Mute" : "Unmute"}</Text>
       </Pressable>
+      <Pressable onPress={onToggleEnabled} style={audioStyles.chip}>
+        <Text style={audioStyles.chipText}>{audioEnabled ? "Disable" : "Enable"}</Text>
+      </Pressable>
+      {profileLabel ? (
+        <View style={audioStyles.chip}>
+          <Text style={audioStyles.chipText}>Profile {profileLabel}</Text>
+        </View>
+      ) : null}
+      <View style={audioStyles.chip}>
+        <Text style={audioStyles.chipText}>Vol {Math.round(volume * 100)}%</Text>
+      </View>
+      <View style={audioStyles.chip}>
+        <Text style={audioStyles.chipText}>Alarm {Math.round(alarmVolume * 100)}%</Text>
+      </View>
     </View>
   );
 });

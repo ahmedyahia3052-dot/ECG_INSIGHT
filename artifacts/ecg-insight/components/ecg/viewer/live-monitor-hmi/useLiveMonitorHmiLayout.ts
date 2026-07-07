@@ -20,8 +20,8 @@ export function useLiveMonitorHmiLayout(diagnosticMode: boolean) {
 
   const chromeHeight = useMemo(() => {
     if (diagnosticMode) return 0;
-    return HMI_LAYOUT.statusBarHeight;
-  }, [diagnosticMode]);
+    return HMI_LAYOUT.statusBarHeight + (controlsPinned ? HMI_LAYOUT.bottomBarHeight : 0);
+  }, [controlsPinned, diagnosticMode]);
 
   const toggleLeft = useCallback(() => setLeftCollapsed((v) => !v), []);
   const toggleRight = useCallback(() => setRightCollapsed((v) => !v), []);

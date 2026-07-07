@@ -3,8 +3,11 @@ import { useCallback, useState } from "react";
 import { playbackRateForPaperSpeed } from "./ecgMonitorGridMath";
 import {
   COMPARISON_PRESETS,
+  DISPLAY_PRESET_LAYOUT,
+  isMultiLeadLayoutMode,
   MONITOR_CUSTOM_DEFAULT,
   type MonitorComparisonPreset,
+  type MonitorDisplayPreset,
   type MonitorLayoutMode,
   type RhythmStripWindow,
 } from "./monitorLayout";
@@ -21,6 +24,7 @@ export type EcgLiveMonitorEngine = EcgWaveformPlaybackState & {
   comparisonPreset: MonitorComparisonPreset;
   customLeads: EcgLeadId[];
   cycleFilter: () => void;
+  displayPreset: MonitorDisplayPreset;
   filter: MonitorFilter;
   focusLead: (lead: EcgLeadId) => void;
   frameStepBackward: () => void;
@@ -30,6 +34,7 @@ export type EcgLiveMonitorEngine = EcgWaveformPlaybackState & {
   jumpToEnd: () => void;
   jumpToStart: () => void;
   layoutMode: MonitorLayoutMode;
+  layoutRevision: number;
   paperSpeed: EcgPaperSpeed;
   pause: () => void;
   play: () => void;
@@ -41,6 +46,7 @@ export type EcgLiveMonitorEngine = EcgWaveformPlaybackState & {
   rhythmStripWindowSec: RhythmStripWindow;
   setComparisonPreset: (preset: MonitorComparisonPreset) => void;
   setCustomLeads: (leads: EcgLeadId[]) => void;
+  setDisplayPreset: (preset: MonitorDisplayPreset) => void;
   setHorizontalScroll: (value: number) => void;
   setIsolatedLead: (lead: EcgLeadId | null) => void;
   setLayoutMode: (mode: MonitorLayoutMode) => void;
@@ -67,6 +73,21 @@ export function useEcgLiveMonitorEngine(durationMs: number, beatIntervalMs = 850
   const [isolatedLead, setIsolatedLead] = useState<EcgLeadId | null>(null);
   const [customLeads, setCustomLeads] = useState<EcgLeadId[]>(MONITOR_CUSTOM_DEFAULT);
   const [comparisonPreset, setComparisonPresetState] = useState<MonitorComparisonPreset>(null);
+  const [displayPreset, setDisplayPresetState] = useState<MonitorDisplayPreset>(null);
+  const [layoutRevision, setLayoutRevision] = useState(0);
+
+  const bumpLayoutRevision = useCallback(() => {
+    setLayoutRevision((value) => value + 1);
+  }, []);
+
+  const applyLayoutMode = useCallback((mode: MonitorLayoutMode) => {
+    setLayoutMode(mode);
+    setDisplayPresetState(null);
+    if (isMultiLeadLayoutMode(mode)) {
+      setIsolatedLead(null);
+    }
+    bumpLayoutRevision();
+  }, [bumpLayoutRevision]);
 
   const setPaperSpeed = useCallback(
     (speed: EcgPaperSpeed) => {
@@ -76,22 +97,38 @@ export function useEcgLiveMonitorEngine(durationMs: number, beatIntervalMs = 850
     [playback],
   );
 
+  const setDisplayPreset = useCallback((preset: MonitorDisplayPreset) => {
+    if (!preset) {
+      setDisplayPresetState(null);
+      return;
+    }
+    setDisplayPresetState(preset);
+    setComparisonPresetState(null);
+    setIsolatedLead(null);
+    setRhythmStripMode(false);
+    setLayoutMode(DISPLAY_PRESET_LAYOUT[preset]);
+    bumpLayoutRevision();
+  }, [bumpLayoutRevision]);
+
   const setComparisonPreset = useCallback((preset: MonitorComparisonPreset) => {
     setComparisonPresetState(preset);
+    setDisplayPresetState(null);
     if (!preset) return;
     const leads = preset === "custom" ? customLeads : COMPARISON_PRESETS[preset];
     setCustomLeads(leads);
-    setLayoutMode("custom");
+    applyLayoutMode("custom");
     setRhythmStripMode(false);
     setIsolatedLead(null);
-  }, [customLeads]);
+  }, [applyLayoutMode, customLeads]);
 
   const focusLead = useCallback((lead: EcgLeadId) => {
     setIsolatedLead(lead);
     setLayoutMode("single");
     setRhythmStripMode(false);
     setComparisonPresetState(null);
-  }, []);
+    setDisplayPresetState(null);
+    bumpLayoutRevision();
+  }, [bumpLayoutRevision]);
 
   const cycleFilter = useCallback(() => {
     setFilter((current) => {
@@ -105,6 +142,14 @@ export function useEcgLiveMonitorEngine(durationMs: number, beatIntervalMs = 850
   const frameStepForward = useCallback(() => playback.jumpToMs(playback.playheadMs + FRAME_STEP_MS), [playback]);
   const frameStepBackward = useCallback(() => playback.jumpToMs(playback.playheadMs - FRAME_STEP_MS), [playback]);
   const toggleRecord = useCallback(() => setRecording((value) => !value), []);
+
+  const setRhythmStripModeSafe = useCallback((value: boolean) => {
+    setRhythmStripMode(value);
+    if (value) {
+      setIsolatedLead(null);
+    }
+    bumpLayoutRevision();
+  }, [bumpLayoutRevision]);
 
   const pause = useCallback(() => {
     if (playback.isPlaying) playback.togglePlay();
@@ -138,6 +183,7 @@ export function useEcgLiveMonitorEngine(durationMs: number, beatIntervalMs = 850
     comparisonPreset,
     customLeads,
     cycleFilter,
+    displayPreset,
     filter,
     focusLead,
     frameStepBackward,
@@ -147,6 +193,7 @@ export function useEcgLiveMonitorEngine(durationMs: number, beatIntervalMs = 850
     jumpToEnd,
     jumpToStart,
     layoutMode,
+    layoutRevision,
     pause,
     paperSpeed,
     play,
@@ -158,13 +205,14 @@ export function useEcgLiveMonitorEngine(durationMs: number, beatIntervalMs = 850
     rhythmStripWindowSec,
     setComparisonPreset,
     setCustomLeads,
+    setDisplayPreset,
     setHorizontalScroll,
     setIsolatedLead,
-    setLayoutMode,
+    setLayoutMode: applyLayoutMode,
     setPaperSpeed,
     setReviewMode,
     setRhythmStripLead,
-    setRhythmStripMode,
+    setRhythmStripMode: setRhythmStripModeSafe,
     setRhythmStripWindowSec,
     toggleRecord,
     toggleReviewMode,
