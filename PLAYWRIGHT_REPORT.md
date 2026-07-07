@@ -1,42 +1,25 @@
-# Playwright Report — Sprint 41 Live Monitor
+# Playwright Report — Sprint 42 Measurement Studio
 
 **Date:** 2026-07-07  
-**Spec:** `tests/e2e/sprint41-live-monitor.spec.ts`  
-**Tags:** `@sprint41 @enterprise`
+**Spec:** `tests/e2e/sprint42-clinical-measurement-studio.spec.ts`  
+**Tags:** `@sprint42 @enterprise`
 
 ## Test Coverage
 
 | Test | Verifies |
 |------|----------|
-| alarm bar and clinical toolbar are visible | `sprint41-live-monitor-alarm-bar`, toolbar test IDs |
-| play pause freeze resume transport | LIVE → PAUSED → FROZEN → LIVE status transitions |
-| review mode freezes acquisition | REVIEW status + alarm acq chip |
-| gain and sweep speed switching | 25/50 mm/s, 5/20 mm/mV in status panel |
-| 3 5 12 lead layout modes and lead switch | Layout labels + V5 single lead |
-| rhythm strip canvas renders | `sprint41-rhythm-strip-canvas` |
-| fullscreen diagnostic mode | Header hidden, ESC restores |
-| zoom pan reset view and snapshot export | Toolbar interactions + optional PNG download |
-
-## Prerequisites
-
-- Authenticated doctor session
-- Digitized ECG case (fixture created in `beforeAll`)
-- Frontend + API servers running
+| workflow presets and enhanced sidebar | `sprint42-measurement-studio-sidebar`, workflow preset buttons |
+| create delete undo redo duplicate | Caliper placement, PR row, duplicate/delete, undo/redo |
+| approve measurement and export formats | Approve button, JSON/CSV/FHIR/XML export buttons |
+| zoom pan consistency and lead switching | Overlay stability after zoom and lead change |
+| floating toolbar crosshair and keyboard | Crosshair tool, M/ESC/Ctrl+Z shortcuts |
 
 ## Run Command
 
 ```bash
-playwright test tests/e2e/sprint41-live-monitor.spec.ts --grep @sprint41
+playwright test tests/e2e/sprint42-clinical-measurement-studio.spec.ts --grep @sprint42
 ```
 
 ## Isolation
 
-- **New spec only** — existing `sprint37-live-monitor.spec.ts` unchanged
-- No modifications to CI pipeline or `playwright.config.ts`
-
-## Test IDs Added (Sprint 41)
-
-- `sprint41-live-monitor-alarm-bar`
-- `sprint41-alarm-hr`, `sprint41-alarm-signal`, `sprint41-alarm-lead`, `sprint41-alarm-noise`, `sprint41-alarm-acq`
-- `sprint41-live-monitor-toolbar`
-- `sprint41-rhythm-strip-host`, `sprint41-rhythm-strip-canvas`
+New spec only — Sprint 13/14/15/34 specs unchanged. No CI pipeline modifications.

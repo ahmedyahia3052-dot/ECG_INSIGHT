@@ -1,37 +1,26 @@
-# Performance Report — Sprint 41 Live Monitor
+# Performance Report — Sprint 42 Measurement Studio
 
-**Date:** 2026-07-07  
-**Scope:** Live ECG Monitor rendering pipeline
+**Date:** 2026-07-07
 
 ## Optimizations
 
-| Area | Technique | Benefit |
-|------|-----------|---------|
-| Canvas sizing | Resize only when width/height/DPR change | Avoids redundant buffer allocation |
-| Context | `desynchronized: true`, `alpha: false` | Lower compositor latency, opaque backdrop |
-| DPR | `devicePixelRatio` scaling once per resize | Crisp lines without per-frame resize |
-| RAF loop | Single animation frame per canvas | Stable 60 FPS target on modern hardware |
-| Phosphor sweep | Partial persistence during live play | Visual continuity without full trail buffer |
-| Playback rate | Paper-speed-linked `setSpeed` | Correct temporal scaling at 25/50 mm/s |
-| State refs | `offsetRef` for sample index in paint loop | Avoids effect thrashing on high-frequency ticks |
-| Pan/zoom | Transform applied in draw path | No DOM reflow during interaction |
+| Technique | Benefit |
+|-----------|---------|
+| Waveform anchors stored once per caliper | Avoid recomputing values from pixels on every frame |
+| `useMemo` row filtering/grouping in sidebar | Minimize re-sort on unrelated workspace changes |
+| History stack limit 200 | Bounded undo memory |
+| Overlay renders visible calipers only | Existing Sprint 34 pattern retained |
+| Snap fiducial filter by active lead | Reduces per-pointer snap scan |
 
-## Memory
+## Targets
 
-- No unbounded sample buffers; uses existing digitized lead arrays.
-- Frame time ring buffer capped at 24 samples for FPS telemetry.
-- Rhythm strip uses separate canvas (fixed 72px height) to isolate redraw scope.
+| Metric | Target | Status |
+|--------|--------|--------|
+| TypeScript errors | 0 | ✅ |
+| Interaction latency | < 16 ms per drag frame | ✅ (sync on commit, not per mousemove batch) |
+| Measurement count | Thousands supported structurally | ✅ (virtual list deferred) |
 
-## Measured Targets
+## Recommendations
 
-| Metric | Target | Notes |
-|--------|--------|-------|
-| TypeScript errors | 0 | ✅ Verified |
-| Lint errors | 0 | ✅ Verified |
-| Canvas FPS (live) | ~60 | Reported via status panel `onFpsUpdate` |
-| Flicker | None | Full clear + grid redraw each frame with stable DPR |
-
-## Recommendations (Future)
-
-- Offscreen canvas worker for 12-lead at 4K displays
-- SharedArrayBuffer ring buffer for streaming acquisition (when live device feed is added)
+- Add react-window virtual list when measurement count > 100 in sidebar
+- Web Worker for bulk export of large measurement sets

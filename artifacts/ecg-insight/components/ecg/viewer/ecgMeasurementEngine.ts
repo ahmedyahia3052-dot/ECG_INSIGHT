@@ -5,6 +5,7 @@ import type {
   EcgClinicalMeasurement,
   EcgMeasurementKind,
   EcgMeasurementReadouts,
+  MeasurementWorkflowPresetId,
   EcgViewerWorkspaceState,
   ImagePoint,
 } from "./measurementTypes";
@@ -20,8 +21,16 @@ import {
 } from "./ecgCalibrationMath";
 import { deltaPixelsForCaliper } from "./ecgCaliperGeometry";
 import { evaluateMeasurementReference, formatReferenceRange } from "./ecgMeasurementReference";
-import { measurementsToCsv } from "./ecgMeasurementExport";
+import { measurementsToCsv, measurementsToXml } from "./ecgMeasurementExport";
 import { MEASUREMENT_KIND_LABELS } from "./measurementTypes";
+import {
+  attachWaveformAnchors,
+  hasWaveformAnchors,
+  measurementValueFromWaveform,
+  readoutsFromWaveformAnchors,
+  syncCaliperImageFromWaveform,
+  waveformContextFromImage,
+} from "./waveformCoordinateSpace";
 
 export type ClinicalMeasurementPreset = {
   caliperKind: EcgCaliperKind;
@@ -37,6 +46,8 @@ export const CLINICAL_MEASUREMENT_PRESETS: ClinicalMeasurementPreset[] = [
   { caliperKind: "horizontal", color: "#7C3AED", kind: "qrs_duration", label: "QRS" },
   { caliperKind: "horizontal", color: "#059669", kind: "qt_interval", label: "QT" },
   { caliperKind: "horizontal", color: "#0F766E", kind: "qtc", label: "QTc" },
+  { caliperKind: "horizontal", color: "#0F766E", kind: "qtc_bazett", label: "QTcB" },
+  { caliperKind: "horizontal", color: "#0891B2", kind: "qtc_fridericia", label: "QTcF" },
   { caliperKind: "horizontal", color: "#DC2626", kind: "rr_interval", label: "RR" },
   { caliperKind: "horizontal", color: "#DB2777", kind: "pp_interval", label: "PP" },
   { caliperKind: "horizontal", color: "#B91C1C", kind: "heart_rate", label: "HR" },
@@ -47,14 +58,64 @@ export const CLINICAL_MEASUREMENT_PRESETS: ClinicalMeasurementPreset[] = [
   { caliperKind: "vertical", color: "#9333EA", kind: "p_amplitude", label: "P Amp" },
   { caliperKind: "vertical", color: "#EF4444", kind: "r_amplitude", label: "R Amp" },
   { caliperKind: "vertical", color: "#0284C7", kind: "s_amplitude", label: "S Amp" },
+  { caliperKind: "horizontal", color: "#334155", kind: "q_wave_width", label: "Q Width" },
+  { caliperKind: "vertical", color: "#475569", kind: "q_wave_depth", label: "Q Depth" },
+  { caliperKind: "horizontal", color: "#64748B", kind: "bundle_branch_delay", label: "BBD" },
   { caliperKind: "vertical", color: "#16A34A", kind: "t_amplitude", label: "T Amp" },
   { caliperKind: "angle", color: "#CA8A04", kind: "electrical_axis", label: "Axis" },
   { caliperKind: "multi", color: "#475569", kind: "custom", label: "Multi Seg" },
   { caliperKind: "distance", color: "#64748B", kind: "custom", label: "Dist Seg" },
   { caliperKind: "dual", color: "#64748B", kind: "custom", label: "Custom" },
+  { caliperKind: "crosshair", color: "#94A3B8", kind: "custom", label: "Crosshair" },
+  { caliperKind: "reference", color: "#CBD5E1", kind: "custom", label: "Reference" },
+  { caliperKind: "free", color: "#64748B", kind: "custom", label: "Free" },
 ];
 
-export type MeasurementExportFormat = "json" | "fhir" | "hl7" | "pdf" | "csv";
+export type MeasurementExportFormat = "json" | "fhir" | "hl7" | "pdf" | "csv" | "xml";
+
+export type MeasurementWorkflowPreset = {
+  id: MeasurementWorkflowPresetId;
+  kinds: EcgMeasurementKind[];
+  label: string;
+};
+
+export const MEASUREMENT_WORKFLOW_PRESETS: MeasurementWorkflowPreset[] = [
+  { id: "basic_ecg", kinds: ["pr_interval", "qrs_duration", "qt_interval", "qtc", "rr_interval"], label: "Basic ECG" },
+  { id: "chest_pain", kinds: ["st_elevation", "st_depression", "qrs_duration", "qt_interval", "qtc"], label: "Chest Pain" },
+  { id: "acs", kinds: ["st_elevation", "st_depression", "qrs_duration", "qt_interval", "qtc", "rr_interval"], label: "ACS" },
+  { id: "stemi", kinds: ["st_elevation", "qrs_duration", "qt_interval", "qtc", "rr_interval"], label: "STEMI" },
+  { id: "nstemi", kinds: ["st_depression", "t_wave_duration", "qt_interval", "qtc", "rr_interval"], label: "NSTEMI" },
+  { id: "arrhythmia", kinds: ["rr_interval", "pp_interval", "heart_rate", "qrs_duration", "pr_interval"], label: "Arrhythmia" },
+  { id: "qt_analysis", kinds: ["qt_interval", "qtc", "qtc_bazett", "qtc_fridericia", "qt_dispersion"], label: "QT Analysis" },
+  { id: "athlete_ecg", kinds: ["qrs_duration", "qt_interval", "qtc", "rr_interval", "r_amplitude"], label: "Athlete ECG" },
+  { id: "pediatric_ecg", kinds: ["pr_interval", "qrs_duration", "qt_interval", "qtc", "heart_rate"], label: "Pediatric ECG" },
+  { id: "pre_operative", kinds: ["pr_interval", "qrs_duration", "qt_interval", "qtc", "st_elevation"], label: "Pre-operative" },
+  { id: "custom", kinds: ["custom"], label: "Custom" },
+];
+
+export const MEASUREMENT_ABBREVIATIONS: Partial<Record<EcgMeasurementKind, string>> = {
+  bundle_branch_delay: "BBD",
+  heart_rate: "HR",
+  p_amplitude: "P",
+  p_wave_duration: "Pdur",
+  pp_interval: "PP",
+  pr_interval: "PR",
+  q_wave_depth: "Qd",
+  q_wave_width: "Qw",
+  qrs_duration: "QRS",
+  qt_dispersion: "QTd",
+  qt_interval: "QT",
+  qtc: "QTc",
+  qtc_bazett: "QTcB",
+  qtc_fridericia: "QTcF",
+  r_amplitude: "R",
+  rr_interval: "RR",
+  s_amplitude: "S",
+  st_depression: "ST↓",
+  st_elevation: "ST↑",
+  t_amplitude: "T",
+  t_wave_duration: "Tdur",
+};
 
 export type SerializedMeasurementBundle = {
   exportedAt: string;
@@ -119,6 +180,39 @@ export function computeQtDispersion(
     updatedAt: timestamp,
     value: dispersion,
   };
+}
+
+export function measurementFromWaveformCaliper(
+  caliper: EcgCaliper,
+  operator: string,
+  options?: { rrMs?: number },
+): { kind: EcgMeasurementKind; name: string; readouts: EcgMeasurementReadouts; unit: string; value: number } | null {
+  if (!hasWaveformAnchors(caliper)) return null;
+  const kind = caliper.measurementKind ?? "custom";
+  const readouts = readoutsFromWaveformAnchors({
+    caliperKind: caliper.kind,
+    end: caliper.waveformEnd,
+    measurementKind: kind,
+    rrMs: options?.rrMs,
+    start: caliper.waveformStart,
+  });
+  const primary = measurementValueFromWaveform(kind, caliper.kind, readouts);
+  const name = caliper.label?.trim() || MEASUREMENT_KIND_LABELS[kind] || "Custom Measurement";
+  return { kind, name, readouts, unit: primary.unit, value: primary.value };
+}
+
+export function syncCalipersFromWaveform(
+  calipers: EcgCaliper[],
+  ctx: ReturnType<typeof waveformContextFromImage>,
+): EcgCaliper[] {
+  return calipers.map((caliper) => syncCaliperImageFromWaveform(caliper, { ...ctx, lead: caliper.lead ?? ctx.lead }));
+}
+
+export function attachWaveformToCalipers(
+  calipers: EcgCaliper[],
+  ctx: ReturnType<typeof waveformContextFromImage>,
+): EcgCaliper[] {
+  return calipers.map((caliper) => (hasWaveformAnchors(caliper) ? caliper : attachWaveformAnchors(caliper, { ...ctx, lead: caliper.lead ?? ctx.lead })));
 }
 
 export function presetForKind(kind: EcgMeasurementKind): ClinicalMeasurementPreset {
@@ -349,6 +443,12 @@ export function exportMeasurements(
       ),
     };
   }
+  if (format === "xml") {
+    return {
+      ...bundle,
+      xml: measurementsToXml(measurements),
+    };
+  }
   return bundle;
 }
 
@@ -369,15 +469,19 @@ export function syncWorkspaceMeasurements(
     .filter((caliper) => !caliper.hidden)
     .map((caliper) => {
       const previous = byCaliper.get(caliper.id);
-      const derived = measurementFromCaliper(caliper, spacing, input.speed, input.gain, input.operator, {
-        rrMs: resolveLatestRrMs(calipers, spacing, input.speed),
-      });
+      const rrMs = resolveLatestRrMs(calipers, spacing, input.speed);
+      const waveformDerived = measurementFromWaveformCaliper(caliper, input.operator, { rrMs });
+      const derived = waveformDerived ?? measurementFromCaliper(caliper, spacing, input.speed, input.gain, input.operator, { rrMs });
       const primary = primaryValueForKind(derived.kind, derived.readouts, caliper.kind);
+      const abbreviation = MEASUREMENT_ABBREVIATIONS[derived.kind] ?? presetForKind(derived.kind).label;
       return enrichMeasurement(
         {
+          aiFindingId: previous?.aiFindingId ?? null,
           aiInterpretation: previous?.aiInterpretation ?? null,
           amplitudeMv: derived.readouts.mv,
+          approvalStatus: previous?.approvalStatus ?? "pending",
           caliperId: caliper.id,
+          abbreviation,
           comments: previous?.comments ?? caliper.comments,
           confidence: previous?.confidence ?? null,
           createdBy: caliper.createdBy ?? previous?.createdBy ?? input.operator,
@@ -398,6 +502,9 @@ export function syncWorkspaceMeasurements(
           unit: primary.unit,
           updatedAt: caliper.updatedAt,
           value: primary.value,
+          version: previous?.version ?? 1,
+          waveformEnd: caliper.waveformEnd ?? previous?.waveformEnd,
+          waveformStart: caliper.waveformStart ?? previous?.waveformStart,
         },
         calibration,
       );

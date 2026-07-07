@@ -4,7 +4,7 @@ import Svg, { Circle, Ellipse, Line, Path, Rect, Text as SvgText } from "react-n
 
 import { medicalTheme } from "@/components/enterprise/EnterpriseUI";
 
-import { resolveLatestRrMs, summarizeCaliper } from "./ecgMeasurementEngine";
+import { MEASUREMENT_ABBREVIATIONS, resolveLatestRrMs, summarizeCaliper } from "./ecgMeasurementEngine";
 import { arcPath } from "./ecgCaliperGeometry";
 import { gridSpacingPx, imageDisplayRect, imageToScreen, resolveGridSpacing, screenToImage } from "./ecgCalibrationMath";
 import { pointToSyncedTimestamp, syncTimestampMarkers } from "./ecgMultiLeadSync";
@@ -36,6 +36,15 @@ function caliperScreenPoints(caliper: EcgCaliper, rect: ReturnType<typeof imageD
   };
 }
 
+function liveLabelForCaliper(caliper: EcgCaliper, summary: ReturnType<typeof summarizeCaliper>, measurement?: { approvalStatus?: string; operator?: string }) {
+  const abbr = caliper.measurementKind ? MEASUREMENT_ABBREVIATIONS[caliper.measurementKind] : undefined;
+  const lead = caliper.lead ? ` · ${caliper.lead}` : "";
+  const status = measurement?.approvalStatus ? ` · ${measurement.approvalStatus}` : "";
+  const operator = measurement?.operator ? ` · ${measurement.operator}` : "";
+  const prefix = abbr ?? caliper.label ?? "Meas";
+  return `${prefix}${lead}: ${summary.primary.value} ${summary.primary.unit}${status}${operator}`;
+}
+
 function distance(a: ImagePoint, b: ImagePoint) {
   return Math.hypot(a.x - b.x, a.y - b.y);
 }
@@ -47,10 +56,12 @@ function CaliperGraphic({
   rrMs,
   selected,
   hovered,
+  measurement,
 }: {
   caliper: EcgCaliper;
   controls: EcgViewerControls;
   hovered: boolean;
+  measurement?: { approvalStatus?: string; operator?: string };
   rect: ReturnType<typeof imageDisplayRect>;
   rrMs?: number;
   selected: boolean;
@@ -80,7 +91,7 @@ function CaliperGraphic({
           <Circle key={`${caliper.id}-handle-${index}`} cx={point.x} cy={point.y} fill={selected ? "#FFFFFF" : stroke} r={HANDLE_RADIUS} stroke={stroke} strokeWidth={2} />
         ))}
         <SvgText fill={medicalTheme.text} fontSize={11} fontWeight="700" x={points[0]!.x} y={points[0]!.y - 8}>
-          {`${label}: ${summary.primary.value} ${summary.primary.unit}`}
+          {liveLabelForCaliper(caliper, summary, measurement)}
         </SvgText>
       </React.Fragment>
     );
@@ -97,7 +108,7 @@ function CaliperGraphic({
         <Circle cx={start.x} cy={start.y} fill={selected ? "#FFFFFF" : stroke} r={HANDLE_RADIUS} stroke={stroke} strokeWidth={2} />
         <Circle cx={end.x} cy={end.y} fill={selected ? "#FFFFFF" : stroke} r={HANDLE_RADIUS} stroke={stroke} strokeWidth={2} />
         <SvgText fill={medicalTheme.text} fontSize={11} fontWeight="700" x={vertex.x + 8} y={vertex.y - 8}>
-          {`${label}: ${summary.primary.value} ${summary.primary.unit}`}
+          {liveLabelForCaliper(caliper, summary, measurement)}
         </SvgText>
       </React.Fragment>
     );
@@ -126,7 +137,7 @@ function CaliperGraphic({
         x={(start.x + end.x) / 2}
         y={Math.min(start.y, end.y) - 8}
       >
-        {`${label}: ${summary.primary.value} ${summary.primary.unit}`}
+        {liveLabelForCaliper(caliper, summary, measurement)}
       </SvgText>
     </React.Fragment>
   );
@@ -358,9 +369,10 @@ export const EcgMeasurementOverlay = memo(function EcgMeasurementOverlay({
             caliper={caliper}
             controls={controls}
             hovered={workspace.hoveredCaliperId === caliper.id}
+            measurement={workspace.present.measurements.find((item) => item.caliperId === caliper.id)}
             rect={rect}
             rrMs={rrMs}
-            selected={workspace.present.selectedCaliperId === caliper.id}
+            selected={workspace.present.selectedCaliperId === caliper.id || workspace.present.aiHighlightMeasurementId === workspace.present.measurements.find((m) => m.caliperId === caliper.id)?.id}
           />
         ))}
         {draftGraphic}

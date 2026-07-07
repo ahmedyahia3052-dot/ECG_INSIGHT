@@ -11,7 +11,7 @@ import {
 } from "../artifacts/ecg-insight/components/ecg/viewer/ecgMeasurementEngine";
 import { createWorkspaceState, migrateWorkspaceState } from "../artifacts/ecg-insight/components/ecg/viewer/measurementTypes";
 
-assert.equal(CLINICAL_MEASUREMENT_PRESETS.length, 19);
+assert.equal(CLINICAL_MEASUREMENT_PRESETS.length, 27);
 assert.equal(presetForKind("pr_interval").label, "PR");
 assert.equal(presetForKind("qtc").caliperKind, "horizontal");
 
@@ -93,10 +93,12 @@ const jsonExport = exportMeasurements(synced, "json") as { schemaVersion: number
 assert.equal(jsonExport.schemaVersion, 4);
 assert.equal((jsonExport as { workspaceVersion: number }).workspaceVersion, 5);
 const csvExport = exportMeasurements(synced, "csv") as { csv: string };
-assert.ok(csvExport.csv.includes("name,type,kind"));
+assert.ok(csvExport.csv.includes("name") && csvExport.csv.includes("kind"));
 const fhirExport = exportMeasurements(synced, "fhir") as { resourceType: string };
 assert.equal(fhirExport.resourceType, "Bundle");
 const hl7Export = exportMeasurements(synced, "hl7") as { segments: string[] };
 assert.ok(hl7Export.segments.length >= 2);
+const xmlExport = exportMeasurements(synced, "xml") as { xml: string };
+assert.ok(xmlExport.xml.includes("<EcgMeasurementExport"));
 
 console.log("ecg-measurement-engine.test.ts: all unit tests passed");

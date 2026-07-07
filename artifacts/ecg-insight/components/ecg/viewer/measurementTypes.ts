@@ -3,7 +3,25 @@ import type { EcgGridGain, EcgImageAdjustments, EcgPaperSpeed, EcgViewerGridSett
 
 export type EcgViewerToolMode = "select" | "pan" | "caliper" | "measurement" | "annotation";
 
-export type EcgCaliperKind = "horizontal" | "vertical" | "dual" | "multi" | "angle" | "distance";
+export type EcgCaliperKind =
+  | "horizontal"
+  | "vertical"
+  | "dual"
+  | "multi"
+  | "angle"
+  | "distance"
+  | "crosshair"
+  | "reference"
+  | "free";
+
+export type MeasurementApprovalStatus = "approved" | "pending" | "rejected";
+
+export type WaveformPoint = {
+  amplitudeMv: number;
+  lead: string;
+  sampleIndex?: number;
+  timeMs: number;
+};
 
 export type EcgMeasurementKind =
   | "pr_interval"
@@ -23,6 +41,11 @@ export type EcgMeasurementKind =
   | "s_amplitude"
   | "t_amplitude"
   | "electrical_axis"
+  | "qtc_bazett"
+  | "qtc_fridericia"
+  | "q_wave_width"
+  | "q_wave_depth"
+  | "bundle_branch_delay"
   | "custom";
 
 export type EcgCalibrationSnapshot = {
@@ -51,6 +74,11 @@ export type EcgCaliper = {
   end: ImagePoint;
   vertex?: ImagePoint;
   waypoints?: ImagePoint[];
+  /** Waveform-space anchors — source of truth when present (Sprint 42). */
+  waveformStart?: WaveformPoint;
+  waveformEnd?: WaveformPoint;
+  waveformVertex?: WaveformPoint;
+  waveformWaypoints?: WaveformPoint[];
   groupId?: string;
   locked: boolean;
   hidden: boolean;
@@ -63,6 +91,7 @@ export type EcgCaliper = {
   createdBy?: string;
   createdAt: string;
   updatedAt: string;
+  version?: number;
 };
 
 export type EcgMeasurementReadouts = {
@@ -82,21 +111,26 @@ export type EcgClinicalMeasurement = {
   caliperId: string;
   kind: EcgMeasurementKind;
   name: string;
+  abbreviation?: string;
   type: string;
   value: number;
   unit: string;
   lead?: string;
   start: ImagePoint;
   end: ImagePoint;
+  waveformStart?: WaveformPoint;
+  waveformEnd?: WaveformPoint;
   durationMs?: number;
   amplitudeMv?: number;
   comments?: string;
   doctorNotes?: string;
   aiInterpretation?: string | null;
+  aiFindingId?: string | null;
   referenceRange?: string;
   clinicalSignificance?: string;
   calibrationSnapshot?: EcgCalibrationSnapshot;
   confidence: number | null;
+  approvalStatus?: MeasurementApprovalStatus;
   timestamp: string;
   updatedAt: string;
   createdBy?: string;
@@ -104,6 +138,7 @@ export type EcgClinicalMeasurement = {
   hidden: boolean;
   groupId?: string;
   readouts: EcgMeasurementReadouts;
+  version?: number;
 };
 
 export type EcgViewerAnnotation = {
@@ -137,11 +172,28 @@ export type EcgMeasurementSnapSettings = {
   snapToBaseline: boolean;
   snapToGrid: boolean;
   snapToWave: boolean;
+  snapTargets?: import("./ecgAutoSnapEngine").SnapTarget[];
+  visibleLeadOnly?: boolean;
 };
+
+export type MeasurementWorkflowPresetId =
+  | "basic_ecg"
+  | "chest_pain"
+  | "acs"
+  | "stemi"
+  | "nstemi"
+  | "arrhythmia"
+  | "qt_analysis"
+  | "athlete_ecg"
+  | "pediatric_ecg"
+  | "pre_operative"
+  | "custom";
 
 export type EcgViewerWorkspaceState = {
   activeLead?: string;
   activeMeasurementKind?: EcgMeasurementKind;
+  activeWorkflowPreset?: MeasurementWorkflowPresetId;
+  aiHighlightMeasurementId?: string | null;
   aiOverlay?: EcgAiOverlayState;
   annotations: EcgViewerAnnotation[];
   calipers: EcgCaliper[];
@@ -161,16 +213,21 @@ export type EcgViewerWorkspaceState = {
 
 export const MEASUREMENT_KIND_LABELS: Record<EcgMeasurementKind, string> = {
   custom: "Custom",
+  bundle_branch_delay: "Bundle Branch Delay",
   electrical_axis: "Electrical Axis",
   heart_rate: "Heart Rate",
   p_amplitude: "P Amplitude",
   p_wave_duration: "P Wave Duration",
   pp_interval: "PP Interval",
   pr_interval: "PR Interval",
+  q_wave_depth: "Q Wave Depth",
+  q_wave_width: "Q Wave Width",
   qrs_duration: "QRS Duration",
   qt_dispersion: "QT Dispersion",
   qt_interval: "QT Interval",
   qtc: "QTc",
+  qtc_bazett: "QTc Bazett",
+  qtc_fridericia: "QTc Fridericia",
   r_amplitude: "R Amplitude",
   rr_interval: "RR Interval",
   s_amplitude: "S Amplitude",
@@ -223,11 +280,15 @@ export function createWorkspaceState(partial?: Partial<EcgViewerWorkspaceState>)
     selectedAnnotationId: partial?.selectedAnnotationId ?? null,
     selectedCaliperId: partial?.selectedCaliperId ?? null,
     selectedMeasurementId: partial?.selectedMeasurementId ?? null,
+    activeWorkflowPreset: partial?.activeWorkflowPreset ?? "basic_ecg",
+    aiHighlightMeasurementId: partial?.aiHighlightMeasurementId ?? null,
     snapSettings: partial?.snapSettings ?? {
       multiLeadSync: true,
       snapToBaseline: true,
       snapToGrid: true,
       snapToWave: true,
+      snapTargets: undefined,
+      visibleLeadOnly: true,
     },
     syncTimestampMs: partial?.syncTimestampMs ?? null,
     toolMode: partial?.toolMode ?? "select",

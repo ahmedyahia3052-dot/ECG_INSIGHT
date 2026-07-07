@@ -1,29 +1,28 @@
-# Clinical Validation Report — Sprint 34
+# Clinical Validation Report — Sprint 42 Measurement Studio
+
+**Date:** 2026-07-07
 
 ## Validation Scope
 
-Manual and automated validation of diagnostic measurement accuracy against digital ECG engine reference values.
+Measurement engine extensions only — no changes to medical intelligence diagnosis logic or AI cardiologist interpretation content.
 
-## Automated Checks
+## Clinical Checks
 
-| Test | Validation |
-|------|------------|
-| `ecg-wave-detection-bridge.test.ts` | Fiducial detection ≥8 points; PR ms conversion ±2 ms |
-| Pixel tolerance unit | ±0.5 px acceptance |
-| Integration markers | Wave snap, multi-lead, history audit |
+| Check | Result |
+|-------|--------|
+| PR/QRS/QT computed in milliseconds from waveform time delta | ✅ |
+| ST deviation in mm from amplitude delta | ✅ |
+| QTc Bazett: QT / √(RR/1000) | ✅ |
+| QTc Fridericia: QT / ∛(RR/1000) | ✅ |
+| QT dispersion derived from multi-lead QT intervals | ✅ |
+| Reference ranges via `ecgMeasurementReference` | ✅ (unchanged) |
+| Manual measurements never overwritten by AI sync | ✅ highlight-only |
+| Approval workflow (pending/approved/rejected) | ✅ |
 
-## Clinical Intervals
+## Coordinate Stability
 
-Seeded calipers from `buildCaliperSeedsFromEngine()` align PR, QRS, QT, RR, and ST segments to engine intervals when digital ECG is available.
+Verified via unit test: waveform anchor round-trip remains within lead region after recomputation; recalibrate on gain/speed change reprojects display endpoints without altering stored waveform anchors.
 
-## Manual Review Checklist
+## Regression
 
-- [x] Caliper presets map to correct measurement kinds
-- [x] Live panel updates during caliper drag
-- [x] History records create/update/delete with doctor attribution
-- [x] Multi-lead sync markers appear on Lead II click
-- [x] Annotations persist in workspace export
-
-## Limitations
-
-Image-only cases without digitization rely on manual caliper placement; engine reference row shows "Pending" until digital ECG is available.
+Sprint 13–34 measurement test IDs and overlay behavior preserved.

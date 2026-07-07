@@ -1,28 +1,37 @@
-# Measurement Engine Report — Sprint 34
+# Measurement Engine Report — Sprint 42
 
-## Overview
+**Module:** Clinical Measurement Studio  
+**Date:** 2026-07-07
 
-The measurement engine aggregates caliper geometry, grid calibration, wave fiducials, and clinical presets into a unified workspace synchronized with auto-save persistence.
+## Core Principle
 
-## Core Modules
+All clinical values are computed from **waveform coordinates** (`timeMs`, `amplitudeMv`, `lead`) when anchors are present. Image/screen pixels are display derivatives only.
 
-- `ecgMeasurementEngine.ts` — presets, sync, export, `summarizeCaliper`
-- `ecgLiveMeasurements.ts` — real-time HR, RR, PR, QRS, QT, QTc, axes, ST, voltage
-- `ecgWaveDetectionBridge.ts` — P/Q/R/S/T/J/ST/QT fiducial detection from digital ECG
-- `useEcgMeasurementWorkspace.ts` — state machine, history, snap, multi-lead, undo/redo
+## Engine Components
 
-## Live Measurements
+| File | Role |
+|------|------|
+| `waveformCoordinateSpace.ts` | Canonical coordinate conversions and waveform readouts |
+| `ecgMeasurementEngine.ts` | Presets, sync, workflow bundles, export, QT dispersion |
+| `ecgAutoSnapEngine.ts` | Clinical fiducial and grid snap pipeline |
+| `ecgCalibrationMath.ts` | Legacy pixel readouts + QTc formulas |
+| `useEcgMeasurementWorkspace.ts` | State machine, undo/redo, approval, workflow presets |
+| `EcgMeasurementsPanel.tsx` | Professional sidebar UI |
 
-`computeLiveMeasurements()` reads the latest non-hidden caliper per measurement kind and recalculates on every caliper move. Displayed in `sprint34-live-measurements-panel`.
+## Measurement Lifecycle
 
-## Precision
+1. **Click waveform** → screen→image→snap→waveform anchor
+2. **Sync** → compute readouts from waveform delta
+3. **Recalibrate** (zoom/gain/speed) → reproject image endpoints from waveform anchors
+4. **Review** → approve/reject in sidebar
+5. **Export** → JSON/CSV/FHIR/HL7/XML bundles
 
-| Metric | Tolerance |
-|--------|-----------|
-| Pixel placement | ±0.5 px |
-| QT interval | ±2 ms |
-| Voltage | ±0.01 mV |
+## Supported Clinical Measurements
 
-## Persistence
+PR, QRS, QT, QTc, QTc Bazett, QTc Fridericia, QT Dispersion, RR, PP, HR, P/T duration, P/R/S/T amplitude, ST elevation/depression, electrical axis, Q wave width/depth, bundle branch delay, custom.
 
-Measurements, calipers, annotations, history, and snap settings export through workspace v5 auto-save.
+## Backward Compatibility
+
+- Workspace version remains **v5**
+- Legacy calipers without waveform anchors fall back to pixel-based `measurementFromCaliper`
+- Existing Sprint 13–34 test IDs preserved

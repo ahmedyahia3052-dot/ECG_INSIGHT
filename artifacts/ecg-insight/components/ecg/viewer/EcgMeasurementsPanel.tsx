@@ -3,7 +3,7 @@ import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-
 
 import { Card, medicalTheme, PrimaryButton, SectionHeader } from "@/components/enterprise/EnterpriseUI";
 
-import { CALIPER_COLORS, CLINICAL_MEASUREMENT_PRESETS } from "./ecgMeasurementEngine";
+import { CALIPER_COLORS, CLINICAL_MEASUREMENT_PRESETS, exportMeasurements, MEASUREMENT_WORKFLOW_PRESETS } from "./ecgMeasurementEngine";
 import { MEASUREMENT_KIND_LABELS, type EcgClinicalMeasurement } from "./measurementTypes";
 import { STANDARD_ECG_LEADS } from "./types";
 import type { EcgMeasurementWorkspace } from "./useEcgMeasurementWorkspace";
@@ -15,11 +15,13 @@ type Props = {
 export const EcgMeasurementsPanel = memo(function EcgMeasurementsPanel({ workspace }: Props) {
   const [query, setQuery] = useState("");
   const [sortBy, setSortBy] = useState<"name" | "value" | "timestamp">("timestamp");
+  const [groupBy, setGroupBy] = useState<"none" | "lead" | "type">("none");
+  const [collapsed, setCollapsed] = useState(false);
 
   const rows = useMemo(() => {
     const filtered = workspace.present.measurements.filter((item) => {
       if (item.hidden) return false;
-      const haystack = `${item.name} ${item.type} ${item.lead ?? ""} ${item.operator} ${item.comments ?? ""}`.toLowerCase();
+      const haystack = `${item.name} ${item.type} ${item.abbreviation ?? ""} ${item.lead ?? ""} ${item.operator} ${item.comments ?? ""}`.toLowerCase();
       return haystack.includes(query.trim().toLowerCase());
     });
     return filtered.sort((left, right) => {
@@ -29,16 +31,58 @@ export const EcgMeasurementsPanel = memo(function EcgMeasurementsPanel({ workspa
     });
   }, [query, sortBy, workspace.present.measurements]);
 
+  const groupedRows = useMemo(() => {
+    if (groupBy === "none") return [{ key: "all", items: rows }];
+    const map = new Map<string, EcgClinicalMeasurement[]>();
+    for (const item of rows) {
+      const key = groupBy === "lead" ? item.lead ?? "Unassigned" : item.type;
+      map.set(key, [...(map.get(key) ?? []), item]);
+    }
+    return [...map.entries()].map(([key, items]) => ({ items, key }));
+  }, [groupBy, rows]);
+
+  const handleExport = (format: "json" | "csv" | "fhir" | "xml") => {
+    if (typeof document === "undefined") return;
+    const bundle = exportMeasurements(workspace.present.measurements, format);
+    const payload =
+      format === "csv" && "csv" in bundle
+        ? String((bundle as { csv: string }).csv)
+        : format === "xml" && "xml" in bundle
+          ? String((bundle as { xml: string }).xml)
+          : JSON.stringify(bundle, null, 2);
+    const mime = format === "csv" ? "text/csv" : format === "xml" ? "application/xml" : "application/json";
+    const link = document.createElement("a");
+    link.download = `ecg-measurements.${format === "json" ? "json" : format}`;
+    link.href = URL.createObjectURL(new Blob([payload], { type: mime }));
+    link.click();
+  };
+
   return (
     <View style={styles.fill} testID="sprint13-ecg-measurements-panel">
       {/* sprint14-ecg-measurements-panel retained for regression markers */}
       <View style={styles.fill} testID="sprint15-ecg-measurements-panel">
+      <View style={styles.fill} testID="sprint42-measurement-studio-sidebar">
       <Card style={styles.card}>
         <SectionHeader
-          subtitle="Professional clinical calipers with PR, QRS, QT, QTc, RR, PP, ST, and custom measurements synchronized to paper speed and gain."
-          title="Clinical Measurements"
+          subtitle="Waveform-coordinate clinical measurements with auto snap, workflow presets, approval workflow, and multi-format export."
+          title="Clinical Measurement Studio"
         />
 
+        <Text style={styles.sectionLabel}>Workflow Presets</Text>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.toolbar}>
+          {MEASUREMENT_WORKFLOW_PRESETS.map((preset) => (
+            <PrimaryButton
+              key={preset.id}
+              label={preset.label}
+              onPress={() => workspace.applyWorkflowPreset(preset.id)}
+              testID={`sprint42-workflow-preset-${preset.id}`}
+              variant={workspace.present.activeWorkflowPreset === preset.id ? "primary" : "outline"}
+            />
+          ))}
+        </ScrollView>
+
+        {!collapsed ? (
+          <>
         <Text style={styles.sectionLabel}>Caliper Geometry</Text>
         <View style={styles.toolbar}>
           <PrimaryButton label="Horizontal" onPress={() => { workspace.activeCaliperKind.current = "horizontal"; workspace.setToolMode("caliper"); }} variant="outline" />
@@ -47,6 +91,9 @@ export const EcgMeasurementsPanel = memo(function EcgMeasurementsPanel({ workspa
           <PrimaryButton label="Multi" onPress={() => { workspace.activeCaliperKind.current = "multi"; workspace.setToolMode("caliper"); }} variant="outline" />
           <PrimaryButton label="Angle" onPress={() => { workspace.activeCaliperKind.current = "angle"; workspace.setToolMode("caliper"); }} variant="outline" />
           <PrimaryButton label="Distance" onPress={() => { workspace.activeCaliperKind.current = "distance"; workspace.setToolMode("caliper"); }} variant="outline" />
+          <PrimaryButton label="Crosshair" onPress={() => { workspace.activeCaliperKind.current = "crosshair"; workspace.setToolMode("caliper"); }} variant="outline" />
+          <PrimaryButton label="Reference" onPress={() => { workspace.activeCaliperKind.current = "reference"; workspace.setToolMode("caliper"); }} variant="outline" />
+          <PrimaryButton label="Free" onPress={() => { workspace.activeCaliperKind.current = "free"; workspace.setToolMode("caliper"); }} variant="outline" />
           <PrimaryButton label="Finish Multi" onPress={() => workspace.finishMultiCaliper()} variant="outline" />
         </View>
 
@@ -85,6 +132,16 @@ export const EcgMeasurementsPanel = memo(function EcgMeasurementsPanel({ workspa
           <PrimaryButton label="Sort Name" onPress={() => setSortBy("name")} variant={sortBy === "name" ? "primary" : "outline"} />
           <PrimaryButton label="Sort Value" onPress={() => setSortBy("value")} variant={sortBy === "value" ? "primary" : "outline"} />
           <PrimaryButton label="Sort Time" onPress={() => setSortBy("timestamp")} variant={sortBy === "timestamp" ? "primary" : "outline"} />
+          <PrimaryButton label="Group Lead" onPress={() => setGroupBy(groupBy === "lead" ? "none" : "lead")} variant={groupBy === "lead" ? "primary" : "outline"} />
+          <PrimaryButton label="Group Type" onPress={() => setGroupBy(groupBy === "type" ? "none" : "type")} variant={groupBy === "type" ? "primary" : "outline"} />
+        </View>
+
+        <View style={styles.sortRow}>
+          <PrimaryButton label="Export JSON" onPress={() => handleExport("json")} testID="sprint42-export-json" variant="outline" />
+          <PrimaryButton label="Export CSV" onPress={() => handleExport("csv")} testID="sprint42-export-csv" variant="outline" />
+          <PrimaryButton label="Export FHIR" onPress={() => handleExport("fhir")} testID="sprint42-export-fhir" variant="outline" />
+          <PrimaryButton label="Export XML" onPress={() => handleExport("xml")} testID="sprint42-export-xml" variant="outline" />
+          <PrimaryButton label={collapsed ? "Expand" : "Collapse"} onPress={() => setCollapsed((v) => !v)} variant="outline" />
         </View>
 
         <View accessibilityRole="summary" style={styles.headerRow}>
@@ -95,12 +152,27 @@ export const EcgMeasurementsPanel = memo(function EcgMeasurementsPanel({ workspa
         </View>
 
         <ScrollView style={styles.list} nestedScrollEnabled>
-          {rows.length ? rows.map((item) => <MeasurementRow key={item.id} item={item} workspace={workspace} />) : (
+          {groupedRows.map((group) => (
+            <View key={group.key}>
+              {groupBy !== "none" ? <Text style={styles.groupLabel}>{group.key}</Text> : null}
+              {group.items.length ? group.items.map((item) => (
+                <MeasurementRow
+                  key={item.id}
+                  highlighted={workspace.present.aiHighlightMeasurementId === item.id}
+                  item={item}
+                  workspace={workspace}
+                />
+              )) : null}
+            </View>
+          ))}
+          {!rows.length ? (
             <Text style={styles.placeholder}>
-              Select a clinical measurement type and drag calipers on the ECG image. Measurements update instantly and persist with the case workspace.
+              Select a workflow preset or clinical measurement type and drag calipers on the waveform. Measurements are computed in waveform coordinate space and remain stable under zoom and pan.
             </Text>
-          )}
+          ) : null}
         </ScrollView>
+          </>
+        ) : null}
 
         <View style={styles.historyRow}>
           <PrimaryButton disabled={!workspace.canUndo} label="Undo" onPress={workspace.undo} variant="outline" />
@@ -109,18 +181,37 @@ export const EcgMeasurementsPanel = memo(function EcgMeasurementsPanel({ workspa
       </Card>
     </View>
     </View>
+    </View>
   );
 });
 
-function MeasurementRow({ item, workspace }: { item: EcgClinicalMeasurement; workspace: EcgMeasurementWorkspace }) {
+function MeasurementRow({
+  highlighted,
+  item,
+  workspace,
+}: {
+  highlighted?: boolean;
+  item: EcgClinicalMeasurement;
+  workspace: EcgMeasurementWorkspace;
+}) {
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState(item.name);
   const [comments, setComments] = useState(item.comments ?? "");
   const selected = workspace.present.selectedMeasurementId === item.id;
 
   return (
-    <View style={[styles.row, selected && styles.rowSelected]} testID={`sprint14-measurement-row-${item.kind}`}>
-      <Pressable accessibilityRole="button" onPress={() => workspace.jumpToMeasurement(item.id)} style={styles.rowMain}>
+    <View
+      style={[styles.row, selected && styles.rowSelected, highlighted && styles.rowAiHighlight]}
+      testID={`sprint14-measurement-row-${item.kind}`}
+    >
+      <Pressable
+        accessibilityRole="button"
+        onPress={() => {
+          workspace.jumpToMeasurement(item.id);
+          workspace.highlightMeasurementForAi(item.id);
+        }}
+        style={styles.rowMain}
+      >
         {editing ? (
           <TextInput
             autoFocus
@@ -133,10 +224,14 @@ function MeasurementRow({ item, workspace }: { item: EcgClinicalMeasurement; wor
             value={name}
           />
         ) : (
-          <Text style={styles.name}>{item.name}</Text>
+          <Text style={styles.name}>{item.abbreviation ? `${item.abbreviation} · ${item.name}` : item.name}</Text>
         )}
-        <Text style={styles.meta}>{MEASUREMENT_KIND_LABELS[item.kind]}</Text>
-        <Text style={styles.meta}>Start ({Math.round(item.start.x)}, {Math.round(item.start.y)}) → End ({Math.round(item.end.x)}, {Math.round(item.end.y)})</Text>
+        <Text style={styles.meta}>{MEASUREMENT_KIND_LABELS[item.kind]} · {item.approvalStatus ?? "pending"}</Text>
+        <Text style={styles.meta}>
+          {item.waveformStart && item.waveformEnd
+            ? `Waveform ${item.waveformStart.timeMs.toFixed(0)}–${item.waveformEnd.timeMs.toFixed(0)} ms`
+            : `Start (${Math.round(item.start.x)}, ${Math.round(item.start.y)}) → End (${Math.round(item.end.x)}, ${Math.round(item.end.y)})`}
+        </Text>
         <Text style={styles.meta}>{item.referenceRange ?? "—"}</Text>
         <Text style={styles.meta}>{item.clinicalSignificance ?? "Manual measurement recorded for clinician review."}</Text>
         <Text style={styles.meta}>AI: {item.aiInterpretation ?? "Awaiting AI interpretation"}</Text>
@@ -170,6 +265,8 @@ function MeasurementRow({ item, workspace }: { item: EcgClinicalMeasurement; wor
         <PrimaryButton label="Rename" onPress={() => setEditing(true)} variant="outline" />
         <PrimaryButton label="Hide" onPress={() => workspace.toggleMeasurementHidden(item.id)} variant="outline" />
         <PrimaryButton label="Duplicate" onPress={() => workspace.duplicateMeasurement(item.id)} variant="outline" />
+        <PrimaryButton label="Approve" onPress={() => workspace.approveMeasurement(item.id)} testID="sprint42-measurement-approve" variant="outline" />
+        <PrimaryButton label="Reject" onPress={() => workspace.rejectMeasurement(item.id)} variant="outline" />
         <PrimaryButton label="Lock" onPress={() => workspace.toggleCaliperLock(item.caliperId)} variant="outline" />
         <PrimaryButton label="Delete" onPress={() => workspace.deleteMeasurement(item.id)} variant="outline" />
       </View>
@@ -195,6 +292,7 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
   },
   fill: { flex: 1 },
+  groupLabel: { color: medicalTheme.primary, fontSize: 11, fontWeight: "900", marginTop: 10 },
   headerCell: { color: medicalTheme.muted, flex: 1, fontSize: 11, fontWeight: "800" },
   headerRow: { flexDirection: "row", gap: 8, marginTop: 8 },
   historyRow: { flexDirection: "row", gap: 8, marginTop: 8 },
@@ -221,6 +319,7 @@ const styles = StyleSheet.create({
     marginTop: 8,
     padding: 10,
   },
+  rowAiHighlight: { borderColor: "#FACC15", borderWidth: 2 },
   rowMain: { flex: 1, gap: 2 },
   rowSelected: { borderColor: medicalTheme.primary, borderWidth: 2 },
   search: {

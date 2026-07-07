@@ -90,11 +90,18 @@ export function buildReadouts(input: {
   if (input.measurementKind === "heart_rate" || input.measurementKind === "rr_interval" || input.measurementKind === "pp_interval") {
     readouts.bpm = heartRateFromRr(milliseconds);
   }
-  if (input.measurementKind === "qtc") {
+  if (input.measurementKind === "qtc" || input.measurementKind === "qtc_bazett") {
     const qtMs = milliseconds;
     readouts.milliseconds = input.rrMs && input.rrMs > 0
       ? Number(computeQtc(qtMs, input.rrMs).toFixed(1))
       : qtMs;
+  }
+  if (input.measurementKind === "qtc_fridericia") {
+    const qtMs = milliseconds;
+    readouts.milliseconds =
+      input.rrMs && input.rrMs > 0
+        ? Number((qtMs / Math.cbrt(input.rrMs / 1000)).toFixed(1))
+        : qtMs;
   }
   if (input.measurementKind === "st_depression" && readouts.mm != null) {
     readouts.mm = Number(Math.abs(readouts.mm).toFixed(2));
@@ -110,6 +117,7 @@ export function primaryValueForKind(kind: EcgMeasurementKind, readouts: EcgMeasu
     return { unit: "mV", value: readouts.mv ?? 0 };
   }
   if (kind === "qt_dispersion") return { unit: "ms", value: readouts.milliseconds ?? 0 };
+  if (kind === "qtc_bazett" || kind === "qtc_fridericia" || kind === "qtc") return { unit: "ms", value: readouts.milliseconds ?? 0 };
   if (caliperKind === "vertical") return { unit: "mV", value: readouts.mv ?? 0 };
   if (caliperKind === "distance") return { unit: "px", value: readouts.pathPixels ?? readouts.milliseconds ?? 0 };
   return { unit: "ms", value: readouts.milliseconds ?? 0 };

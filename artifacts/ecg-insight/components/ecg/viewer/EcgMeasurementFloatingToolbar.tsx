@@ -115,6 +115,20 @@ export const EcgMeasurementFloatingToolbar = memo(function EcgMeasurementFloatin
       testID: "sprint34-measure-distance",
     },
     {
+      active: caliperKind === "crosshair",
+      icon: "crosshair",
+      label: "Crosshair",
+      onPress: () => setCaliper("crosshair"),
+      testID: "sprint42-measure-crosshair",
+    },
+    {
+      active: caliperKind === "reference",
+      icon: "bookmark",
+      label: "Reference Caliper",
+      onPress: () => setCaliper("reference"),
+      testID: "sprint42-measure-reference",
+    },
+    {
       icon: "trash-2",
       label: "Delete",
       onPress: workspace.removeSelected,

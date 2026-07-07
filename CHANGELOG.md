@@ -26,6 +26,29 @@
 
 ---
 
+## [Unreleased] — Sprint 42 Clinical Measurement Studio (2026-07-07)
+
+### Added
+- **Waveform coordinate engine** — `waveformCoordinateSpace.ts` for timeMs/amplitudeMv measurement anchors
+- **Auto snap engine** — `ecgAutoSnapEngine.ts` with clinical fiducial targets (P/Q/R/S/T/J/ST/baseline/grid)
+- **Workflow presets** — Basic ECG, Chest Pain, ACS, STEMI, NSTEMI, Arrhythmia, QT Analysis, Athlete, Pediatric, Pre-op, Custom
+- **Caliper modes** — crosshair, reference, free
+- **Clinical measurements** — QTc Bazett/Fridericia, Q wave width/depth, bundle branch delay
+- **Approval workflow** — pending/approved/rejected per measurement
+- **Export XML** — FHIR-ready structure + CSV waveform columns
+- **Playwright:** `tests/e2e/sprint42-clinical-measurement-studio.spec.ts` (`@sprint42`)
+
+### Changed
+- `ecgMeasurementEngine.ts`, `useEcgMeasurementWorkspace.ts`, `EcgMeasurementsPanel.tsx`, `EcgMeasurementOverlay.tsx`, `EcgMeasurementFloatingToolbar.tsx`
+- `measurementTypes.ts` — waveform anchors, approval status, workflow preset state
+
+### Quality Gate
+- lint, typecheck, build, measurement unit tests — **PASS**
+- Tag: `Sprint42-ClinicalMeasurementStudio`
+- Deliverables: `SPRINT42_FINAL_REPORT.md`, `MEASUREMENT_ENGINE_REPORT.md`, `CALIPER_ENGINE_REPORT.md`, `AUTO_SNAP_REPORT.md`, `CLINICAL_VALIDATION_REPORT.md`, `PERFORMANCE_REPORT.md`, `PLAYWRIGHT_REPORT.md`, `VISUAL_QA_REPORT.md`
+
+---
+
 ## [Unreleased] — Sprint 41 Professional Live ECG Monitor (2026-07-07)
 
 ### Added

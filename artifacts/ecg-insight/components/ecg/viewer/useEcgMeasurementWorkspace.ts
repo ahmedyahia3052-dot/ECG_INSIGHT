@@ -5,11 +5,14 @@ import type { DigitalEcg } from "@/services/ecgProcessing";
 
 import {
   focusTransformForCaliper,
+  MEASUREMENT_WORKFLOW_PRESETS,
   presetForKind,
   summarizeCaliper,
+  syncCalipersFromWaveform,
   syncWorkspaceMeasurements,
   type ClinicalMeasurementPreset,
 } from "./ecgMeasurementEngine";
+import { applyAutoSnap } from "./ecgAutoSnapEngine";
 import {
   dragCaliperEndpoint,
   dragCaliperVertex,
@@ -20,10 +23,8 @@ import {
 import { appendHistory, createHistoryEntry, deleteHistoryEntry, renameHistoryEntry } from "./ecgMeasurementHistory";
 import { replicateHorizontalCaliper } from "./ecgMultiLeadSync";
 import {
-  baselineYForLead,
-  buildCaliperSeedsFromEngine,
   detectWaveFiducials,
-  snapToNearestFiducial,
+  buildCaliperSeedsFromEngine,
   type WaveFiducial,
 } from "./ecgWaveDetectionBridge";
 import {
@@ -34,11 +35,14 @@ import {
   type EcgCaliper,
   type EcgCaliperKind,
   type EcgMeasurementKind,
+  type MeasurementApprovalStatus,
+  type MeasurementWorkflowPresetId,
   type EcgViewerAnnotation,
   type EcgViewerToolMode,
   type EcgViewerWorkspaceState,
   type ImagePoint,
 } from "./measurementTypes";
+import { attachWaveformAnchors, waveformContextFromImage } from "./waveformCoordinateSpace";
 import { useHistoryStack } from "./useHistoryStack";
 import type { EcgViewerControls } from "./useEcgViewerControls";
 
@@ -56,6 +60,8 @@ type WorkspaceSlice = Pick<
   EcgViewerWorkspaceState,
   | "activeLead"
   | "activeMeasurementKind"
+  | "activeWorkflowPreset"
+  | "aiHighlightMeasurementId"
   | "annotations"
   | "calipers"
   | "measurementHistory"
@@ -72,6 +78,8 @@ function workspaceSlice(state: EcgViewerWorkspaceState): WorkspaceSlice {
   return {
     activeLead: state.activeLead,
     activeMeasurementKind: state.activeMeasurementKind,
+    activeWorkflowPreset: state.activeWorkflowPreset,
+    aiHighlightMeasurementId: state.aiHighlightMeasurementId,
     annotations: state.annotations,
     calipers: state.calipers,
     measurementHistory: state.measurementHistory,
@@ -114,6 +122,7 @@ export function useEcgMeasurementWorkspace(options: {
   const draftPointsRef = useRef<ImagePoint[]>([]);
   const waveFiducialsRef = useRef<WaveFiducial[]>([]);
   const imageDimensionsRef = useRef({ height: 0, width: 0 });
+  const samplingRateRef = useRef<number | undefined>(undefined);
   const [draftCaliper, setDraftCaliper] = useState<{ end: ImagePoint; start: ImagePoint; vertex?: ImagePoint; waypoints?: ImagePoint[] } | null>(null);
   const [hoveredCaliperId, setHoveredCaliperId] = useState<string | null>(null);
 
@@ -180,20 +189,38 @@ export function useEcgMeasurementWorkspace(options: {
   const applySnap = useCallback(
     (point: ImagePoint, lead?: string) => {
       const slice = presentRef.current;
-      const spacing = spacingForGrid();
-      let next = slice.snapSettings.snapToGrid ? snapPoint(point, spacing) : point;
       const activeLead = lead ?? slice.activeLead ?? "II";
       const { height, width } = imageDimensionsRef.current;
-      if (slice.snapSettings.snapToBaseline && width > 0 && height > 0) {
-        next = { ...next, y: baselineYForLead(activeLead, width, height) };
+      if (width <= 0 || height <= 0) {
+        const spacing = spacingForGrid();
+        return slice.snapSettings.snapToGrid ? snapPoint(point, spacing) : point;
       }
-      if (slice.snapSettings.snapToWave && waveFiducialsRef.current.length > 0 && width > 0 && height > 0) {
-        next = snapToNearestFiducial(next, waveFiducialsRef.current, controlsRef.current.grid, width, height, activeLead);
-      }
-      return next;
+      const fiducials =
+        slice.snapSettings.visibleLeadOnly !== false
+          ? waveFiducialsRef.current.filter((f) => f.lead === activeLead || f.lead === "Rhythm Strip")
+          : waveFiducialsRef.current;
+      return applyAutoSnap(point, {
+        fiducials,
+        grid: controlsRef.current.grid,
+        imageHeight: height,
+        imageWidth: width,
+        lead: activeLead,
+        snapSettings: slice.snapSettings,
+      });
     },
     [spacingForGrid],
   );
+
+  const waveformCtx = useCallback(() => {
+    const { height, width } = imageDimensionsRef.current;
+    return waveformContextFromImage(
+      controlsRef.current.grid,
+      width,
+      height,
+      presentRef.current.activeLead ?? "II",
+      samplingRateRef.current,
+    );
+  }, []);
 
   const addCaliper = useCallback(
     (kind: EcgCaliperKind, start: ImagePoint, end?: ImagePoint, overrides?: Partial<EcgCaliper>) => {
@@ -203,7 +230,7 @@ export function useEcgMeasurementWorkspace(options: {
       const snappedEnd = applySnap(end ?? { x: start.x + spacingForGrid() * 5, y: start.y }, lead);
       const preset = activePreset.current;
       const groupId = overrides?.groupId ?? (slice.snapSettings.multiLeadSync && kind === "horizontal" ? uid("group") : undefined);
-      const caliper: EcgCaliper = {
+      const caliperBase: EcgCaliper = {
         color: overrides?.color ?? preset.color,
         comments: overrides?.comments,
         createdAt: nowIso(),
@@ -223,6 +250,8 @@ export function useEcgMeasurementWorkspace(options: {
         vertex: overrides?.vertex,
         waypoints: overrides?.waypoints,
       };
+      const ctx = waveformCtx();
+      const caliper = attachWaveformAnchors(caliperBase, { ...ctx, lead });
 
       const { height, width } = imageDimensionsRef.current;
       const replicas =
@@ -247,7 +276,7 @@ export function useEcgMeasurementWorkspace(options: {
       }));
       return caliper.id;
     },
-    [applySnap, options.operatorName, spacingForGrid, updateSlice],
+    [applySnap, options.operatorName, spacingForGrid, updateSlice, waveformCtx],
   );
 
   const beginDraftCaliper = useCallback((start: ImagePoint) => {
@@ -364,8 +393,10 @@ export function useEcgMeasurementWorkspace(options: {
       const spacing = spacingForGrid();
       const snapped = applySnap(imagePoint, caliper.lead);
       const next = dragCaliperEndpoint(caliper, endpoint, snapped, spacing);
+      const ctx = waveformCtx();
+      const withWaveform = attachWaveformAnchors({ ...caliper, ...next }, { ...ctx, lead: caliper.lead ?? ctx.lead });
       updateSlice((slice) => {
-        const updated = slice.calipers.map((item) => (item.id === caliperId ? { ...item, ...next, updatedAt: nowIso() } : item));
+        const updated = slice.calipers.map((item) => (item.id === caliperId ? { ...withWaveform, updatedAt: nowIso() } : item));
         const changed = updated.find((item) => item.id === caliperId);
         return {
           ...slice,
@@ -384,7 +415,39 @@ export function useEcgMeasurementWorkspace(options: {
         };
       });
     },
-    [applySnap, options.operatorName, spacingForGrid, updateSlice],
+    [applySnap, options.operatorName, spacingForGrid, updateSlice, waveformCtx],
+  );
+
+  const setMeasurementApproval = useCallback(
+    (measurementId: string, approvalStatus: MeasurementApprovalStatus) => {
+      updateSlice((slice) => ({
+        ...slice,
+        measurements: slice.measurements.map((item) =>
+          item.id === measurementId ? { ...item, approvalStatus, updatedAt: nowIso() } : item,
+        ),
+      }));
+    },
+    [updateSlice],
+  );
+
+  const approveMeasurement = useCallback((measurementId: string) => setMeasurementApproval(measurementId, "approved"), [setMeasurementApproval]);
+  const rejectMeasurement = useCallback((measurementId: string) => setMeasurementApproval(measurementId, "rejected"), [setMeasurementApproval]);
+
+  const applyWorkflowPreset = useCallback(
+    (presetId: MeasurementWorkflowPresetId) => {
+      const preset = MEASUREMENT_WORKFLOW_PRESETS.find((item) => item.id === presetId) ?? MEASUREMENT_WORKFLOW_PRESETS[0]!;
+      const firstKind = preset.kinds[0] ?? "rr_interval";
+      selectMeasurementPreset(presetForKind(firstKind));
+      updateSlice((slice) => ({ ...slice, activeWorkflowPreset: presetId }));
+    },
+    [selectMeasurementPreset, updateSlice],
+  );
+
+  const highlightMeasurementForAi = useCallback(
+    (measurementId: string | null) => {
+      updateSlice((slice) => ({ ...slice, aiHighlightMeasurementId: measurementId }));
+    },
+    [updateSlice],
   );
 
   const dragCaliperHandle = useCallback(
@@ -587,8 +650,10 @@ export function useEcgMeasurementWorkspace(options: {
   const configureWaveDetection = useCallback((digitalEcg?: DigitalEcg | null, lead = "II") => {
     if (!digitalEcg) {
       waveFiducialsRef.current = [];
+      samplingRateRef.current = undefined;
       return;
     }
+    samplingRateRef.current = digitalEcg.leads[0]?.samplingRate ?? undefined;
     waveFiducialsRef.current = detectWaveFiducials(digitalEcg, lead);
   }, []);
 
@@ -704,8 +769,16 @@ export function useEcgMeasurementWorkspace(options: {
   }, [applySnap]);
 
   const recalibrateMeasurements = useCallback(() => {
-    updateSlice((slice) => ({ ...slice, measurements: syncMeasurements(slice.calipers, slice.measurements) }));
-  }, [syncMeasurements, updateSlice]);
+    updateSlice((slice) => {
+      const ctx = waveformCtx();
+      const resyncedCalipers = syncCalipersFromWaveform(slice.calipers, ctx);
+      return {
+        ...slice,
+        calipers: resyncedCalipers,
+        measurements: syncMeasurements(resyncedCalipers, slice.measurements),
+      };
+    });
+  }, [syncMeasurements, updateSlice, waveformCtx]);
 
   useEffect(() => {
     recalibrateMeasurements();
@@ -719,6 +792,15 @@ export function useEcgMeasurementWorkspace(options: {
       if (!event.ctrlKey && (event.key === "c" || event.key === "C")) setToolMode("caliper");
       if (!event.ctrlKey && (event.key === "m" || event.key === "M")) setToolMode("measurement");
       if (!event.ctrlKey && (event.key === "a" || event.key === "A")) setToolMode("annotation");
+      if (event.key === "Escape") {
+        event.preventDefault();
+        cancelDraftCaliper();
+        updateSlice((slice) => ({ ...slice, selectedCaliperId: null, selectedMeasurementId: null, toolMode: "select" }));
+      }
+      if (event.key === " " && !event.ctrlKey && !event.shiftKey) {
+        event.preventDefault();
+        setToolMode(presentRef.current.toolMode === "caliper" ? "select" : "caliper");
+      }
       if (event.key === "Delete") {
         event.preventDefault();
         removeSelected();
@@ -742,7 +824,7 @@ export function useEcgMeasurementWorkspace(options: {
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [nudgeSelectedCaliper, redo, removeSelected, setToolMode, undo]);
+  }, [cancelDraftCaliper, nudgeSelectedCaliper, redo, removeSelected, setToolMode, undo, updateSlice]);
 
   const exportState = useCallback((): EcgViewerWorkspaceState => {
     return {
@@ -766,6 +848,10 @@ export function useEcgMeasurementWorkspace(options: {
   );
 
   return {
+    applyWorkflowPreset,
+    approveMeasurement,
+    highlightMeasurementForAi,
+    rejectMeasurement,
     activeAnnotationKind,
     activeCaliperKind,
     activeMeasurementKind,
