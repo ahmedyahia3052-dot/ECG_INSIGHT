@@ -2,9 +2,14 @@ import React, { type ReactNode, useCallback, useEffect, useRef, useState } from 
 import { Platform, StyleSheet, View } from "react-native";
 
 import { EcgEnterpriseLayoutEngine } from "./EcgEnterpriseLayoutEngine";
-import { ECG_WORKSTATION_VISUAL } from "./ecgWorkstationVisualTokens";
+import {
+  clampLeftPanelWidth,
+  clampRightPanelWidth,
+  ECG_WORKSTATION_VISUAL,
+  responsiveLeftPanelWidth,
+} from "./ecgWorkstationVisualTokens";
 
-const LAYOUT_KEY = "ecg-insight:ecg-monitor-panel-layout-v9";
+const LAYOUT_KEY = "ecg-insight:ecg-workspace-panel-layout-v11";
 
 type SavedLayout = {
   autoHidePanels?: boolean;
@@ -18,27 +23,37 @@ type SavedLayout = {
 };
 
 function loadLayout(): SavedLayout {
+  const viewportWidth = typeof window !== "undefined" ? window.innerWidth : 1920;
+  const defaultLeft = responsiveLeftPanelWidth(viewportWidth);
   if (typeof window === "undefined") {
-    return { leftSize: ECG_WORKSTATION_VISUAL.leftExpandedWidth, rightSize: ECG_WORKSTATION_VISUAL.rightExpandedWidth };
+    return { leftSize: defaultLeft, rightSize: ECG_WORKSTATION_VISUAL.rightExpandedWidth };
   }
   try {
     const raw =
       window.localStorage.getItem(LAYOUT_KEY) ??
-      window.localStorage.getItem("ecg-insight:ecg-monitor-panel-layout-v7") ??
-      window.localStorage.getItem("ecg-insight:ecg-monitor-panel-layout-v6") ??
-      window.localStorage.getItem("ecg-insight:ecg-monitor-panel-layout-v5") ??
-      window.localStorage.getItem("ecg-insight:ecg-monitor-panel-layout-v3") ??
-      window.localStorage.getItem("ecg-insight:ecg-monitor-panel-layout-v2");
+      window.localStorage.getItem("ecg-insight:ecg-workspace-panel-layout-v11") ??
+      window.localStorage.getItem("ecg-insight:ecg-monitor-panel-layout-v10") ??
+      window.localStorage.getItem("ecg-insight:ecg-monitor-panel-layout-v7");
+    const parsed = JSON.parse(raw ?? "{}") as SavedLayout;
+    const leftSize = clampLeftPanelWidth(parsed.leftSize ?? defaultLeft);
+    const rightSize = clampRightPanelWidth(parsed.rightSize ?? ECG_WORKSTATION_VISUAL.rightExpandedWidth);
     return {
-      autoHidePanels: true,
-      leftPinned: true,
-      rightPinned: false,
-      leftSize: ECG_WORKSTATION_VISUAL.leftExpandedWidth,
-      rightSize: ECG_WORKSTATION_VISUAL.rightExpandedWidth,
-      ...(JSON.parse(raw ?? "{}") as SavedLayout),
+      autoHidePanels: false,
+      leftCollapsed: parsed.leftCollapsed ?? false,
+      leftPinned: parsed.leftPinned ?? true,
+      rightCollapsed: parsed.rightCollapsed ?? false,
+      rightPinned: parsed.rightPinned ?? true,
+      leftSize,
+      rightSize,
     };
   } catch {
-    return { leftSize: ECG_WORKSTATION_VISUAL.leftExpandedWidth, rightSize: ECG_WORKSTATION_VISUAL.rightExpandedWidth };
+    return {
+      autoHidePanels: false,
+      leftCollapsed: false,
+      leftPinned: true,
+      leftSize: defaultLeft,
+      rightSize: ECG_WORKSTATION_VISUAL.rightExpandedWidth,
+    };
   }
 }
 
@@ -66,8 +81,29 @@ export function EcgViewerResizableWorkspace({ bottom, center, diagnosticMode = f
   const mergedRef = useRef(layout);
 
   useEffect(() => {
-    if (controlledLayout) setLayout((current) => ({ ...current, ...controlledLayout }));
+    if (controlledLayout) {
+      setLayout((current) => ({
+        ...current,
+        ...controlledLayout,
+        leftSize: clampLeftPanelWidth(controlledLayout.leftSize ?? current.leftSize ?? ECG_WORKSTATION_VISUAL.leftExpandedWidth),
+        rightSize: clampRightPanelWidth(controlledLayout.rightSize ?? current.rightSize ?? ECG_WORKSTATION_VISUAL.rightExpandedWidth),
+      }));
+    }
   }, [controlledLayout]);
+
+  useEffect(() => {
+    if (Platform.OS !== "web" || typeof window === "undefined") return undefined;
+    const onResize = () => {
+      setLayout((current) => {
+        if (current.leftCollapsed) return current;
+        const nextLeft = clampLeftPanelWidth(Math.max(current.leftSize ?? ECG_WORKSTATION_VISUAL.leftExpandedWidth, responsiveLeftPanelWidth(window.innerWidth)));
+        if (nextLeft === current.leftSize) return current;
+        return { ...current, leftSize: nextLeft };
+      });
+    };
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
 
   useEffect(() => {
     mergedRef.current = layout;
@@ -75,12 +111,19 @@ export function EcgViewerResizableWorkspace({ bottom, center, diagnosticMode = f
     onLayoutChange?.(layout);
   }, [layout, onLayoutChange]);
 
-  const updateLayout = useCallback((patch: Partial<SavedLayout>) => setLayout((current) => ({ ...current, ...patch })), []);
+  const updateLayout = useCallback((patch: Partial<SavedLayout>) => {
+    setLayout((current) => ({
+      ...current,
+      ...patch,
+      leftSize: patch.leftSize != null ? clampLeftPanelWidth(patch.leftSize) : current.leftSize,
+      rightSize: patch.rightSize != null ? clampRightPanelWidth(patch.rightSize) : current.rightSize,
+    }));
+  }, []);
 
   return (
     <View style={styles.webRoot}>
       <EcgEnterpriseLayoutEngine
-        autoHidePanels={layout.autoHidePanels ?? true}
+        autoHidePanels={layout.autoHidePanels ?? false}
         bottom={bottom}
         center={center}
         diagnosticMode={diagnosticMode}
@@ -94,7 +137,7 @@ export function EcgViewerResizableWorkspace({ bottom, center, diagnosticMode = f
         onRightWidthChange={(rightSize) => updateLayout({ rightSize })}
         right={right}
         rightCollapsed={!!layout.rightCollapsed}
-        rightPinned={layout.rightPinned ?? false}
+        rightPinned={layout.rightPinned ?? true}
         rightWidth={layout.rightSize ?? ECG_WORKSTATION_VISUAL.rightExpandedWidth}
       />
     </View>

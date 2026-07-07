@@ -79,8 +79,10 @@ export class EcgRenderLoop {
     const frontCtx = this.frontCanvas.getContext("2d");
     const backCtx = this.backCanvas.getContext("2d");
     if (!frontCtx || !backCtx) return;
-    frontCtx.clearRect(0, 0, this.frontCanvas.width, this.frontCanvas.height);
-    frontCtx.drawImage(this.backCanvas as CanvasImageSource, 0, 0);
+    const front2d = frontCtx as CanvasRenderingContext2D;
+    const back2d = backCtx as CanvasRenderingContext2D;
+    front2d.clearRect(0, 0, this.frontCanvas.width, this.frontCanvas.height);
+    front2d.drawImage(this.backCanvas as CanvasImageSource, 0, 0);
   }
 
   getDirtyManager() {

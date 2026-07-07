@@ -132,7 +132,14 @@ export const EcgProViewerEngine = memo(function EcgProViewerEngine({
       controls.zoomAtAnchor(anchor, delta);
     };
     node.addEventListener("wheel", onWheel, { passive: false });
-    return () => node.removeEventListener("wheel", onWheel);
+    const onDoubleClick = () => {
+      controls.applyFit("hero");
+    };
+    node.addEventListener("dblclick", onDoubleClick);
+    return () => {
+      node.removeEventListener("wheel", onWheel);
+      node.removeEventListener("dblclick", onDoubleClick);
+    };
   }, [controls, imageUrl, testID]);
 
   const stopMomentum = useCallback(() => {
@@ -269,7 +276,7 @@ export const EcgProViewerEngine = memo(function EcgProViewerEngine({
           style={[
             styles.layerImage as never,
             filterStyle ? ({ filter: filterStyle } as never) : null,
-            Platform.OS === "web" ? ({ imageRendering: "crisp-edges" } as never) : null,
+            Platform.OS === "web" ? ({ imageRendering: "auto", WebkitFontSmoothing: "antialiased" } as never) : null,
           ]}
           testID="sprint13-ecg-layer-image"
         />

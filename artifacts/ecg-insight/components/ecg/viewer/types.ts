@@ -3,7 +3,7 @@ export type EcgGridGain = 5 | 10 | 20;
 
 export type EcgImageFormat = "png" | "jpg" | "jpeg" | "webp" | "tiff" | "bmp" | "pdf" | "unknown";
 
-export type EcgViewerFitMode = "none" | "width" | "height" | "contain" | "hero" | "100";
+export type EcgViewerFitMode = "100" | "150" | "200" | "300" | "contain" | "height" | "hero" | "none" | "width";
 
 export type EcgImageAdjustments = {
   brightness: number;
@@ -71,7 +71,6 @@ export type EcgWorkstationViewMode =
   | "compare"
   | "image"
   | "measurement"
-  | "monitor"
   | "overlay"
   | "processed"
   | "report"
@@ -79,7 +78,16 @@ export type EcgWorkstationViewMode =
 
 export type EcgCompareLayoutMode = "overlay" | "side-by-side" | "split";
 
-export type EcgLeadLayoutMode = "12-lead" | "rhythm" | "single";
+export type EcgLeadLayoutMode = "12-lead" | "3x4" | "6x2" | "rhythm" | "sequential" | "single" | "stacked";
+
+/** Sprint 53 — enterprise workspace layout presets (static interpretation only). */
+export type EcgWorkspaceLayoutMode =
+  | "classic"
+  | "dual"
+  | "compare"
+  | "teaching"
+  | "presentation"
+  | "reading";
 
 export type EcgWorkstationTheme = "clinical" | "dark";
 

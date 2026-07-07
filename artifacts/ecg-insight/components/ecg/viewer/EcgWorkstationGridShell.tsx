@@ -1,9 +1,9 @@
 import React, { createElement, useCallback, useRef, type ReactNode } from "react";
 import { Platform, StyleSheet, View } from "react-native";
 
-import { ECG_WORKSTATION_VISUAL } from "./ecgWorkstationVisualTokens";
+import { clampLeftPanelWidth, clampRightPanelWidth, ECG_WORKSTATION_VISUAL } from "./ecgWorkstationVisualTokens";
 
-/** Sprint 29 — docking layout optimized for ≥80% center viewer with hover-expand rails. */
+/** Sprint 53 — CSS Grid workstation: independent sidebar + canvas regions (no overlap). */
 export function EcgWorkstationGridShell({
   bottom,
   center,
@@ -30,8 +30,12 @@ export function EcgWorkstationGridShell({
   rightWidth?: number;
 }) {
   const dragRef = useRef<{ edge: "left" | "right"; startX: number; startWidth: number } | null>(null);
-  const minSide = ECG_WORKSTATION_VISUAL.leftPanelMinWidth;
-  const maxSide = ECG_WORKSTATION_VISUAL.leftPanelMaxWidth;
+  const leftMin = ECG_WORKSTATION_VISUAL.leftPanelMinWidth;
+  const leftMax = ECG_WORKSTATION_VISUAL.leftPanelMaxWidth;
+  const rightMin = ECG_WORKSTATION_VISUAL.rightPanelMinWidth;
+  const rightMax = ECG_WORKSTATION_VISUAL.rightPanelMaxWidth;
+  const safeLeftWidth = clampLeftPanelWidth(leftWidth);
+  const safeRightWidth = clampRightPanelWidth(rightWidth);
 
   const startDrag = useCallback(
     (edge: "left" | "right", event: React.MouseEvent) => {
@@ -39,15 +43,15 @@ export function EcgWorkstationGridShell({
       dragRef.current = {
         edge,
         startX: event.clientX,
-        startWidth: edge === "left" ? leftWidth : rightWidth,
+        startWidth: edge === "left" ? safeLeftWidth : safeRightWidth,
       };
       const onMove = (moveEvent: MouseEvent) => {
         if (!dragRef.current) return;
         const delta = moveEvent.clientX - dragRef.current.startX;
         const next =
           dragRef.current.edge === "left"
-            ? Math.min(maxSide, Math.max(minSide, dragRef.current.startWidth + delta))
-            : Math.min(maxSide, Math.max(minSide, dragRef.current.startWidth - delta));
+            ? clampLeftPanelWidth(dragRef.current.startWidth + delta)
+            : clampRightPanelWidth(dragRef.current.startWidth - delta);
         if (dragRef.current.edge === "left") onLeftWidthChange?.(next);
         else onRightWidthChange?.(next);
       };
@@ -59,7 +63,7 @@ export function EcgWorkstationGridShell({
       window.addEventListener("mousemove", onMove);
       window.addEventListener("mouseup", onUp);
     },
-    [leftWidth, maxSide, minSide, onLeftWidthChange, onRightWidthChange, rightWidth],
+    [onLeftWidthChange, onRightWidthChange, safeLeftWidth, safeRightWidth],
   );
 
   const resetWidth = useCallback(
@@ -74,16 +78,46 @@ export function EcgWorkstationGridShell({
   const hideLeft = diagnosticMode || !left;
   const hideRight = diagnosticMode || !right;
   const hideBottom = !bottom;
-  const leftCol = hideLeft ? "0px" : leftCollapsed ? `${ECG_WORKSTATION_VISUAL.leftCollapsedWidth}px` : `${leftWidth}px`;
-  const rightCol = hideRight ? "0px" : rightCollapsed ? `${ECG_WORKSTATION_VISUAL.rightCollapsedWidth}px` : `${rightWidth}px`;
+
+  const leftCol = hideLeft
+    ? "0px"
+    : leftCollapsed
+      ? `${ECG_WORKSTATION_VISUAL.leftCollapsedWidth}px`
+      : `minmax(${leftMin}px, ${safeLeftWidth}px)`;
+
+  const rightCol = hideRight
+    ? "0px"
+    : rightCollapsed
+      ? `${ECG_WORKSTATION_VISUAL.rightCollapsedWidth}px`
+      : `minmax(${rightMin}px, ${safeRightWidth}px)`;
 
   if (Platform.OS !== "web") {
     return (
       <View style={styles.nativeColumn}>
         <View style={styles.nativeRow}>
-          <View style={[styles.nativeSide, { width: leftCollapsed ? ECG_WORKSTATION_VISUAL.leftCollapsedWidth : leftWidth }]}>{left}</View>
+          <View
+            style={[
+              styles.nativeSide,
+              {
+                minWidth: leftCollapsed ? ECG_WORKSTATION_VISUAL.leftCollapsedWidth : leftMin,
+                width: leftCollapsed ? ECG_WORKSTATION_VISUAL.leftCollapsedWidth : safeLeftWidth,
+              },
+            ]}
+          >
+            {left}
+          </View>
           <View style={styles.nativeCenter}>{center}</View>
-          <View style={[styles.nativeSide, { width: rightCollapsed ? ECG_WORKSTATION_VISUAL.rightCollapsedWidth : rightWidth }]}>{right}</View>
+          <View
+            style={[
+              styles.nativeSide,
+              {
+                minWidth: rightCollapsed ? ECG_WORKSTATION_VISUAL.rightCollapsedWidth : rightMin,
+                width: rightCollapsed ? ECG_WORKSTATION_VISUAL.rightCollapsedWidth : safeRightWidth,
+              },
+            ]}
+          >
+            {right}
+          </View>
         </View>
         <View style={styles.nativeBottom}>{bottom}</View>
       </View>
@@ -93,28 +127,30 @@ export function EcgWorkstationGridShell({
   return createElement(
     "div",
     {
-      "data-testid": "sprint29-enterprise-layout",
-      id: "sprint26-workstation-layout",
+      "data-testid": "sprint53-workspace-grid",
+      id: "sprint29-enterprise-layout",
       style: {
         boxSizing: "border-box",
         display: "grid",
         gap,
         gridTemplateAreas: hideBottom
           ? hideLeft && hideRight
-            ? `"center"`
-            : `"left center right"`
+            ? `"canvas"`
+            : `"sidebar canvas panel"`
           : hideLeft && hideRight
             ? `
-          "center"
-          "bottom"
+          "canvas"
+          "status"
         `
             : `
-          "left center right"
-          "bottom bottom bottom"
+          "sidebar canvas panel"
+          "status status status"
         `,
-        gridTemplateColumns: hideLeft && hideRight ? "minmax(0, 1fr)" : `${leftCol} minmax(0, 1fr) ${rightCol}`,
+        gridTemplateColumns:
+          hideLeft && hideRight ? "minmax(0, 1fr)" : `${leftCol} minmax(0, 1fr) ${rightCol}`,
         gridTemplateRows: hideBottom ? "minmax(0, 1fr)" : "minmax(0, 1fr) auto",
         height: "100%",
+        isolation: "isolate",
         minHeight: 0,
         overflow: "hidden",
         width: "100%",
@@ -123,57 +159,90 @@ export function EcgWorkstationGridShell({
     hideLeft
       ? null
       : createElement(
-      "div",
+          "aside",
+          {
+            "data-testid": "sprint53-left-sidebar-region",
+            style: {
+              boxSizing: "border-box",
+              display: "flex",
+              flexDirection: "column",
+              flexShrink: 0,
+              gridArea: "sidebar",
+              minHeight: 0,
+              minWidth: leftCollapsed ? ECG_WORKSTATION_VISUAL.leftCollapsedWidth : leftMin,
+              overflow: "hidden",
+              position: "relative",
+              width: "100%",
+            },
+          },
+          left,
+          !leftCollapsed
+            ? createElement("div", {
+                "data-testid": "sprint29-resize-left",
+                onDoubleClick: () => resetWidth("left"),
+                onMouseDown: (event: React.MouseEvent) => startDrag("left", event),
+                role: "separator",
+                style: { bottom: 0, cursor: "col-resize", position: "absolute", right: -2, top: 0, width: 4, zIndex: 20 },
+              })
+            : null,
+        ),
+    createElement(
+      "main",
       {
+        "data-testid": "sprint53-canvas-region",
         style: {
+          boxSizing: "border-box",
           display: "flex",
-          gridArea: "left",
+          flexDirection: "column",
+          gridArea: hideLeft && hideRight ? "canvas" : "canvas",
           minHeight: 0,
           minWidth: 0,
           overflow: "hidden",
           position: "relative",
-          transition: "width 180ms ease",
         },
       },
-      left,
-      !leftCollapsed
-        ? createElement("div", {
-            "data-testid": "sprint29-resize-left",
-            onDoubleClick: () => resetWidth("left"),
-            onMouseDown: (event: React.MouseEvent) => startDrag("left", event),
-            role: "separator",
-            style: { bottom: 0, cursor: "col-resize", position: "absolute", right: -2, top: 0, width: 4, zIndex: 20 },
-          })
-        : null,
+      center,
     ),
-    createElement("div", { style: { display: "flex", gridArea: "center", minHeight: 0, minWidth: 0, overflow: "hidden" } }, center),
     hideRight
       ? null
       : createElement(
-      "div",
-      {
-        style: {
-          display: "flex",
-          gridArea: "right",
-          minHeight: 0,
-          minWidth: 0,
-          overflow: "hidden",
-          position: "relative",
-          transition: "width 180ms ease",
-        },
-      },
-      !rightCollapsed
-        ? createElement("div", {
-            "data-testid": "sprint29-resize-right",
-            onDoubleClick: () => resetWidth("right"),
-            onMouseDown: (event: React.MouseEvent) => startDrag("right", event),
-            role: "separator",
-            style: { bottom: 0, cursor: "col-resize", left: -2, position: "absolute", top: 0, width: 4, zIndex: 20 },
-          })
-        : null,
-      right,
-    ),
-    hideBottom ? null : createElement("div", { style: { gridArea: "bottom", minHeight: 0, minWidth: 0, overflow: "hidden" } }, bottom),
+          "aside",
+          {
+            "data-testid": "sprint53-right-sidebar-region",
+            style: {
+              boxSizing: "border-box",
+              display: "flex",
+              flexDirection: "column",
+              flexShrink: 0,
+              gridArea: "panel",
+              minHeight: 0,
+              minWidth: rightCollapsed ? ECG_WORKSTATION_VISUAL.rightCollapsedWidth : rightMin,
+              overflow: "hidden",
+              position: "relative",
+              width: "100%",
+            },
+          },
+          !rightCollapsed
+            ? createElement("div", {
+                "data-testid": "sprint29-resize-right",
+                onDoubleClick: () => resetWidth("right"),
+                onMouseDown: (event: React.MouseEvent) => startDrag("right", event),
+                role: "separator",
+                style: { bottom: 0, cursor: "col-resize", left: -2, position: "absolute", top: 0, width: 4, zIndex: 20 },
+              })
+            : null,
+          right,
+        ),
+    hideBottom
+      ? null
+      : createElement(
+          "footer",
+          {
+            "data-testid": "sprint53-status-region",
+            style: { gridArea: "status", minHeight: 0, minWidth: 0, overflow: "hidden" },
+          },
+          bottom,
+        ),
   );
 }
 

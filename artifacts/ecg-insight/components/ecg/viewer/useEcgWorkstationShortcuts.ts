@@ -4,9 +4,8 @@ import { Platform } from "react-native";
 import type { EcgWorkstationViewMode } from "./types";
 import type { EcgMeasurementWorkspace } from "./useEcgMeasurementWorkspace";
 import type { EcgViewerControls } from "./useEcgViewerControls";
-import type { EcgWaveformPlaybackState } from "./useEcgWaveformPlayback";
 
-/** Sprint 31 — hospital workstation keyboard shortcuts. */
+/** Sprint 52 — hospital workstation keyboard shortcuts (no monitor playback in workspace). */
 export function useEcgWorkstationShortcuts(input: {
   controls: EcgViewerControls;
   diagnosticMode?: boolean;
@@ -18,7 +17,6 @@ export function useEcgWorkstationShortcuts(input: {
   onSave?: () => void;
   onUpload?: () => void;
   onViewModeChange?: (mode: EcgWorkstationViewMode) => void;
-  playback?: EcgWaveformPlaybackState;
   viewMode?: EcgWorkstationViewMode;
   workspace?: EcgMeasurementWorkspace;
 }) {
@@ -81,6 +79,7 @@ export function useEcgWorkstationShortcuts(input: {
       if (event.ctrlKey && event.key.toLowerCase() === "r") {
         event.preventDefault();
         input.controls.resetView();
+        input.controls.applyFit("hero");
         return;
       }
       if (event.ctrlKey && event.key.toLowerCase() === "p") {
@@ -93,22 +92,12 @@ export function useEcgWorkstationShortcuts(input: {
         input.onExportPdf?.();
         return;
       }
-      if (event.ctrlKey && event.key.toLowerCase() === "m") {
-        event.preventDefault();
-        input.onViewModeChange?.("monitor");
-        return;
-      }
       if (event.ctrlKey && event.key.toLowerCase() === "a") {
         event.preventDefault();
         input.onViewModeChange?.("ai-review");
         return;
       }
       if (!event.ctrlKey && !event.metaKey && event.code === "Space") {
-        if (input.viewMode === "monitor" && input.playback) {
-          event.preventDefault();
-          input.playback.togglePlay();
-          return;
-        }
         if (input.controls.isPanActive) return;
         event.preventDefault();
         input.controls.togglePanMode();
@@ -133,7 +122,6 @@ export function useEcgWorkstationShortcuts(input: {
     input.onSave,
     input.onUpload,
     input.onViewModeChange,
-    input.playback,
     input.viewMode,
     input.workspace,
   ]);

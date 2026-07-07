@@ -116,9 +116,8 @@ export function zoomAtPoint(
   };
 }
 
-/** Target canvas fill for hospital hero framing (Sprint 33.5). */
-/** Sprint 35 — ECG canvas fill target (75–80% of viewer column). */
-export const ECG_HERO_FILL_TARGET = 0.78;
+/** Sprint 53 — ECG interpretation viewport fill (90–95% clinical target). */
+export const ECG_HERO_FILL_TARGET = 0.94;
 
 export function heroFitZoom(
   containerWidth: number,
@@ -143,10 +142,13 @@ export function fitZoomForDimensions(
   containerHeight: number,
   imageWidth: number,
   imageHeight: number,
-  mode: "width" | "height" | "contain" | "hero" | "100",
+  mode: "width" | "height" | "contain" | "hero" | "100" | "150" | "200" | "300",
 ) {
   if (!containerWidth || !containerHeight || !imageWidth || !imageHeight) return 1;
   if (mode === "100") return 1;
+  if (mode === "150") return 1.5;
+  if (mode === "200") return 2;
+  if (mode === "300") return 3;
   if (mode === "hero") return heroFitZoom(containerWidth, containerHeight, imageWidth, imageHeight);
   const contain = Math.min(containerWidth / imageWidth, containerHeight / imageHeight);
   const displayWidth = imageWidth * contain;

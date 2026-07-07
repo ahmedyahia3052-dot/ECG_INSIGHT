@@ -112,6 +112,7 @@ export type EcgBenchmarkResult = {
 export type EcgTwelveLeadRegion = {
   height: number;
   lead: EcgLeadId | string;
+  rhythmStrip?: boolean;
   width: number;
   x: number;
   y: number;
