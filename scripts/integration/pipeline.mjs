@@ -110,6 +110,7 @@ export const integrationScripts = [
   "scripts/render-engine-2.integration.ts",
   "scripts/sprint47-acquisition-digitization.integration.ts",
   "scripts/sprint48-hospital-examination-workflow.integration.ts",
+  "scripts/sprint49-live-monitor-hmi.integration.ts",
 ];
 
 export const releaseE2eSpecs = [

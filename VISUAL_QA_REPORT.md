@@ -1,3 +1,3 @@
-# Visual QA Report — Sprint 48
+# Visual QA Report — Sprint 49
 
-Examination tab validates session badge, 21-step chip grid, timeline entries, QC metrics, doctor review actions, final report preview, and electronic signature block.
+Validates ICU-style phosphor monitor chrome: patient identity row, hospital HUD telemetry, collapsible acquisition/clinical rails, bottom timeline track, diagnostic HUD with ESC exit.

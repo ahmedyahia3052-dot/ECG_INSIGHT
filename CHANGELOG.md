@@ -1,5 +1,29 @@
 # Changelog — Enterprise QA Infrastructure
 
+## Sprint 49 — Hospital ECG Monitor HMI — 2026-07-07
+
+### Added
+- **Live Monitor HMI module** (`live-monitor-hmi/`) — ICU-style status bar, overlay left/right rails, bottom transport bar, diagnostic HUD
+- Patient identity row (name, MRN, age, sex, hospital, recording time)
+- Collapsible acquisition rail (leads, filter, calipers, capture, record, freeze, export)
+- Collapsible clinical rail (findings, measurements, notes, alerts, quick impression) — case data only, no AI backend changes
+- Bottom timeline/playback/zoom/scale bar with auto-hide
+- Mouse wheel zoom + panel toggle shortcuts `[` `]` `\`
+- Canvas viewport ratio **94%** with overlay chrome
+
+### Preserved
+- Render Engine 2.0, `EcgLiveMonitorView` canvas internals, backend, AI, digitization, reports
+- All Sprint 37/41/45 testIDs and live monitor shortcuts
+
+### Validated
+- `npm run lint` / `typecheck` / `build` — PASS
+- Playwright Sprint 49 (6/6) + Sprint 45 regression — PASS
+
+### Tag
+- `Sprint49-MonitorHMI`
+
+---
+
 ## Sprint 48 — Hospital ECG Examination Workflow — 2026-07-07
 
 ### Added

@@ -1,21 +1,24 @@
 import { useRouter } from "expo-router";
 import React, { memo, useCallback, useEffect, useMemo, useState } from "react";
-import { Platform, Pressable, StyleSheet, Text, useWindowDimensions, View } from "react-native";
+import { Platform, StyleSheet, useWindowDimensions, View } from "react-native";
 
-import { PrimaryButton } from "@/components/enterprise/EnterpriseUI";
-import type { ApiECGCase } from "@/services/clinical";
+import type { ApiECGCase, ApiPatient } from "@/services/clinical";
 import type { DigitalEcg } from "@/services/ecgProcessing";
 
-import { exportMonitorCanvas, useMonitorCanvasRef } from "./EcgLiveMonitorClinicalToolbar";
+import { useMonitorCanvasRef } from "./EcgLiveMonitorClinicalToolbar";
 import { EcgLiveMonitorView } from "./EcgLiveMonitorView";
-import { ECG_LIVE_MONITOR, ECG_LIVE_MONITOR_TYPO } from "./ecgLiveMonitorTokens";
+import { ECG_LIVE_MONITOR } from "./ecgLiveMonitorTokens";
 import { durationMsForLead } from "./ecgMonitorPath";
 import {
-  EcgLiveMonitorFloatingPalette,
-  EcgLiveMonitorHospitalHud,
-  useMonitorPaletteVisibility,
-  useMonitorTelemetry,
-} from "./live-monitor-v2";
+  EcgLiveMonitorHmiBottomBar,
+  EcgLiveMonitorHmiDiagnosticHud,
+  EcgLiveMonitorHmiLeftRail,
+  EcgLiveMonitorHmiRightRail,
+  EcgLiveMonitorHmiStatusBar,
+  HMI_LAYOUT,
+  useLiveMonitorHmiLayout,
+} from "./live-monitor-hmi";
+import { useMonitorPaletteVisibility, useMonitorTelemetry } from "./live-monitor-v2";
 import type { MonitorLayoutMode } from "./monitorLayout";
 import { type EcgLeadId } from "./types";
 import { useEcgDiagnosticMode } from "./useEcgDiagnosticMode";
@@ -23,6 +26,13 @@ import { useEcgLiveMonitorEngine } from "./useEcgLiveMonitorEngine";
 import { useEcgLiveMonitorShortcuts } from "./useEcgLiveMonitorShortcuts";
 import { useEcgViewerControls } from "./useEcgViewerControls";
 import type { MonitorAlarmState } from "./EcgLiveMonitorAlarmBar";
+
+function patientAge(dob?: string | null) {
+  if (!dob) return undefined;
+  const birth = new Date(dob);
+  if (Number.isNaN(birth.getTime())) return undefined;
+  return Math.floor((Date.now() - birth.getTime()) / (365.25 * 24 * 3600 * 1000));
+}
 
 export const EcgLiveMonitorShell = memo(function EcgLiveMonitorShell({
   digitalEcg,
@@ -35,7 +45,7 @@ export const EcgLiveMonitorShell = memo(function EcgLiveMonitorShell({
   ecgCase: ApiECGCase;
   isDigitizing?: boolean;
   onDigitize?: () => void;
-  patient: { firstName: string; id: string; lastName: string };
+  patient: ApiPatient;
 }) {
   const router = useRouter();
   const controls = useEcgViewerControls();
@@ -43,11 +53,11 @@ export const EcgLiveMonitorShell = memo(function EcgLiveMonitorShell({
   const [selectedLead, setSelectedLead] = useState<EcgLeadId>("II");
   const [fps, setFps] = useState<number | undefined>(undefined);
   const [measureMode, setMeasureMode] = useState(false);
-  const [autoHideControls, setAutoHideControls] = useState(false);
   const canvasRef = useMonitorCanvasRef();
   const { diagnosticMode, enterDiagnostic, exitDiagnostic } = useEcgDiagnosticMode();
   const telemetry = useMonitorTelemetry();
-  const { paletteVisible, revealPalette } = useMonitorPaletteVisibility(autoHideControls);
+  const hmi = useLiveMonitorHmiLayout(diagnosticMode);
+  const { paletteVisible, revealPalette } = useMonitorPaletteVisibility(!hmi.controlsPinned);
 
   const activeLeadData = useMemo(
     () => digitalEcg?.leads.find((lead) => lead.lead === selectedLead) ?? digitalEcg?.leads.find((lead) => lead.lead === "II") ?? null,
@@ -66,15 +76,28 @@ export const EcgLiveMonitorShell = memo(function EcgLiveMonitorShell({
     if (diagnosticMode) {
       document.body.setAttribute("data-ecg-live-diagnostic", "true");
       document.documentElement.style.overflow = "hidden";
+      void document.documentElement.requestFullscreen?.().catch(() => undefined);
     } else {
       document.body.removeAttribute("data-ecg-live-diagnostic");
       document.documentElement.style.overflow = "";
+      if (document.fullscreenElement) void document.exitFullscreen?.().catch(() => undefined);
     }
     return () => {
       document.body.removeAttribute("data-ecg-live-diagnostic");
       document.documentElement.style.overflow = "";
     };
   }, [diagnosticMode]);
+
+  useEffect(() => {
+    if (Platform.OS !== "web" || typeof window === "undefined") return undefined;
+    const onWheel = (event: WheelEvent) => {
+      if (event.ctrlKey || event.metaKey) return;
+      event.preventDefault();
+      controls.zoomBy(event.deltaY > 0 ? -1 : 1);
+    };
+    window.addEventListener("wheel", onWheel, { passive: false });
+    return () => window.removeEventListener("wheel", onWheel);
+  }, [controls]);
 
   const heartRate = ecgCase.heartRate ?? undefined;
   const rhythm = ecgCase.rhythm ?? "Pending";
@@ -125,10 +148,6 @@ export const EcgLiveMonitorShell = memo(function EcgLiveMonitorShell({
     engine.setHorizontalScroll(0);
   }, [controls, engine]);
 
-  const handleSnapshot = useCallback(() => {
-    exportMonitorCanvas(canvasRef.current, `ecg-monitor-${ecgCase.caseNumber ?? ecgCase.id}.png`);
-  }, [canvasRef, ecgCase.caseNumber, ecgCase.id]);
-
   const handleLayoutModeChange = useCallback(
     (mode: MonitorLayoutMode) => {
       engine.setLayoutMode(mode);
@@ -146,6 +165,17 @@ export const EcgLiveMonitorShell = memo(function EcgLiveMonitorShell({
     onExitMonitor: handleExitMonitor,
   });
 
+  useEffect(() => {
+    if (Platform.OS !== "web" || typeof window === "undefined") return undefined;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "[") hmi.toggleLeft();
+      if (event.key === "]") hmi.toggleRight();
+      if (event.key === "\\") hmi.toggleBottom();
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [hmi]);
+
   const handleRhythmStripToggle = useCallback(() => {
     engine.setRhythmStripMode(!engine.rhythmStripMode);
     if (!engine.rhythmStripMode) {
@@ -156,160 +186,191 @@ export const EcgLiveMonitorShell = memo(function EcgLiveMonitorShell({
 
   const canvasMinHeight = Math.max(
     360,
-    Math.floor(viewportHeight * ECG_LIVE_MONITOR.canvasViewportRatio) - (diagnosticMode ? 0 : ECG_LIVE_MONITOR.chromeCompact),
+    Math.floor(viewportHeight * HMI_LAYOUT.canvasViewportRatio) - (diagnosticMode ? 0 : hmi.chromeHeight),
   );
 
-  const patientLabel = `${patient.lastName}, ${patient.firstName}`.slice(0, 24);
-  const patientId = ecgCase.caseNumber ?? ecgCase.caseId ?? patient.id;
+  const patientName = `${patient.lastName}, ${patient.firstName}`.slice(0, 32);
+  const mrn = patient.medicalRecordNumber ?? ecgCase.caseNumber ?? ecgCase.caseId;
+  const age = patient.age ?? patientAge(patient.dateOfBirth);
+  const sex = patient.gender ?? "—";
+  const hospital = ecgCase.hospitalName ?? patient.company ?? undefined;
+  const recordingTime = ecgCase.acquisitionDate ? new Date(ecgCase.acquisitionDate).toLocaleTimeString() : telemetry.clock;
+
+  const measurements = useMemo(
+    () =>
+      [
+        heartRate != null ? `HR ${heartRate} bpm` : null,
+        ecgCase.prInterval != null ? `PR ${ecgCase.prInterval} ms` : null,
+        ecgCase.qrsDuration != null ? `QRS ${ecgCase.qrsDuration} ms` : null,
+        ecgCase.qtInterval != null ? `QT ${ecgCase.qtInterval} ms` : null,
+      ].filter(Boolean) as string[],
+    [ecgCase.prInterval, ecgCase.qrsDuration, ecgCase.qtInterval, heartRate],
+  );
+
+  const alerts = useMemo(() => {
+    const rows: string[] = [];
+    if (alarmState.leadOff) rows.push("Lead off detected");
+    if (noiseLevel === "high") rows.push("High noise — verify electrode contact");
+    if (heartRate != null && (heartRate < 50 || heartRate > 120)) rows.push(`Heart rate ${heartRate} bpm out of range`);
+    return rows;
+  }, [alarmState.leadOff, heartRate, noiseLevel]);
+
+  const bottomVisible = paletteVisible || hmi.controlsPinned;
 
   return (
     <View style={[styles.root, diagnosticMode && styles.rootDiagnostic]} testID="sprint37-live-monitor-ready">
-      {!diagnosticMode ? (
-        <View style={styles.topChrome}>
-          <View style={styles.header} testID="sprint37-live-monitor-header">
-            <Text style={styles.title} numberOfLines={1}>
-              LIVE · {patientLabel}
-            </Text>
-            <View style={styles.headerActions}>
-              <PrimaryButton label="Review" onPress={() => router.push(`/ecg-workspace?caseId=${ecgCase.id}` as never)} variant="outline" />
-            </View>
-          </View>
-          <EcgLiveMonitorHospitalHud
+      <View nativeID="sprint49-hmi-workspace-ready" style={styles.fill} testID="sprint49-hmi-workspace-ready">
+        {!diagnosticMode ? (
+          <EcgLiveMonitorHmiStatusBar
+            age={age}
             alarmState={alarmState}
             controls={controls}
             engine={engine}
             filterLabel={engine.filter}
             fps={fps}
             heartRate={heartRate}
+            hospital={hospital ?? undefined}
             isolatedLead={engine.isolatedLead}
-            patientId={String(patientId)}
+            mrn={String(mrn)}
+            onReview={() => router.push(`/ecg-workspace?caseId=${ecgCase.id}` as never)}
+            patientName={patientName}
+            recordingTime={recordingTime}
             rhythm={rhythm}
+            samplingRate={digitalEcg?.calibration ? "500 Hz" : undefined}
+            sex={sex}
             signalQuality={signalQuality}
             telemetry={telemetry}
           />
-        </View>
-      ) : (
-        <View pointerEvents="box-none" style={styles.diagnosticOverlay}>
-          <Pressable accessibilityLabel="Exit diagnostic monitor" onPress={exitDiagnostic} style={styles.exitChip} testID="sprint37-exit-diagnostic">
-            <Text style={styles.exitChipText}>ESC · Exit Full Screen</Text>
-          </Pressable>
-          <View style={styles.diagnosticHud}>
-            <Text style={styles.diagnosticHudText}>
-              HR {heartRate ?? "--"} · {rhythm} · {controls.grid.speed} mm/s · {controls.grid.gain} mm/mV · {engine.filter} ·{" "}
-              {engine.frozen ? "FROZEN" : engine.isPlaying ? "LIVE" : "PAUSED"} · {telemetry.clock}
-            </Text>
+        ) : (
+          <EcgLiveMonitorHmiDiagnosticHud
+            clock={telemetry.clock}
+            filter={engine.filter}
+            frozen={engine.frozen}
+            gain={controls.grid.gain}
+            heartRate={heartRate}
+            isPlaying={engine.isPlaying}
+            onExit={exitDiagnostic}
+            rhythm={rhythm}
+            speed={controls.grid.speed}
+          />
+        )}
+
+        <View style={styles.workspaceRow}>
+          <View style={[styles.monitorStage, { minHeight: canvasMinHeight }, diagnosticMode && styles.monitorStageDiagnostic]}>
+            <EcgLiveMonitorView
+              allLeads={digitalEcg?.leads ?? []}
+              autoFit
+              canvasRef={canvasRef}
+              chrome={diagnosticMode ? "canvas-only" : "workspace"}
+              controls={controls}
+              customLeads={engine.customLeads}
+              engine={engine}
+              heartRate={heartRate}
+              highlightedLead={selectedLead}
+              isDigitizing={isDigitizing}
+              layoutMode={engine.layoutMode}
+              lead={activeLeadData}
+              measureMode={measureMode}
+              onDigitize={onDigitize}
+              onFpsUpdate={setFps}
+              onPanBy={(dx, dy) => controls.panBy(dx * 0.35, dy * 0.35)}
+              panActive={controls.panMode === "active"}
+              playback={engine}
+              reviewMode={engine.reviewMode}
+              rhythm={rhythm}
+              rhythmStripLead={engine.rhythmStripLead}
+              rhythmStripMode={engine.rhythmStripMode}
+              selectedLead={selectedLead}
+              showMiniNavigator={false}
+            />
+
+            {!diagnosticMode ? (
+              <>
+                <View pointerEvents="box-none" style={[styles.leftRailOverlay, { width: hmi.leftWidth }]}>
+                  <EcgLiveMonitorHmiLeftRail
+                    canvasRef={canvasRef}
+                    collapsed={hmi.leftCollapsed}
+                    controls={controls}
+                    customLeads={engine.customLeads}
+                    engine={engine}
+                    exportFilename={`ecg-monitor-${ecgCase.caseNumber ?? ecgCase.id}.png`}
+                    layoutMode={engine.layoutMode}
+                    measureMode={measureMode}
+                    onCollapseToggle={hmi.toggleLeft}
+                    onCustomLeadsChange={engine.setCustomLeads}
+                    onLayoutModeChange={handleLayoutModeChange}
+                    onLeadChange={(lead) => {
+                      engine.setLayoutMode("single");
+                      engine.setRhythmStripMode(false);
+                      engine.setIsolatedLead(null);
+                      setSelectedLead(lead);
+                    }}
+                    onMeasureToggle={() => setMeasureMode((v) => !v)}
+                    onResetView={handleResetView}
+                    onRhythmStripToggle={handleRhythmStripToggle}
+                    selectedLead={selectedLead}
+                  />
+                </View>
+                <View pointerEvents="box-none" style={[styles.rightRailOverlay, { width: hmi.rightWidth }]}>
+                  <EcgLiveMonitorHmiRightRail
+                    aiDiagnosis={ecgCase.aiDiagnosis ?? ecgCase.aiStatus}
+                    alerts={alerts}
+                    clinicalNotes={ecgCase.clinicalNotes ?? ecgCase.clinicalComments ?? undefined}
+                    collapsed={hmi.rightCollapsed}
+                    heartRate={heartRate}
+                    measurements={measurements}
+                    onCollapseToggle={hmi.toggleRight}
+                    quickImpression={ecgCase.clinicalIndication ?? rhythm}
+                    rhythm={rhythm}
+                    signalQuality={signalQuality}
+                  />
+                </View>
+              </>
+            ) : null}
+
+            {!diagnosticMode && bottomVisible ? (
+              <View pointerEvents="box-none" style={styles.bottomOverlay}>
+                <EcgLiveMonitorHmiBottomBar
+                  collapsed={hmi.bottomCollapsed}
+                  controls={controls}
+                  durationMs={playbackDurationMs}
+                  engine={engine}
+                  onAutoHideToggle={() => hmi.setControlsPinned((v) => !v)}
+                  onCollapseToggle={hmi.toggleBottom}
+                  onEnterDiagnostic={enterDiagnostic}
+                  onResetView={handleResetView}
+                  palettePinned={hmi.controlsPinned}
+                />
+              </View>
+            ) : !diagnosticMode && !bottomVisible ? (
+              <View nativeID="sprint45-palette-reveal" pointerEvents="box-none" style={styles.bottomOverlay}>
+                <EcgLiveMonitorHmiBottomBar
+                  collapsed
+                  controls={controls}
+                  durationMs={playbackDurationMs}
+                  engine={engine}
+                  onAutoHideToggle={() => hmi.setControlsPinned(true)}
+                  onCollapseToggle={revealPalette}
+                  onResetView={handleResetView}
+                  palettePinned={hmi.controlsPinned}
+                />
+              </View>
+            ) : null}
           </View>
         </View>
-      )}
-
-      <View style={[styles.monitorStage, { minHeight: canvasMinHeight }, diagnosticMode && styles.monitorStageDiagnostic]}>
-        <EcgLiveMonitorView
-          allLeads={digitalEcg?.leads ?? []}
-          autoFit
-          canvasRef={canvasRef}
-          chrome={diagnosticMode ? "canvas-only" : "workspace"}
-          controls={controls}
-          customLeads={engine.customLeads}
-          engine={engine}
-          heartRate={heartRate}
-          highlightedLead={selectedLead}
-          isDigitizing={isDigitizing}
-          layoutMode={engine.layoutMode}
-          lead={activeLeadData}
-          measureMode={measureMode}
-          onDigitize={onDigitize}
-          onFpsUpdate={setFps}
-          onPanBy={(dx, dy) => controls.panBy(dx * 0.35, dy * 0.35)}
-          panActive={controls.panMode === "active"}
-          playback={engine}
-          reviewMode={engine.reviewMode}
-          rhythm={rhythm}
-          rhythmStripLead={engine.rhythmStripLead}
-          rhythmStripMode={engine.rhythmStripMode}
-          selectedLead={selectedLead}
-          showMiniNavigator={false}
-        />
       </View>
-
-      <EcgLiveMonitorFloatingPalette
-        autoHideEnabled={autoHideControls}
-        canvasRef={canvasRef}
-        controls={controls}
-        customLeads={engine.customLeads}
-        diagnosticMode={diagnosticMode}
-        engine={engine}
-        exportFilename={`ecg-monitor-${ecgCase.caseNumber ?? ecgCase.id}.png`}
-        layoutMode={engine.layoutMode}
-        measureMode={measureMode}
-        onAutoHideToggle={() => setAutoHideControls((v) => !v)}
-        onCustomLeadsChange={engine.setCustomLeads}
-        onEnterDiagnostic={diagnosticMode ? undefined : enterDiagnostic}
-        onLayoutModeChange={handleLayoutModeChange}
-        onLeadChange={(lead) => {
-          engine.setLayoutMode("single");
-          engine.setRhythmStripMode(false);
-          engine.setIsolatedLead(null);
-          setSelectedLead(lead);
-        }}
-        onMeasureToggle={() => setMeasureMode((v) => !v)}
-        onResetView={handleResetView}
-        onRhythmStripToggle={handleRhythmStripToggle}
-        paletteVisible={paletteVisible || !autoHideControls}
-        revealPalette={revealPalette}
-        selectedLead={selectedLead}
-      />
-
-      {diagnosticMode ? (
-        <View style={styles.hiddenControls} testID="sprint37-live-monitor-controls">
-          <PrimaryButton label="Snapshot" onPress={handleSnapshot} variant="outline" />
-        </View>
-      ) : null}
     </View>
   );
 });
 
 const styles = StyleSheet.create({
-  diagnosticHud: {
-    alignSelf: "flex-end",
-    backgroundColor: ECG_LIVE_MONITOR.overlay,
-    borderColor: ECG_LIVE_MONITOR.border,
-    borderRadius: 4,
-    borderWidth: 1,
-    marginRight: 6,
-    marginTop: 6,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-  },
-  diagnosticHudText: { color: ECG_LIVE_MONITOR.statusText, fontSize: 10, fontWeight: "800" },
-  diagnosticOverlay: { left: 0, pointerEvents: "box-none", position: "absolute", right: 0, top: 0, zIndex: 30 },
-  exitChip: {
-    alignSelf: "flex-start",
-    backgroundColor: ECG_LIVE_MONITOR.overlay,
-    borderColor: ECG_LIVE_MONITOR.border,
-    borderRadius: 999,
-    borderWidth: 1,
-    marginLeft: 6,
-    marginTop: 6,
-    paddingHorizontal: 10,
-    paddingVertical: 3,
-  },
-  exitChipText: { color: ECG_LIVE_MONITOR.statusText, fontSize: 10, fontWeight: "800" },
-  header: {
-    alignItems: "center",
-    flexDirection: "row",
-    flexShrink: 0,
-    gap: 6,
-    justifyContent: "space-between",
-    minHeight: 22,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-  },
-  headerActions: { flexDirection: "row", gap: 4 },
-  hiddenControls: { height: 0, opacity: 0, overflow: "hidden", position: "absolute", width: 0 },
-  monitorStage: { flex: 1, minHeight: 0 },
+  bottomOverlay: { bottom: 6, left: 6, pointerEvents: "box-none", position: "absolute", right: 6, zIndex: 25 },
+  fill: { flex: 1, minHeight: 0 },
+  leftRailOverlay: { bottom: 0, left: 0, pointerEvents: "box-none", position: "absolute", top: 0, zIndex: 20 },
+  monitorStage: { flex: 1, minHeight: 0, minWidth: 0, position: "relative" },
   monitorStageDiagnostic: { paddingBottom: 0 },
+  rightRailOverlay: { bottom: 0, pointerEvents: "box-none", position: "absolute", right: 0, top: 0, zIndex: 20 },
   root: { backgroundColor: ECG_LIVE_MONITOR.background, flex: 1, minHeight: 0 },
   rootDiagnostic: { backgroundColor: "#000000" },
-  title: { ...ECG_LIVE_MONITOR_TYPO.title, color: ECG_LIVE_MONITOR.statusText, flex: 1, fontSize: 11 },
-  topChrome: { flexShrink: 0 },
+  workspaceRow: { flex: 1, minHeight: 0 },
 });

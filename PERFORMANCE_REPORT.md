@@ -1,3 +1,3 @@
-# Performance Report — Sprint 48
+# Performance Report — Sprint 49
 
-Examination session reads/writes use lightweight CaseClinicalNote metadata — no additional DB tables. Quality refresh reuses existing digitization quality endpoint. React Query caches session per case.
+HMI panels are lightweight React Native views — no additional canvas work. Mouse wheel zoom delegates to existing controls.zoomBy. Panel collapse reduces layout chrome without affecting RAF render loop.

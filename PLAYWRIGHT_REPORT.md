@@ -1,5 +1,5 @@
-# Playwright Report — Sprint 48
+# Playwright Report — Sprint 49
 
-Spec: tests/e2e/sprint48-hospital-examination-workflow.spec.ts (@sprint48 @enterprise)
+Spec: tests/e2e/sprint49-live-monitor-hmi.spec.ts (@sprint49 @enterprise)
 
-Coverage: examination tab UI, QC + doctor review panels, session API lifecycle, Sprint 47 acquisition regression.
+Coverage: HMI status bar, left/right rails, bottom transport, canvas ratio, diagnostic fullscreen, Sprint 45 transport regression.
