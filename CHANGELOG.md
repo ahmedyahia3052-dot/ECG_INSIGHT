@@ -1,6 +1,28 @@
 # Changelog
 
-## Sprint37-LiveMonitor (2026-07-07)
+## Sprint38-AICardiologistWorkspace (2026-07-07)
+
+### Added
+- **EcgAiCardiologistWorkspace** — 14-section hospital-grade AI interpretation UI
+- **ai-cardiologist/** model builder, lead map, and types
+- **medicalIntelligence.ts** frontend service with fetch/analyze helpers
+- Medical Intelligence API registration (`/api/medical-intelligence`)
+- `highlightLeads` on AI overlay workspace for diagnosis-driven visualization
+- Integration test `sprint38-ai-cardiologist-workspace.integration.ts`
+- Playwright suite `@sprint38` (3 tests)
+
+### Changed
+- `EcgClinicalRightPanel` AI tab now uses cardiologist workspace (replaces simple review panel)
+- `EcgMonitorViewerFoundation` loads medical intelligence report when digitized ECG available
+
+### Preserved
+- Sprint 37 Live Monitor workspace — no changes
+- `EcgAiReviewWorkflowPanel` retained for backward compatibility (not mounted in AI tab)
+- ECG Review workstation shell, workflow ribbon, measurements, reports tabs
+
+---
+
+# Changelog — Sprint 37 Live Monitor
 
 ### Added
 - Dedicated **Live ECG Monitor Workspace** at `/ecg-live-monitor` and `/ecg-live-monitor/[caseId]`

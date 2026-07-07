@@ -1044,6 +1044,7 @@ model User {
   authoredCdssRules           ClinicalDecisionRule[]
   cdssRuns                    ClinicalDecisionSupportRun[]
   longitudinalComparisons     LongitudinalECGComparison[]
+  medicalIntelligenceReports  MedicalIntelligenceReport[]
   organization                Organization?             @relation("OrganizationUsers", fields: [organizationId], references: [id], onDelete: SetNull)
 
   @@index([role])
@@ -1189,6 +1190,7 @@ model Patient {
   auditLogs              AuditLog[]
   cdssRuns               ClinicalDecisionSupportRun[]
   longitudinalComparisons LongitudinalECGComparison[]
+  medicalIntelligenceReports MedicalIntelligenceReport[]
 
   @@unique([organizationId, employeeId])
   @@index([lastName, firstName])
@@ -1773,6 +1775,7 @@ model ECGCase {
   cdssRuns              ClinicalDecisionSupportRun[]
   longitudinalComparisons LongitudinalECGComparison[] @relation("CurrentLongitudinalCase")
   baselineComparisons    LongitudinalECGComparison[] @relation("BaselineLongitudinalCase")
+  medicalIntelligenceReports MedicalIntelligenceReport[]
 
   @@index([patientId])
   @@index([uploadedById])
@@ -3685,4 +3688,113 @@ model NotificationDeliveryLog {
   @@index([provider])
   @@index([status])
   @@index([createdAt])
+}
+
+enum MedicalConfidenceLevel {
+  HIGH
+  MEDIUM
+  LOW
+  UNKNOWN
+}
+
+enum MedicalReportSeverity {
+  NORMAL
+  MINOR
+  ABNORMAL
+  URGENT
+  CRITICAL
+}
+
+enum MedicalReportUrgency {
+  ROUTINE
+  URGENT
+  EMERGENT
+  CRITICAL
+}
+
+model MedicalKnowledgeBaseEntry {
+  id                    String   @id @default(cuid())
+  code                  String   @unique
+  label                 String
+  category              String
+  severity              String
+  urgency               String
+  diagnosticCriteria    String[]
+  ecgCharacteristics    String[]
+  measurements          String[]
+  differentialDiagnosis String[]
+  pitfalls              String[]
+  clinicalNotes         String[]
+  guidelineReferences   Json
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  @@index([category])
+  @@index([label])
+}
+
+model MedicalRuleDefinition {
+  id           String   @id @default(cuid())
+  ruleId       String   @unique
+  category     String
+  description  String
+  enabled      Boolean  @default(true)
+  version      String   @default("1.0.0")
+  criteriaJson Json
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([category])
+  @@index([enabled])
+}
+
+model MedicalIntelligenceReport {
+  id                     String                    @id @default(cuid())
+  caseId                 String?
+  patientId              String?
+  evaluatedById          String
+  engineVersion          String
+  engineId               String
+  primaryDiagnosisCode   String?
+  primaryDiagnosisLabel  String
+  overallSeverity        MedicalReportSeverity
+  overallUrgency         MedicalReportUrgency
+  overallConfidenceLevel MedicalConfidenceLevel
+  overallConfidenceScore Float
+  reportJson             Json
+  findingsCount          Int                       @default(0)
+  criticalFindingsCount  Int                       @default(0)
+  explainabilitySummary  String
+  createdAt              DateTime                  @default(now())
+  case                   ECGCase?                  @relation(fields: [caseId], references: [id], onDelete: SetNull)
+  patient                Patient?                  @relation(fields: [patientId], references: [id], onDelete: SetNull)
+  evaluatedBy            User                      @relation(fields: [evaluatedById], references: [id], onDelete: Cascade)
+  findings               MedicalDiagnosisFinding[]
+
+  @@index([caseId])
+  @@index([patientId])
+  @@index([evaluatedById])
+  @@index([primaryDiagnosisCode])
+  @@index([overallSeverity])
+  @@index([createdAt])
+}
+
+model MedicalDiagnosisFinding {
+  id                 String                    @id @default(cuid())
+  reportId           String
+  diagnosisCode      String
+  diagnosisLabel     String
+  category           String
+  severity           MedicalReportSeverity
+  urgency            MedicalReportUrgency
+  confidenceLevel    MedicalConfidenceLevel
+  confidenceScore    Float
+  explainabilityJson Json
+  differentialJson   Json
+  createdAt          DateTime                  @default(now())
+  report             MedicalIntelligenceReport @relation(fields: [reportId], references: [id], onDelete: Cascade)
+
+  @@index([reportId])
+  @@index([diagnosisCode])
+  @@index([severity])
 }

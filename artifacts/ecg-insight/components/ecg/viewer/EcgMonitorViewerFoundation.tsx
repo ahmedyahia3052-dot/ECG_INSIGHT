@@ -10,6 +10,7 @@ import { getAIExplainability, getAIResult, type AIExplainability } from "@/servi
 import { API_URL } from "@/services/api";
 import type { ApiECGCase } from "@/services/clinical";
 import { digitizeECG, getDigitalECG } from "@/services/ecgProcessing";
+import { fetchOrAnalyzeMedicalIntelligence } from "@/services/medicalIntelligence";
 import { listReports } from "@/services/reports";
 import { downloadEcgViewerWorkspacePdf, downloadEcgViewerWorkspaceJson } from "@/services/ecgViewerWorkspace";
 import { buildSegmentAlignedDigitizedWaveformLeads } from "./ecgDigitizedWaveformSync";
@@ -36,6 +37,7 @@ import { EcgWaveformPlaybackTimeline } from "./EcgWaveformPlaybackTimeline";
 import { EcgWorkstationToolbar } from "./EcgWorkstationToolbar";
 import { ECG_COCKPIT_COLORS } from "./ecgCockpitColors";
 import { ECG_WORKSTATION_VISUAL } from "./ecgWorkstationVisualTokens";
+import type { CardiologistStructuredFinding } from "./ai-cardiologist/types";
 import type { EcgLeadId, EcgViewerPreviousStudy } from "./types";
 import { STANDARD_ECG_LEADS } from "./types";
 import { useClinicalWorkflowEngine } from "./useClinicalWorkflowEngine";
@@ -86,6 +88,7 @@ export function EcgMonitorViewerFoundation({
   const [rightPanelTab, setRightPanelTab] = useState<"patient" | "measurements" | "ai" | "reports" | "history" | undefined>();
   const [rightPanelSection, setRightPanelSection] = useState<"notes" | undefined>();
   const [aiConfirmed, setAiConfirmed] = useState(false);
+  const [selectedFindingId, setSelectedFindingId] = useState<string | null>(null);
   const [doctorNotes, setDoctorNotes] = useState(ecgCase.clinicalNotes ?? ecgCase.clinicalComments ?? "");
   const [panelLayout, setPanelLayout] = useState<{ bottomSize?: number; leftCollapsed: boolean; leftSize?: number; rightCollapsed: boolean; rightSize?: number }>({
     leftCollapsed: false,
@@ -125,6 +128,14 @@ export function EcgMonitorViewerFoundation({
     retry: false,
   });
   const digitalEcg = digitalEcgQuery.data?.digitalEcg ?? null;
+  const medicalIntelligenceQuery = useQuery({
+    enabled: !!token && !!ecgCase.id && digitalEcg?.status === "available",
+    queryFn: () => fetchOrAnalyzeMedicalIntelligence(token!, ecgCase.id),
+    queryKey: ["ecg-medical-intelligence", token, ecgCase.id],
+    retry: 1,
+    staleTime: 5 * 60 * 1000,
+  });
+  const medicalReport = medicalIntelligenceQuery.data ?? null;
   const reportsQuery = useQuery({
     enabled: !!token && !!ecgCase.id,
     queryFn: async () => {
@@ -177,6 +188,19 @@ export function EcgMonitorViewerFoundation({
   );
 
   const enterprise = useEcgEnterpriseViewerState({ caseId: ecgCase.id, historyStudies: previousStudies });
+
+  const handleFocusFinding = useCallback(
+    (finding: CardiologistStructuredFinding) => {
+      setSelectedFindingId(finding.id);
+      const lead = finding.affectedLeads[0];
+      if (lead) setSelectedLead(lead);
+      enterprise.setViewMode("ai-review");
+      aiOverlay.highlightLeads(finding.affectedLeads);
+      workspace.setActiveLead(finding.affectedLeads[0] ?? "II");
+      setRightPanelTab("ai");
+    },
+    [aiOverlay, enterprise, workspace],
+  );
 
   const rhythmLead = useMemo(
     () => digitalEcg?.leads.find((lead) => lead.lead === selectedLead) ?? digitalEcg?.leads.find((lead) => lead.lead === "II") ?? null,
@@ -679,6 +703,8 @@ export function EcgMonitorViewerFoundation({
               hospital={ecgCase.hospitalName ?? patient.company ?? undefined}
               imageHeight={controls.viewport.imageHeight}
               imageWidth={controls.viewport.imageWidth}
+              medicalReport={medicalReport}
+              medicalReportLoading={medicalIntelligenceQuery.isLoading || medicalIntelligenceQuery.isFetching}
               onCompareStudy={(caseId) => {
                 enterprise.setCompareCaseId(caseId);
                 enterprise.setCompareMode(true);
@@ -686,6 +712,7 @@ export function EcgMonitorViewerFoundation({
               }}
               onConfirmAi={() => setAiConfirmed(true)}
               onDigitize={() => digitizeMutation.mutate()}
+              onFocusFinding={handleFocusFinding}
               onNotesChange={setDoctorNotes}
               onOpenReview={() => router.push(`/ecg-cases/${ecgCase.id}/review` as never)}
               onExportPdf={() => void exportPdf()}
@@ -695,6 +722,7 @@ export function EcgMonitorViewerFoundation({
               previousStudies={previousStudies}
               patient={{ age: patient.age, gender: patient.gender, id: patient.id, name: patientDisplayName(patient) }}
               referringPhysician={ecgCase.assignedDoctor?.name ?? ecgCase.reviewedBy?.name ?? undefined}
+              selectedFindingId={selectedFindingId}
               studyDate={study.studyDate}
               timelineEvents={workflow.timelineEvents}
               visitId={ecgCase.caseNumber ?? ecgCase.caseId}

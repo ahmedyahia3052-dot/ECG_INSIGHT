@@ -9,7 +9,7 @@ import type { AIAnalysisResult, AIExplainability } from "@/services/ai";
 import type { DigitalEcg } from "@/services/ecgProcessing";
 
 import { EcgAiAnnotationInspector } from "./EcgAiAnnotationInspector";
-import { EcgAiReviewWorkflowPanel } from "./EcgAiReviewWorkflowPanel";
+import { EcgAiCardiologistWorkspace } from "./EcgAiCardiologistWorkspace";
 import { EcgClinicalCard } from "./EcgClinicalCard";
 import { EcgHistoryEnginePanel } from "./EcgHistoryEnginePanel";
 import { EcgMeasurementStudioPanel } from "./EcgMeasurementStudioPanel";
@@ -91,6 +91,10 @@ export const EcgClinicalRightPanel = memo(function EcgClinicalRightPanel({
   studyDate,
   timelineEvents = [],
   visitId,
+  medicalReport,
+  medicalReportLoading,
+  onFocusFinding,
+  selectedFindingId,
   workspace,
 }: {
   aiConfirmed?: boolean;
@@ -108,24 +112,26 @@ export const EcgClinicalRightPanel = memo(function EcgClinicalRightPanel({
   hospital?: string;
   imageHeight?: number;
   imageWidth?: number;
+  medicalReport?: import("@/services/medicalIntelligence").MedicalIntelligenceReport | null;
+  medicalReportLoading?: boolean;
   onCompareStudy?: (caseId: string) => void;
   onConfirmAi?: () => void;
   onDigitize?: () => void;
   onExportPdf?: () => void;
   onExportPng?: () => void;
+  onFocusFinding?: (finding: import("./ai-cardiologist/types").CardiologistStructuredFinding) => void;
   onNotesChange?: (notes: string) => void;
   onOpenReview?: () => void;
   operatorName?: string;
   patient?: { age?: number; gender?: string; id: string; name: string };
   previousStudies?: EcgViewerPreviousStudy[];
   referringPhysician?: string;
+  selectedFindingId?: string | null;
   studyDate?: string;
   timelineEvents?: CaseTimelineEvent[];
   visitId?: string;
   workspace: EcgMeasurementWorkspace;
 }) {
-  const severity = analysis?.severity ?? "normal";
-
   const [activeTab, setActiveTab] = useState<ClinicalTab>("measurements");
 
   useEffect(() => {
@@ -149,17 +155,18 @@ export const EcgClinicalRightPanel = memo(function EcgClinicalRightPanel({
 
   const aiTab = (
     <View style={styles.aiPane} testID="sprint35-ai-findings-tab-pane">
-      <EcgAiReviewWorkflowPanel
+      <EcgAiCardiologistWorkspace
         analysis={analysis}
         confirmed={aiConfirmed}
+        digitalEcg={digitalEcg}
         explainability={explainability}
+        loading={medicalReportLoading || digitalEcgLoading}
+        medicalReport={medicalReport}
         onConfirm={onConfirmAi}
+        onFocusLeads={onFocusFinding}
         onOpenReview={onOpenReview}
+        selectedFindingId={selectedFindingId}
       />
-      <PanelSection id="diagnosis" title="AI Interpretation">
-        <MetricRow label="Primary" tone={severity === "critical" || severity === "severe" ? "critical" : "primary"} value={analysis?.diagnosis ?? findings.interpretation.value} />
-        <MetricRow label="Confidence" value={findings.confidence.value} />
-      </PanelSection>
       <EcgClinicalCard id="ai-inspector" title="AI Inspector">
         <EcgAiAnnotationInspector workspace={aiOverlay} />
       </EcgClinicalCard>

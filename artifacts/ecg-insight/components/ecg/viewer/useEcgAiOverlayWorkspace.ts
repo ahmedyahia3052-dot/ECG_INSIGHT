@@ -211,6 +211,25 @@ export function useEcgAiOverlayWorkspace(options: Options) {
 
   const exportOverlay = useCallback(() => exportOverlayAnnotations(present), [present]);
 
+  const highlightLeads = useCallback(
+    (leads: string[]) => {
+      const normalized = leads.map((lead) => (lead === "Rhythm Strip" ? "II" : lead));
+      updateSlice((slice) => {
+        const matchingIds = slice.annotations.filter((item) => normalized.includes(item.lead)).map((item) => item.id);
+        return {
+          ...slice,
+          annotations: slice.annotations.map((item) => ({
+            ...item,
+            selected: normalized.includes(item.lead),
+          })),
+          selectedAnnotationIds: matchingIds,
+          settings: { ...slice.settings, enabled: true },
+        };
+      });
+    },
+    [updateSlice],
+  );
+
   useEffect(() => {
     if (Platform.OS !== "web" || typeof window === "undefined") return undefined;
     const onKeyDown = (event: KeyboardEvent) => {
@@ -266,6 +285,7 @@ export function useEcgAiOverlayWorkspace(options: Options) {
     confirmAnnotation,
     exportOverlay,
     exportState,
+    highlightLeads,
     hydrate,
     patchAnnotation,
     present,

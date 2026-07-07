@@ -1,48 +1,33 @@
-# Visual QA Report — Sprint 37 Live Monitor
+# Visual QA Report — Sprint 38 AI Cardiologist
 
 **Date:** 2026-07-07  
-**Environment:** Playwright chromium-desktop + managed dev servers
+**Scope:** AI Cardiologist Workspace in ECG Review workstation
 
-## Visual Theme Checklist
+## Layout Checklist
 
-| Element | Expected | Verified |
-|---------|----------|----------|
-| Background | Deep monitor black (`#010409` / `#020617`) | ✅ |
-| Waveform color | Green phosphor (`#22C55E`) | ✅ |
-| Status typography | Uppercase labels, hospital weight | ✅ |
-| Lead strip | Horizontal 12-lead + Rhythm Strip chip | ✅ |
-| Alarm HR styling | Yellow highlight <50 or >120 BPM | ✅ |
-| Canvas grid | Optional ECG grid via grid toggle | ✅ |
+| Element | Result |
+|---------|--------|
+| Collapsible clinical cards per section | ✅ |
+| Interval table with flag column | ✅ |
+| Primary diagnosis header with confidence badge | ✅ |
+| Finding rows with lead chips | ✅ |
+| No overcrowding in right panel scroll | ✅ |
+| AI Inspector retained below workspace | ✅ |
 
-## Layout Validation
+## Interaction QA
 
 | Scenario | Result |
 |----------|--------|
-| Live Monitor opens without review ribbon/toolbar | ✅ PASS |
-| Status panel visible with HR + playback state | ✅ PASS |
-| Lead V5 label updates monitor header | ✅ PASS |
-| Rhythm Strip mode updates header copy | ✅ PASS |
-| Diagnostic mode hides header and lead strip | ✅ PASS |
-| ESC restores standard monitor chrome | ✅ PASS |
-| Review workspace still shows workflow ribbon | ✅ PASS |
+| AI tab shows cardiologist workspace | ✅ PASS |
+| Rhythm + intervals + impression visible | ✅ PASS |
+| Finding click shows "Lead focus active" | ✅ PASS |
+| Live monitor has no cardiologist UI | ✅ PASS |
 
-## Playwright Evidence
+## Playwright
 
-- Suite: `tests/e2e/sprint37-live-monitor.spec.ts`
-- Result: **4/4 passed**
-- Screenshots captured on failure path (none in final run)
-
-## Accessibility Notes
-
-- Diagnostic exit chip exposes `accessibilityLabel="Exit diagnostic monitor"`
-- Transport buttons use visible text labels (Play, Freeze, Record, etc.)
-- Keyboard shortcuts documented in controls hint row
-
-## Known Limitations
-
-- Native (non-web) fallback uses SVG monitor path (no GPU canvas)
-- Recording indicator is UI state only (no file export in this sprint)
+- Suite: `tests/e2e/sprint38-ai-cardiologist.spec.ts`
+- Result: **3/3 passed**
 
 ## Sign-off
 
-Visual QA criteria for Sprint 37 Live Monitor Workspace: **APPROVED**
+Visual QA for Sprint 38 AI Cardiologist Workspace: **APPROVED**
