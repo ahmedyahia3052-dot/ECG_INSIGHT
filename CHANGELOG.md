@@ -1,5 +1,26 @@
 # Changelog — Enterprise QA Infrastructure
 
+## Sprint 45 — Hospital Grade ECG Monitor V2 — 2026-07-07
+
+### Added
+- **Live Monitor V2 module** (`live-monitor-v2/`): hospital HUD, floating control palette, clinical 1 mm / 5 mm grid, clinical markers (PVC/ST/QT/AF/R-peak)
+- **6-lead and custom layout modes** in `monitorLayout.ts`
+- **Filter cycle, horizontal scroll, lead isolation** in `useEcgLiveMonitorEngine`
+- Canvas-first shell (~93% viewport); controls moved to auto-hide floating palette
+- Playwright: `tests/e2e/sprint45-hospital-monitor-v2.spec.ts` (7 tests)
+- Integration: `scripts/sprint45-live-monitor-v2.integration.ts`
+- Reports: `SPRINT45_FINAL_REPORT.md`, `LIVE_MONITOR_V2_REPORT.md`, `FPS_REPORT.md`, `MEMORY_REPORT.md`, `VISUAL_QA_REPORT.md`, `PLAYWRIGHT_REPORT.md`, `PERFORMANCE_REPORT.md`
+
+### Validated
+- `npm run lint` / `typecheck` / `build` — PASS
+- Playwright Sprint 45 (7/7) + Sprint 41 regression (8/8) — PASS
+- Integration markers — PASS
+
+### Tag
+- `Sprint45-HospitalMonitorV2`
+
+---
+
 ## Release Candidate RC-1 — 2026-07-07
 
 ### Validated
@@ -15,6 +36,7 @@
 - **RC1-006:** Sprint 34 measurement integration — include `ecgWaveDetectionBridge.ts` / `ecgMultiLeadSync.ts` in marker scan
 - **RC1-007:** TypeScript errors in clinical report engine + missing `selectedLead` state in viewer foundation
 - **RC1-008:** Sprint 22 integration — accept `drawClinicalGrid` rename for hospital monitor canvas
+- **RC1-009:** Vitest `ecgMeasurementExport.test.ts` — CSV header schema v6 alignment
 
 ### Added
 - `scripts/rc1-production-readiness.mjs` — RC-1 orchestrator

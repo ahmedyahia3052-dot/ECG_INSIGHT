@@ -1,32 +1,10 @@
-# Playwright Report — Sprint 44 Clinical Decision Support
+# Playwright Report — Sprint 45
 
-**Date:** 2026-07-07  
-**Spec:** `tests/e2e/sprint44-cdss-workspace.spec.ts`  
-**Tags:** `@sprint44 @enterprise`
+Generated: 2026-07-07T18:23:33.052Z
 
-## Test Coverage
+## Specs
 
-| Test | Verifies |
-|------|----------|
-| CDSS workspace renders triage badge and clinical summary | Tab pane, workspace, triage badge, summary/diagnosis headings |
-| CDSS panels include differential evidence recommendations guidelines risk | All 7 workspace panels + relationship graph |
-| report view includes clinical decision support section | Report mode CDSS section with testID |
-| Sprint 43 report engine sections remain present | Patient Header, AI Findings, Doctor Review regression |
+- `tests/e2e/sprint45-hospital-monitor-v2.spec.ts` (@sprint45 @enterprise)
+- Sprint 41 regression: `tests/e2e/sprint41-live-monitor.spec.ts`
 
-## Run Command
-
-```bash
-playwright test tests/e2e/sprint44-cdss-workspace.spec.ts --grep "@sprint44"
-```
-
-## Results (2026-07-07)
-
-**4 passed** (3.4m, chromium-desktop)
-
-## Sprint 43 Regression
-
-```bash
-playwright test tests/e2e/sprint43-clinical-report-engine.spec.ts --grep "@sprint43"
-```
-
-**4 passed** (3.6m)
+Run: `npx playwright test tests/e2e/sprint45-hospital-monitor-v2.spec.ts --grep @sprint45`

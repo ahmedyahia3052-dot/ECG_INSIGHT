@@ -1,26 +1,13 @@
-# Performance Report — Sprint 44 CDSS
+# Performance Report — Sprint 45 Live Monitor V2
 
-**Date:** 2026-07-07
+Generated: 2026-07-07T18:23:33.052Z
 
-## Optimizations
+| Optimization | Implementation |
+|--------------|----------------|
+| 60 FPS target | Single rAF paint loop in `WebMonitorCanvas` |
+| No React render loop | Playback offset via refs; FPS sampled in canvas loop |
+| GPU compositing | Canvas 2D `desynchronized: true` + DPR scaling |
+| Phosphor sweep | Alpha fade overlay 0.08–0.32 during live sweep |
+| Adaptive stroke | `adaptiveTraceStrokeWidth` by layout density + zoom |
 
-| Technique | Benefit |
-|-----------|---------|
-| `useMemo` on `buildCdssWorkspaceModel` in panel | Recompute only when clinical inputs change |
-| `memo` on `Section`, `DiagnosisCard`, `ConfidenceBar` | Isolate toolbar/tab switches from CDSS body |
-| Rule evaluation sync (no async) | Sub-50ms typical evaluation |
-| Relationship graph edge cap in UI (12) | Bounded render for long rule sets |
-| CDSS tab lazy mount | Panel renders only when CDSS tab active |
-
-## Targets
-
-| Metric | Target | Status |
-|--------|--------|--------|
-| TypeScript errors | 0 | ✅ |
-| CDSS model build | < 50 ms | ✅ |
-| Tab switch | No foundation re-render | ✅ |
-| Scroll FPS | 60 FPS typical workspace | ✅ |
-
-## Sprint 43 Carry-over
-
-Report engine memoization unchanged. CDSS section adds one optional block when model includes `clinicalDecision`.
+See `FPS_REPORT.md` and `MEMORY_REPORT.md`.

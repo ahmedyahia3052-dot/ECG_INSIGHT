@@ -1,20 +1,8 @@
-# Visual QA Report — Sprint 44 CDSS Workspace
+# Visual QA Report — Sprint 45
 
-**Date:** 2026-07-07
+Generated: 2026-07-07T18:23:33.052Z
 
-## Checks
-
-| Check | Result | Notes |
-|-------|--------|-------|
-| CDSS tab in right panel | PASS | 5-tab layout, no clipping |
-| Triage badge contrast | PASS | Color-coded green/yellow/orange/red/black on white text |
-| Section card spacing | PASS | Consistent 10px padding, bordered cards |
-| Diagnosis evidence cards | PASS | Lead/measurement/morphology lists readable at 11–13px |
-| Confidence bars in Risk panel | PASS | Track + fill aligned |
-| Relationship graph edges | PASS | Truncated to 12 edges for readability |
-| Report CDSS section | PASS | Appears after Clinical Impression, before Differential |
-| Sprint 43 report sections | PASS | No layout regression |
-
-## Playwright Scoping
-
-Report and workspace assertions scoped to `sprint44-*` and `sprint43-enterprise-clinical-report` testIDs.
+- Canvas fill ratio validated in Playwright (`sprint45-hospital-monitor-v2.spec.ts`)
+- Hospital grid colors: minor `rgba(16,120,88,0.52)`, major `rgba(34,197,94,0.82)`
+- Zero-padding canvas host; black clinical background
+- Diagnostic mode: full-bleed canvas + transparent HUD

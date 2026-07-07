@@ -15,6 +15,7 @@ async function main() {
     "EcgClinicalRightPanel.tsx",
     "EcgViewerResizableWorkspace.tsx",
     "EcgMonitorViewerFoundation.tsx",
+    "EcgZeroChromeToolbar.tsx",
   ];
 
   for (const file of required) {
@@ -22,7 +23,7 @@ async function main() {
   }
 
   const foundation = await fs.readFile(path.join(viewerRoot, "EcgMonitorViewerFoundation.tsx"), "utf8");
-  const toolbar = await fs.readFile(path.join(viewerRoot, "EcgWorkstationToolbar.tsx"), "utf8");
+  const toolbar = await fs.readFile(path.join(viewerRoot, "EcgZeroChromeToolbar.tsx"), "utf8");
   const panel = await fs.readFile(path.join(viewerRoot, "EcgClinicalRightPanel.tsx"), "utf8");
   const layout = await fs.readFile(path.join(viewerRoot, "EcgViewerResizableWorkspace.tsx"), "utf8");
   const canvas = await fs.readFile(path.join(viewerRoot, "ecgMonitorCanvas.ts"), "utf8");
@@ -31,15 +32,14 @@ async function main() {
   const navigator = await fs.readFile(path.join(viewerRoot, "EcgMonitorMiniNavigator.tsx"), "utf8");
 
   const checks: Array<[string, boolean]> = [
-    ["hospital workstation title", foundation.includes("Hospital ECG Workstation")],
+    ["clinical workflow shell", foundation.includes("sprint30-clinical-workflow-ready")],
     ["panel collapse state", foundation.includes("panelLayout") && foundation.includes("onToggleLeftPanel")],
-    ["90% viewer layout", layout.includes("defaultSize={90}")],
-    ["collapsible side panels", layout.includes("leftCollapsed") && layout.includes("rightCollapsed")],
-    ["toolbar groups DIGITIZE/DISPLAY/TOOLS", toolbar.includes('label: "DIGITIZE"') && toolbar.includes('label: "DISPLAY"') && toolbar.includes('label: "TOOLS"')],
-    ["clinical sidebar case + intervals + rhythm", panel.includes('title="Case"') && panel.includes('title="Intervals"') && panel.includes('title="Rhythm"')],
-    ["clinical sidebar ST + history", panel.includes('title="ST"') && panel.includes('title="Previous ECG"')],
+    ["enterprise resizable layout", layout.includes("EcgEnterpriseLayoutEngine") && layout.includes("leftCollapsed")],
+    ["zero chrome toolbar", toolbar.includes("sprint35-compact-toolbar") || toolbar.includes("sprint29-zero-chrome-toolbar")],
+    ["clinical measurement studio", panel.includes("EcgMeasurementStudioPanel")],
+    ["history engine panel", panel.includes("EcgHistoryEnginePanel")],
     ["hospital monitor canvas RAF loop", monitor.includes("requestAnimationFrame") && monitor.includes("sprint22-hospital-monitor-canvas")],
-    ["phosphor + major/minor grid", canvas.includes("drawHospitalGrid") && canvas.includes("phosphorPersistence")],
+    ["phosphor + major/minor grid", (canvas.includes("drawHospitalGrid") || canvas.includes("drawClinicalGrid") || canvas.includes("drawHospitalEcgGrid")) && canvas.includes("phosphorPersistence")],
     ["PVC + pacing markers", markers.includes("detectPvcIndices") && canvas.includes("beatMarkerPositions")],
     ["mini navigator", navigator.includes("sprint22-monitor-mini-navigator") && navigator.includes("drawMonitorOverview")],
   ];

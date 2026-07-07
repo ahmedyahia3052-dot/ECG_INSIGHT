@@ -2,14 +2,24 @@ import { useCallback, useState } from "react";
 
 import { playbackRateForPaperSpeed } from "./ecgMonitorGridMath";
 import type { MonitorLayoutMode } from "./monitorLayout";
+import { MONITOR_CUSTOM_DEFAULT } from "./monitorLayout";
 import { useEcgWaveformPlayback, type EcgWaveformPlaybackState } from "./useEcgWaveformPlayback";
-import type { EcgPaperSpeed } from "./types";
+import type { EcgLeadId, EcgPaperSpeed } from "./types";
 
 const FRAME_STEP_MS = 40;
 
+export type MonitorFilter = "100Hz" | "150Hz" | "40Hz" | "Diagnostic" | "Monitor";
+
+const FILTER_CYCLE: MonitorFilter[] = ["Monitor", "Diagnostic", "40Hz", "100Hz", "150Hz"];
+
 export type EcgLiveMonitorEngine = EcgWaveformPlaybackState & {
+  customLeads: EcgLeadId[];
+  cycleFilter: () => void;
+  filter: MonitorFilter;
   frameStepBackward: () => void;
   frameStepForward: () => void;
+  horizontalScroll: number;
+  isolatedLead: EcgLeadId | null;
   jumpToEnd: () => void;
   jumpToStart: () => void;
   layoutMode: MonitorLayoutMode;
@@ -21,6 +31,9 @@ export type EcgLiveMonitorEngine = EcgWaveformPlaybackState & {
   reviewMode: boolean;
   rhythmStripLead: string;
   rhythmStripMode: boolean;
+  setCustomLeads: (leads: EcgLeadId[]) => void;
+  setHorizontalScroll: (value: number) => void;
+  setIsolatedLead: (lead: EcgLeadId | null) => void;
   setLayoutMode: (mode: MonitorLayoutMode) => void;
   setPaperSpeed: (speed: EcgPaperSpeed) => void;
   setReviewMode: (value: boolean) => void;
@@ -38,6 +51,10 @@ export function useEcgLiveMonitorEngine(durationMs: number, beatIntervalMs = 850
   const [reviewMode, setReviewMode] = useState(false);
   const [layoutMode, setLayoutMode] = useState<MonitorLayoutMode>("single");
   const [paperSpeed, setPaperSpeedState] = useState<EcgPaperSpeed>(25);
+  const [filter, setFilter] = useState<MonitorFilter>("Monitor");
+  const [horizontalScroll, setHorizontalScroll] = useState(0);
+  const [isolatedLead, setIsolatedLead] = useState<EcgLeadId | null>(null);
+  const [customLeads, setCustomLeads] = useState<EcgLeadId[]>(MONITOR_CUSTOM_DEFAULT);
 
   const setPaperSpeed = useCallback(
     (speed: EcgPaperSpeed) => {
@@ -46,6 +63,13 @@ export function useEcgLiveMonitorEngine(durationMs: number, beatIntervalMs = 850
     },
     [playback],
   );
+
+  const cycleFilter = useCallback(() => {
+    setFilter((current) => {
+      const index = FILTER_CYCLE.indexOf(current);
+      return FILTER_CYCLE[(index + 1) % FILTER_CYCLE.length]!;
+    });
+  }, []);
 
   const jumpToStart = useCallback(() => playback.jumpToMs(0), [playback]);
   const jumpToEnd = useCallback(() => playback.jumpToMs(durationMs), [durationMs, playback]);
@@ -82,8 +106,13 @@ export function useEcgLiveMonitorEngine(durationMs: number, beatIntervalMs = 850
 
   return {
     ...playback,
+    customLeads,
+    cycleFilter,
+    filter,
     frameStepBackward,
     frameStepForward,
+    horizontalScroll,
+    isolatedLead,
     jumpToEnd,
     jumpToStart,
     layoutMode,
@@ -95,6 +124,9 @@ export function useEcgLiveMonitorEngine(durationMs: number, beatIntervalMs = 850
     reviewMode,
     rhythmStripLead,
     rhythmStripMode,
+    setCustomLeads,
+    setHorizontalScroll,
+    setIsolatedLead,
     setLayoutMode,
     setPaperSpeed,
     setReviewMode,

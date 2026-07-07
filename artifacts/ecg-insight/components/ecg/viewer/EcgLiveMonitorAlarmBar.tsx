@@ -66,8 +66,8 @@ function AlarmChip({
 }
 
 const styles = StyleSheet.create({
-  chip: { borderRadius: 8, borderWidth: 1, flex: 1, minWidth: 100, paddingHorizontal: 10, paddingVertical: 6 },
-  chipLabel: { color: ECG_LIVE_MONITOR.statusMuted, fontSize: 9, fontWeight: "800", letterSpacing: 1.1 },
-  chipValue: { fontSize: 12, fontWeight: "900", marginTop: 2 },
-  root: { flexDirection: "row", flexWrap: "wrap", gap: 8, paddingHorizontal: 12, paddingVertical: 6 },
+  chip: { borderRadius: 4, borderWidth: 1, flex: 1, minWidth: 72, paddingHorizontal: 6, paddingVertical: 3 },
+  chipLabel: { color: ECG_LIVE_MONITOR.statusMuted, fontSize: 8, fontWeight: "800", letterSpacing: 0.8 },
+  chipValue: { fontSize: 10, fontWeight: "900", marginTop: 1 },
+  root: { flex: 1, flexDirection: "row", flexWrap: "nowrap", gap: 4, paddingHorizontal: 0, paddingVertical: 0 },
 });

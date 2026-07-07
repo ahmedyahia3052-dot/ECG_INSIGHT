@@ -6,6 +6,7 @@ import { PrimaryButton } from "@/components/enterprise/EnterpriseUI";
 import { ECG_LIVE_MONITOR } from "./ecgLiveMonitorTokens";
 
 export const EcgLiveMonitorClinicalToolbar = memo(function EcgLiveMonitorClinicalToolbar({
+  compact = false,
   measureMode,
   onExport,
   onMeasureToggle,
@@ -15,6 +16,7 @@ export const EcgLiveMonitorClinicalToolbar = memo(function EcgLiveMonitorClinica
   panActive,
   controls,
 }: {
+  compact?: boolean;
   measureMode: boolean;
   onExport: () => void;
   onMeasureToggle: () => void;
@@ -25,7 +27,7 @@ export const EcgLiveMonitorClinicalToolbar = memo(function EcgLiveMonitorClinica
   controls: { togglePanMode: () => void; zoomBy: (delta: number) => void; transform: { zoom: number } };
 }) {
   return (
-    <View accessibilityRole="toolbar" style={styles.root} testID="sprint41-live-monitor-toolbar">
+    <View accessibilityRole="toolbar" style={[styles.root, compact && styles.rootCompact]} testID="sprint41-live-monitor-toolbar">
       <ToolbarGroup label="View">
         <PrimaryButton label="Zoom +" onPress={() => controls.zoomBy(1)} variant="outline" />
         <PrimaryButton label="Zoom −" onPress={() => controls.zoomBy(-1)} variant="outline" />
@@ -72,13 +74,15 @@ const styles = StyleSheet.create({
   group: { gap: 2 },
   groupLabel: { color: ECG_LIVE_MONITOR.statusMuted, fontSize: 9, fontWeight: "800", letterSpacing: 1.1 },
   groupRow: { alignItems: "center", flexDirection: "row", gap: 6 },
-  meta: { color: ECG_LIVE_MONITOR.statusMuted, fontSize: 10, fontWeight: "700", paddingTop: 4 },
+  meta: { color: ECG_LIVE_MONITOR.statusMuted, fontSize: 9, fontWeight: "700" },
   root: {
     backgroundColor: ECG_LIVE_MONITOR.canvasBackground,
     borderBottomColor: ECG_LIVE_MONITOR.border,
     borderBottomWidth: 1,
-    gap: 6,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
+    flexShrink: 0,
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
   },
+  rootCompact: { minHeight: 32, paddingVertical: 3 },
 });

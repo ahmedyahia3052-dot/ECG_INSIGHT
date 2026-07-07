@@ -1,25 +1,28 @@
 import { useRouter } from "expo-router";
-import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Pressable, StyleSheet, Text, useWindowDimensions, View } from "react-native";
+import React, { memo, useCallback, useEffect, useMemo, useState } from "react";
+import { Platform, Pressable, StyleSheet, Text, useWindowDimensions, View } from "react-native";
 
 import { PrimaryButton } from "@/components/enterprise/EnterpriseUI";
 import type { ApiECGCase } from "@/services/clinical";
 import type { DigitalEcg } from "@/services/ecgProcessing";
 
-import { EcgLiveMonitorAlarmBar, type MonitorAlarmState } from "./EcgLiveMonitorAlarmBar";
-import { EcgLiveMonitorClinicalToolbar, exportMonitorCanvas, useMonitorCanvasRef } from "./EcgLiveMonitorClinicalToolbar";
-import { EcgLiveMonitorControls } from "./EcgLiveMonitorControls";
-import { EcgLiveMonitorLeadStrip } from "./EcgLiveMonitorLeadStrip";
-import { EcgLiveMonitorStatusPanel } from "./EcgLiveMonitorStatusPanel";
+import { exportMonitorCanvas, useMonitorCanvasRef } from "./EcgLiveMonitorClinicalToolbar";
 import { EcgLiveMonitorView } from "./EcgLiveMonitorView";
 import { ECG_LIVE_MONITOR, ECG_LIVE_MONITOR_TYPO } from "./ecgLiveMonitorTokens";
 import { durationMsForLead } from "./ecgMonitorPath";
+import {
+  EcgLiveMonitorFloatingPalette,
+  EcgLiveMonitorHospitalHud,
+  useMonitorPaletteVisibility,
+  useMonitorTelemetry,
+} from "./live-monitor-v2";
 import type { MonitorLayoutMode } from "./monitorLayout";
 import { type EcgLeadId } from "./types";
 import { useEcgDiagnosticMode } from "./useEcgDiagnosticMode";
 import { useEcgLiveMonitorEngine } from "./useEcgLiveMonitorEngine";
 import { useEcgLiveMonitorShortcuts } from "./useEcgLiveMonitorShortcuts";
 import { useEcgViewerControls } from "./useEcgViewerControls";
+import type { MonitorAlarmState } from "./EcgLiveMonitorAlarmBar";
 
 export const EcgLiveMonitorShell = memo(function EcgLiveMonitorShell({
   digitalEcg,
@@ -36,12 +39,15 @@ export const EcgLiveMonitorShell = memo(function EcgLiveMonitorShell({
 }) {
   const router = useRouter();
   const controls = useEcgViewerControls();
-  const { width } = useWindowDimensions();
+  const { height: viewportHeight } = useWindowDimensions();
   const [selectedLead, setSelectedLead] = useState<EcgLeadId>("II");
   const [fps, setFps] = useState<number | undefined>(undefined);
   const [measureMode, setMeasureMode] = useState(false);
+  const [autoHideControls, setAutoHideControls] = useState(false);
   const canvasRef = useMonitorCanvasRef();
   const { diagnosticMode, enterDiagnostic, exitDiagnostic } = useEcgDiagnosticMode();
+  const telemetry = useMonitorTelemetry();
+  const { paletteVisible, revealPalette } = useMonitorPaletteVisibility(autoHideControls);
 
   const activeLeadData = useMemo(
     () => digitalEcg?.leads.find((lead) => lead.lead === selectedLead) ?? digitalEcg?.leads.find((lead) => lead.lead === "II") ?? null,
@@ -55,13 +61,28 @@ export const EcgLiveMonitorShell = memo(function EcgLiveMonitorShell({
     engine.setPaperSpeed(controls.grid.speed);
   }, [controls.grid.speed, engine]);
 
+  useEffect(() => {
+    if (Platform.OS !== "web" || typeof document === "undefined") return undefined;
+    if (diagnosticMode) {
+      document.body.setAttribute("data-ecg-live-diagnostic", "true");
+      document.documentElement.style.overflow = "hidden";
+    } else {
+      document.body.removeAttribute("data-ecg-live-diagnostic");
+      document.documentElement.style.overflow = "";
+    }
+    return () => {
+      document.body.removeAttribute("data-ecg-live-diagnostic");
+      document.documentElement.style.overflow = "";
+    };
+  }, [diagnosticMode]);
+
   const heartRate = ecgCase.heartRate ?? undefined;
   const rhythm = ecgCase.rhythm ?? "Pending";
   const signalQuality =
     digitalEcg?.validation?.signalContinuityPercent != null
-      ? `${Math.round(digitalEcg.validation.signalContinuityPercent)}% continuity`
+      ? `${Math.round(digitalEcg.validation.signalContinuityPercent)}%`
       : digitalEcg?.quality?.score != null
-        ? `Score ${Math.round(digitalEcg.quality.score * 100)}%`
+        ? `${Math.round(digitalEcg.quality.score * 100)}%`
         : "Unknown";
 
   const noiseLevel: MonitorAlarmState["noiseLevel"] = useMemo(() => {
@@ -101,7 +122,8 @@ export const EcgLiveMonitorShell = memo(function EcgLiveMonitorShell({
 
   const handleResetView = useCallback(() => {
     controls.resetView();
-  }, [controls]);
+    engine.setHorizontalScroll(0);
+  }, [controls, engine]);
 
   const handleSnapshot = useCallback(() => {
     exportMonitorCanvas(canvasRef.current, `ecg-monitor-${ecgCase.caseNumber ?? ecgCase.id}.png`);
@@ -111,6 +133,7 @@ export const EcgLiveMonitorShell = memo(function EcgLiveMonitorShell({
     (mode: MonitorLayoutMode) => {
       engine.setLayoutMode(mode);
       engine.setRhythmStripMode(false);
+      engine.setIsolatedLead(null);
     },
     [engine],
   );
@@ -131,78 +154,69 @@ export const EcgLiveMonitorShell = memo(function EcgLiveMonitorShell({
     }
   }, [engine]);
 
-  const isCompact = width < 900;
+  const canvasMinHeight = Math.max(
+    360,
+    Math.floor(viewportHeight * ECG_LIVE_MONITOR.canvasViewportRatio) - (diagnosticMode ? 0 : ECG_LIVE_MONITOR.chromeCompact),
+  );
+
+  const patientLabel = `${patient.lastName}, ${patient.firstName}`.slice(0, 24);
+  const patientId = ecgCase.caseNumber ?? ecgCase.caseId ?? patient.id;
 
   return (
-    <View style={[styles.root, isCompact && styles.rootCompact]} testID="sprint37-live-monitor-ready">
+    <View style={[styles.root, diagnosticMode && styles.rootDiagnostic]} testID="sprint37-live-monitor-ready">
       {!diagnosticMode ? (
-        <View style={styles.header} testID="sprint37-live-monitor-header">
-          <View style={styles.headerText}>
-            <Text style={styles.title}>LIVE ECG MONITOR</Text>
-            <Text style={styles.subtitle}>
-              {ecgCase.caseNumber ?? ecgCase.caseId} · {patient.firstName} {patient.lastName}
+        <View style={styles.topChrome}>
+          <View style={styles.header} testID="sprint37-live-monitor-header">
+            <Text style={styles.title} numberOfLines={1}>
+              LIVE · {patientLabel}
             </Text>
+            <View style={styles.headerActions}>
+              <PrimaryButton label="Review" onPress={() => router.push(`/ecg-workspace?caseId=${ecgCase.id}` as never)} variant="outline" />
+            </View>
           </View>
-          <View style={styles.headerActions}>
-            <PrimaryButton label="ECG Review Workspace" onPress={() => router.push(`/ecg-workspace?caseId=${ecgCase.id}` as never)} variant="outline" />
-            <PrimaryButton label="Diagnostic Monitor" onPress={() => enterDiagnostic()} variant="primary" />
-          </View>
+          <EcgLiveMonitorHospitalHud
+            alarmState={alarmState}
+            controls={controls}
+            engine={engine}
+            filterLabel={engine.filter}
+            fps={fps}
+            heartRate={heartRate}
+            isolatedLead={engine.isolatedLead}
+            patientId={String(patientId)}
+            rhythm={rhythm}
+            signalQuality={signalQuality}
+            telemetry={telemetry}
+          />
         </View>
       ) : (
         <View pointerEvents="box-none" style={styles.diagnosticOverlay}>
           <Pressable accessibilityLabel="Exit diagnostic monitor" onPress={exitDiagnostic} style={styles.exitChip} testID="sprint37-exit-diagnostic">
-            <Text style={styles.exitChipText}>ESC · Exit Monitor</Text>
+            <Text style={styles.exitChipText}>ESC · Exit Full Screen</Text>
           </Pressable>
-          <View style={styles.diagnosticStatus}>
-            <EcgLiveMonitorStatusPanel compact controls={controls} engine={engine} fps={fps} heartRate={heartRate} rhythm={rhythm} signalQuality={signalQuality} />
+          <View style={styles.diagnosticHud}>
+            <Text style={styles.diagnosticHudText}>
+              HR {heartRate ?? "--"} · {rhythm} · {controls.grid.speed} mm/s · {controls.grid.gain} mm/mV · {engine.filter} ·{" "}
+              {engine.frozen ? "FROZEN" : engine.isPlaying ? "LIVE" : "PAUSED"} · {telemetry.clock}
+            </Text>
           </View>
         </View>
       )}
 
-      {!diagnosticMode ? <EcgLiveMonitorAlarmBar state={alarmState} /> : null}
-
-      {!diagnosticMode ? (
-        <EcgLiveMonitorStatusPanel controls={controls} engine={engine} fps={fps} heartRate={heartRate} rhythm={rhythm} signalQuality={signalQuality} />
-      ) : null}
-
-      {!diagnosticMode ? (
-        <EcgLiveMonitorClinicalToolbar
-          controls={controls}
-          measureMode={measureMode}
-          onExport={handleSnapshot}
-          onMeasureToggle={() => setMeasureMode((v) => !v)}
-          onPanToggle={controls.togglePanMode}
-          onResetView={handleResetView}
-          onSnapshot={handleSnapshot}
-          panActive={controls.panMode === "active"}
-        />
-      ) : null}
-
-      {!diagnosticMode ? (
-        <EcgLiveMonitorLeadStrip
-          layoutMode={engine.layoutMode}
-          onLayoutModeChange={handleLayoutModeChange}
-          onLeadChange={(lead) => {
-            engine.setLayoutMode("single");
-            engine.setRhythmStripMode(false);
-            setSelectedLead(lead);
-          }}
-          onRhythmStripToggle={handleRhythmStripToggle}
-          rhythmStripMode={engine.rhythmStripMode}
-          selectedLead={selectedLead}
-        />
-      ) : null}
-
-      <View style={[styles.monitorStage, diagnosticMode && styles.monitorStageDiagnostic]}>
+      <View style={[styles.monitorStage, { minHeight: canvasMinHeight }, diagnosticMode && styles.monitorStageDiagnostic]}>
         <EcgLiveMonitorView
           allLeads={digitalEcg?.leads ?? []}
+          autoFit
           canvasRef={canvasRef}
           chrome={diagnosticMode ? "canvas-only" : "workspace"}
           controls={controls}
+          customLeads={engine.customLeads}
+          engine={engine}
           heartRate={heartRate}
+          highlightedLead={selectedLead}
           isDigitizing={isDigitizing}
           layoutMode={engine.layoutMode}
           lead={activeLeadData}
+          measureMode={measureMode}
           onDigitize={onDigitize}
           onFpsUpdate={setFps}
           onPanBy={(dx, dy) => controls.panBy(dx * 0.35, dy * 0.35)}
@@ -213,51 +227,89 @@ export const EcgLiveMonitorShell = memo(function EcgLiveMonitorShell({
           rhythmStripLead={engine.rhythmStripLead}
           rhythmStripMode={engine.rhythmStripMode}
           selectedLead={selectedLead}
+          showMiniNavigator={false}
         />
       </View>
 
+      <EcgLiveMonitorFloatingPalette
+        autoHideEnabled={autoHideControls}
+        canvasRef={canvasRef}
+        controls={controls}
+        customLeads={engine.customLeads}
+        diagnosticMode={diagnosticMode}
+        engine={engine}
+        exportFilename={`ecg-monitor-${ecgCase.caseNumber ?? ecgCase.id}.png`}
+        layoutMode={engine.layoutMode}
+        measureMode={measureMode}
+        onAutoHideToggle={() => setAutoHideControls((v) => !v)}
+        onCustomLeadsChange={engine.setCustomLeads}
+        onEnterDiagnostic={diagnosticMode ? undefined : enterDiagnostic}
+        onLayoutModeChange={handleLayoutModeChange}
+        onLeadChange={(lead) => {
+          engine.setLayoutMode("single");
+          engine.setRhythmStripMode(false);
+          engine.setIsolatedLead(null);
+          setSelectedLead(lead);
+        }}
+        onMeasureToggle={() => setMeasureMode((v) => !v)}
+        onResetView={handleResetView}
+        onRhythmStripToggle={handleRhythmStripToggle}
+        paletteVisible={paletteVisible || !autoHideControls}
+        revealPalette={revealPalette}
+        selectedLead={selectedLead}
+      />
+
       {diagnosticMode ? (
-        <EcgLiveMonitorControls controls={controls} engine={engine} floating onResetView={handleResetView} />
-      ) : (
-        <EcgLiveMonitorControls controls={controls} engine={engine} onResetView={handleResetView} />
-      )}
+        <View style={styles.hiddenControls} testID="sprint37-live-monitor-controls">
+          <PrimaryButton label="Snapshot" onPress={handleSnapshot} variant="outline" />
+        </View>
+      ) : null}
     </View>
   );
 });
 
 const styles = StyleSheet.create({
-  diagnosticOverlay: { left: 0, position: "absolute", right: 0, top: 0, zIndex: 30 },
-  diagnosticStatus: { paddingHorizontal: 8, paddingTop: 8 },
+  diagnosticHud: {
+    alignSelf: "flex-end",
+    backgroundColor: ECG_LIVE_MONITOR.overlay,
+    borderColor: ECG_LIVE_MONITOR.border,
+    borderRadius: 4,
+    borderWidth: 1,
+    marginRight: 6,
+    marginTop: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+  },
+  diagnosticHudText: { color: ECG_LIVE_MONITOR.statusText, fontSize: 10, fontWeight: "800" },
+  diagnosticOverlay: { left: 0, pointerEvents: "box-none", position: "absolute", right: 0, top: 0, zIndex: 30 },
   exitChip: {
     alignSelf: "flex-start",
     backgroundColor: ECG_LIVE_MONITOR.overlay,
     borderColor: ECG_LIVE_MONITOR.border,
     borderRadius: 999,
     borderWidth: 1,
-    marginLeft: 12,
-    marginTop: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
+    marginLeft: 6,
+    marginTop: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 3,
   },
-  exitChipText: { color: ECG_LIVE_MONITOR.statusText, fontSize: 11, fontWeight: "800" },
+  exitChipText: { color: ECG_LIVE_MONITOR.statusText, fontSize: 10, fontWeight: "800" },
   header: {
     alignItems: "center",
-    backgroundColor: ECG_LIVE_MONITOR.background,
-    borderBottomColor: ECG_LIVE_MONITOR.border,
-    borderBottomWidth: 1,
     flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 12,
+    flexShrink: 0,
+    gap: 6,
     justifyContent: "space-between",
-    paddingHorizontal: 12,
-    paddingVertical: 10,
+    minHeight: 22,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
   },
-  headerActions: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
-  headerText: { flex: 1, gap: 2, minWidth: 220 },
-  monitorStage: { flex: 1, minHeight: 360 },
-  monitorStageDiagnostic: { paddingBottom: 120 },
+  headerActions: { flexDirection: "row", gap: 4 },
+  hiddenControls: { height: 0, opacity: 0, overflow: "hidden", position: "absolute", width: 0 },
+  monitorStage: { flex: 1, minHeight: 0 },
+  monitorStageDiagnostic: { paddingBottom: 0 },
   root: { backgroundColor: ECG_LIVE_MONITOR.background, flex: 1, minHeight: 0 },
-  rootCompact: { minHeight: 480 },
-  subtitle: { color: ECG_LIVE_MONITOR.statusMuted, fontSize: 12, fontWeight: "700" },
-  title: { ...ECG_LIVE_MONITOR_TYPO.title, color: ECG_LIVE_MONITOR.statusText },
+  rootDiagnostic: { backgroundColor: "#000000" },
+  title: { ...ECG_LIVE_MONITOR_TYPO.title, color: ECG_LIVE_MONITOR.statusText, flex: 1, fontSize: 11 },
+  topChrome: { flexShrink: 0 },
 });
