@@ -23,7 +23,7 @@ type SelectedAsset = {
 type WorkflowStage = "idle" | "creating_case" | "uploading" | "preprocessing" | "analyzing" | "reporting" | "complete";
 type PatientMode = "existing" | "new";
 
-const acceptedFormats = ["jpg", "jpeg", "png", "pdf", "json", "csv", "txt"];
+const acceptedFormats = ["jpg", "jpeg", "png", "pdf", "tiff", "tif", "json", "csv", "txt"];
 const processingSteps = ["Auto crop", "Border detection", "Deskew", "Perspective correction", "Contrast enhancement", "Shadow removal", "ECG grid cleanup"];
 
 export default function UploadEcgScreen() {

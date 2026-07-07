@@ -754,9 +754,11 @@ export function EcgMonitorViewerFoundation({
           right={
             diagnosticMode ? null : (
             <EcgClinicalRightPanel
+              accessToken={token ?? undefined}
               aiConfirmed={aiConfirmed}
               aiOverlay={aiOverlay}
               analysis={analysis}
+              caseId={ecgCase.id}
               clinicalNotes={doctorNotes}
               department={ecgCase.patient?.department ?? undefined}
               digitalEcg={digitalEcg}
@@ -767,6 +769,7 @@ export function EcgMonitorViewerFoundation({
               focusTab={rightPanelTab}
               hospital={ecgCase.hospitalName ?? patient.company ?? undefined}
               imageHeight={controls.viewport.imageHeight}
+              imageUrl={imageUrl}
               imageWidth={controls.viewport.imageWidth}
               medicalReport={medicalReport}
               medicalReportLoading={medicalIntelligenceQuery.isLoading || medicalIntelligenceQuery.isFetching}

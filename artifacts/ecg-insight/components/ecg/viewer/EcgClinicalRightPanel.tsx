@@ -8,6 +8,7 @@ import { ECG_SPACING, ECG_TYPOGRAPHY } from "./ecgSpacingTokens";
 import type { AIAnalysisResult, AIExplainability } from "@/services/ai";
 import type { DigitalEcg } from "@/services/ecgProcessing";
 
+import { EcgAcquisitionDigitizationPanel } from "../acquisition/EcgAcquisitionDigitizationPanel";
 import { EcgAiAnnotationInspector } from "./EcgAiAnnotationInspector";
 import { EcgAiCardiologistWorkspace } from "./EcgAiCardiologistWorkspace";
 import { EcgCdssWorkspacePanel } from "./cdss-workspace/EcgCdssWorkspacePanel";
@@ -53,9 +54,10 @@ function PanelSection({ children, id, title }: { children: React.ReactNode; id: 
   );
 }
 
-type ClinicalTab = "measurements" | "ai" | "cdss" | "reports" | "history";
+type ClinicalTab = "acquisition" | "measurements" | "ai" | "cdss" | "reports" | "history";
 
 const TABS: Array<{ id: ClinicalTab; label: string }> = [
+  { id: "acquisition", label: "Acquisition" },
   { id: "measurements", label: "Measurements" },
   { id: "ai", label: "AI Findings" },
   { id: "cdss", label: "CDSS" },
@@ -81,6 +83,9 @@ export const EcgClinicalRightPanel = memo(function EcgClinicalRightPanel({
   imageWidth,
   onCompareStudy,
   onConfirmAi,
+  accessToken,
+  caseId,
+  imageUrl,
   onDigitize,
   onExportPdf,
   onExportPng,
@@ -118,6 +123,9 @@ export const EcgClinicalRightPanel = memo(function EcgClinicalRightPanel({
   medicalReportLoading?: boolean;
   onCompareStudy?: (caseId: string) => void;
   onConfirmAi?: () => void;
+  accessToken?: string;
+  caseId?: string;
+  imageUrl?: string;
   onDigitize?: () => void;
   onExportPdf?: () => void;
   onExportPng?: () => void;
@@ -148,6 +156,19 @@ export const EcgClinicalRightPanel = memo(function EcgClinicalRightPanel({
   useEffect(() => {
     if (focusSection === "notes") setActiveTab("history");
   }, [focusSection]);
+
+  const acquisitionTab = (
+    <View testID="sprint47-acquisition-tab-pane">
+      <EcgAcquisitionDigitizationPanel
+        accessToken={accessToken}
+        caseId={caseId}
+        digitalEcg={digitalEcg}
+        digitalEcgLoading={digitalEcgLoading}
+        imageUrl={imageUrl}
+        onDigitize={onDigitize}
+      />
+    </View>
+  );
 
   const measurementsTab = (
     <View style={styles.measurementsPane} testID="sprint35-measurements-tab-pane">
@@ -221,7 +242,9 @@ export const EcgClinicalRightPanel = memo(function EcgClinicalRightPanel({
   );
 
   const tabContent =
-    activeTab === "measurements"
+    activeTab === "acquisition"
+      ? acquisitionTab
+      : activeTab === "measurements"
       ? measurementsTab
       : activeTab === "ai"
         ? aiTab

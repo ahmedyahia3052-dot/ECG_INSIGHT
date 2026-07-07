@@ -46,7 +46,7 @@ export function EcgDigitizationQualityPanel({
       <Card style={styles.card}>
       <SectionHeader title="Digitization Quality" subtitle="Signal extraction and calibration confidence" />
       <View style={styles.badgeRow}>
-        <Badge label={`Quality ${digitalEcg.quality.score}/100`} tone={digitalEcg.quality.score >= 80 ? "success" : digitalEcg.quality.score >= 55 ? "warning" : "critical"} />
+        <Badge label={digitalEcg.quality.tier ?? `Quality ${digitalEcg.quality.score}/100`} tone={digitalEcg.quality.score >= 80 ? "success" : digitalEcg.quality.score >= 55 ? "warning" : "critical"} />
         <Badge label={`${digitalEcg.leadSegments.length || digitalEcg.leads.length}/12 leads`} tone={(digitalEcg.leadSegments.length || digitalEcg.leads.length) === 12 ? "success" : "warning"} />
         <Badge label={`${digitalEcg.calibration.paperSpeedMmPerSec} mm/s`} tone="primary" />
         <Badge label={`${digitalEcg.calibration.gainMmPerMv} mm/mV`} tone="primary" />
@@ -70,7 +70,7 @@ export function EcgDigitizationQualityPanel({
       ) : null}
       <SectionHeader title="Signal Quality & Warnings" />
       <View style={styles.warningList}>
-        {warnings.map((warning) => (
+        {(digitalEcg.quality.reasons ?? warnings).map((warning) => (
           <Text key={warning} style={styles.warningText}>• {warning}</Text>
         ))}
       </View>

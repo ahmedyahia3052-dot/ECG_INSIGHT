@@ -9,6 +9,12 @@ import {
 } from "../ecg-digitization/export/formats";
 import { buildDigitalSignalObjects } from "../ecg-digitization/signal-engine";
 import { runDigitizationPipeline } from "../ecg-digitization/digitizer";
+import {
+  cancelDigitizationJob,
+  createDigitizationJob,
+  getDigitizationJob,
+  runDigitizationJob,
+} from "../ecg-digitization/jobs/digitization-job-queue";
 import { DIGITIZATION_PIPELINE_VERSION } from "../ecg-digitization/types";
 import type { EcgMetadataOcr, SignalValidationMetrics } from "../ecg-digitization/types";
 import { isPdfEcgFile, isRasterEcgFile } from "../ecg-digitization/image-processing";
@@ -72,6 +78,7 @@ export interface DigitalEcgPayload {
   ecgFileId: string;
   enhancedImageUrl?: string;
   fallbackReason?: string;
+  gridOverlaySvg?: string;
   extractionTimestamp?: string;
   leadSegments: LeadSegment[];
   leads: DigitizedLead[];
@@ -210,6 +217,7 @@ function buildDigitalPayload(input: {
   ecgFileId: string;
   enhancedImageUrl?: string;
   extractionTimestamp?: string;
+  gridOverlaySvg?: string;
   interpretationEngine: EcgClinicalInterpretation;
   leadSegments: LeadSegment[];
   leads: DigitizedLead[];
@@ -498,6 +506,7 @@ export async function getDigitalEcg(caseId: string): Promise<DigitalEcgPayload> 
     measurementEngine,
     ocrMetadata: digitization.ocrMetadata,
     originalImageUrl: fileDownloadUrl(file.id),
+    gridOverlaySvg: digitization.gridOverlaySvg,
     preprocessing: digitization.preprocessing,
     quality: digitization.quality,
     validation: digitization.validation,
@@ -512,6 +521,7 @@ function digitizationMetadata(file: ECGFile): {
   leadSegments: LeadSegment[];
   measurementEngine?: EcgClinicalMeasurementResult;
   ocrMetadata?: EcgMetadataOcr;
+  gridOverlaySvg?: string;
   preprocessing?: DigitizationPreprocessing;
   quality: DigitizationQuality;
   validation?: SignalValidationMetrics;
@@ -521,10 +531,14 @@ function digitizationMetadata(file: ECGFile): {
   const quality = digitization["quality"] && typeof digitization["quality"] === "object"
     ? digitization["quality"] as { score?: unknown; warnings?: unknown }
     : undefined;
+  const artifacts = digitization["artifacts"] && typeof digitization["artifacts"] === "object"
+    ? digitization["artifacts"] as Record<string, unknown>
+    : {};
   return {
     aiDiagnosis: aiDiagnosisFromMetadata(digitization["aiDiagnosis"]),
     calibration: digitization["calibration"] as GridCalibration | undefined,
     extractionTimestamp: typeof digitization["extractionTimestamp"] === "string" ? digitization["extractionTimestamp"] : undefined,
+    gridOverlaySvg: typeof artifacts["gridOverlaySvg"] === "string" ? artifacts["gridOverlaySvg"] : undefined,
     interpretationEngine: interpretationFromMetadata(digitization["interpretationEngine"]),
     leadSegments: Array.isArray(digitization["leadSegments"]) ? digitization["leadSegments"] as LeadSegment[] : [],
     measurementEngine: measurementFromMetadata(digitization["measurementEngine"]),
@@ -533,6 +547,10 @@ function digitizationMetadata(file: ECGFile): {
     quality: {
       score: typeof quality?.score === "number" ? quality.score : typeof metadata["qualityScore"] === "number" ? metadata["qualityScore"] : 0,
       warnings: Array.isArray(quality?.warnings) ? quality.warnings.filter((item): item is string => typeof item === "string") : [],
+      tier: typeof (quality as { tier?: unknown })?.tier === "string" ? (quality as { tier: "Excellent" | "Fair" | "Good" | "Poor" }).tier : undefined,
+      reasons: Array.isArray((quality as { reasons?: unknown })?.reasons)
+        ? ((quality as { reasons: unknown[] }).reasons.filter((item): item is string => typeof item === "string"))
+        : undefined,
     },
     validation: digitization["validation"] as SignalValidationMetrics | undefined,
   };
@@ -555,6 +573,40 @@ export async function getDigitalEcgForFile(fileId: string): Promise<DigitalEcgPa
   const file = await prisma.eCGFile.findUnique({ where: { id: fileId } });
   if (!file?.caseId) throw new AppError(404, "Digitized ECG file not found.", "ECG_FILE_NOT_FOUND");
   return getDigitalEcg(file.caseId);
+}
+
+export async function getGridOverlayForCase(caseId: string) {
+  const digital = await getDigitalEcg(caseId);
+  return {
+    gridOverlaySvg: digital.gridOverlaySvg ?? "",
+    leadSegments: digital.leadSegments,
+    status: digital.status,
+  };
+}
+
+export function enqueueDigitizationJob(caseId: string, actorId: string, override?: Partial<GridCalibration>) {
+  const job = createDigitizationJob(caseId, actorId);
+  void runDigitizationJob(job.id, async ({ isCancelled, setStage }) => {
+    if (isCancelled()) throw new Error("Digitization cancelled.");
+    setStage("preprocess");
+    const digitalEcg = await reconstructCaseEcg(caseId, actorId, override);
+    if (isCancelled()) throw new Error("Digitization cancelled.");
+    setStage("validate");
+    return digitalEcg;
+  });
+  return job;
+}
+
+export function readDigitizationJob(jobId: string) {
+  const job = getDigitizationJob(jobId);
+  if (!job) throw new AppError(404, "Digitization job not found.", "DIGITIZATION_JOB_NOT_FOUND");
+  return job;
+}
+
+export function cancelDigitizationJobById(jobId: string) {
+  const job = cancelDigitizationJob(jobId);
+  if (!job) throw new AppError(404, "Digitization job not found.", "DIGITIZATION_JOB_NOT_FOUND");
+  return job;
 }
 
 export function exportDigitalEcg(payload: DigitalEcgPayload, format: "binary" | "csv" | "json" | "pdf" | "png" | "svg") {

@@ -57,6 +57,29 @@ function scoreImageQualityLocal(metrics: ImageAnalysisMetrics, preprocessingFlag
   return Math.max(0, Math.min(100, Math.round((blur + brightness + contrast) / 3 + preprocessingFlags)));
 }
 
+function applyDeskewRotation(data: Uint8Array | Buffer, width: number, height: number, degrees: number) {
+  if (Math.abs(degrees) < 0.4) return { data, height, width };
+  const radians = (degrees * Math.PI) / 180;
+  const cos = Math.cos(radians);
+  const sin = Math.sin(radians);
+  const cx = width / 2;
+  const cy = height / 2;
+  const output = new Uint8Array(data.length);
+  output.fill(255);
+  for (let y = 0; y < height; y += 1) {
+    for (let x = 0; x < width; x += 1) {
+      const dx = x - cx;
+      const dy = y - cy;
+      const srcX = Math.round(cos * dx + sin * dy + cx);
+      const srcY = Math.round(-sin * dx + cos * dy + cy);
+      if (srcX >= 0 && srcX < width && srcY >= 0 && srcY < height) {
+        output[y * width + x] = data[srcY * width + srcX] ?? 255;
+      }
+    }
+  }
+  return { data: Buffer.from(output), height, width };
+}
+
 function detectBorder(data: Uint8Array, width: number, height: number) {
   const marginX = Math.floor(width * 0.04);
   const marginY = Math.floor(height * 0.04);
@@ -194,6 +217,12 @@ export function preprocessEcgImage(source: ProcessedImageData): {
   const borderDetected = detectBorder(data, width, height);
   const deskewDegrees = estimateDeskew(data, width, height);
   const autoRotationDegrees = Math.abs(deskewDegrees) >= 0.8 ? Number((-deskewDegrees).toFixed(1)) : 0;
+  if (Math.abs(autoRotationDegrees) >= 0.4) {
+    const rotated = applyDeskewRotation(data, width, height, autoRotationDegrees);
+    data = Buffer.from(rotated.data);
+    width = rotated.width;
+    height = rotated.height;
+  }
   const shadowRemoved = metrics.darkRatio > 0.18;
   if (shadowRemoved) data = Buffer.from(enhanceContrast(data));
 

@@ -7,7 +7,7 @@ import { AppError } from "../../middleware/error";
 import { ensureClinicalReportForCase, serializeReport } from "../reports/reports.service";
 import { assertCanRunAnalysis, recordAnalysisUsage } from "../../subscriptions/monetization.service";
 import { assertResourceAccess, canAccessCase, canAccessPatient } from "../../utils/resource-access";
-import { exportDigitalEcg, getDigitalEcg, getDigitizationQuality, reconstructCaseEcg } from "./ecg-digitization.service";
+import { exportDigitalEcg, getDigitalEcg, getDigitizationQuality, getGridOverlayForCase, reconstructCaseEcg, cancelDigitizationJobById, enqueueDigitizationJob, readDigitizationJob } from "./ecg-digitization.service";
 import { measureCaseFromStoredLeads } from "../ecg-measurement";
 import { interpretMeasurementBundle } from "../ecg-interpretation";
 import { analyzeEcgImage, getEcgImageAnalysisResults } from "./ecg-image-analysis.service";
@@ -312,6 +312,53 @@ ecgProcessingRouter.get("/digital/:caseId/export/:format", async (req, res, next
     res.setHeader("content-type", exported.contentType);
     res.setHeader("content-disposition", `attachment; filename="${exported.fileName}"`);
     res.send(exported.data);
+  } catch (error) {
+    next(error);
+  }
+});
+
+ecgProcessingRouter.get("/digital/:caseId/grid-overlay", async (req, res, next) => {
+  try {
+    const caseId = String(req.params.caseId);
+    assertResourceAccess(await canAccessCase(caseId, req.auth!));
+    res.json(await getGridOverlayForCase(caseId));
+  } catch (error) {
+    next(error);
+  }
+});
+
+const digitizationJobSchema = z.object({
+  caseId: z.string().trim().min(1),
+  gainMmPerMv: z.union([z.literal(5), z.literal(10), z.literal(20)]).optional(),
+  paperSpeedMmPerSec: z.union([z.literal(25), z.literal(50)]).optional(),
+});
+
+ecgProcessingRouter.post("/digitization/jobs", requireRole("DOCTOR"), async (req, res, next) => {
+  try {
+    const body = digitizationJobSchema.parse(req.body);
+    const caseId = await resolveCaseId(body.caseId);
+    assertResourceAccess(await canAccessCase(caseId, req.auth!));
+    const job = enqueueDigitizationJob(caseId, req.auth!.id, {
+      gainMmPerMv: body.gainMmPerMv,
+      paperSpeedMmPerSec: body.paperSpeedMmPerSec,
+    });
+    res.status(202).json({ job });
+  } catch (error) {
+    next(error);
+  }
+});
+
+ecgProcessingRouter.get("/digitization/jobs/:jobId", requireRole("DOCTOR"), async (req, res, next) => {
+  try {
+    res.json({ job: readDigitizationJob(String(req.params.jobId)) });
+  } catch (error) {
+    next(error);
+  }
+});
+
+ecgProcessingRouter.delete("/digitization/jobs/:jobId", requireRole("DOCTOR"), async (req, res, next) => {
+  try {
+    res.json({ job: cancelDigitizationJobById(String(req.params.jobId)) });
   } catch (error) {
     next(error);
   }

@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import path from "node:path";
 import type { ECGFile } from "@prisma/client";
 import { decodeEcgImage, isPdfEcgFile, preprocessEcgImage, saveProcessedPreview } from "../image-processing";
 import { detectGrid } from "../grid-detector";
@@ -20,7 +21,9 @@ import {
   type DigitizationPipelineResult,
   type GridCalibration,
 } from "../types";
-import path from "node:path";
+import { detectSmartEcgFeatures } from "../acquisition/smart-ecg-detector";
+import { enrichQualityWithTier } from "../quality-tier";
+import { reconstructDigitizedLeads } from "../signal-reconstruction";
 
 const processedRoot = path.resolve(process.cwd(), "uploads", "processed-ecg");
 
@@ -55,13 +58,26 @@ export async function runEnterpriseDigitizationPipeline(
   } as GridCalibration;
 
   const leadSegments = detectStandardLeadLayout(image.buffer, image.width, image.height, image.metrics);
-  const quality = scoreImageQuality({
+  const smartDetection = detectSmartEcgFeatures(image.buffer, image.width, image.height, image.metrics, preprocessing.borderDetected, preprocessing.deskewDegrees);
+  preprocessing.smartDetection = {
+    autoCropRecommended: smartDetection.autoCropRecommended,
+    backgroundNoiseLevel: smartDetection.backgroundNoiseLevel,
+    foldedPaperLikely: smartDetection.foldedPaperLikely,
+    paperBordersDetected: smartDetection.paperBordersDetected,
+    paperColor: smartDetection.paperColor,
+    perspectiveDistortion: smartDetection.perspectiveDistortion,
+    rotationDegrees: smartDetection.rotationDegrees,
+    shadowDetected: smartDetection.shadowDetected,
+  };
+
+  const qualityRaw = scoreImageQuality({
     calibration,
     fileSizeBytes: file.sizeBytes,
     metrics: image.metrics,
     preprocessing,
     segments: leadSegments,
   });
+  const quality = enrichQualityWithTier(qualityRaw);
 
   if (quality.score < MIN_ACCEPTABLE_QUALITY_SCORE) {
     quality.warnings.push(lowImageQualityError(quality.score).message);
@@ -88,12 +104,20 @@ export async function runEnterpriseDigitizationPipeline(
     };
   });
 
+  const reconstructedLeads = reconstructDigitizedLeads(
+    completeLeads.map((lead) => ({ lead: lead.lead, samples: lead.samples })),
+  );
+  const finalLeads = completeLeads.map((lead) => {
+    const reconstructed = reconstructedLeads.find((item) => item.lead === lead.lead);
+    return reconstructed ? { ...lead, samples: reconstructed.samples } : lead;
+  });
+
   const signalObjects = buildDigitalSignalObjects({
     calibration,
     durationSeconds,
     ecgFileId: file.id,
     leadSegments,
-    leads: completeLeads,
+    leads: finalLeads,
   });
   const validation = validateDigitizedSignals({ calibration, leadSegments, signalObjects });
   if (validation.score < MIN_ACCEPTABLE_VALIDATION_SCORE) {

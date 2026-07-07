@@ -1,6 +1,6 @@
 export const STANDARD_LEADS = ["I", "II", "III", "aVR", "aVL", "aVF", "V1", "V2", "V3", "V4", "V5", "V6"] as const;
 export const DEFAULT_SAMPLING_RATE = 500;
-export const DIGITIZATION_PIPELINE_VERSION = "ecg-digitization-v16.0";
+export const DIGITIZATION_PIPELINE_VERSION = "ecg-digitization-v47.0";
 export const MIN_ACCEPTABLE_QUALITY_SCORE = 50;
 export const MIN_ACCEPTABLE_VALIDATION_SCORE = 55;
 
@@ -52,6 +52,7 @@ export interface DigitizationPreprocessing {
   perspectiveCorrected: boolean;
   processedImagePath?: string;
   shadowRemoved: boolean;
+  smartDetection?: SmartEcgDetectionSnapshot;
 }
 
 export interface DigitizationQuality {
@@ -66,6 +67,19 @@ export interface DigitizationQuality {
     paperVisibility: number;
     resolution: number;
   };
+  reasons?: string[];
+  tier?: "Excellent" | "Fair" | "Good" | "Poor";
+}
+
+export interface SmartEcgDetectionSnapshot {
+  autoCropRecommended: boolean;
+  backgroundNoiseLevel: "high" | "low" | "medium";
+  foldedPaperLikely: boolean;
+  paperBordersDetected: boolean;
+  paperColor: "pink" | "red" | "white" | "unknown";
+  perspectiveDistortion: boolean;
+  rotationDegrees: number;
+  shadowDetected: boolean;
 }
 
 export interface LeadSegment {

@@ -179,6 +179,7 @@ export interface DigitalEcg {
     perspectiveCorrected: boolean;
     shadowRemoved: boolean;
   };
+  gridOverlaySvg?: string;
   ocrMetadata?: {
     gain?: string;
     patientName?: string;
@@ -187,6 +188,8 @@ export interface DigitalEcg {
   quality: {
     score: number;
     warnings: string[];
+    tier?: "Excellent" | "Fair" | "Good" | "Poor";
+    reasons?: string[];
   };
   status: "available" | "fallback";
   validation?: {
@@ -280,4 +283,59 @@ export async function reconstructDigitalECG(
 
 export function digitalECGExportUrl(caseId: string, format: "json" | "pdf" | "png" | "svg") {
   return `/ecg/digital/${caseId}/export/${format}`;
+}
+
+export type DigitizationJobStage =
+  | "cancelled"
+  | "complete"
+  | "decode"
+  | "failed"
+  | "grid"
+  | "leads"
+  | "persist"
+  | "preprocess"
+  | "queued"
+  | "reconstruct"
+  | "validate";
+
+export type DigitizationJobRecord = {
+  actorId: string;
+  cancelRequested: boolean;
+  caseId: string;
+  createdAt: number;
+  error?: string;
+  id: string;
+  progress: number;
+  result?: unknown;
+  stage: DigitizationJobStage;
+  updatedAt: number;
+};
+
+export async function startDigitizationJob(
+  accessToken: string,
+  input: { caseId: string; gainMmPerMv?: 5 | 10 | 20; paperSpeedMmPerSec?: 25 | 50 },
+) {
+  return apiRequest<{ job: DigitizationJobRecord }>("/ecg/digitization/jobs", {
+    accessToken,
+    body: JSON.stringify(input),
+    method: "POST",
+  });
+}
+
+export async function getDigitizationJob(accessToken: string, jobId: string) {
+  return apiRequest<{ job: DigitizationJobRecord }>(`/ecg/digitization/jobs/${jobId}`, { accessToken });
+}
+
+export async function cancelDigitizationJob(accessToken: string, jobId: string) {
+  return apiRequest<{ job: DigitizationJobRecord }>(`/ecg/digitization/jobs/${jobId}`, {
+    accessToken,
+    method: "DELETE",
+  });
+}
+
+export async function getGridOverlay(accessToken: string, caseId: string) {
+  return apiRequest<{ gridOverlaySvg: string; leadSegments: DigitalEcg["leadSegments"]; status: DigitalEcg["status"] }>(
+    `/ecg/digital/${caseId}/grid-overlay`,
+    { accessToken },
+  );
 }
