@@ -312,8 +312,11 @@ export function EcgMonitorViewerFoundation({
   useEffect(() => {
     if (enterprise.viewMode === "measurement") {
       workspace.setToolMode("measurement");
+      if (digitalEcg && controls.viewport.imageWidth > 0 && controls.viewport.imageHeight > 0) {
+        workspace.configureWaveDetection(digitalEcg, workspace.present.activeLead ?? "II");
+      }
     }
-  }, [enterprise.viewMode, workspace]);
+  }, [controls.viewport.imageHeight, controls.viewport.imageWidth, digitalEcg, enterprise.viewMode, workspace]);
 
   const measurementCount = workspace.present.measurements.length;
   const workflow = useClinicalWorkflowEngine({

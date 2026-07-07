@@ -36,6 +36,8 @@ export const integrationScripts = [
   "scripts/sprint32-notification-center.integration.ts",
   "scripts/sprint33-collaboration-platform.integration.ts",
   "scripts/sprint34-cdss.integration.ts",
+  "scripts/sprint34-professional-measurement-engine.integration.ts",
+  "scripts/ecg-wave-detection-bridge.test.ts",
   "scripts/sprint35-longitudinal-ecg.integration.ts",
   "scripts/sprint36-security-hardening.integration.ts",
   "scripts/sprint37-release-candidate.integration.ts",

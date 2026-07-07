@@ -14,6 +14,12 @@ export const AI_ANNOTATION_TYPES = [
   "electrical_axis",
   "t_wave",
   "u_wave",
+  "pvc",
+  "pac",
+  "atrial_fibrillation",
+  "lbbb",
+  "rbbb",
+  "conduction_delay",
   "custom",
 ] as const;
 

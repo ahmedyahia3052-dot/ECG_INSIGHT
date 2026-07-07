@@ -15,14 +15,20 @@ import { DEFAULT_AI_OVERLAY_SETTINGS } from "./aiOverlayTypes";
 const STANDARD_LEADS = ["I", "II", "III", "aVR", "aVL", "aVF", "V1", "V2", "V3", "V4", "V5", "V6"] as const;
 
 const TYPE_LABELS: Record<EcgAiAnnotationType, string> = {
+  atrial_fibrillation: "Atrial Fibrillation",
+  conduction_delay: "Conduction Delay",
   custom: "Custom Finding",
   electrical_axis: "Electrical Axis",
   heart_rate: "Heart Rate",
+  lbbb: "LBBB",
   p_wave: "P Wave",
+  pac: "PAC",
   pr_interval: "PR Interval",
+  pvc: "PVC",
   qrs_complex: "QRS Complex",
   qt_interval: "QT Interval",
   qtc_interval: "QTc Interval",
+  rbbb: "RBBB",
   rhythm: "Rhythm",
   rr_interval: "RR Interval",
   st_segment: "ST Segment",
@@ -161,6 +167,12 @@ function fallbackHighlights(analysis: AIAnalysisResult | null | undefined, ecgCa
 
 function waveTypeForFinding(finding: string): EcgAiAnnotationType {
   const lower = finding.toLowerCase();
+  if (lower.includes("pvc") || lower.includes("premature ventricular")) return "pvc";
+  if (lower.includes("pac") || lower.includes("premature atrial")) return "pac";
+  if (lower.includes("atrial fibrillation") || lower.includes(" af")) return "atrial_fibrillation";
+  if (lower.includes("lbbb") || lower.includes("left bundle")) return "lbbb";
+  if (lower.includes("rbbb") || lower.includes("right bundle")) return "rbbb";
+  if (lower.includes("conduction delay") || lower.includes("av block")) return "conduction_delay";
   if (lower.includes("p wave") || lower.includes("absent p")) return "p_wave";
   if (lower.includes("pr")) return "pr_interval";
   if (lower.includes("qrs") || lower.includes("rbbb") || lower.includes("lbbb")) return "qrs_complex";
@@ -323,6 +335,36 @@ export function buildAiClinicalAnnotations(input: EcgAiOverlayBuildInput): EcgAi
       clinicalMeaning: "QRS axis in the frontal plane",
     }),
   );
+
+  const diagnosisText = `${ecgCase.aiDiagnosis ?? ""} ${analysis?.diagnosis ?? ""}`.toLowerCase();
+  const morphologyOverlays: Array<{ lead: string; label: string; type: EcgAiAnnotationType }> = [
+    { label: "PVC", lead: "V1", type: "pvc" },
+    { label: "PAC", lead: "II", type: "pac" },
+    { label: "AF", lead: "II", type: "atrial_fibrillation" },
+    { label: "LBBB", lead: "V1", type: "lbbb" },
+    { label: "RBBB", lead: "V1", type: "rbbb" },
+    { label: "Conduction Delay", lead: "II", type: "conduction_delay" },
+  ];
+  for (const overlay of morphologyOverlays) {
+    const token = overlay.type === "atrial_fibrillation" ? "fibrillation" : overlay.label.toLowerCase();
+    if (!diagnosisText.includes(token) && overlay.type !== "conduction_delay") continue;
+    if (overlay.type === "conduction_delay" && !diagnosisText.includes("block") && !diagnosisText.includes("delay")) continue;
+    push(
+      measurementAnnotation({
+        confidence: Math.max(confidence - 5, 50),
+        createdBy: operatorName,
+        ecgCase,
+        evidence: [`Morphology engine flagged ${overlay.label}`],
+        imageHeight,
+        imageWidth,
+        lead: overlay.lead,
+        measurement: overlay.label,
+        medicalExplanation: `${overlay.label} pattern annotated for clinical review.`,
+        type: overlay.type,
+        clinicalMeaning: overlay.label,
+      }),
+    );
+  }
 
   const highlights = explainability?.leadHighlights?.length
     ? explainability.leadHighlights

@@ -407,6 +407,27 @@ export function syncWorkspaceMeasurements(
   return dispersion ? [...withoutDispersion, dispersion] : withoutDispersion;
 }
 
+export function summarizeCaliper(
+  caliper: EcgCaliper,
+  controls: { grid: { gain: EcgViewerWorkspaceState["grid"]["gain"]; speed: EcgViewerWorkspaceState["grid"]["speed"]; customCalibration?: boolean; pixelsPerSmallBox?: number } },
+  rrMs?: number,
+) {
+  const spacing = resolveGridSpacing(controls.grid);
+  const deltaPx = deltaPixelsForCaliper(caliper);
+  const readouts = buildReadouts({
+    caliper,
+    deltaPx,
+    gain: controls.grid.gain,
+    kind: caliper.kind,
+    measurementKind: caliper.measurementKind,
+    rrMs,
+    spacing,
+    speed: controls.grid.speed,
+  });
+  const primary = primaryValueForKind(caliper.measurementKind ?? "custom", readouts, caliper.kind);
+  return { primary, readouts };
+}
+
 export function focusTransformForCaliper(
   caliper: EcgCaliper,
   viewport: { containerHeight: number; containerWidth: number; imageHeight: number; imageWidth: number },

@@ -4,11 +4,11 @@ import Svg, { Circle, Ellipse, Line, Path, Rect, Text as SvgText } from "react-n
 
 import { medicalTheme } from "@/components/enterprise/EnterpriseUI";
 
-import { resolveLatestRrMs } from "./ecgMeasurementEngine";
+import { resolveLatestRrMs, summarizeCaliper } from "./ecgMeasurementEngine";
 import { arcPath } from "./ecgCaliperGeometry";
 import { gridSpacingPx, imageDisplayRect, imageToScreen, resolveGridSpacing, screenToImage } from "./ecgCalibrationMath";
+import { pointToSyncedTimestamp, syncTimestampMarkers } from "./ecgMultiLeadSync";
 import type { EcgMeasurementWorkspace } from "./useEcgMeasurementWorkspace";
-import { summarizeCaliper } from "./useEcgMeasurementWorkspace";
 import type { EcgViewerControls } from "./useEcgViewerControls";
 import type { EcgViewerAnnotation, EcgCaliper, ImagePoint } from "./measurementTypes";
 
@@ -149,6 +149,15 @@ export const EcgMeasurementOverlay = memo(function EcgMeasurementOverlay({
   const spacing = resolveGridSpacing(controls.grid);
   const rrMs = resolveLatestRrMs(workspace.present.calipers, spacing, controls.grid.speed);
 
+  useEffect(() => {
+    workspace.setImageDimensions(imageWidth, imageHeight);
+  }, [imageHeight, imageWidth, workspace]);
+
+  const syncMarkers = useMemo(() => {
+    if (workspace.present.syncTimestampMs == null) return [];
+    return syncTimestampMarkers(workspace.present.syncTimestampMs, controls.grid, imageWidth, imageHeight);
+  }, [controls.grid, imageHeight, imageWidth, workspace.present.syncTimestampMs]);
+
   const screenPoint = useCallback(
     (locationX: number, locationY: number) => screenToImage({ x: locationX, y: locationY }, rect, controls.transform),
     [controls.transform, rect],
@@ -201,8 +210,31 @@ export const EcgMeasurementOverlay = memo(function EcgMeasurementOverlay({
   const handlePress = useCallback(
     (locationX: number, locationY: number) => {
       if (controls.isPanActive || workspace.present.toolMode === "pan") return;
-      if (workspace.present.toolMode !== "caliper" && workspace.present.toolMode !== "measurement") return;
       const point = screenPoint(locationX, locationY);
+
+      if (workspace.present.snapSettings.multiLeadSync) {
+        const timestampMs = pointToSyncedTimestamp(point, workspace.present.activeLead ?? "II", controls.grid, imageWidth, imageHeight);
+        workspace.setSyncTimestamp(timestampMs);
+      }
+
+      if (workspace.present.toolMode === "annotation") {
+        const kind = workspace.activeAnnotationKind.current;
+        if (kind === "freehand" || kind === "highlighter") {
+          workspace.appendAnnotationPoint(point);
+          return;
+        }
+        if (!clickAnchorRef.current) {
+          clickAnchorRef.current = point;
+          workspace.beginAnnotation(point);
+          return;
+        }
+        workspace.appendAnnotationPoint(point);
+        workspace.commitDraftAnnotation();
+        clickAnchorRef.current = null;
+        return;
+      }
+
+      if (workspace.present.toolMode !== "caliper" && workspace.present.toolMode !== "measurement") return;
       const kind = workspace.activeCaliperKind.current;
       if (kind === "angle" || kind === "multi") {
         if (!clickAnchorRef.current) {
@@ -223,7 +255,7 @@ export const EcgMeasurementOverlay = memo(function EcgMeasurementOverlay({
       workspace.commitDraftCaliper();
       clickAnchorRef.current = null;
     },
-    [controls.isPanActive, screenPoint, workspace],
+    [controls.grid, controls.isPanActive, imageHeight, imageWidth, screenPoint, workspace],
   );
 
   const onPointerUp = useCallback(() => {
@@ -332,6 +364,22 @@ export const EcgMeasurementOverlay = memo(function EcgMeasurementOverlay({
           />
         ))}
         {draftGraphic}
+        {syncMarkers.map((marker) => {
+          const screen = imageToScreen({ x: marker.x, y: marker.y }, rect, controls.transform);
+          return (
+            <Line
+              key={`sync-${marker.lead}`}
+              opacity={0.55}
+              stroke="#38BDF8"
+              strokeDasharray="3,3"
+              strokeWidth={1}
+              x1={screen.x}
+              x2={screen.x}
+              y1={screen.y - 18}
+              y2={screen.y + 18}
+            />
+          );
+        })}
         {visibleAnnotations.map((annotation) => renderAnnotation(annotation, rect, controls.transform))}
       </Svg>
       </View>

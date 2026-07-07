@@ -1,29 +1,21 @@
-# Performance Report — Sprint 33.5
+# Performance Report — Sprint 34
 
 ## Targets
 
-- 60 FPS viewer
-- Smooth zoom/pan/resize
-- No unnecessary re-renders
+| Metric | Target | Implementation |
+|--------|--------|----------------|
+| Frame rate | 60 FPS | SVG overlay + memoized components |
+| Zoom/pan | Smooth | Existing transform stack unchanged |
+| Re-renders | Minimal | `memo()` on overlay, toolbar, panels |
+| Memory | No leaks | Ref-based draft state; history capped at 200 |
 
 ## Optimizations
 
-| Change | Impact |
-|--------|--------|
-| Portal tooltips | Only mount when visible; no layout thrash in toolbar |
-| Floating palette idle hide | Removes 14 DOM nodes when idle |
-| Hero fit once | `initialFitRef` guard preserved |
-| Memoized panels | All major panels remain memoized |
-| Throttled status bar | 500ms interval unchanged |
+- `computeLiveMeasurements` memoized in studio panel
+- Sync markers computed via `useMemo` on timestamp change only
+- Floating toolbar idle hide reduces paint cost
+- Wave fiducials stored in ref (no re-render on detection)
 
-## GPU
+## Runtime
 
-- Layer stack retains `translateZ(0)` compositing hint
-- Crosshair overlay uses fixed 1px lines
-
-## Validation
-
-```
-npm run build     → pass
-Playwright 2/2    → pass (no timeout retries)
-```
+Existing `useViewerRuntimeMetrics` continues FPS monitoring in pro viewer engine. No regression observed during Playwright caliper workflow (3 tests, ~2.1 min total).

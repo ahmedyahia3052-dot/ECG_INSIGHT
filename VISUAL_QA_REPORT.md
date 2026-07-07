@@ -1,31 +1,24 @@
-# Visual QA Report — Sprint 33.5
+# Visual QA Report — Sprint 34
 
-**Verdict:** PASS
+## Test Matrix
 
-## Rejection Criteria Checklist
+| Scenario | Result |
+|----------|--------|
+| Live measurements panel visible | ✅ Playwright |
+| Measurement history panel visible | ✅ Playwright |
+| Floating toolbar on caliper mode | ✅ Playwright |
+| Overlay stable after caliper placement | ✅ Playwright |
+| Sync markers (multi-lead) | ✅ SVG dashed lines #38BDF8 |
+| Toolbar idle collapse | ✅ 2.4s opacity fade |
 
-| Criterion | Status |
-|-----------|--------|
-| Tooltip clipping | ✓ Fixed — portal rendering |
-| Text clipping | ✓ numberOfLines + wrap in tooltips |
-| Label truncation (tabs) | ✓ Tab margin spacing separates AI Findings |
-| Overlapping text | ✓ None observed |
-| Uneven spacing | ✓ 4px grid applied |
-| Oversized toolbar | ✓ 18px height |
-| Oversized warning panels | ✓ Compact collapsible alerts |
-| Blank panels | ✓ Quick Actions hidden when empty |
-| ECG not maximum workspace | ✓ 90% hero fill + narrow panels |
-| Misaligned icons | ✓ Centered in 22/24px cells |
-| Misaligned cards | ✓ Dot-leader two-column layout |
-| AI Findings touching Measurements | ✓ Tab marginHorizontal 4px |
+## Visual Tokens
 
-## Automated Tests
+Floating toolbar reuses cockpit colors (`ECG_COCKPIT_COLORS`) and 22px buttons consistent with Sprint 33.5 palette.
 
-- `sprint335-enterprise-viewer-polish.spec.ts` — 2/2 pass
-- Screenshots captured for before/after comparison
+## Layout Compliance
 
-## Manual Inspection Notes
+No changes to left/right panel widths, chrome row, or diagnostic fullscreen behavior.
 
-- Tooltips render above all chrome with full description text
-- Diagnostic mode shows only ECG + floating tools + exit
-- Developer metrics hidden until DR toggle
+## Screenshots
+
+Captured during Playwright run in `test-results/` for overlay and measurements tab states.

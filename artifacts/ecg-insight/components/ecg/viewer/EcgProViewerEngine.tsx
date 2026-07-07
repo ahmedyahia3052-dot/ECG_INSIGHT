@@ -8,6 +8,7 @@ import { emitRuntimeEvent } from "@/services/runtimeEvents";
 
 import { EcgAiOverlayLayer, type EcgAiOverlayRegion } from "./EcgAiOverlayLayer";
 import { EcgDigitizedWaveformLayer, type DigitizedWaveformLead } from "./EcgDigitizedWaveformLayer";
+import { EcgMeasurementFloatingToolbar } from "./EcgMeasurementFloatingToolbar";
 import { EcgMeasurementOverlay } from "./EcgMeasurementOverlay";
 import { EcgMiniNavigator } from "./EcgMiniNavigator";
 import { EcgViewerCrosshairOverlay } from "./EcgViewerCrosshairOverlay";
@@ -329,6 +330,11 @@ export const EcgProViewerEngine = memo(function EcgProViewerEngine({
             imageWidth={viewport.imageWidth}
             workspace={workspace}
           />
+          {workspace.present.toolMode === "caliper" ||
+          workspace.present.toolMode === "measurement" ||
+          workspace.present.toolMode === "annotation" ? (
+            <EcgMeasurementFloatingToolbar workspace={workspace} />
+          ) : null}
         </View>
       ) : null}
       {imageUrl && !isPdf && showMiniNavigator && viewport.containerWidth > 0 && viewport.imageWidth > 0 ? (

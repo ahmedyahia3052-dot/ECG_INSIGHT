@@ -1,9 +1,11 @@
-import React, { memo } from "react";
+import React, { memo, useMemo } from "react";
 import { StyleSheet, Text, View } from "react-native";
 
 import { medicalTheme } from "@/components/enterprise/EnterpriseUI";
 import type { DigitalEcg } from "@/services/ecgProcessing";
 
+import { computeLiveMeasurements } from "./ecgLiveMeasurements";
+import { EcgMeasurementHistoryPanel } from "./EcgMeasurementHistoryPanel";
 import { EcgMeasurementsPanel } from "./EcgMeasurementsPanel";
 import type { EcgClinicalFindingsModel } from "./types";
 import type { EcgMeasurementWorkspace } from "./useEcgMeasurementWorkspace";
@@ -38,6 +40,10 @@ export const EcgMeasurementStudioPanel = memo(function EcgMeasurementStudioPanel
   findings: EcgClinicalFindingsModel;
   workspace: EcgMeasurementWorkspace;
 }) {
+  const live = useMemo(
+    () => computeLiveMeasurements(workspace.present.calipers, workspace.present.grid),
+    [workspace.present.calipers, workspace.present.grid, workspace.present.calipers.length],
+  );
   const engine = digitalEcg?.measurementEngine;
   const calibrationConfidence =
     digitalEcg?.calibration?.confidence != null ? `${Math.round(digitalEcg.calibration.confidence * 100)}% engine confidence` : undefined;
@@ -47,6 +53,23 @@ export const EcgMeasurementStudioPanel = memo(function EcgMeasurementStudioPanel
   return (
     <View style={styles.root} testID="sprint30-measurement-studio">
       <Text style={styles.title}>Measurement Studio</Text>
+      <Text style={styles.section}>Live Measurements</Text>
+      <View style={styles.grid} testID="sprint34-live-measurements-panel">
+        <StudioMetric label="Heart Rate" source="Live calipers" value={live.heartRate} />
+        <StudioMetric label="RR" source="Live calipers" value={live.rr} />
+        <StudioMetric label="PR" source="Live calipers" value={live.pr} />
+        <StudioMetric label="QRS" source="Live calipers" value={live.qrs} />
+        <StudioMetric label="QT" source="Live calipers" value={live.qt} />
+        <StudioMetric label="QTc" source="Live calipers" value={live.qtc} />
+        <StudioMetric label="QRS Axis" source="Live calipers" value={live.qrsAxis} />
+        <StudioMetric label="P Axis" source="Live calipers" value={live.pAxis} />
+        <StudioMetric label="T Axis" source="Live calipers" value={live.tAxis} />
+        <StudioMetric label="Voltage" source="Live calipers" value={live.voltage} />
+        <StudioMetric label="Amplitude" source="Live calipers" value={live.amplitude} />
+        <StudioMetric label="ST Elevation" source="Live calipers" value={live.stElevation} />
+        <StudioMetric label="ST Depression" source="Live calipers" value={live.stDepression} />
+      </View>
+      <Text style={styles.section}>Engine Reference</Text>
       <View style={styles.grid}>
         <StudioMetric confidence={calibrationConfidence} label="Heart Rate" source={findings.heartRate.source} value={findings.heartRate.value} />
         <StudioMetric label="PR" source={findings.prInterval.source} value={findings.prInterval.value} />
@@ -62,6 +85,7 @@ export const EcgMeasurementStudioPanel = memo(function EcgMeasurementStudioPanel
       </View>
       <Text style={styles.section}>Manual Correction</Text>
       <EcgMeasurementsPanel workspace={workspace} />
+      <EcgMeasurementHistoryPanel workspace={workspace} />
       <Text style={styles.audit}>Audit history and manual overrides are persisted with auto-save.</Text>
     </View>
   );

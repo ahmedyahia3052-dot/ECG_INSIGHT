@@ -119,6 +119,26 @@ export type EcgViewerAnnotation = {
   updatedAt: string;
 };
 
+export type EcgMeasurementHistoryEntry = {
+  action: "create" | "delete" | "rename" | "restore" | "update";
+  caliperId?: string;
+  doctor: string;
+  id: string;
+  lead?: string;
+  measurementId?: string;
+  measurementType: string;
+  name?: string;
+  timestamp: string;
+  value: string;
+};
+
+export type EcgMeasurementSnapSettings = {
+  multiLeadSync: boolean;
+  snapToBaseline: boolean;
+  snapToGrid: boolean;
+  snapToWave: boolean;
+};
+
 export type EcgViewerWorkspaceState = {
   activeLead?: string;
   activeMeasurementKind?: EcgMeasurementKind;
@@ -126,10 +146,13 @@ export type EcgViewerWorkspaceState = {
   annotations: EcgViewerAnnotation[];
   calipers: EcgCaliper[];
   grid: EcgViewerGridSettings;
+  measurementHistory: EcgMeasurementHistoryEntry[];
   measurements: EcgClinicalMeasurement[];
   selectedAnnotationId: string | null;
   selectedCaliperId: string | null;
   selectedMeasurementId: string | null;
+  snapSettings: EcgMeasurementSnapSettings;
+  syncTimestampMs: number | null;
   toolMode: EcgViewerToolMode;
   transform: EcgViewerTransform;
   adjustments: EcgImageAdjustments;
@@ -195,10 +218,18 @@ export function createWorkspaceState(partial?: Partial<EcgViewerWorkspaceState>)
     annotations: partial?.annotations ?? [],
     calipers: partial?.calipers ?? [],
     grid: partial?.grid ?? { gain: 10, opacity: 0.75, speed: 25, visible: true },
+    measurementHistory: partial?.measurementHistory ?? [],
     measurements: partial?.measurements ?? [],
     selectedAnnotationId: partial?.selectedAnnotationId ?? null,
     selectedCaliperId: partial?.selectedCaliperId ?? null,
     selectedMeasurementId: partial?.selectedMeasurementId ?? null,
+    snapSettings: partial?.snapSettings ?? {
+      multiLeadSync: true,
+      snapToBaseline: true,
+      snapToGrid: true,
+      snapToWave: true,
+    },
+    syncTimestampMs: partial?.syncTimestampMs ?? null,
     toolMode: partial?.toolMode ?? "select",
     transform: partial?.transform ?? { panX: 0, panY: 0, rotation: 0, zoom: 1 },
     version: 5,
