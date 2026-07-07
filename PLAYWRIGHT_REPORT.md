@@ -1,25 +1,28 @@
-# Playwright Report — Sprint 42 Measurement Studio
+# Playwright Report — Sprint 43 Clinical Report Engine
 
 **Date:** 2026-07-07  
-**Spec:** `tests/e2e/sprint42-clinical-measurement-studio.spec.ts`  
-**Tags:** `@sprint42 @enterprise`
+**Spec:** `tests/e2e/sprint43-clinical-report-engine.spec.ts`  
+**Tags:** `@sprint43 @enterprise`
 
 ## Test Coverage
 
 | Test | Verifies |
 |------|----------|
-| workflow presets and enhanced sidebar | `sprint42-measurement-studio-sidebar`, workflow preset buttons |
-| create delete undo redo duplicate | Caliper placement, PR row, duplicate/delete, undo/redo |
-| approve measurement and export formats | Approve button, JSON/CSV/FHIR/XML export buttons |
-| zoom pan consistency and lead switching | Overlay stability after zoom and lead change |
-| floating toolbar crosshair and keyboard | Crosshair tool, M/ESC/Ctrl+Z shortcuts |
+| enterprise report panel renders with report types and themes | Host panel, report body, Hospital PDF / Dark / Landscape, header sections |
+| report sections include measurements differential and confidence | Differential, recommendations, confidence, lead summary, doctor review |
+| export preview controls and JSON export button | Export Preview mode, JSON/FHIR/Print buttons |
+| generate report workflow preserves legacy preview | Generate Report + legacy HTML preview block |
 
 ## Run Command
 
 ```bash
-playwright test tests/e2e/sprint42-clinical-measurement-studio.spec.ts --grep @sprint42
+playwright test tests/e2e/sprint43-clinical-report-engine.spec.ts --grep "@sprint43"
 ```
+
+## Results (2026-07-07)
+
+**4 passed** (2.2m, chromium-desktop, managed API + frontend)
 
 ## Isolation
 
-New spec only — Sprint 13/14/15/34 specs unchanged. No CI pipeline modifications.
+New spec only — no modifications to Sprint 13–42 specs or SAT/regression infrastructure.

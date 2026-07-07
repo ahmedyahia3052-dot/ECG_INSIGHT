@@ -102,6 +102,7 @@ export const integrationScripts = [
   "scripts/enterprise-auth.integration.ts",
   "scripts/auth-production-stabilization.integration.ts",
   "scripts/clinical-workflow.integration.ts",
+  "scripts/sprint43-clinical-report-engine.integration.ts",
 ];
 
 export const releaseE2eSpecs = [

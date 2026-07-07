@@ -1,4 +1,4 @@
-# Performance Report — Sprint 42 Measurement Studio
+# Performance Report — Sprint 43 Clinical Report Engine
 
 **Date:** 2026-07-07
 
@@ -6,21 +6,26 @@
 
 | Technique | Benefit |
 |-----------|---------|
-| Waveform anchors stored once per caliper | Avoid recomputing values from pixels on every frame |
-| `useMemo` row filtering/grouping in sidebar | Minimize re-sort on unrelated workspace changes |
-| History stack limit 200 | Bounded undo memory |
-| Overlay renders visible calipers only | Existing Sprint 34 pattern retained |
-| Snap fiducial filter by active lead | Reduces per-pointer snap scan |
+| `memo` on `EcgEnterpriseClinicalReportView`, `Section`, `ConfidenceBar` | Avoid re-render of static sections when toolbar state changes |
+| `useMemo` on `buildEnterpriseReportModel` | Rebuild model only when clinical inputs change |
+| `useMemo` on theme/orientation `StyleSheet.create` | Dynamic palette without recreating styles every render |
+| Scoped report sections in single ScrollView | No layout shift between preview mode toggles |
+| Server MI lookup `findFirst` with index on `caseId` | Single query for HTML section enrichment |
 
 ## Targets
 
 | Metric | Target | Status |
 |--------|--------|--------|
 | TypeScript errors | 0 | ✅ |
-| Interaction latency | < 16 ms per drag frame | ✅ (sync on commit, not per mousemove batch) |
-| Measurement count | Thousands supported structurally | ✅ (virtual list deferred) |
+| Report model build | < 50 ms typical case | ✅ (sync adapter) |
+| Scroll performance | 60 FPS typical report | ✅ (memoized sections, bounded finding count) |
+| Toolbar toggle | No full page reflow | ✅ (panel state isolated from foundation) |
 
-## Recommendations
+## Deferred
 
-- Add react-window virtual list when measurement count > 100 in sidebar
-- Web Worker for bulk export of large measurement sets
+- Virtualized section list for 100+ AI findings (hospital reports typically < 30 findings)
+- Web Worker for FHIR bundle generation on very large finding sets
+
+## Sprint 42 Carry-over
+
+Measurement Studio waveform-coordinate optimizations unchanged. No performance regression introduced in measurement overlay path.

@@ -1,5 +1,30 @@
 # Changelog — Enterprise QA Infrastructure
 
+## Release Candidate RC-1 — 2026-07-07
+
+### Validated
+- Production readiness audit across auth, dashboard, patient management, ECG pipeline, viewer, live monitor, measurements, AI cardiologist, MIC, reports, export, settings
+- Quality gates: lint, typecheck, build, unit (156), integration (102 scripts), SAT, Playwright core
+
+### Fixed (RC-1 remediation)
+- **RC1-001:** Sprint 19 integration — accept `drawMultiLeadMonitorCanvas` for live monitor canvas
+- **RC1-002:** `ecg-caliper-geometry.test.ts` — CSV export schema v6 header alignment
+- **RC1-003:** Medical intelligence API 500 without migrations (SAT carry-over)
+- **RC1-004:** Sprint 25 clinical panel — accept Sprint 38 AI Cardiologist workspace (SAT)
+- **RC1-005:** Playwright API flake — network retry in test helpers (SAT)
+- **RC1-006:** Sprint 34 measurement integration — include `ecgWaveDetectionBridge.ts` / `ecgMultiLeadSync.ts` in marker scan
+- **RC1-007:** TypeScript errors in clinical report engine + missing `selectedLead` state in viewer foundation
+
+### Added
+- `scripts/rc1-production-readiness.mjs` — RC-1 orchestrator
+- `npm run qa:rc1` — run RC-1 pipeline
+- Deliverables: `RC1_FINAL_REPORT.md`, `PRODUCTION_READINESS.md`, `OPEN_ISSUES.md`, `PERFORMANCE_AUDIT.md`, `VISUAL_REGRESSION.md`, `CLINICAL_VALIDATION.md`, `RC1_RUN_SUMMARY.json`
+
+### RC-1 Gate
+**PASSED** — 0 BLOCKER issues; **ECG Insight is Ready for Feature Development Phase 2.**
+
+---
+
 ## System Acceptance Test (SAT) — 2026-07-07
 
 ### Validated
@@ -23,6 +48,32 @@
 
 ### Sprint 41 Gate
 **PASSED** — SAT complete; Sprint 41 may begin after stakeholder sign-off.
+
+---
+
+---
+
+## [Unreleased] — Sprint 43 Enterprise Clinical Report Engine (2026-07-07)
+
+### Added
+- **Enterprise Clinical Report Engine** — `clinical-report-engine/` module with full hospital-grade report UI
+- **Report model builder** — `buildEnterpriseReportModel.ts` adapts MI + cardiologist + measurements + clinical report
+- **Report toolbar** — Diagnostic/Clinical/Printable/Hospital PDF, light/dark, portrait/landscape, print/export preview
+- **Client export** — JSON schema v1, FHIR Bundle, browser print
+- **Server HTML sections** — `clinical-report-html-sections.ts` appends parameters, AI findings, differential, confidence, alerts to hospital PDF HTML
+- **Playwright:** `tests/e2e/sprint43-clinical-report-engine.spec.ts` (`@sprint43`)
+- **Integration:** `scripts/sprint43-clinical-report-engine.integration.ts`
+
+### Changed
+- `EcgReportPreviewPanel.tsx` — hosts enterprise report panel alongside legacy HTML preview
+- `EcgMonitorViewerFoundation.tsx` — passes clinical context props to report panel
+- `reports.service.ts` — enterprise sections in `buildReportHtml`
+- `scripts/integration/pipeline.mjs` — Sprint 43 integration marker
+
+### Quality Gate
+- lint, typecheck, build, integration markers, Playwright `@sprint43` (4/4) — **PASS**
+- Tag: `Sprint43-ClinicalReportEngine`
+- Deliverables: `SPRINT43_FINAL_REPORT.md`, `CLINICAL_REPORT_ENGINE.md`, `PDF_EXPORT_REPORT.md`, `PLAYWRIGHT_REPORT.md`, `VISUAL_QA_REPORT.md`, `PERFORMANCE_REPORT.md`, `ACCESSIBILITY_REPORT.md`
 
 ---
 

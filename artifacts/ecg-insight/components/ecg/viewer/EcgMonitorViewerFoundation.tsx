@@ -8,7 +8,7 @@ import { patientDisplayName } from "@/components/enterprise/EnterpriseUI";
 import { useAuth } from "@/context/AuthContext";
 import { getAIExplainability, getAIResult, type AIExplainability } from "@/services/ai";
 import { API_URL } from "@/services/api";
-import type { ApiECGCase } from "@/services/clinical";
+import type { ApiECGCase, ApiPatient } from "@/services/clinical";
 import { digitizeECG, getDigitalECG } from "@/services/ecgProcessing";
 import { fetchOrAnalyzeMedicalIntelligence } from "@/services/medicalIntelligence";
 import { listReports } from "@/services/reports";
@@ -70,6 +70,21 @@ export function EcgMonitorViewerFoundation({
   const queryClient = useQueryClient();
   const { authToken, user } = useAuth();
   const token = authToken?.token;
+  const reportPatient: ApiPatient = useMemo(
+    () =>
+      ecgCase.patient ??
+      ({
+        age: patient.age ?? 0,
+        company: patient.company ?? undefined,
+        dateOfBirth: "",
+        firstName: patient.firstName,
+        gender: (patient.gender as ApiPatient["gender"]) ?? "unknown",
+        id: patient.id,
+        lastName: patient.lastName,
+        medicalRecordNumber: patient.id,
+      } satisfies ApiPatient),
+    [ecgCase.patient, patient],
+  );
   const [selectedLead, setSelectedLead] = useState<EcgLeadId>("II");
   const [pointerCoords, setPointerCoords] = useState<{ imageX: number; imageY: number; x: number; y: number } | null>(null);
   const [renderFps, setRenderFps] = useState(60);
@@ -565,9 +580,17 @@ export function EcgMonitorViewerFoundation({
               {enterprise.viewMode === "report" ? (
               <EcgReportPreviewPanel
                 accessToken={token}
+                analysis={analysis ?? null}
                 caseId={ecgCase.id}
                 caseNumber={ecgCase.caseNumber ?? ecgCase.caseId}
+                digitalEcg={digitalEcg}
+                ecgCase={ecgCase}
+                imageUrl={imageUrl}
+                measurements={workspace.present.measurements}
+                medicalReport={medicalReport}
+                patient={reportPatient}
                 patientName={patientDisplayName(patient)}
+                processedImageUrl={processedImageUrl}
               />
             ) : enterprise.viewMode === "ai-review" ? (
               <EcgImageCanvas

@@ -12,6 +12,13 @@ import {
   signReport,
   type ClinicalReport,
 } from "@/services/reports";
+import type { ApiECGCase, ApiPatient } from "@/services/clinical";
+import type { AIAnalysisResult } from "@/services/ai";
+import type { DigitalEcg } from "@/services/ecgProcessing";
+import type { MedicalIntelligenceReport } from "@/services/medicalIntelligence";
+
+import type { EcgClinicalMeasurement } from "./measurementTypes";
+import { EcgEnterpriseClinicalReportPanel } from "./clinical-report-engine/EcgEnterpriseClinicalReportPanel";
 
 function ReportPreviewFrame({ htmlUrl, token }: { htmlUrl: string; token: string }) {
   const [frameSrc, setFrameSrc] = useState<string | null>(null);
@@ -58,14 +65,30 @@ function ReportPreviewFrame({ htmlUrl, token }: { htmlUrl: string; token: string
 
 export const EcgReportPreviewPanel = memo(function EcgReportPreviewPanel({
   accessToken,
+  analysis,
   caseId,
   caseNumber,
+  digitalEcg,
+  ecgCase,
+  imageUrl,
+  measurements = [],
+  medicalReport,
+  patient,
   patientName,
+  processedImageUrl,
 }: {
   accessToken?: string | null;
+  analysis?: AIAnalysisResult | null;
   caseId: string;
   caseNumber?: string;
+  digitalEcg?: DigitalEcg | null;
+  ecgCase?: ApiECGCase;
+  imageUrl?: string;
+  measurements?: EcgClinicalMeasurement[];
+  medicalReport?: MedicalIntelligenceReport | null;
+  patient?: ApiPatient;
   patientName?: string;
+  processedImageUrl?: string;
 }) {
   const queryClient = useQueryClient();
   const [selectedReportId, setSelectedReportId] = useState<string | null>(null);
@@ -183,6 +206,22 @@ export const EcgReportPreviewPanel = memo(function EcgReportPreviewPanel({
         </View>
       )}
 
+      {activeReport && ecgCase && patient ? (
+        <View style={styles.enterpriseBlock} testID="sprint43-enterprise-report-host">
+          <EcgEnterpriseClinicalReportPanel
+            analysis={analysis}
+            clinicalReport={activeReport}
+            digitalEcg={digitalEcg}
+            ecgCase={ecgCase}
+            imageUrl={imageUrl}
+            measurements={measurements}
+            medicalReport={medicalReport}
+            patient={patient}
+            processedImageUrl={processedImageUrl}
+          />
+        </View>
+      ) : null}
+
       {activeReport ? (
         <View style={styles.previewBlock}>
           <View style={styles.metaGrid}>
@@ -214,6 +253,7 @@ function Meta({ label, value }: { label: string; value: string }) {
 }
 
 const styles = StyleSheet.create({
+  enterpriseBlock: { flex: 1, minHeight: 520 },
   empty: { gap: 12, padding: 16 },
   header: { alignItems: "center", flexDirection: "row", flexWrap: "wrap", gap: 12, justifyContent: "space-between" },
   headerActions: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
