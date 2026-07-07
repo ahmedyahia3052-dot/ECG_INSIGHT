@@ -8,11 +8,13 @@ export function useEcgLiveMonitorShortcuts({
   controls,
   enabled = true,
   engine,
+  onDiagnostic,
   onExitMonitor,
 }: {
   controls: EcgViewerControls;
   enabled?: boolean;
   engine: EcgLiveMonitorEngine;
+  onDiagnostic?: () => void;
   onExitMonitor: () => void;
 }) {
   useEffect(() => {
@@ -32,6 +34,11 @@ export function useEcgLiveMonitorShortcuts({
           event.preventDefault();
           engine.setFrozen(!engine.frozen);
           break;
+        case "v":
+        case "V":
+          event.preventDefault();
+          engine.toggleReviewMode();
+          break;
         case "r":
         case "R":
           event.preventDefault();
@@ -42,9 +49,18 @@ export function useEcgLiveMonitorShortcuts({
           event.preventDefault();
           engine.setLoop(!engine.loop);
           break;
+        case "F11":
+          event.preventDefault();
+          onDiagnostic?.();
+          break;
         case "Escape":
           event.preventDefault();
           onExitMonitor();
+          break;
+        case "g":
+        case "G":
+          event.preventDefault();
+          controls.toggleGrid();
           break;
         case "+":
         case "=":
@@ -80,6 +96,18 @@ export function useEcgLiveMonitorShortcuts({
           event.preventDefault();
           engine.jumpToEnd();
           break;
+        case "1":
+          event.preventDefault();
+          engine.setLayoutMode("single");
+          break;
+        case "3":
+          event.preventDefault();
+          engine.setLayoutMode("3-lead");
+          break;
+        case "5":
+          event.preventDefault();
+          engine.setLayoutMode("5-lead");
+          break;
         default:
           break;
       }
@@ -87,5 +115,5 @@ export function useEcgLiveMonitorShortcuts({
 
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [controls, enabled, engine, onExitMonitor]);
+  }, [controls, enabled, engine, onDiagnostic, onExitMonitor]);
 }

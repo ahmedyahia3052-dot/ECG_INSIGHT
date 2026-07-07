@@ -1,26 +1,34 @@
-# Sprint 36 — Responsive Report
+# Responsive Report — Sprint 41 Live Monitor
 
-## Viewports Tested (Playwright)
+**Date:** 2026-07-07
 
-| Resolution | Left rail | Right panel | Toolbar | Status bar | Workflow ribbon |
-|------------|-----------|-------------|---------|------------|-----------------|
-| 1366×768 | Visible | Visible | Visible | Visible | Visible |
-| 1440×900 | Visible | Visible | Visible | Visible | Visible |
-| 1600×900 | Visible | Visible | Visible | Visible | Visible |
-| 1920×1080 | Visible | Visible | Visible | Visible | Visible |
+## Breakpoints
 
-## Layout Guards Validated (Static)
+| Viewport | Behavior |
+|----------|----------|
+| ≥ 900px (desktop) | Full header, alarm bar, toolbar, lead strip, status panel, controls |
+| < 900px (compact) | `rootCompact` min-height; header wraps; horizontal scroll on button groups |
+| Diagnostic mode | Canvas fills stage; floating controls bottom overlay with max-width 960px |
+| Large monitors | Canvas host flex-grow; onLayout drives dynamic canvas dimensions |
 
-- `EcgWorkstationGridShell` — `minmax(0, 1fr)` center column
-- `EcgClinicalRightPanel` — tab labels `numberOfLines={1}`
-- `EcgWorkstationTooltip` — portal rendering (no parent clipping)
-- Pipeline chips / sidebar duplication removed in prior sprints; re-verified present
+## Responsive Patterns
 
-## Issues Found & Fixed
+- **Horizontal ScrollView** on lead strip and control groups prevents button overflow on narrow widths.
+- **flexWrap** on header and alarm bar chips.
+- **minHeight** guards (360px monitor stage, 480px root compact) preserve usable canvas area on tablets.
+- **Floating controls** in diagnostic mode use absolute positioning with safe margins.
 
-- Invalid `nativeID` on web layout nodes (console noise, potential layout engine quirks)
-- Nested buttons in measurement list (invalid HTML on narrow panels)
+## Test Matrix
 
-## Result
+| Device class | Width | Verified |
+|--------------|-------|----------|
+| Desktop | 1920 | Layout spec + manual |
+| Laptop | 1366 | Compact flag at 900px boundary |
+| Tablet | 768 | Scroll + wrap |
+| Large monitor | 2560+ | Flex canvas expansion |
 
-**PASS** — No clipping or overflow failures across tested hospital desktop breakpoints.
+## Accessibility at All Sizes
+
+- Keyboard shortcuts functional regardless of viewport
+- Alarm chips use `accessibilityRole="summary"` and per-chip labels
+- Toolbar uses `accessibilityRole="toolbar"`

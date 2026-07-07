@@ -12,17 +12,20 @@ export const EcgLiveMonitorControls = memo(function EcgLiveMonitorControls({
   engine,
   floating = false,
   onEnterDiagnostic,
+  onResetView,
 }: {
   controls: EcgViewerControls;
   engine: EcgLiveMonitorEngine;
   floating?: boolean;
   onEnterDiagnostic?: () => void;
+  onResetView?: () => void;
 }) {
   return (
     <View style={[styles.root, floating && styles.rootFloating]} testID="sprint37-live-monitor-controls">
       <ControlGroup label="Transport">
         <PrimaryButton label={engine.isPlaying ? "Pause" : "Play"} onPress={engine.togglePlay} variant="primary" />
         <PrimaryButton label={engine.frozen ? "Resume" : "Freeze"} onPress={() => (engine.frozen ? engine.resume() : engine.setFrozen(true))} variant="outline" />
+        <PrimaryButton label={engine.reviewMode ? "Exit Review" : "Review Mode"} onPress={engine.toggleReviewMode} variant={engine.reviewMode ? "primary" : "outline"} />
         <PrimaryButton label={engine.recording ? "Stop Rec" : "Record"} onPress={engine.toggleRecord} variant={engine.recording ? "danger" : "outline"} />
         <PrimaryButton label={engine.loop ? "Loop On" : "Loop Off"} onPress={() => engine.setLoop(!engine.loop)} variant="outline" />
       </ControlGroup>
@@ -35,21 +38,20 @@ export const EcgLiveMonitorControls = memo(function EcgLiveMonitorControls({
         <PrimaryButton label="Beat +" onPress={engine.nextBeat} variant="outline" />
       </ControlGroup>
       <ControlGroup label="Signal">
-        <PrimaryButton label="Speed 25" onPress={() => controls.setGrid((current) => ({ ...current, speed: 25 }))} variant={controls.grid.speed === 25 ? "primary" : "outline"} />
-        <PrimaryButton label="Speed 50" onPress={() => controls.setGrid((current) => ({ ...current, speed: 50 }))} variant={controls.grid.speed === 50 ? "primary" : "outline"} />
-        <PrimaryButton label="Gain 5" onPress={() => controls.setGrid((current) => ({ ...current, gain: 5 }))} variant={controls.grid.gain === 5 ? "primary" : "outline"} />
-        <PrimaryButton label="Gain 10" onPress={() => controls.setGrid((current) => ({ ...current, gain: 10 }))} variant={controls.grid.gain === 10 ? "primary" : "outline"} />
-        <PrimaryButton label="Gain 20" onPress={() => controls.setGrid((current) => ({ ...current, gain: 20 }))} variant={controls.grid.gain === 20 ? "primary" : "outline"} />
+        <PrimaryButton label="Speed 25" onPress={() => { controls.setGrid((c) => ({ ...c, speed: 25 })); engine.setPaperSpeed(25); }} variant={controls.grid.speed === 25 ? "primary" : "outline"} />
+        <PrimaryButton label="Speed 50" onPress={() => { controls.setGrid((c) => ({ ...c, speed: 50 })); engine.setPaperSpeed(50); }} variant={controls.grid.speed === 50 ? "primary" : "outline"} />
+        <PrimaryButton label="Gain 5" onPress={() => controls.setGrid((c) => ({ ...c, gain: 5 }))} variant={controls.grid.gain === 5 ? "primary" : "outline"} />
+        <PrimaryButton label="Gain 10" onPress={() => controls.setGrid((c) => ({ ...c, gain: 10 }))} variant={controls.grid.gain === 10 ? "primary" : "outline"} />
+        <PrimaryButton label="Gain 20" onPress={() => controls.setGrid((c) => ({ ...c, gain: 20 }))} variant={controls.grid.gain === 20 ? "primary" : "outline"} />
         <PrimaryButton label={controls.grid.visible ? "Grid On" : "Grid Off"} onPress={controls.toggleGrid} variant="outline" />
-        <PrimaryButton label="Zoom −" onPress={() => controls.zoomBy(-1)} variant="outline" />
-        <PrimaryButton label="Zoom +" onPress={() => controls.zoomBy(1)} variant="outline" />
+        {onResetView ? <PrimaryButton label="Reset View" onPress={onResetView} variant="outline" /> : null}
       </ControlGroup>
       {onEnterDiagnostic ? (
         <ControlGroup label="Display">
           <PrimaryButton label="Diagnostic Monitor" onPress={onEnterDiagnostic} variant="primary" />
         </ControlGroup>
       ) : null}
-      <Text style={styles.hint}>Space Play · F Freeze · R Record · L Loop · ESC Exit · ± Zoom · Arrows Navigate</Text>
+      <Text style={styles.hint}>Space Play · F Freeze · V Review · R Record · L Loop · ESC Exit · ± Zoom · Arrows Navigate</Text>
     </View>
   );
 });

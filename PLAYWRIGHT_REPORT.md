@@ -1,36 +1,42 @@
-# PLAYWRIGHT_REPORT.md — Sprint 31
+# Playwright Report — Sprint 41 Live Monitor
 
 **Date:** 2026-07-07  
-**Spec:** `tests/e2e/sprint31-clinical-workspace-polish.spec.ts`  
-**Project:** chromium-desktop  
-**Result:** 2/2 passed (29.0s)
+**Spec:** `tests/e2e/sprint41-live-monitor.spec.ts`  
+**Tags:** `@sprint41 @enterprise`
 
-## Tests
+## Test Coverage
 
-| Test | Duration | Status |
-|------|----------|--------|
-| unified clinical panel, compact toolbar, and pipeline chips | 11.7s | Pass |
-| diagnostic fullscreen hides chrome and restores on ESC | 11.5s | Pass |
+| Test | Verifies |
+|------|----------|
+| alarm bar and clinical toolbar are visible | `sprint41-live-monitor-alarm-bar`, toolbar test IDs |
+| play pause freeze resume transport | LIVE → PAUSED → FROZEN → LIVE status transitions |
+| review mode freezes acquisition | REVIEW status + alarm acq chip |
+| gain and sweep speed switching | 25/50 mm/s, 5/20 mm/mV in status panel |
+| 3 5 12 lead layout modes and lead switch | Layout labels + V5 single lead |
+| rhythm strip canvas renders | `sprint41-rhythm-strip-canvas` |
+| fullscreen diagnostic mode | Header hidden, ESC restores |
+| zoom pan reset view and snapshot export | Toolbar interactions + optional PNG download |
 
-## Verified Test IDs
-- `sprint31-unified-clinical-left-panel`
-- `sprint29-zero-chrome-toolbar`
-- `sprint30-clinical-workflow-ribbon`
-- `sprint31-pipeline-1`
-- `sprint30-clinical-right-panel`
-- `sprint29-diagnostic-mode`
-- `sprint29-diagnostic-header`
-- `sprint29-enterprise-status-bar`
+## Prerequisites
 
-## Screenshot
-- `test-results/screenshots/sprint31-workspace-polish.png`
+- Authenticated doctor session
+- Digitized ECG case (fixture created in `beforeAll`)
+- Frontend + API servers running
 
-## Related Passing Suites
-- `sprint24-hospital-workstation-rebuild.spec.ts` (updated for unified panel)
-- Integration: `sprint31-clinical-workspace-polish.integration.ts`
+## Run Command
 
-## Command
-```powershell
-$env:PLAYWRIGHT_REUSE_SERVER='1'
-npx playwright test tests/e2e/sprint31-clinical-workspace-polish.spec.ts --project=chromium-desktop
+```bash
+playwright test tests/e2e/sprint41-live-monitor.spec.ts --grep @sprint41
 ```
+
+## Isolation
+
+- **New spec only** — existing `sprint37-live-monitor.spec.ts` unchanged
+- No modifications to CI pipeline or `playwright.config.ts`
+
+## Test IDs Added (Sprint 41)
+
+- `sprint41-live-monitor-alarm-bar`
+- `sprint41-alarm-hr`, `sprint41-alarm-signal`, `sprint41-alarm-lead`, `sprint41-alarm-noise`, `sprint41-alarm-acq`
+- `sprint41-live-monitor-toolbar`
+- `sprint41-rhythm-strip-host`, `sprint41-rhythm-strip-canvas`

@@ -38,7 +38,9 @@ export const EcgLiveMonitorStatusPanel = memo(function EcgLiveMonitorStatusPanel
       <StatusCell compact={compact} label="RECORD" tone={engine.recording ? "alarm" : "muted"} value={recordLabel} />
       {!compact && fps != null ? <StatusCell label="FPS" tone={fps >= 55 ? "live" : "alarm"} value={`${fps}`} /> : null}
       {!compact ? <StatusCell label="LOOP" value={engine.loop ? "ON" : "OFF"} /> : null}
-      {!compact && engine.rhythmStripMode ? <StatusCell label="MODE" value="RHYTHM STRIP" tone="live" /> : null}
+      {!compact && engine.reviewMode ? <StatusCell label="MODE" value="REVIEW" tone="live" /> : null}
+      {!compact && engine.layoutMode !== "single" ? <StatusCell label="LAYOUT" value={engine.layoutMode.toUpperCase()} tone="live" /> : null}
+      {!compact && engine.rhythmStripMode ? <StatusCell label="STRIP" value={`LEAD ${engine.rhythmStripLead}`} tone="live" /> : null}
     </View>
   );
 });

@@ -1,26 +1,27 @@
-import React, { memo, useEffect, useRef, useState } from "react";
-import { createElement } from "react";
+import React, { memo } from "react";
 import { LayoutChangeEvent, StyleSheet, View } from "react-native";
+import { createElement } from "react";
 
 import type { DigitalEcgLead } from "@/services/ecgProcessing";
 
 import { drawMonitorOverview } from "./ecgMonitorCanvas";
 import { ECG_WORKSTATION_VISUAL } from "./ecgWorkstationVisualTokens";
+import type { EcgGridGain } from "./types";
 
 export const EcgMonitorMiniNavigator = memo(function EcgMonitorMiniNavigator({
-  gainScale,
+  gainMmPerMv,
   lead,
   offsetIndex,
 }: {
-  gainScale: number;
+  gainMmPerMv: EcgGridGain;
   lead: DigitalEcgLead;
   offsetIndex: number;
 }) {
-  const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  const [hostWidth, setHostWidth] = useState(920);
+  const canvasRef = React.useRef<HTMLCanvasElement | null>(null);
+  const [hostWidth, setHostWidth] = React.useState(920);
   const height = ECG_WORKSTATION_VISUAL.miniNavigatorHeight;
 
-  useEffect(() => {
+  React.useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext("2d");
@@ -31,8 +32,8 @@ export const EcgMonitorMiniNavigator = memo(function EcgMonitorMiniNavigator({
     canvas.height = Math.floor(height * dpr);
     canvas.style.width = `${width}px`;
     canvas.style.height = `${height}px`;
-    drawMonitorOverview(ctx, lead, width, height, offsetIndex, gainScale);
-  }, [gainScale, height, hostWidth, lead, offsetIndex]);
+    drawMonitorOverview(ctx, lead, width, height, offsetIndex, gainMmPerMv);
+  }, [gainMmPerMv, height, hostWidth, lead, offsetIndex]);
 
   const onLayout = (event: LayoutChangeEvent) => {
     const { width } = event.nativeEvent.layout;

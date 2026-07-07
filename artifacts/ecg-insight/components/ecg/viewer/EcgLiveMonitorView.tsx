@@ -1,43 +1,50 @@
 import React, { createElement, memo, useEffect, useMemo, useRef, useState } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { PanResponder, Pressable, StyleSheet, Text, View } from "react-native";
 import Svg, { Circle, Line, Path, Rect, Text as SvgText } from "react-native-svg";
 
 import { medicalTheme, PrimaryButton } from "@/components/enterprise/EnterpriseUI";
 import type { DigitalEcgLead } from "@/services/ecgProcessing";
 
-import { drawMonitorCanvas } from "./ecgMonitorCanvas";
+import { drawMultiLeadMonitorCanvas, drawRhythmStripCanvas } from "./ecgMonitorCanvas";
 import { ECG_WORKSTATION_VISUAL } from "./ecgWorkstationVisualTokens";
 import { EcgMonitorMiniNavigator } from "./EcgMonitorMiniNavigator";
 import { buildScrollingMonitorPath, durationMsForLead, msToSampleIndex } from "./ecgMonitorPath";
+import type { MonitorLayoutMode } from "./monitorLayout";
 import type { EcgLeadId } from "./types";
 import type { EcgWaveformPlaybackState } from "./useEcgWaveformPlayback";
 import type { EcgViewerControls } from "./useEcgViewerControls";
 
 const CANVAS_W = 920;
 const CANVAS_H = 280;
+const RHYTHM_STRIP_H = 72;
 
 function WebMonitorCanvas({
   alarmTone,
+  allLeads,
   brightness,
+  canvasRef,
   controls,
-  gainScale,
   height,
-  lead,
+  layoutMode,
   offsetIndex,
   playback,
+  reviewMode,
+  selectedLead,
   width,
 }: {
   alarmTone: boolean;
+  allLeads: DigitalEcgLead[];
   brightness: number;
+  canvasRef: React.RefObject<HTMLCanvasElement | null>;
   controls: EcgViewerControls;
-  gainScale: number;
   height: number;
-  lead: DigitalEcgLead;
+  layoutMode: MonitorLayoutMode;
   offsetIndex: number;
-  playback: EcgWaveformPlaybackState;
+  playback: EcgWaveformPlaybackState & { reviewMode?: boolean };
+  reviewMode: boolean;
+  selectedLead: EcgLeadId;
   width: number;
 }) {
-  const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const offsetRef = useRef(offsetIndex);
   const sizeRef = useRef({ dpr: 0, height: 0, width: 0 });
   offsetRef.current = offsetIndex;
@@ -47,7 +54,7 @@ function WebMonitorCanvas({
     if (!canvas) return undefined;
     let raf = 0;
     const paint = () => {
-      const ctx = canvas.getContext("2d");
+      const ctx = canvas.getContext("2d", { alpha: false, desynchronized: true } as CanvasRenderingContext2DSettings);
       if (!ctx) return;
       const dpr = window.devicePixelRatio || 1;
       if (sizeRef.current.width !== width || sizeRef.current.height !== height || sizeRef.current.dpr !== dpr) {
@@ -57,22 +64,48 @@ function WebMonitorCanvas({
         canvas.style.height = `${height}px`;
         sizeRef.current = { dpr, height, width };
       }
-      drawMonitorCanvas(ctx, lead, width, height, {
+      drawMultiLeadMonitorCanvas(ctx, allLeads, width, height, {
         alarmTone,
         brightness,
         frozen: playback.frozen,
-        gainScale,
+        gainMmPerMv: controls.grid.gain,
+        gridVisible: controls.grid.visible,
         isPlaying: playback.isPlaying,
+        layoutMode,
         offsetIndex: offsetRef.current,
+        panX: controls.transform.panX,
+        panY: controls.transform.panY,
         paperSpeed: controls.grid.speed,
         playheadMs: playback.playheadMs,
-        phosphorPersistence: playback.isPlaying && !playback.frozen ? 0.22 : 1,
+        phosphorPersistence: playback.isPlaying && !playback.frozen && !reviewMode ? 0.2 : 1,
+        reviewMode,
+        selectedLead,
+        zoom: controls.transform.zoom,
       });
       raf = requestAnimationFrame(paint);
     };
     raf = requestAnimationFrame(paint);
     return () => cancelAnimationFrame(raf);
-  }, [alarmTone, brightness, controls.grid.speed, gainScale, height, lead, playback.frozen, playback.isPlaying, playback.playheadMs, width]);
+  }, [
+    alarmTone,
+    allLeads,
+    brightness,
+    canvasRef,
+    controls.grid.gain,
+    controls.grid.speed,
+    controls.grid.visible,
+    controls.transform.panX,
+    controls.transform.panY,
+    controls.transform.zoom,
+    height,
+    layoutMode,
+    playback.frozen,
+    playback.isPlaying,
+    playback.playheadMs,
+    reviewMode,
+    selectedLead,
+    width,
+  ]);
 
   return createElement("canvas", {
     "data-testid": "sprint22-hospital-monitor-canvas",
@@ -81,28 +114,98 @@ function WebMonitorCanvas({
   });
 }
 
+function WebRhythmStripCanvas({
+  alarmTone,
+  controls,
+  lead,
+  offsetIndex,
+  playback,
+  reviewMode,
+  width,
+}: {
+  alarmTone: boolean;
+  controls: EcgViewerControls;
+  lead: DigitalEcgLead;
+  offsetIndex: number;
+  playback: EcgWaveformPlaybackState;
+  reviewMode: boolean;
+  width: number;
+}) {
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const offsetRef = useRef(offsetIndex);
+  offsetRef.current = offsetIndex;
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return undefined;
+    let raf = 0;
+    const paint = () => {
+      const ctx = canvas.getContext("2d", { alpha: false, desynchronized: true } as CanvasRenderingContext2DSettings);
+      if (!ctx) return;
+      const dpr = window.devicePixelRatio || 1;
+      canvas.width = Math.floor(width * dpr);
+      canvas.height = Math.floor(RHYTHM_STRIP_H * dpr);
+      canvas.style.width = `${width}px`;
+      canvas.style.height = `${RHYTHM_STRIP_H}px`;
+      drawRhythmStripCanvas(ctx, lead, width, RHYTHM_STRIP_H, {
+        alarmTone,
+        frozen: playback.frozen,
+        gainMmPerMv: controls.grid.gain,
+        gridVisible: controls.grid.visible,
+        isPlaying: playback.isPlaying,
+        offsetIndex: offsetRef.current,
+        paperSpeed: controls.grid.speed,
+        reviewMode,
+      });
+      raf = requestAnimationFrame(paint);
+    };
+    raf = requestAnimationFrame(paint);
+    return () => cancelAnimationFrame(raf);
+  }, [alarmTone, controls.grid.gain, controls.grid.speed, controls.grid.visible, lead, playback.frozen, playback.isPlaying, reviewMode, width]);
+
+  return createElement("canvas", {
+    "data-testid": "sprint41-rhythm-strip-canvas",
+    ref: canvasRef,
+    style: { display: "block", height: RHYTHM_STRIP_H, width: "100%" },
+  });
+}
+
 export const EcgLiveMonitorView = memo(function EcgLiveMonitorView({
+  allLeads = [],
+  canvasRef: externalCanvasRef,
   chrome = "full",
   controls,
   heartRate,
   isDigitizing,
+  layoutMode = "single",
   lead,
   onDigitize,
   onFpsUpdate,
+  onPanBy,
+  panActive = false,
   playback,
+  reviewMode = false,
   rhythm,
+  rhythmStripLead = "II",
   rhythmStripMode = false,
   selectedLead,
 }: {
+  allLeads?: DigitalEcgLead[];
+  canvasRef?: React.RefObject<HTMLCanvasElement | null>;
   chrome?: "canvas-only" | "full" | "workspace";
   controls: EcgViewerControls;
   heartRate?: number;
   isDigitizing?: boolean;
+  layoutMode?: MonitorLayoutMode;
   lead?: DigitalEcgLead | null;
   onDigitize?: () => void;
   onFpsUpdate?: (fps: number) => void;
+  onPanBy?: (dx: number, dy: number) => void;
+  panActive?: boolean;
   playback: EcgWaveformPlaybackState;
+  reviewMode?: boolean;
   rhythm?: string;
+  rhythmStripLead?: EcgLeadId | string;
   rhythmStripMode?: boolean;
   selectedLead: EcgLeadId;
 }) {
@@ -110,7 +213,19 @@ export const EcgLiveMonitorView = memo(function EcgLiveMonitorView({
   const [canvasSize, setCanvasSize] = useState({ height: CANVAS_H, width: CANVAS_W });
   const [monitorBrightness, setMonitorBrightness] = useState(1);
   const frameTimes = useRef<number[]>([]);
+  const internalCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const canvasRef = externalCanvasRef ?? internalCanvasRef;
   const gainScale = controls.grid.gain / 10;
+
+  const leadsForRender = useMemo(() => {
+    if (allLeads.length) return allLeads;
+    return lead ? [lead] : [];
+  }, [allLeads, lead]);
+
+  const rhythmLeadData = useMemo(
+    () => allLeads.find((l) => l.lead === rhythmStripLead) ?? allLeads.find((l) => l.lead === "II") ?? lead,
+    [allLeads, lead, rhythmStripLead],
+  );
 
   useEffect(() => {
     if (!lead || playback.frozen || !playback.isPlaying) return undefined;
@@ -135,6 +250,15 @@ export const EcgLiveMonitorView = memo(function EcgLiveMonitorView({
     setOffsetIndex(msToSampleIndex(lead, playback.playheadMs));
   }, [lead, playback.playheadMs]);
 
+  const panResponder = useMemo(
+    () =>
+      PanResponder.create({
+        onMoveShouldSetPanResponder: () => panActive,
+        onPanResponderMove: (_event, gesture) => onPanBy?.(gesture.dx, gesture.dy),
+      }),
+    [onPanBy, panActive],
+  );
+
   const path = useMemo(() => {
     if (!lead) return "";
     return buildScrollingMonitorPath(lead, CANVAS_W - 50, CANVAS_H - 40, gainScale, offsetIndex);
@@ -148,7 +272,16 @@ export const EcgLiveMonitorView = memo(function EcgLiveMonitorView({
   const showWorkspaceChrome = chrome === "workspace";
   const canvasOnly = chrome === "canvas-only";
 
-  if (!lead) {
+  const layoutLabel =
+    layoutMode === "single"
+      ? `LEAD ${selectedLead}`
+      : layoutMode === "3-lead"
+        ? "3-LEAD MONITOR"
+        : layoutMode === "5-lead"
+          ? "5-LEAD MONITOR"
+          : "12-LEAD MONITOR";
+
+  if (!lead && !leadsForRender.length) {
     return (
       <View style={styles.empty} testID="sprint18-live-monitor">
         <Text style={styles.emptyTitle}>Live Monitor — Lead {selectedLead}</Text>
@@ -168,14 +301,14 @@ export const EcgLiveMonitorView = memo(function EcgLiveMonitorView({
       {showChrome || showWorkspaceChrome ? (
         <View style={styles.header}>
           <Text style={styles.title}>
-            {rhythmStripMode ? "RHYTHM STRIP · LEAD II" : `HOSPITAL DIGITAL ECG MONITOR · LEAD ${selectedLead}`}
+            {rhythmStripMode ? `RHYTHM STRIP · LEAD ${rhythmStripLead}` : `HOSPITAL DIGITAL ECG MONITOR · ${layoutLabel}`}
           </Text>
           {!showWorkspaceChrome ? (
             <>
               <Text style={[styles.metric, alarmTone && styles.metricAlarm]}>HR {heartRate ?? "--"} BPM</Text>
               <Text style={styles.metric}>{rhythm ?? "Rhythm pending"}</Text>
               <Text style={styles.metric}>{controls.grid.speed} mm/s · {controls.grid.gain} mm/mV</Text>
-              <Text style={styles.metric}>{playback.frozen ? "FROZEN" : playback.isPlaying ? "LIVE" : "PAUSED"}</Text>
+              <Text style={styles.metric}>{reviewMode ? "REVIEW" : playback.frozen ? "FROZEN" : playback.isPlaying ? "LIVE" : "PAUSED"}</Text>
               <PrimaryButton label="Bright+" onPress={() => setMonitorBrightness((value) => Math.min(1.2, Number((value + 0.05).toFixed(2))))} variant="outline" />
               <PrimaryButton label="Bright−" onPress={() => setMonitorBrightness((value) => Math.max(0.65, Number((value - 0.05).toFixed(2))))} variant="outline" />
             </>
@@ -183,60 +316,64 @@ export const EcgLiveMonitorView = memo(function EcgLiveMonitorView({
         </View>
       ) : null}
       <Pressable
+        {...panResponder.panHandlers}
         onLayout={(event) => {
           const { height, width } = event.nativeEvent.layout;
-          if (width > 0 && height > 0) setCanvasSize({ height: Math.max(height, CANVAS_H), width: Math.max(width, 640) });
+          if (width > 0 && height > 0) {
+            const rhythmOffset = rhythmStripMode ? RHYTHM_STRIP_H + 8 : 0;
+            setCanvasSize({ height: Math.max(height - rhythmOffset, CANVAS_H), width: Math.max(width, 640) });
+          }
         }}
-        onPress={playback.togglePlay}
+        onPress={panActive ? undefined : playback.togglePlay}
         style={styles.canvasHost}
       >
         {useWebCanvas ? (
           <WebMonitorCanvas
             alarmTone={alarmTone}
+            allLeads={leadsForRender}
             brightness={monitorBrightness}
+            canvasRef={canvasRef}
             controls={controls}
-            gainScale={gainScale}
             height={canvasSize.height}
-            lead={lead}
+            layoutMode={layoutMode}
             offsetIndex={offsetIndex}
             playback={playback}
+            reviewMode={reviewMode}
+            selectedLead={selectedLead}
             width={canvasSize.width}
           />
         ) : (
           <Svg height={CANVAS_H} viewBox={`0 0 ${CANVAS_W} ${CANVAS_H}`} width="100%">
             <Rect fill="#020617" height={CANVAS_H} width={CANVAS_W} />
-            {Array.from({ length: 19 }).map((_, index) => (
-              <Line key={`v-${index}`} stroke="#064E3B" strokeWidth={0.45} x1={index * 48} x2={index * 48} y1={0} y2={CANVAS_H} />
-            ))}
-            {Array.from({ length: 6 }).map((_, index) => (
-              <Line key={`h-${index}`} stroke="#064E3B" strokeWidth={0.45} x1={0} x2={CANVAS_W} y1={index * 48} y2={index * 48} />
-            ))}
             {path ? <Path d={path} fill="none" stroke={alarmTone ? "#FACC15" : "#22C55E"} strokeLinecap="round" strokeWidth={2.6} transform="translate(30 18)" /> : null}
             <Line stroke="#DCFCE7" strokeOpacity={playback.frozen ? 0.35 : 0.92} strokeWidth={2} x1={sweepX} x2={sweepX} y1={8} y2={CANVAS_H - 8} />
             <Circle cx={sweepX} cy={36} fill={playback.frozen ? "#FACC15" : alarmTone ? "#F87171" : "#22C55E"} r={5} />
             <SvgText fill="#86EFAC" fontSize={12} x={32} y={CANVAS_H - 10}>
-              {playback.frozen ? "FROZEN" : playback.isPlaying ? "LIVE SWEEP" : "PAUSED"} · {Math.round(playback.playheadMs)} ms / {Math.round(durationMsForLead(lead))} ms
+              {playback.frozen ? "FROZEN" : playback.isPlaying ? "LIVE SWEEP" : "PAUSED"}
             </SvgText>
           </Svg>
         )}
       </Pressable>
-      {!canvasOnly ? <EcgMonitorMiniNavigator gainScale={gainScale} lead={lead} offsetIndex={offsetIndex} /> : null}
-      {showChrome ? (
-        <View style={styles.controls}>
-          <PrimaryButton label={playback.isPlaying ? "Pause" : "Play"} onPress={playback.togglePlay} variant="primary" />
-          <PrimaryButton label={playback.frozen ? "Resume" : "Freeze"} onPress={() => playback.setFrozen(!playback.frozen)} variant="outline" />
-          <PrimaryButton label={playback.loop ? "Loop On" : "Loop Off"} onPress={() => playback.setLoop(!playback.loop)} variant="outline" />
-          <PrimaryButton label="Step −" onPress={playback.previousBeat} variant="outline" />
-          <PrimaryButton label="Step +" onPress={playback.nextBeat} variant="outline" />
+      {rhythmStripMode && rhythmLeadData && useWebCanvas ? (
+        <View style={styles.rhythmStripHost} testID="sprint41-rhythm-strip-host">
+          <WebRhythmStripCanvas
+            alarmTone={alarmTone}
+            controls={controls}
+            lead={rhythmLeadData}
+            offsetIndex={offsetIndex}
+            playback={playback}
+            reviewMode={reviewMode}
+            width={canvasSize.width}
+          />
         </View>
       ) : null}
+      {!canvasOnly && lead ? <EcgMonitorMiniNavigator gainMmPerMv={controls.grid.gain} lead={lead} offsetIndex={offsetIndex} /> : null}
     </View>
   );
 });
 
 const styles = StyleSheet.create({
   canvasHost: { borderRadius: 10, flex: 1, minHeight: 280, overflow: "hidden" },
-  controls: { flexDirection: "row", flexWrap: "wrap", gap: 8, paddingTop: 8 },
   empty: {
     alignItems: "center",
     backgroundColor: "#020617",
@@ -254,6 +391,7 @@ const styles = StyleSheet.create({
   header: { alignItems: "center", flexDirection: "row", flexWrap: "wrap", gap: 12, paddingBottom: 8 },
   metric: { color: "#86EFAC", fontSize: 12, fontWeight: "800" },
   metricAlarm: { color: "#FACC15" },
+  rhythmStripHost: { borderTopColor: "#14532D", borderTopWidth: 1, height: RHYTHM_STRIP_H, overflow: "hidden" },
   root: {
     backgroundColor: "#020617",
     borderColor: medicalTheme.border,

@@ -1,83 +1,68 @@
-# Live Monitor Report — Sprint 37
+# Live Monitor Report — Sprint 41
 
-## Overview
+**Module:** Live ECG Monitor  
+**Date:** 2026-07-07
 
-The Live ECG Monitor is a dedicated bedside-style workspace for real-time digitized waveform review. It does **not** replace or embed into the Hospital ECG Review Workstation.
+## Wave Rendering
 
-## Routes
+- **Engine:** `requestAnimationFrame` loop with `desynchronized: true` canvas context for hardware-accelerated 2D compositing on supported browsers.
+- **Sweep:** Phosphor persistence sweep line during live playback; full redraw when frozen, paused, or in review mode.
+- **Multi-lead:** `drawMultiLeadMonitorCanvas` renders 3-, 5-, 12-lead, and single-lead layouts via `monitorLayout.ts` region builders.
+- **Rhythm strip:** Dedicated `drawRhythmStripCanvas` on a secondary canvas below the main monitor.
 
-| Route | Purpose |
-|-------|---------|
-| `/ecg-live-monitor` | Resolver route (caseId/patientId query or demo case) |
-| `/ecg-live-monitor/[caseId]` | Direct case monitor session |
+## Monitor Modes
 
-## UI Surfaces
+| Mode | Leads Displayed |
+|------|-----------------|
+| Single | One selected lead (I–V6) |
+| 3-lead | I, II, III |
+| 5-lead | I, II, III, aVR, V1 |
+| 12-lead | Standard 12-lead grid |
+| Rhythm strip | Continuous Lead II (or selected lead) strip |
 
-### Standard Monitor Layout
-- **Header:** Case ID, patient name, link back to Review Workspace, Diagnostic Monitor entry
-- **Status panel:** HR, rhythm, signal quality, gain, speed, grid, zoom, playback/record state, FPS
-- **Lead strip:** All 12 standard leads + Rhythm Strip mode
-- **Waveform stage:** Dark theme hospital canvas with sweep animation
-- **Transport bar:** Play, pause, freeze, resume, record, loop, jump start/end, frame step, beat step, speed/gain/grid/zoom
+Instant switching via lead strip buttons or keyboard (1, 3, 5).
 
-### Diagnostic Monitor Mode
-Triggered via **Diagnostic Monitor** in the header.
+## Clinical Controls
 
-Hidden:
-- Enterprise sidebar (full-bleed shell)
-- Monitor header, lead strip, bottom transport chrome
+| Control | Values | Implementation |
+|---------|--------|----------------|
+| Paper speed | 25 / 50 mm/s | `ecgMonitorGridMath.playbackRateForPaperSpeed` + grid spacing |
+| Gain | 5 / 10 / 20 mm/mV | `gainScaleFromMmPerMv` in canvas renderer |
+| Grid | On / Off | `controls.grid.visible` wired to canvas |
+| Zoom / Pan | Toolbar + shortcuts | `controls.transform` applied in canvas state |
 
-Visible:
-- Full-stage waveform canvas
-- Compact floating status overlay
-- Floating transport controls
-- ESC exit chip
+## Transport
 
-## Controls Reference
+| Action | UI | Shortcut |
+|--------|-----|----------|
+| Play / Pause | Controls | Space |
+| Freeze / Resume | Controls | F |
+| Review Mode | Controls | V |
+| Record | Controls | R |
+| Loop | Controls | L |
+| Diagnostic fullscreen | Header / F11 | F11 |
+| Exit diagnostic | ESC chip | Escape |
 
-| Control | Action |
-|---------|--------|
-| Play / Pause | Toggle sweep playback |
-| Freeze / Resume | Hold waveform; resume continues sweep |
-| Record | Toggle recording indicator (STBY / REC) |
-| Loop | Loop playhead at end of signal |
-| Jump Start / End | Playhead to 0 ms / duration end |
-| Frame ± | 40 ms step |
-| Beat ± | Beat interval step |
-| Speed 25/50 | Paper speed mm/s |
-| Gain 5/10/20 | mm/mV calibration |
-| Lead buttons | Switch active lead waveform |
-| Rhythm Strip | Lead II wide-strip presentation label |
+## Alarm Bar
 
-## Keyboard Shortcuts
+Real telemetry from digitized ECG and playback engine:
 
-| Key | Action |
-|-----|--------|
-| Space | Play / Pause |
-| F | Freeze toggle |
-| R | Record toggle |
-| L | Loop toggle |
-| ESC | Exit diagnostic mode (or return to review if not in diagnostic) |
-| + / − | Zoom in / out |
-| ← / → | Frame step |
-| ↑ / ↓ | Cycle gain |
-| Home / End | Jump start / end |
+- **HR:** From case analysis; alarm tone when <50 or >120 BPM
+- **Signal:** Continuity % or quality score
+- **Lead off:** Detected when active lead has insufficient samples
+- **Noise:** Derived from quality score (low / medium / high)
+- **Acquisition:** live | paused | frozen | review | no_signal
 
-## Technical Notes
+## Files Changed
 
-- Rendering: HTML canvas + `requestAnimationFrame` via `drawMonitorCanvas`
-- Playback state: `useEcgLiveMonitorEngine` wrapping `useEcgWaveformPlayback`
-- Shortcuts: `useEcgLiveMonitorShortcuts` (web only)
-- Fullscreen: `useEcgDiagnosticMode` with browser fullscreen API
-
-## Test IDs
-
-- `sprint37-live-monitor-workspace-ready`
-- `sprint37-live-monitor-ready`
-- `sprint37-live-monitor-header`
-- `sprint37-live-monitor-status`
-- `sprint37-live-monitor-leads`
-- `sprint37-live-monitor-controls`
-- `sprint37-exit-diagnostic`
-- `sprint37-live-monitor-canvas-host`
-- `sprint22-hospital-monitor-canvas`
+- `EcgLiveMonitorShell.tsx` — orchestration
+- `EcgLiveMonitorView.tsx` — dual canvas host
+- `EcgLiveMonitorControls.tsx` — transport + gain/speed
+- `EcgLiveMonitorLeadStrip.tsx` — layout modes
+- `EcgLiveMonitorAlarmBar.tsx` — alarm chips
+- `EcgLiveMonitorClinicalToolbar.tsx` — zoom/pan/measure/capture
+- `ecgMonitorCanvas.ts` — rendering core
+- `ecgMonitorGridMath.ts` — clinical math
+- `monitorLayout.ts` — lead regions
+- `useEcgLiveMonitorEngine.ts` — layout, review, paper speed
+- `useEcgLiveMonitorShortcuts.ts` — keyboard map
