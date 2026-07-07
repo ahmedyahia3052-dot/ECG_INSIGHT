@@ -41,6 +41,7 @@ import type { CardiologistStructuredFinding } from "./ai-cardiologist/types";
 import type { EcgLeadId, EcgViewerPreviousStudy } from "./types";
 import { STANDARD_ECG_LEADS } from "./types";
 import { useClinicalWorkflowEngine } from "./useClinicalWorkflowEngine";
+import { useExaminationWorkflowEngine } from "./examination-workflow";
 import { useEcgAiOverlayWorkspace } from "./useEcgAiOverlayWorkspace";
 import { useEcgClinicalFindings } from "./useEcgClinicalFindings";
 import { useEcgDiagnosticMode } from "./useEcgDiagnosticMode";
@@ -105,7 +106,7 @@ export function EcgMonitorViewerFoundation({
   const [renderMetrics, setRenderMetrics] = useState<EcgRenderMetrics | null>(null);
   const [exportedArtifact, setExportedArtifact] = useState(false);
   const [unsavedChanges, setUnsavedChanges] = useState(false);
-  const [rightPanelTab, setRightPanelTab] = useState<"patient" | "measurements" | "ai" | "cdss" | "reports" | "history" | undefined>();
+  const [rightPanelTab, setRightPanelTab] = useState<"patient" | "examination" | "acquisition" | "measurements" | "ai" | "cdss" | "reports" | "history" | undefined>();
   const [rightPanelSection, setRightPanelSection] = useState<"notes" | undefined>();
   const [aiConfirmed, setAiConfirmed] = useState(false);
   const [selectedFindingId, setSelectedFindingId] = useState<string | null>(null);
@@ -428,6 +429,19 @@ export function EcgMonitorViewerFoundation({
     onOpenReview: () => router.push(`/ecg-cases/${ecgCase.id}/review` as never),
     onViewModeChange: enterprise.setViewMode,
     reports: caseReports,
+  });
+
+  const examination = useExaminationWorkflowEngine({
+    accessToken: token ?? undefined,
+    analysis,
+    caseId: ecgCase.id,
+    caseRecord: ecgCase,
+    digitalEcg,
+    measurementCount,
+    medicalReport,
+    onFocusTab: (tab) => setRightPanelTab(tab),
+    operatorName,
+    patient,
   });
 
   const enterDiagnosticMode = useCallback(() => {
@@ -763,6 +777,7 @@ export function EcgMonitorViewerFoundation({
               department={ecgCase.patient?.department ?? undefined}
               digitalEcg={digitalEcg}
               digitalEcgLoading={digitalEcgQuery.isLoading || digitizeMutation.isPending}
+              examinationEngine={examination}
               explainability={explainability}
               findings={findings}
               focusSection={rightPanelSection}

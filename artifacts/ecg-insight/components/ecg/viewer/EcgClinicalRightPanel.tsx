@@ -9,6 +9,8 @@ import type { AIAnalysisResult, AIExplainability } from "@/services/ai";
 import type { DigitalEcg } from "@/services/ecgProcessing";
 
 import { EcgAcquisitionDigitizationPanel } from "../acquisition/EcgAcquisitionDigitizationPanel";
+import { EcgExaminationWorkflowPanel } from "./examination-workflow";
+import type { useExaminationWorkflowEngine } from "./examination-workflow/useExaminationWorkflowEngine";
 import { EcgAiAnnotationInspector } from "./EcgAiAnnotationInspector";
 import { EcgAiCardiologistWorkspace } from "./EcgAiCardiologistWorkspace";
 import { EcgCdssWorkspacePanel } from "./cdss-workspace/EcgCdssWorkspacePanel";
@@ -54,9 +56,10 @@ function PanelSection({ children, id, title }: { children: React.ReactNode; id: 
   );
 }
 
-type ClinicalTab = "acquisition" | "measurements" | "ai" | "cdss" | "reports" | "history";
+type ClinicalTab = "examination" | "acquisition" | "measurements" | "ai" | "cdss" | "reports" | "history";
 
 const TABS: Array<{ id: ClinicalTab; label: string }> = [
+  { id: "examination", label: "Examination" },
   { id: "acquisition", label: "Acquisition" },
   { id: "measurements", label: "Measurements" },
   { id: "ai", label: "AI Findings" },
@@ -76,6 +79,7 @@ export const EcgClinicalRightPanel = memo(function EcgClinicalRightPanel({
   digitalEcgLoading,
   explainability,
   findings,
+  examinationEngine,
   focusSection,
   focusTab,
   hospital,
@@ -114,6 +118,7 @@ export const EcgClinicalRightPanel = memo(function EcgClinicalRightPanel({
   digitalEcgLoading?: boolean;
   explainability?: AIExplainability | null;
   findings: EcgClinicalFindingsModel;
+  examinationEngine?: ReturnType<typeof useExaminationWorkflowEngine>;
   focusSection?: "notes";
   focusTab?: ClinicalTab | "patient";
   hospital?: string;
@@ -156,6 +161,12 @@ export const EcgClinicalRightPanel = memo(function EcgClinicalRightPanel({
   useEffect(() => {
     if (focusSection === "notes") setActiveTab("history");
   }, [focusSection]);
+
+  const examinationTab = (
+    <View testID="sprint48-examination-tab-pane">
+      {examinationEngine ? <EcgExaminationWorkflowPanel engine={examinationEngine} /> : null}
+    </View>
+  );
 
   const acquisitionTab = (
     <View testID="sprint47-acquisition-tab-pane">
@@ -242,7 +253,9 @@ export const EcgClinicalRightPanel = memo(function EcgClinicalRightPanel({
   );
 
   const tabContent =
-    activeTab === "acquisition"
+    activeTab === "examination"
+      ? examinationTab
+      : activeTab === "acquisition"
       ? acquisitionTab
       : activeTab === "measurements"
       ? measurementsTab

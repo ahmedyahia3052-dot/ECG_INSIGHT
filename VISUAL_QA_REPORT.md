@@ -1,3 +1,3 @@
-# Visual QA Report — Sprint 47
+# Visual QA Report — Sprint 48
 
-Overlay studio validates original image + digitized waveform alignment with opacity slider and split mode.
+Examination tab validates session badge, 21-step chip grid, timeline entries, QC metrics, doctor review actions, final report preview, and electronic signature block.

@@ -109,6 +109,7 @@ export const integrationScripts = [
   "scripts/sprint46-1-test-infrastructure.integration.ts",
   "scripts/render-engine-2.integration.ts",
   "scripts/sprint47-acquisition-digitization.integration.ts",
+  "scripts/sprint48-hospital-examination-workflow.integration.ts",
 ];
 
 export const releaseE2eSpecs = [

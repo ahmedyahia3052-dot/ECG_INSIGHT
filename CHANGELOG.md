@@ -1,5 +1,33 @@
 # Changelog — Enterprise QA Infrastructure
 
+## Sprint 48 — Hospital ECG Examination Workflow — 2026-07-07
+
+### Added
+- **Examination workflow module** (`examination-workflow/`) — 21-step hospital examination session with lifecycle manager
+- **Session APIs** — `GET/PUT/POST /cases/:caseId/examination/*` (session, advance, quality, findings review, impression, sign)
+- **Timeline** — timestamps, performed actions, responsible user
+- **Quality control** — ECG/signal/lead/noise/baseline scores with auto recommendations
+- **Doctor review mode** — pending/accepted/rejected/modified findings with reason tracking
+- **Final examination report** — clinical history, measurements, AI + doctor findings, e-signature
+- **Examination tab** in clinical right panel (additive)
+- Pipeline version: **examination-workflow-v48.0**
+- Playwright: `tests/e2e/sprint48-hospital-examination-workflow.spec.ts`
+- Integration: `scripts/sprint48-hospital-examination-workflow.integration.ts`
+- Reports: `SPRINT48_FINAL_REPORT.md`, `EXAMINATION_WORKFLOW_REPORT.md`, `SESSION_MANAGER_REPORT.md`, `QUALITY_CONTROL_REPORT.md`, `PERFORMANCE_REPORT.md`, `PLAYWRIGHT_REPORT.md`, `VISUAL_QA_REPORT.md`
+
+### Preserved
+- Live Monitor, Diagnostic Workstation, Measurement Studio, AI Cardiologist, CDSS, Report Engine, Acquisition/Digitization (S47)
+- Existing APIs, database schema, RC-1/SAT compatibility
+
+### Validated
+- `npm run lint` / `typecheck` / `build` — PASS
+- Playwright Sprint 48 (4/4) + Sprint 47 acquisition regression — PASS
+
+### Tag
+- `Sprint48-ExaminationWorkflow`
+
+---
+
 ## Render Engine 2.0 — Hospital Visualization Engine — 2026-07-07
 
 ### Added (visualization only)
