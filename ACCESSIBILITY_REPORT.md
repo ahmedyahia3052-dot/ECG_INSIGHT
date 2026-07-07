@@ -1,4 +1,4 @@
-# Accessibility Report — Sprint 43 Clinical Report Engine
+# Accessibility Report — Sprint 44 CDSS
 
 **Date:** 2026-07-07
 
@@ -6,19 +6,17 @@
 
 | Feature | Location |
 |---------|----------|
-| Section headings | `accessibilityRole="header"` on report section titles |
-| Toolbar buttons | `PrimaryButton` with visible labels (Diagnostic, Clinical, Print, etc.) |
-| Semantic structure | Ordered sections: header → parameters → findings → impression → review |
-| Color contrast (light) | `#0F172A` on `#F8FAFC` — WCAG AA |
-| Color contrast (dark) | `#E2E8F0` on `#0B1220` — WCAG AA |
-| Scroll container | Native `ScrollView` with keyboard-accessible focus on web |
+| Section headings | `accessibilityRole="header"` on all CDSS panels |
+| Tab navigation | CDSS tab uses `accessibilityRole="tab"` via right panel tablist |
+| Triage badge | High-contrast white text on saturated background |
+| Semantic diagnosis cards | Structured title + meta + evidence lists |
+| Report CDSS section | Heading "Clinical Decision Support" with testID for automation |
 
 ## Recommendations (Future)
 
-- Add `accessibilityLabel` on confidence progress bars with percent announced
-- Landmark regions for critical alerts (`accessibilityRole="alert"`)
-- Focus trap in print preview modal if dedicated modal added
+- `accessibilityRole="alert"` on red/black triage badges
+- Announce confidence percentages to screen readers on Risk panel bars
 
 ## Regression
 
-Existing `tests/e2e/accessibility.spec.ts` routes unchanged. Sprint 43 adds no new global routes.
+No changes to global routes or accessibility spec paths.

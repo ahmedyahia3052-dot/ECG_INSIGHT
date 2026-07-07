@@ -112,6 +112,7 @@ export type EnterpriseDoctorReview = {
 
 export type EnterpriseClinicalReportModel = {
   aiFindings: EnterpriseAiFinding[];
+  clinicalDecision?: import("../cdss-workspace/types").EnterpriseClinicalDecisionSection;
   clinicalImpression: string[];
   confidence: EnterpriseConfidenceMetric[];
   criticalAlerts: EnterpriseCriticalAlert[];

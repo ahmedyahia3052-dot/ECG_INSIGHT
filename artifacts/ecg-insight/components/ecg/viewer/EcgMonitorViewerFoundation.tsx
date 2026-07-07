@@ -100,7 +100,7 @@ export function EcgMonitorViewerFoundation({
   const [renderMetrics, setRenderMetrics] = useState<EcgRenderMetrics | null>(null);
   const [exportedArtifact, setExportedArtifact] = useState(false);
   const [unsavedChanges, setUnsavedChanges] = useState(false);
-  const [rightPanelTab, setRightPanelTab] = useState<"patient" | "measurements" | "ai" | "reports" | "history" | undefined>();
+  const [rightPanelTab, setRightPanelTab] = useState<"patient" | "measurements" | "ai" | "cdss" | "reports" | "history" | undefined>();
   const [rightPanelSection, setRightPanelSection] = useState<"notes" | undefined>();
   const [aiConfirmed, setAiConfirmed] = useState(false);
   const [selectedFindingId, setSelectedFindingId] = useState<string | null>(null);

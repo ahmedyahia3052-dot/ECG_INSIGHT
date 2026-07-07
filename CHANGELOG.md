@@ -14,6 +14,7 @@
 - **RC1-005:** Playwright API flake — network retry in test helpers (SAT)
 - **RC1-006:** Sprint 34 measurement integration — include `ecgWaveDetectionBridge.ts` / `ecgMultiLeadSync.ts` in marker scan
 - **RC1-007:** TypeScript errors in clinical report engine + missing `selectedLead` state in viewer foundation
+- **RC1-008:** Sprint 22 integration — accept `drawClinicalGrid` rename for hospital monitor canvas
 
 ### Added
 - `scripts/rc1-production-readiness.mjs` — RC-1 orchestrator
@@ -50,6 +51,33 @@
 **PASSED** — SAT complete; Sprint 41 may begin after stakeholder sign-off.
 
 ---
+
+---
+
+---
+
+## [Unreleased] — Sprint 44 Clinical Decision Support Engine (2026-07-07)
+
+### Added
+- **CDSS workspace module** — `cdss-workspace/` with deterministic 31-rule clinical engine
+- **Explainable diagnoses** — leads, measurements, morphology, axis, rhythm, reasoning per rule
+- **Severity & triage** — Normal → Life Threatening with Green/Yellow/Orange/Red/Black badge
+- **Guideline engine** — ACC/AHA, ESC, Universal Definition of MI references
+- **Finding relationship graph** — measurements → findings → diagnosis → recommendations
+- **Clinical Decision Workspace** — CDSS tab in ECG Monitor right panel
+- **Report integration** — Clinical Decision Support section in Sprint 43 enterprise reports
+- **Playwright:** `tests/e2e/sprint44-cdss-workspace.spec.ts` (`@sprint44`)
+- **Integration:** `scripts/sprint44-cdss-workspace.integration.ts`
+
+### Changed (Additive)
+- `EcgClinicalRightPanel.tsx` — CDSS tab
+- `clinical-report-engine/*` — optional `clinicalDecision` report section
+- `scripts/integration/pipeline.mjs` — Sprint 44 markers
+
+### Quality Gate
+- lint, typecheck, build, integration markers, Playwright `@sprint44` (4/4), Sprint 43 regression (4/4) — **PASS**
+- Tag: `Sprint44-ClinicalDecisionSupport`
+- Deliverables: `SPRINT44_FINAL_REPORT.md`, `CDSS_ENGINE_REPORT.md`, `RULE_ENGINE_REPORT.md`, `GUIDELINE_ENGINE_REPORT.md`, `CLINICAL_REASONING_REPORT.md`, `PLAYWRIGHT_REPORT.md`, `VISUAL_QA_REPORT.md`, `PERFORMANCE_REPORT.md`, `ACCESSIBILITY_REPORT.md`
 
 ---
 

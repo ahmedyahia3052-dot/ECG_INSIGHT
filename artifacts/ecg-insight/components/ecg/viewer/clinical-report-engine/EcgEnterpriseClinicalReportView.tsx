@@ -134,6 +134,26 @@ export const EcgEnterpriseClinicalReportView = memo(function EcgEnterpriseClinic
           ))}
         </Section>
 
+        {model.clinicalDecision ? (
+          <Section title="Clinical Decision Support">
+            <Text style={[dynamic.text, styles.impressionLine]} testID="sprint44-report-clinical-decision">
+              {model.clinicalDecision.triageLabel}
+            </Text>
+            <Text style={dynamic.text}>{model.clinicalDecision.assessment.finalDiagnosis}</Text>
+            <Text style={dynamic.muted}>{model.clinicalDecision.assessment.reasoning}</Text>
+            {model.clinicalDecision.primaryDiagnosis ? (
+              <>
+                <Text style={[dynamic.text, styles.recAction]}>{model.clinicalDecision.primaryDiagnosis.diagnosis} · {model.clinicalDecision.primaryDiagnosis.confidence}%</Text>
+                <Text style={dynamic.muted}>Evidence: {model.clinicalDecision.primaryDiagnosis.evidence.morphology.join("; ")}</Text>
+              </>
+            ) : null}
+            {model.clinicalDecision.recommendations.slice(0, 4).map((rec) => (
+              <Text key={rec.action} style={dynamic.muted}>{rec.action} — {rec.rationale}</Text>
+            ))}
+            <Text style={dynamic.muted}>{model.clinicalDecision.relationshipSummary}</Text>
+          </Section>
+        ) : null}
+
         <Section title="Differential Diagnosis">
           {model.differential.map((row) => (
             <View key={`${row.diagnosis}-${row.probability}`} style={[styles.card, dynamic.section]}>

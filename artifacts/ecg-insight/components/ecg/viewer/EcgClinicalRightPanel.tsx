@@ -10,6 +10,7 @@ import type { DigitalEcg } from "@/services/ecgProcessing";
 
 import { EcgAiAnnotationInspector } from "./EcgAiAnnotationInspector";
 import { EcgAiCardiologistWorkspace } from "./EcgAiCardiologistWorkspace";
+import { EcgCdssWorkspacePanel } from "./cdss-workspace/EcgCdssWorkspacePanel";
 import { EcgClinicalCard } from "./EcgClinicalCard";
 import { EcgHistoryEnginePanel } from "./EcgHistoryEnginePanel";
 import { EcgMeasurementStudioPanel } from "./EcgMeasurementStudioPanel";
@@ -52,11 +53,12 @@ function PanelSection({ children, id, title }: { children: React.ReactNode; id: 
   );
 }
 
-type ClinicalTab = "measurements" | "ai" | "reports" | "history";
+type ClinicalTab = "measurements" | "ai" | "cdss" | "reports" | "history";
 
 const TABS: Array<{ id: ClinicalTab; label: string }> = [
   { id: "measurements", label: "Measurements" },
   { id: "ai", label: "AI Findings" },
+  { id: "cdss", label: "CDSS" },
   { id: "reports", label: "Reports" },
   { id: "history", label: "History" },
 ];
@@ -173,6 +175,18 @@ export const EcgClinicalRightPanel = memo(function EcgClinicalRightPanel({
     </View>
   );
 
+  const cdssTab = (
+    <View style={styles.aiPane} testID="sprint44-cdss-tab-pane">
+      <EcgCdssWorkspacePanel
+        analysis={analysis}
+        digitalEcg={digitalEcg}
+        explainability={explainability}
+        measurements={workspace.present.measurements}
+        medicalReport={medicalReport}
+      />
+    </View>
+  );
+
   const reportsTab = (
     <>
       <PanelSection id="export" title="Export">
@@ -211,9 +225,11 @@ export const EcgClinicalRightPanel = memo(function EcgClinicalRightPanel({
       ? measurementsTab
       : activeTab === "ai"
         ? aiTab
-        : activeTab === "reports"
-          ? reportsTab
-          : historyTab;
+        : activeTab === "cdss"
+          ? cdssTab
+          : activeTab === "reports"
+            ? reportsTab
+            : historyTab;
 
   return (
     <View style={styles.fill} testID="sprint35-clinical-right-panel" nativeID="sprint25-clinical-right-panel">

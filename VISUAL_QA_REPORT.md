@@ -1,30 +1,20 @@
-# Visual QA Report — Sprint 43 Clinical Report Engine
+# Visual QA Report — Sprint 44 CDSS Workspace
 
 **Date:** 2026-07-07
-
-## Scope
-
-Enterprise clinical report layout in ECG Monitor Report Preview mode.
 
 ## Checks
 
 | Check | Result | Notes |
 |-------|--------|-------|
-| Patient header grid alignment | PASS | Two-column KV grid, no clipping at 820px portrait |
-| Section spacing | PASS | Consistent 12–16px padding per section card |
-| Typography hierarchy | PASS | Section titles uppercase accent; body 13px clinical |
-| Dark theme contrast | PASS | `#0B1220` page, `#E2E8F0` text, accent `#38BDF8` |
-| Landscape width | PASS | `maxWidth: 1120` without horizontal overflow |
-| Confidence progress bars | PASS | Track + fill + percent label aligned |
-| Critical alert cards | PASS | Red-tinted background, bordered cards |
-| ECG snapshot images | PASS | `object-fit: contain`, bounded height |
-| Toolbar wrap | PASS | Flex wrap on narrow viewports |
-| Legacy HTML iframe preview | PASS | Coexists below enterprise panel |
+| CDSS tab in right panel | PASS | 5-tab layout, no clipping |
+| Triage badge contrast | PASS | Color-coded green/yellow/orange/red/black on white text |
+| Section card spacing | PASS | Consistent 10px padding, bordered cards |
+| Diagnosis evidence cards | PASS | Lead/measurement/morphology lists readable at 11–13px |
+| Confidence bars in Risk panel | PASS | Track + fill aligned |
+| Relationship graph edges | PASS | Truncated to 12 edges for readability |
+| Report CDSS section | PASS | Appears after Clinical Impression, before Differential |
+| Sprint 43 report sections | PASS | No layout regression |
 
-## Playwright Visual Assertions
+## Playwright Scoping
 
-Scoped to `sprint43-enterprise-clinical-report` testID to avoid collision with clinical tab labels (e.g. "AI Findings" in right rail).
-
-## Outstanding
-
-- Formal pixel-diff baselines not added (Sprint 43 uses structural/heading assertions per enterprise QA convention for new modules).
+Report and workspace assertions scoped to `sprint44-*` and `sprint43-enterprise-clinical-report` testIDs.

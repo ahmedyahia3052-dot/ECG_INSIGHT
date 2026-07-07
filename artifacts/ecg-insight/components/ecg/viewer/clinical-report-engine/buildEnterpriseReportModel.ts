@@ -6,6 +6,7 @@ import type { DigitalEcg } from "@/services/ecgProcessing";
 import type { AIAnalysisResult, AIExplainability } from "@/services/ai";
 import { buildCardiologistModel } from "../ai-cardiologist/buildCardiologistModel";
 import type { CardiologistWorkspaceModel } from "../ai-cardiologist/types";
+import { buildCdssWorkspaceModel, buildEnterpriseClinicalDecisionSection } from "../cdss-workspace/buildCdssWorkspaceModel";
 import { STANDARD_ECG_LEADS } from "../types";
 import type { EcgClinicalMeasurement } from "../measurementTypes";
 import type {
@@ -160,8 +161,18 @@ export function buildEnterpriseReportModel(input: {
 
   const uniqueImpression = [...new Set(impressionLines.map((line) => line.trim()).filter(Boolean))];
 
+  const cdssModel = buildCdssWorkspaceModel({
+    analysis: input.analysis,
+    digitalEcg: input.digitalEcg,
+    explainability: input.explainability,
+    measurements: manualMeasurements,
+    medicalReport: input.medicalReport,
+  });
+  const clinicalDecision = buildEnterpriseClinicalDecisionSection(cdssModel);
+
   return {
     aiFindings,
+    clinicalDecision,
     clinicalImpression: uniqueImpression.length ? uniqueImpression : ["Pending structured clinical impression."],
     confidence: [
       { label: "Image Confidence", percent: model.confidence.imageQuality.includes("%") ? parseInt(model.confidence.imageQuality, 10) || 0 : 75 },
