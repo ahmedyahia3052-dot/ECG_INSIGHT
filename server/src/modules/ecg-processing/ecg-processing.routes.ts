@@ -8,7 +8,16 @@ import { ensureClinicalReportForCase, serializeReport } from "../reports/reports
 import { assertCanRunAnalysis, recordAnalysisUsage } from "../../subscriptions/monetization.service";
 import { assertResourceAccess, canAccessCase, canAccessPatient } from "../../utils/resource-access";
 import { exportDigitalEcg, getDigitalEcg, getDigitizationQuality, getGridOverlayForCase, reconstructCaseEcg, cancelDigitizationJobById, enqueueDigitizationJob, readDigitizationJob } from "./ecg-digitization.service";
-import { measureCaseFromStoredLeads } from "../ecg-measurement";
+import {
+  compareMeasurements,
+  computeMeasurementTrend,
+  exportMeasurementPayload,
+  getLiveMeasurementSnapshot,
+  getMeasurementHistory,
+} from "../ecg-diagnostic-engine";
+import { diagnosticPipelineFromStoredLeads, measureCaseFromStoredLeads } from "../ecg-measurement";
+import { runMeasurementEngine, type EcgMeasurementEngineResult } from "../ecg-measurement-engine";
+import type { DigitizedLead, GridCalibration } from "../ecg-digitization/types";
 import { interpretMeasurementBundle } from "../ecg-interpretation";
 import { analyzeEcgImage, getEcgImageAnalysisResults } from "./ecg-image-analysis.service";
 import {
@@ -39,6 +48,43 @@ ecgProcessingRouter.get("/measurements/:caseId", async (req, res, next) => {
       clinicalMeasurements: clinical,
       measurement: measurement ? serializeMeasurement(measurement) : null,
     });
+  } catch (error) {
+    next(error);
+  }
+});
+
+async function loadStoredCaseLeads(caseId: string): Promise<{ calibration: GridCalibration; leads: DigitizedLead[] } | null> {
+  const file = await prisma.eCGFile.findFirst({ orderBy: { createdAt: "desc" }, where: { caseId } });
+  if (!file) return null;
+  const leads = await prisma.eCGLeadSignal.findMany({ orderBy: { leadName: "asc" }, where: { ecgFileId: file.id } });
+  if (!leads.length) return null;
+  const calibration: GridCalibration = {
+    confidence: 0.5,
+    gainMmPerMv: (leads[0]?.gain ?? 10) as 5 | 10 | 20,
+    gridDetected: true,
+    paperSpeedMmPerSec: (leads[0]?.paperSpeed ?? 25) as 25 | 50,
+  };
+  return {
+    calibration,
+    leads: leads.map((lead) => ({
+      durationSeconds: lead.duration,
+      lead: lead.leadName,
+      samples: lead.signalData,
+      samplingRate: lead.samplingRate,
+    })),
+  };
+}
+
+ecgProcessingRouter.get("/measurement-engine/:caseId", requireRole("DOCTOR"), async (req, res, next) => {
+  try {
+    const caseId = String(req.params.caseId);
+    const ecgCase = await prisma.eCGCase.findUnique({ where: { id: caseId } });
+    if (!ecgCase) throw new AppError(404, "ECG case not found.", "CASE_NOT_FOUND");
+    assertResourceAccess(await canAccessCase(ecgCase.id, req.auth!));
+    const loaded = await loadStoredCaseLeads(caseId);
+    if (!loaded) throw new AppError(404, "Digitized leads not found for case.", "LEADS_NOT_FOUND");
+    const result: EcgMeasurementEngineResult = runMeasurementEngine(loaded);
+    res.json(result);
   } catch (error) {
     next(error);
   }
@@ -359,6 +405,82 @@ ecgProcessingRouter.get("/digitization/jobs/:jobId", requireRole("DOCTOR"), asyn
 ecgProcessingRouter.delete("/digitization/jobs/:jobId", requireRole("DOCTOR"), async (req, res, next) => {
   try {
     res.json({ job: cancelDigitizationJobById(String(req.params.jobId)) });
+  } catch (error) {
+    next(error);
+  }
+});
+
+ecgProcessingRouter.get("/diagnostic/:caseId", requireRole("DOCTOR"), async (req, res, next) => {
+  try {
+    const caseId = await resolveCaseId(String(req.params.caseId));
+    assertResourceAccess(await canAccessCase(caseId, req.auth!));
+    const pipeline = await diagnosticPipelineFromStoredLeads(caseId);
+    if (!pipeline) {
+      res.status(404).json({ error: "No digitized leads available for diagnostic analysis." });
+      return;
+    }
+    res.json({
+      clinicalDisclaimer: "Automated diagnostic engine output requires physician verification.",
+      diagnosticEngine: pipeline,
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+ecgProcessingRouter.get("/measurement-studio/:caseId/live", async (req, res, next) => {
+  try {
+    const caseId = await resolveCaseId(String(req.params.caseId));
+    assertResourceAccess(await canAccessCase(caseId, req.auth!));
+    await diagnosticPipelineFromStoredLeads(caseId);
+    res.json({ snapshot: getLiveMeasurementSnapshot(caseId) });
+  } catch (error) {
+    next(error);
+  }
+});
+
+ecgProcessingRouter.get("/measurement-studio/:caseId/history", async (req, res, next) => {
+  try {
+    const caseId = await resolveCaseId(String(req.params.caseId));
+    assertResourceAccess(await canAccessCase(caseId, req.auth!));
+    res.json({ history: getMeasurementHistory(caseId) });
+  } catch (error) {
+    next(error);
+  }
+});
+
+ecgProcessingRouter.get("/measurement-studio/:caseId/export", requireRole("DOCTOR"), async (req, res, next) => {
+  try {
+    const caseId = await resolveCaseId(String(req.params.caseId));
+    assertResourceAccess(await canAccessCase(caseId, req.auth!));
+    const pipeline = await diagnosticPipelineFromStoredLeads(caseId);
+    if (!pipeline) {
+      res.status(404).json({ error: "No measurements available for export." });
+      return;
+    }
+    res.json({ export: exportMeasurementPayload(caseId, pipeline) });
+  } catch (error) {
+    next(error);
+  }
+});
+
+ecgProcessingRouter.get("/measurement-studio/:caseId/compare", async (req, res, next) => {
+  try {
+    const caseId = await resolveCaseId(String(req.params.caseId));
+    assertResourceAccess(await canAccessCase(caseId, req.auth!));
+    const comparison = compareMeasurements(caseId);
+    res.json({ comparison });
+  } catch (error) {
+    next(error);
+  }
+});
+
+ecgProcessingRouter.get("/measurement-studio/:caseId/trend/:metric", async (req, res, next) => {
+  try {
+    const caseId = await resolveCaseId(String(req.params.caseId));
+    assertResourceAccess(await canAccessCase(caseId, req.auth!));
+    const metric = String(req.params.metric) as keyof import("../ecg-diagnostic-engine").EnterpriseMeasurementBundle;
+    res.json({ trend: computeMeasurementTrend(caseId, metric) });
   } catch (error) {
     next(error);
   }

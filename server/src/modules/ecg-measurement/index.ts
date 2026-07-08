@@ -1,6 +1,11 @@
 import type { Prisma } from "@prisma/client";
 import { prisma } from "../../config/prisma";
 import type { DigitizedLead, GridCalibration } from "../ecg-digitization/types";
+import {
+  recordMeasurementSnapshot,
+  runDiagnosticPipelineSync,
+  type DiagnosticPipelineResult,
+} from "../ecg-diagnostic-engine";
 import { measureFromLeads, serializeMeasurementSummary } from "./engine";
 import type { EcgClinicalMeasurementResult } from "./types";
 
@@ -8,6 +13,8 @@ export type { EcgClinicalMeasurementResult, EcgMeasurementItem, MeasurementHighl
 export { measureFromLeads, emptyMeasurementResult, serializeMeasurementSummary } from "./engine";
 
 export async function persistCaseMeasurement(caseId: string, leads: DigitizedLead[], calibration: GridCalibration) {
+  const pipeline = runDiagnosticPipelineSync({ calibration, leads });
+  recordMeasurementSnapshot(caseId, pipeline);
   const clinical = measureFromLeads({ calibration, leads });
   await prisma.eCGMeasurement.create({
     data: {
@@ -71,4 +78,34 @@ export async function measureCaseFromStoredLeads(caseId: string): Promise<EcgCli
       samplingRate: lead.samplingRate,
     })),
   });
+}
+
+async function loadCaseLeads(caseId: string): Promise<{ calibration: GridCalibration; leads: DigitizedLead[] } | null> {
+  const file = await prisma.eCGFile.findFirst({ orderBy: { createdAt: "desc" }, where: { caseId } });
+  if (!file) return null;
+  const leads = await prisma.eCGLeadSignal.findMany({ orderBy: { leadName: "asc" }, where: { ecgFileId: file.id } });
+  if (!leads.length) return null;
+  const calibration: GridCalibration = {
+    confidence: 0.5,
+    gainMmPerMv: (leads[0]?.gain ?? 10) as 5 | 10 | 20,
+    gridDetected: true,
+    paperSpeedMmPerSec: (leads[0]?.paperSpeed ?? 25) as 25 | 50,
+  };
+  return {
+    calibration,
+    leads: leads.map((lead) => ({
+      durationSeconds: lead.duration,
+      lead: lead.leadName,
+      samples: lead.signalData,
+      samplingRate: lead.samplingRate,
+    })),
+  };
+}
+
+export async function diagnosticPipelineFromStoredLeads(caseId: string): Promise<DiagnosticPipelineResult | null> {
+  const loaded = await loadCaseLeads(caseId);
+  if (!loaded) return null;
+  const pipeline = runDiagnosticPipelineSync(loaded);
+  recordMeasurementSnapshot(caseId, pipeline);
+  return pipeline;
 }
