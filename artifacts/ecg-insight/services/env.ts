@@ -7,3 +7,11 @@ export {
   configuredApiUrl,
   requiredApiUrl,
 } from "@/src/config/api";
+
+export {
+  BACKEND_FOUNDATION_VERSION,
+  foundationEnvironment,
+  apiClientConfiguration,
+  isFeatureEnabled,
+  FEATURE_FLAGS,
+} from "@/services/foundation";

@@ -1,5 +1,5 @@
 import type { SmartIntent } from "../smart-intent-types";
-import type { CommunicationIntent, GenerateInput } from "./types";
+import type { GenerateInput } from "./types";
 import { NaturalResponse } from "./v2/natural-response";
 import { MedicalReasoning } from "./v2/medical-reasoning";
 import { emptyClinicalContext } from "../intent-manager";

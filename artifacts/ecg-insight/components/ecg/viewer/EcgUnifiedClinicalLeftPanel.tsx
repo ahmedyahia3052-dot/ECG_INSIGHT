@@ -150,7 +150,7 @@ export const EcgUnifiedClinicalLeftPanel = memo(function EcgUnifiedClinicalLeftP
   }
 
   return (
-    <View nativeID="sprint53-workspace-left-sidebar" style={styles.shell} testID="sprint53-workspace-left-sidebar">
+    <View nativeID="sprint53-workspace-left-sidebar" style={styles.shell} testID="sprint35-clinical-summary-panel">
       <View style={styles.header}>
         <Text style={styles.headerTitle} numberOfLines={1}>
           Clinical Controls

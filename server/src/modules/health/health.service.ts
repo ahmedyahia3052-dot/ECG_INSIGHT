@@ -12,10 +12,6 @@ const workspaceRoot = path.resolve(__dirname, "../../../..");
 
 export type HealthStatus = "degraded" | "down" | "healthy";
 
-function statusFrom(ok: boolean): HealthStatus {
-  return ok ? "healthy" : "down";
-}
-
 async function timed<T>(check: () => Promise<T>) {
   const start = Date.now();
   try {

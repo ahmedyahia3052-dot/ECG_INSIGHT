@@ -2,6 +2,9 @@ generator client {
   provider = "prisma-client-js"
 }
 
+// Sprint 80 — Database foundation: normalized audit fields, soft delete, recordUuid on core entities.
+// Contract: server/src/database/foundation/contracts.ts (sprint80-v1)
+
 datasource db {
   provider = "postgresql"
 }
@@ -10,7 +13,9 @@ enum Role {
   OWNER
   SUPER_ADMIN
   ADMIN
+  ORGANIZATION_ADMIN
   DOCTOR
+  TECHNICIAN
   CORPORATE_CLIENT
   USER
   STUDENT
@@ -266,11 +271,20 @@ enum ECGCaseStatus {
 
 enum CaseManagementStatus {
   DRAFT
+  UPLOADED
+  PROCESSING
   PENDING_REVIEW
   REVIEWED
   CONFIRMED
+  FINALIZED
   SIGNED
   ARCHIVED
+}
+
+enum CaseCommentNoteType {
+  CLINICAL
+  DOCTOR
+  INTERNAL
 }
 
 enum CaseHistoryEventType {
@@ -1370,6 +1384,11 @@ model User {
   generatedEcgClinicalAlerts  ECGClinicalAlert[]        @relation("GeneratedEcgClinicalAlerts")
   calculatedEcgRiskAssessments ECGRiskAssessment[]      @relation("CalculatedEcgRiskAssessments")
   ecgAlertHistoryEvents       ECGAlertHistory[]         @relation("EcgAlertHistoryActor")
+  ecgProcessingJobsRequested  EcgProcessingJob[]        @relation("EcgProcessingJobRequestedBy")
+  aiOrchestrationJobsRequested AiOrchestrationJob[]     @relation("AiOrchestrationJobRequestedBy")
+  ecgIngestionJobsRequested   EcgIngestionJob[]         @relation("EcgIngestionJobRequestedBy")
+  ecgViewerPreference         EcgViewerPreference?
+  ecgPhysicianAnnotations     EcgPhysicianAnnotation[]  @relation("PhysicianAnnotationAuthor")
   sentEmails                  EmailLog[]                @relation("SentReportEmails")
   fitnessAssessments          FitnessAssessment[]       @relation("FitnessAssessmentPhysician")
   returnToWorkDecisions       ReturnToWorkDecision[]    @relation("ReturnToWorkPhysician")
@@ -1438,6 +1457,17 @@ model User {
   managedBranches             OrganizationBranch[]      @relation("BranchManager")
   loginHistory                LoginHistory[]
   platformNotifications       OrganizationNotification[]
+  casesCreated                ECGCase[]                 @relation("CaseCreatedBy")
+  casesUpdated                ECGCase[]                 @relation("CaseUpdatedBy")
+  patientsCreated             Patient[]                 @relation("PatientCreatedBy")
+  patientsUpdated             Patient[]                 @relation("PatientUpdatedBy")
+  organizationsCreated        Organization[]            @relation("OrganizationCreatedBy")
+  organizationsUpdated        Organization[]            @relation("OrganizationUpdatedBy")
+  departmentsCreated          Department[]              @relation("DepartmentCreatedBy")
+  departmentsUpdated          Department[]              @relation("DepartmentUpdatedBy")
+  clinicalDocumentsUploaded   ClinicalDocument[]        @relation("ClinicalDocumentUploader")
+  clinicalDocumentsUpdated    ClinicalDocument[]        @relation("ClinicalDocumentUpdater")
+  aiAnalysesCreated           AIAnalysis[]              @relation("AIAnalysisCreatedBy")
 
   @@index([role])
   @@index([isActive])
@@ -1539,8 +1569,10 @@ model Patient {
   medications            String?
   notes                  String?
   status                 PatientStatus          @default(ACTIVE)
+  recordUuid             String                 @unique @default(uuid())
   createdById            String?
   updatedById            String?
+  deletedAt              DateTime?
   archivedAt             DateTime?
   createdAt              DateTime               @default(now())
   updatedAt              DateTime               @updatedAt
@@ -1550,6 +1582,8 @@ model Patient {
   contractor             Contractor?            @relation(fields: [contractorId], references: [id])
   contractorCompany      ContractorCompany?     @relation(fields: [contractorCompanyId], references: [id])
   employeeProfile        Employee?              @relation(fields: [employeeProfileId], references: [id])
+  createdBy              User?                  @relation("PatientCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  updatedBy              User?                  @relation("PatientUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
   cases                  ECGCase[]
   cardiacHistory         CardiacHistory?
   procedureHistories     ProcedureHistory[]
@@ -1599,6 +1633,9 @@ model Patient {
   hl7Messages             HL7Message[]
   interoperabilityLogs    InteroperabilityLog[]
   fhirAudits              FHIRAudit[]
+  processingJobs          EcgProcessingJob[]
+  aiOrchestrationJobs     AiOrchestrationJob[]        @relation("PatientAiOrchestrationJobs")
+  ingestionJobs           EcgIngestionJob[]
 
   @@unique([organizationId, employeeId])
   @@index([lastName, firstName])
@@ -1610,9 +1647,12 @@ model Patient {
   @@index([contractorId])
   @@index([contractorCompanyId])
   @@index([archivedAt])
+  @@index([deletedAt])
   @@index([patientCode])
   @@index([status])
   @@index([createdById])
+  @@index([updatedById])
+  @@index([recordUuid])
 }
 
 model Organization {
@@ -1633,10 +1673,15 @@ model Organization {
   storageQuotaMb         Int?                     @default(10240)
   aiQuotaMonthly         Int?                     @default(100)
   version                Int                      @default(1)
+  recordUuid             String                   @unique @default(uuid())
+  createdById            String?
+  updatedById            String?
   deletedAt              DateTime?
   status                 OrganizationStatus       @default(ACTIVE)
   createdAt              DateTime                 @default(now())
   updatedAt              DateTime                 @updatedAt
+  createdBy              User?                    @relation("OrganizationCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  updatedBy              User?                    @relation("OrganizationUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
   users                  User[]                    @relation("OrganizationUsers")
   companies              Company[]
   departments            Department[]
@@ -1681,6 +1726,9 @@ model Organization {
   @@index([type])
   @@index([deletedAt])
   @@index([country, city])
+  @@index([createdById])
+  @@index([updatedById])
+  @@index([recordUuid])
 }
 
 model Company {
@@ -1712,9 +1760,16 @@ model Department {
   name                   String
   category               DepartmentCategory @default(CUSTOM)
   description            String?
+  recordUuid             String          @unique @default(uuid())
+  createdById            String?
+  updatedById            String?
   deletedAt              DateTime?
+  createdAt              DateTime        @default(now())
+  updatedAt              DateTime        @updatedAt
   organization           Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   company                Company?        @relation(fields: [companyId], references: [id], onDelete: SetNull)
+  createdBy              User?           @relation("DepartmentCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  updatedBy              User?           @relation("DepartmentUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
   employees              Employee[]
   patients               Patient[]
   clinicalDecisionAlerts ClinicalAlert[]
@@ -1728,6 +1783,9 @@ model Department {
   @@index([companyId])
   @@index([category])
   @@index([deletedAt])
+  @@index([createdById])
+  @@index([updatedById])
+  @@index([recordUuid])
 }
 
 model ContractorCompany {
@@ -2027,10 +2085,16 @@ model ClinicalDocument {
   mimeType     String
   sizeBytes    Int
   storagePath  String
+  recordUuid   String               @unique @default(uuid())
   uploadedById String
+  updatedById  String?
+  deletedAt    DateTime?
   createdAt    DateTime             @default(now())
+  updatedAt    DateTime             @updatedAt
   patient      Patient              @relation(fields: [patientId], references: [id], onDelete: Cascade)
   case         ECGCase?             @relation(fields: [caseId], references: [id], onDelete: SetNull)
+  uploadedBy   User                 @relation("ClinicalDocumentUploader", fields: [uploadedById], references: [id])
+  updatedBy    User?                @relation("ClinicalDocumentUpdater", fields: [updatedById], references: [id], onDelete: SetNull)
   extraction   DocumentExtraction?
   searchIndex  DocumentSearchIndex?
 
@@ -2038,6 +2102,10 @@ model ClinicalDocument {
   @@index([caseId])
   @@index([category])
   @@index([createdAt])
+  @@index([deletedAt])
+  @@index([uploadedById])
+  @@index([updatedById])
+  @@index([recordUuid])
 }
 
 model DocumentExtraction {
@@ -2189,12 +2257,18 @@ model ECGCase {
   reviewerId            String?
   tags                  String[]               @default([])
   duplicateOfCaseId     String?
+  recordUuid            String                 @unique @default(uuid())
+  createdById           String?
+  updatedById           String?
+  deletedAt             DateTime?
   archivedAt            DateTime?
   restoredAt            DateTime?
   createdAt             DateTime               @default(now())
   updatedAt             DateTime               @updatedAt
   patient               Patient                @relation(fields: [patientId], references: [id])
   uploadedBy            User                   @relation("UploadedCases", fields: [uploadedById], references: [id])
+  createdBy             User?                  @relation("CaseCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  updatedBy             User?                  @relation("CaseUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
   assignedDoctor        User?                  @relation("AssignedCases", fields: [assignedDoctorId], references: [id])
   reviewedBy            User?                  @relation("ReviewedCases", fields: [reviewedById], references: [id])
   reviewer              User?                  @relation("ReviewerCases", fields: [reviewerId], references: [id])
@@ -2246,6 +2320,11 @@ model ECGCase {
   hl7Messages                HL7Message[]
   interoperabilityLogs       InteroperabilityLog[]
   fhirAudits                 FHIRAudit[]
+  processingJobs             EcgProcessingJob[]
+  aiOrchestrationJobs        AiOrchestrationJob[]        @relation("CaseAiOrchestrationJobs")
+  ingestionJobs              EcgIngestionJob[]
+  ecgPhysicianAnnotations    EcgPhysicianAnnotation[]
+  ecgViewerOverlay           EcgViewerCaseOverlay?
 
   @@index([patientId])
   @@index([uploadedById])
@@ -2260,7 +2339,11 @@ model ECGCase {
   @@index([managementStatus])
   @@index([reviewerId])
   @@index([archivedAt])
+  @@index([deletedAt])
   @@index([duplicateOfCaseId])
+  @@index([createdById])
+  @@index([updatedById])
+  @@index([recordUuid])
 }
 
 model CaseHistory {
@@ -2289,9 +2372,10 @@ model CaseComment {
   authorId    String
   parentId    String?
   body        String
-  mentions    String[]      @default([])
-  isClinical  Boolean       @default(false)
-  createdAt   DateTime      @default(now())
+  mentions    String[]            @default([])
+  isClinical  Boolean             @default(false)
+  noteType    CaseCommentNoteType @default(DOCTOR)
+  createdAt   DateTime            @default(now())
   updatedAt   DateTime      @updatedAt
   case        ECGCase       @relation(fields: [caseId], references: [id], onDelete: Cascade)
   author      User          @relation("CaseCommentAuthor", fields: [authorId], references: [id])
@@ -2302,6 +2386,7 @@ model CaseComment {
   @@index([authorId])
   @@index([parentId])
   @@index([isClinical])
+  @@index([noteType])
   @@index([createdAt])
 }
 
@@ -2862,6 +2947,7 @@ model ClinicalReport {
   finalizedAt                 DateTime?
   signedAt                    DateTime?
   archivedAt                  DateTime?
+  deletedAt                   DateTime?
   authorId                    String
   finalizedById               String?
   signedById                  String?
@@ -2888,6 +2974,7 @@ model ClinicalReport {
   @@index([templateCategory])
   @@index([reportUuid])
   @@index([contentHash])
+  @@index([deletedAt])
 }
 
 model EnterpriseReportTemplate {
@@ -3015,6 +3102,8 @@ model ECGMeasurement {
 model AIAnalysis {
   id              String           @id @default(cuid())
   caseId          String
+  recordUuid      String           @unique @default(uuid())
+  createdById     String?
   rhythm          String
   heartRate       Int
   severity        AISeverity
@@ -3026,8 +3115,12 @@ model AIAnalysis {
   processingTime  Int
   status          AIAnalysisStatus @default(QUEUED)
   diagnosis       String
+  deletedAt       DateTime?
   createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
   case            ECGCase          @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  createdBy       User?            @relation("AIAnalysisCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  orchestrationJobs AiOrchestrationJob[]
 
   @@index([caseId])
   @@index([severity])
@@ -3035,6 +3128,9 @@ model AIAnalysis {
   @@index([diagnosis])
   @@index([createdAt])
   @@index([caseId, createdAt])
+  @@index([deletedAt])
+  @@index([createdById])
+  @@index([recordUuid])
 }
 
 model ECGFile {
@@ -3050,6 +3146,12 @@ model ECGFile {
   sizeBytes             Int
   storagePath           String
   storedPath            String?
+  checksum              String?
+  storageProvider       String                 @default("local")
+  storageKey            String?
+  version               Int                    @default(1)
+  recordUuid            String?                @unique
+  deletedAt             DateTime?
   uploadedById          String
   manufacturer          String?
   deviceModel           String?
@@ -3066,6 +3168,9 @@ model ECGFile {
   annotations           ECGAnnotation[]
   clinicalAlerts        ECGClinicalAlert[]
   telecardiologyReviews TelecardiologyReview[]
+  processingJobs        EcgProcessingJob[]
+  ingestionJobs         EcgIngestionJob[]
+  versions              ECGFileVersion[]
 
   @@index([caseId])
   @@index([patientId])
@@ -3073,6 +3178,29 @@ model ECGFile {
   @@index([fileType])
   @@index([uploadedById])
   @@index([caseId, createdAt])
+  @@index([checksum])
+  @@index([storageProvider])
+  @@index([deletedAt])
+}
+
+model ECGFileVersion {
+  id           String   @id @default(cuid())
+  ecgFileId    String
+  version      Int
+  storageKey   String
+  storagePath  String?
+  checksum     String
+  sizeBytes    Int
+  mimeType     String
+  originalName String
+  metadataJson Json?
+  createdById  String
+  createdAt    DateTime @default(now())
+  ecgFile      ECGFile  @relation(fields: [ecgFileId], references: [id], onDelete: Cascade)
+
+  @@unique([ecgFileId, version])
+  @@index([ecgFileId])
+  @@index([checksum])
 }
 
 model ECGLeadSignal {
@@ -3091,6 +3219,311 @@ model ECGLeadSignal {
   @@unique([ecgFileId, leadName])
   @@index([ecgFileId])
   @@index([leadName])
+}
+
+model EcgViewerPreference {
+  id              String   @id @default(cuid())
+  userId          String   @unique
+  defaultZoom     Float    @default(1)
+  zoomPresets     Json     @default("[0.5,1,2,4,8,16]")
+  gainMmPerMv     Int      @default(10)
+  paperSpeedMmSec Int      @default(25)
+  layoutJson      Json?
+  overlayDefaults Json?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model EcgPhysicianAnnotation {
+  id         String   @id @default(cuid())
+  caseId     String
+  ecgFileId  String?
+  authorId   String
+  lead       String
+  type       String
+  geometry   Json
+  label      String?
+  color      String?
+  visible    Boolean  @default(true)
+  metadata   Json?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  case       ECGCase  @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  author     User     @relation("PhysicianAnnotationAuthor", fields: [authorId], references: [id])
+
+  @@index([caseId])
+  @@index([authorId])
+  @@index([ecgFileId])
+  @@index([lead])
+}
+
+model EcgViewerCaseOverlay {
+  id        String   @id @default(cuid())
+  caseId    String   @unique
+  config    Json
+  updatedBy String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  case      ECGCase  @relation(fields: [caseId], references: [id], onDelete: Cascade)
+
+  @@index([caseId])
+}
+
+enum EcgProcessingJobStatus {
+  QUEUED
+  PROCESSING
+  COMPLETED
+  FAILED
+  CANCELLED
+  RETRY_SCHEDULED
+}
+
+enum EcgProcessingStage {
+  UPLOAD_INGEST
+  PREPROCESS
+  NORMALIZE
+  GRID_DETECT
+  PERSPECTIVE_CORRECT
+  NOISE_REDUCE
+  LEAD_MAP
+  WAVEFORM_EXTRACT
+  MEASURE
+  QUALITY_SCORE
+  VALIDATE
+  PERSIST
+  COMPLETE
+}
+
+model EcgProcessingJob {
+  id              String                   @id @default(cuid())
+  jobGroupId      String
+  caseId          String
+  ecgFileId       String
+  patientId       String?
+  status          EcgProcessingJobStatus   @default(QUEUED)
+  stage           EcgProcessingStage       @default(UPLOAD_INGEST)
+  progress        Int                      @default(0)
+  qualityScore    Float?
+  attemptCount    Int                      @default(0)
+  maxAttempts     Int                      @default(3)
+  errorMessage    String?
+  errorCode       String?
+  stageLog        Json                     @default("[]")
+  resultJson      Json?
+  requestedById   String
+  engineVersion   String
+  startedAt       DateTime?
+  completedAt     DateTime?
+  nextRetryAt     DateTime?
+  createdAt       DateTime                 @default(now())
+  updatedAt       DateTime                 @updatedAt
+  case            ECGCase                  @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  ecgFile         ECGFile                  @relation(fields: [ecgFileId], references: [id], onDelete: Cascade)
+  patient         Patient?                 @relation(fields: [patientId], references: [id], onDelete: SetNull)
+  requestedBy     User                     @relation("EcgProcessingJobRequestedBy", fields: [requestedById], references: [id])
+
+  @@index([caseId])
+  @@index([ecgFileId])
+  @@index([patientId])
+  @@index([status])
+  @@index([stage])
+  @@index([status, nextRetryAt])
+  @@index([createdAt])
+}
+
+enum AiOrchestrationJobStatus {
+  QUEUED
+  PROCESSING
+  COMPLETED
+  FAILED
+  CANCELLED
+  RETRY_SCHEDULED
+  TIMED_OUT
+}
+
+enum AiOrchestrationStage {
+  VALIDATE
+  LOAD_CONTEXT
+  ECG_ANALYSIS
+  CLINICAL_REASONING
+  ECG_INTERPRETATION
+  LLM_ENRICHMENT
+  PERSIST
+  COMPLETE
+}
+
+enum AiProviderPreference {
+  AUTO
+  OPENAI
+  OLLAMA
+  RULE_BASED
+}
+
+enum AiOrchestrationPipelineKind {
+  FULL
+  ECG_ONLY
+  LLM_ONLY
+}
+
+model AiOrchestrationJob {
+  id                 String                      @id @default(cuid())
+  jobGroupId         String
+  caseId             String
+  analysisId         String?
+  patientId          String?
+  status             AiOrchestrationJobStatus    @default(QUEUED)
+  stage              AiOrchestrationStage        @default(VALIDATE)
+  progress           Int                         @default(0)
+  pipelineKind       AiOrchestrationPipelineKind @default(FULL)
+  providerPreference AiProviderPreference        @default(AUTO)
+  attemptCount       Int                         @default(0)
+  maxAttempts        Int                         @default(3)
+  timeoutMs          Int                         @default(300000)
+  errorMessage       String?
+  errorCode          String?
+  stageLog           Json                        @default("[]")
+  processingLogs     Json                        @default("[]")
+  resultJson         Json?
+  requestedById      String
+  engineVersion      String
+  startedAt          DateTime?
+  completedAt        DateTime?
+  nextRetryAt        DateTime?
+  timedOutAt         DateTime?
+  createdAt          DateTime                    @default(now())
+  updatedAt          DateTime                    @updatedAt
+  case               ECGCase                     @relation("CaseAiOrchestrationJobs", fields: [caseId], references: [id], onDelete: Cascade)
+  analysis           AIAnalysis?                 @relation(fields: [analysisId], references: [id], onDelete: SetNull)
+  patient            Patient?                    @relation("PatientAiOrchestrationJobs", fields: [patientId], references: [id], onDelete: SetNull)
+  requestedBy        User                        @relation("AiOrchestrationJobRequestedBy", fields: [requestedById], references: [id])
+
+  @@index([caseId])
+  @@index([analysisId])
+  @@index([patientId])
+  @@index([status])
+  @@index([stage])
+  @@index([status, nextRetryAt])
+  @@index([createdAt])
+}
+
+enum EcgIngestionJobStatus {
+  QUEUED
+  VALIDATING
+  PROCESSING
+  FAILED
+  CANCELLED
+  RETRY_SCHEDULED
+  COMPLETED
+  DUPLICATE
+  DEAD_LETTER
+}
+
+enum EcgIngestionStage {
+  UPLOAD
+  VALIDATE
+  STORAGE
+  QUEUE
+  PROCESSING
+  AI_ORCHESTRATION
+  RESULTS
+  PERSIST
+  NOTIFICATION
+  COMPLETE
+}
+
+enum EcgIngestionPriority {
+  CRITICAL
+  HIGH
+  NORMAL
+  LOW
+}
+
+enum EcgIngestionEventType {
+  STAGE_STARTED
+  STAGE_COMPLETED
+  STAGE_FAILED
+  DUPLICATE_DETECTED
+  CHECKSUM_COMPUTED
+  CHILD_JOB_ENQUEUED
+  CHILD_JOB_COMPLETED
+  RETRY_SCHEDULED
+  CANCELLED
+  TIMED_OUT
+  DEAD_LETTER
+  NOTIFICATION_SENT
+  PROGRESS
+  RESUMED
+}
+
+model EcgIngestionJob {
+  id                 String                 @id @default(cuid())
+  jobGroupId         String
+  caseId             String
+  ecgFileId          String
+  patientId          String?
+  status             EcgIngestionJobStatus  @default(QUEUED)
+  stage              EcgIngestionStage      @default(UPLOAD)
+  progress           Int                    @default(0)
+  priority           EcgIngestionPriority   @default(NORMAL)
+  checksumSha256     String?
+  duplicateOfJobId   String?
+  processingJobId    String?
+  orchestrationJobId String?
+  analysisId         String?
+  attemptCount       Int                    @default(0)
+  maxAttempts        Int                    @default(3)
+  timeoutMs          Int                    @default(600000)
+  errorMessage       String?
+  errorCode          String?
+  stageLog           Json                   @default("[]")
+  metricsJson        Json                   @default("{}")
+  resultJson         Json?
+  resumeFromStage    EcgIngestionStage?
+  requestedById      String
+  engineVersion      String
+  startedAt          DateTime?
+  completedAt        DateTime?
+  cancelledAt        DateTime?
+  nextRetryAt        DateTime?
+  timedOutAt         DateTime?
+  deadLetterAt       DateTime?
+  createdAt          DateTime               @default(now())
+  updatedAt          DateTime               @updatedAt
+  case               ECGCase                @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  ecgFile            ECGFile                @relation(fields: [ecgFileId], references: [id], onDelete: Cascade)
+  patient            Patient?               @relation(fields: [patientId], references: [id], onDelete: SetNull)
+  requestedBy        User                   @relation("EcgIngestionJobRequestedBy", fields: [requestedById], references: [id])
+  duplicateOf        EcgIngestionJob?       @relation("IngestionDuplicateOf", fields: [duplicateOfJobId], references: [id], onDelete: SetNull)
+  duplicates         EcgIngestionJob[]      @relation("IngestionDuplicateOf")
+  pipelineEvents     EcgIngestionPipelineEvent[]
+
+  @@index([caseId])
+  @@index([ecgFileId])
+  @@index([checksumSha256])
+  @@index([caseId, checksumSha256])
+  @@index([status])
+  @@index([stage])
+  @@index([priority, status])
+  @@index([status, nextRetryAt])
+  @@index([createdAt])
+}
+
+model EcgIngestionPipelineEvent {
+  id             String                @id @default(cuid())
+  ingestionJobId String
+  eventType      EcgIngestionEventType
+  stage          EcgIngestionStage?
+  message        String
+  payload        Json?
+  createdAt      DateTime              @default(now())
+  ingestionJob   EcgIngestionJob       @relation(fields: [ingestionJobId], references: [id], onDelete: Cascade)
+
+  @@index([ingestionJobId])
+  @@index([eventType])
+  @@index([createdAt])
 }
 
 model ECGAnnotation {
@@ -4259,6 +4692,7 @@ model Session {
   expiresAt        DateTime
   revokedAt        DateTime?
   replacedById     String?
+  tokenVersion     Int       @default(1)
   userAgent        String?
   ipAddress        String?
   createdAt        DateTime  @default(now())
@@ -4267,6 +4701,7 @@ model Session {
 
   @@index([userId])
   @@index([expiresAt])
+  @@index([replacedById])
 }
 
 model OAuthIdentity {
@@ -4707,6 +5142,7 @@ model Notification {
   locale      String            @default("en")
   scheduledAt DateTime?
   sentAt      DateTime?
+  deletedAt   DateTime?
   preferences Json?
   createdAt   DateTime         @default(now())
   updatedAt   DateTime         @updatedAt
@@ -4730,6 +5166,7 @@ model Notification {
   @@index([read])
   @@index([scheduledAt])
   @@index([createdAt])
+  @@index([deletedAt])
 }
 
 model NotificationTemplate {

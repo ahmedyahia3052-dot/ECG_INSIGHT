@@ -1,68 +1,49 @@
-# Visual Validation Report — Sprint 24
+# Visual Validation Report — Sprint 30
 
-**Date:** 2026-07-06  
-**Overall Score:** 100%  
-**Status:** PASS  
-**Minimum Required:** 98%
+## Before
 
-## Sprint 24 Layout Validation
+Prior to Sprint 30, the workstation had:
+- View mode switcher and toolbar without guided workflow
+- Clinical panels without unified physician journey
+- No stage progress indicator
+- No clinical alerts strip
 
-| Check | Result |
-|-------|--------|
-| CSS Grid shell (`sprint24-workstation-grid`) | Pass |
-| Left nav visible, scrollable (`sprint24-workstation-left-nav`) | Pass |
-| Ribbon toolbar wrap, no clip (`sprint24-hospital-ribbon-toolbar`) | Pass |
-| Clinical sidebar independent scroll (`sprint24-clinical-right-panel`) | Pass |
-| Hospital status bar fully visible (`sprint24-hospital-status-bar`) | Pass |
-| No overlapping panels | Pass |
-| No hidden toolbar buttons | Pass |
-| No clipped icons | Pass |
-| No double scrollbars | Pass |
+## After
 
-## Module Scores
+- **16-stage workflow ribbon** with progress bar and unsaved indicator
+- **Clinical alerts banner** with severity-coded chips
+- **Patient workspace** with avatar, MRN, organization, risk
+- **Measurement studio** with confidence scores
+- **AI review workspace** with differential and confirmation
+- **History engine** with compare buttons
+- **Doctor notes** with templates
 
-| Module | Score |
-|--------|-------|
-| Layout | 100% |
-| Toolbar | 100% |
-| Sidebar / Clinical Panel | 100% |
-| Monitor | 100% |
-| Canvas | 100% |
-| Responsiveness | 100% |
-| Typography | 100% |
-| Spacing | 100% |
-| Visual Consistency | 100% |
-| Pixel Quality | 100% |
-| **Overall** | **100%** |
+## Visual TestIDs
 
-## Viewports Tested
+| Element | testID |
+|---------|--------|
+| Workflow ribbon | `sprint30-clinical-workflow-ribbon` |
+| Workflow progress | `sprint30-workflow-progress` |
+| Clinical alerts | `sprint30-clinical-alerts` |
+| Patient workspace | `sprint30-patient-workspace` |
+| Measurement studio | `sprint30-measurement-studio` |
+| AI review panel | `sprint30-ai-review-panel` |
+| History engine | `sprint30-history-engine` |
+| Clinical notes | `sprint30-clinical-notes` |
+| Case timeline | `sprint30-case-timeline` |
+| Right panel | `sprint30-clinical-right-panel` |
 
-| Viewport | Shell | Monitor |
-|----------|-------|---------|
-| 1366×768 | Pass | Pass |
-| 1440×900 | Pass | Pass |
-| 1536×864 | Pass | Pass |
-| 1920×1080 | Pass | Pass |
-| 2560×1440 | Pass | Pass |
+## Playwright Results
 
-## View Modes Captured
+```
+3 passed — sprint30-clinical-workflow.spec.ts
+```
 
-- Original (image)
-- Processed
-- Waveform / Digitized
-- Live Monitor
-- AI Review
-- Compare
+Screenshot: `test-results/screenshots/sprint30-clinical-workflow.png`
 
-## Before / After
+## Acceptance
 
-| Phase | Description |
-|-------|-------------|
-| Before (Sprint 22) | Resizable-panel layout, compact toolbar, basic clinical sidebar |
-| After (Sprint 24) | CSS Grid hospital shell, enterprise left nav, ribbon toolbar, expanded status bar |
-
-Screenshots: `test-results/screenshots/sprint23/` (visual inspector re-run post Sprint 24 layout).
-
-## Issues Detected
-
-None.
+- ECG canvas remains center hero element
+- No clipped workflow step labels (horizontal scroll)
+- Green/blue/disabled step states visually distinct
+- Alert severity colors: critical (red), warning (yellow), info (blue)

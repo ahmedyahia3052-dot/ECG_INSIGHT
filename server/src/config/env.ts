@@ -121,6 +121,13 @@ const envSchema = z
     PHI_ENCRYPTION_KEY: z.string().min(32).optional(),
     REQUEST_SIGNING_SECRET: z.string().min(32).optional(),
     STORAGE_PATH: z.string().default("uploads"),
+    STORAGE_PROVIDER: z.enum(["local", "s3"]).default("local"),
+    S3_ENDPOINT: optionalUrl,
+    S3_BUCKET: z.string().optional(),
+    S3_ACCESS_KEY: z.string().optional(),
+    S3_SECRET_KEY: z.string().optional(),
+    S3_REGION: z.string().default("us-east-1"),
+    ECG_STORAGE_MAX_BYTES: z.coerce.number().int().positive().default(50 * 1024 * 1024),
     TRUST_PROXY: z
       .enum(["true", "false"])
       .default("false")

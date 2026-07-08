@@ -1,0 +1,137 @@
+{
+  "generatedAt": "2026-07-06T20:35:33.723Z",
+  "issues": [],
+  "minimumAcceptance": 98,
+  "moduleScores": {
+    "layout": 100,
+    "toolbar": 100,
+    "sidebar": 100,
+    "monitor": 100,
+    "canvas": 100,
+    "clinicalPanel": 100,
+    "responsiveness": 100,
+    "typography": 100,
+    "spacing": 100,
+    "accessibility": 100,
+    "performance": 100,
+    "animations": 100,
+    "visualConsistency": 100,
+    "pixelQuality": 100,
+    "overall": 100
+  },
+  "overallScore": 100,
+  "passed": true,
+  "screenshots": [
+    {
+      "viewport": "1366x768",
+      "mode": "shell",
+      "path": "C:\\Users\\Ahmed\\Downloads\\BelatedElasticLoop\\test-results\\screenshots\\sprint23\\shell-1366x768.png"
+    },
+    {
+      "viewport": "1600x900",
+      "mode": "shell",
+      "path": "C:\\Users\\Ahmed\\Downloads\\BelatedElasticLoop\\test-results\\screenshots\\sprint23\\shell-1600x900.png"
+    },
+    {
+      "viewport": "1600x900",
+      "mode": "monitor",
+      "path": "C:\\Users\\Ahmed\\Downloads\\BelatedElasticLoop\\test-results\\screenshots\\sprint23\\monitor-1600x900.png"
+    },
+    {
+      "viewport": "1920x1080",
+      "mode": "shell",
+      "path": "C:\\Users\\Ahmed\\Downloads\\BelatedElasticLoop\\test-results\\screenshots\\sprint23\\shell-1920x1080.png"
+    },
+    {
+      "viewport": "1920x1080",
+      "mode": "monitor",
+      "path": "C:\\Users\\Ahmed\\Downloads\\BelatedElasticLoop\\test-results\\screenshots\\sprint23\\monitor-1920x1080.png"
+    },
+    {
+      "viewport": "2560x1440",
+      "mode": "shell",
+      "path": "C:\\Users\\Ahmed\\Downloads\\BelatedElasticLoop\\test-results\\screenshots\\sprint23\\shell-2560x1440.png"
+    },
+    {
+      "viewport": "2560x1440",
+      "mode": "monitor",
+      "path": "C:\\Users\\Ahmed\\Downloads\\BelatedElasticLoop\\test-results\\screenshots\\sprint23\\monitor-2560x1440.png"
+    },
+    {
+      "viewport": "3440x1440",
+      "mode": "shell",
+      "path": "C:\\Users\\Ahmed\\Downloads\\BelatedElasticLoop\\test-results\\screenshots\\sprint23\\shell-3440x1440.png"
+    },
+    {
+      "viewport": "3440x1440",
+      "mode": "monitor",
+      "path": "C:\\Users\\Ahmed\\Downloads\\BelatedElasticLoop\\test-results\\screenshots\\sprint23\\monitor-3440x1440.png"
+    },
+    {
+      "viewport": "3840x2160",
+      "mode": "shell",
+      "path": "C:\\Users\\Ahmed\\Downloads\\BelatedElasticLoop\\test-results\\screenshots\\sprint23\\shell-3840x2160.png"
+    },
+    {
+      "viewport": "3840x2160",
+      "mode": "monitor",
+      "path": "C:\\Users\\Ahmed\\Downloads\\BelatedElasticLoop\\test-results\\screenshots\\sprint23\\monitor-3840x2160.png"
+    },
+    {
+      "viewport": "1920x1080",
+      "mode": "image",
+      "path": "C:\\Users\\Ahmed\\Downloads\\BelatedElasticLoop\\test-results\\screenshots\\sprint23\\mode-image.png"
+    },
+    {
+      "viewport": "1920x1080",
+      "mode": "processed",
+      "path": "C:\\Users\\Ahmed\\Downloads\\BelatedElasticLoop\\test-results\\screenshots\\sprint23\\mode-processed.png"
+    },
+    {
+      "viewport": "1920x1080",
+      "mode": "waveform",
+      "path": "C:\\Users\\Ahmed\\Downloads\\BelatedElasticLoop\\test-results\\screenshots\\sprint23\\mode-waveform.png"
+    },
+    {
+      "viewport": "1920x1080",
+      "mode": "monitor",
+      "path": "C:\\Users\\Ahmed\\Downloads\\BelatedElasticLoop\\test-results\\screenshots\\sprint23\\mode-monitor.png"
+    },
+    {
+      "viewport": "1920x1080",
+      "mode": "ai-review",
+      "path": "C:\\Users\\Ahmed\\Downloads\\BelatedElasticLoop\\test-results\\screenshots\\sprint23\\mode-ai-review.png"
+    },
+    {
+      "viewport": "1920x1080",
+      "mode": "compare",
+      "path": "C:\\Users\\Ahmed\\Downloads\\BelatedElasticLoop\\test-results\\screenshots\\sprint23\\mode-compare.png"
+    }
+  ],
+  "viewportResults": [
+    {
+      "viewport": "1366x768",
+      "issues": []
+    },
+    {
+      "viewport": "1600x900",
+      "issues": []
+    },
+    {
+      "viewport": "1920x1080",
+      "issues": []
+    },
+    {
+      "viewport": "2560x1440",
+      "issues": []
+    },
+    {
+      "viewport": "3440x1440",
+      "issues": []
+    },
+    {
+      "viewport": "3840x2160",
+      "issues": []
+    }
+  ]
+}

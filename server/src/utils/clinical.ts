@@ -39,17 +39,23 @@ export type ApiCaseManagementStatus =
   | "archived"
   | "confirmed"
   | "draft"
+  | "finalized"
   | "pending_review"
+  | "processing"
   | "reviewed"
-  | "signed";
+  | "signed"
+  | "uploaded";
 
 const managementStatusToApi: Record<CaseManagementStatus, ApiCaseManagementStatus> = {
   ARCHIVED: "archived",
   CONFIRMED: "confirmed",
   DRAFT: "draft",
+  FINALIZED: "finalized",
   PENDING_REVIEW: "pending_review",
+  PROCESSING: "processing",
   REVIEWED: "reviewed",
   SIGNED: "signed",
+  UPLOADED: "uploaded",
 };
 
 const genderToApi: Record<Gender, ApiGender> = {

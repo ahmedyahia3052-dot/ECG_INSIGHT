@@ -2,7 +2,7 @@ import { expect, test } from "./test";
 import { mkdirSync } from "node:fs";
 import path from "node:path";
 import { createClinicalFixture, API_URL, authHeaders } from "./utils/qa";
-import { ecgViewMode, openEcgWorkspace } from "./utils/ecg-workspace-locators";
+import { ecgViewMode, openEcgWorkspace, activateMonitorView } from "./utils/ecg-workspace-locators";
 
 const screenshotDir = path.join(process.cwd(), "validation-screenshots", "operator-login-proof");
 
@@ -40,7 +40,7 @@ test.describe("Operator login proof @operator-proof @sprint50", () => {
     await page.screenshot({ path: path.join(screenshotDir, "02-dashboard-after-login.png"), fullPage: true });
 
     await openEcgWorkspace(page, caseId);
-    await ecgViewMode(page, "monitor").click();
+    await activateMonitorView(page);
     await expect(page.getByTestId("sprint22-hospital-live-monitor")).toBeVisible({ timeout: 30_000 });
     await expect(page.getByTestId("sprint22-hospital-monitor-canvas")).toBeVisible({ timeout: 30_000 });
     await page.screenshot({ path: path.join(screenshotDir, "03-ecg-workspace-live-monitor.png"), fullPage: true });

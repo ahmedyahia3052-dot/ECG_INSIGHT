@@ -1,5 +1,5 @@
 import type { AttachmentForAnalysis } from "../copilot-types";
-import type { PipelineStageRecord } from "../copilot-attachment-pipeline.service";
+import type { PipelineStageRecord } from "./pipeline-stage.types";
 import type { ClinicalOcrStructuredData } from "../../ocr/clinical-ocr.service";
 import { medicalExtractorRegistry } from "../extractors/registry";
 import { classifyDocumentType } from "../extractors/document-classifier";

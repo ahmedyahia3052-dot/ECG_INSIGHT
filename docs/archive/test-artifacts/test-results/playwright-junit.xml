@@ -1,0 +1,178 @@
+<testsuites id="" name="" tests="17" failures="0" skipped="14" errors="3" time="51.625556">
+<testsuite name="live-monitor-layout-hotfix.spec.ts" timestamp="2026-07-08T01:37:05.257Z" hostname="chromium-desktop" tests="6" failures="0" skipped="5" time="0.001" errors="1">
+<testcase name="Live Monitor Layout Hotfix @live-monitor-layout @enterprise › sidebar layout is stable at 1366x768" classname="live-monitor-layout-hotfix.spec.ts" time="0.001">
+<system-out>
+<![CDATA[
+[[ATTACHMENT|playwright-artifacts\live-monitor-layout-hotfix-ce26d-ayout-is-stable-at-1366x768-chromium-desktop\error-context.md]]
+
+[[ATTACHMENT|playwright-artifacts\live-monitor-layout-hotfix-ce26d-ayout-is-stable-at-1366x768-chromium-desktop\trace.zip]]
+]]>
+</system-out>
+<error message="ECG case API create failed: {&quot;code&quot;:&quot;INTERNAL_SERVER_ERROR&quot;,&quot;message&quot;:&quot;Unexpected server error.&quot;,&quot;requestId&quot;:&quot;bc518eef-3908-43cd-8318-701db8e673ad&quot;}" type="Error">
+<![CDATA[  [chromium-desktop] › live-monitor-layout-hotfix.spec.ts:34:9 › Live Monitor Layout Hotfix @live-monitor-layout @enterprise › sidebar layout is stable at 1366x768 
+
+    Error: ECG case API create failed: {"code":"INTERNAL_SERVER_ERROR","message":"Unexpected server error.","requestId":"bc518eef-3908-43cd-8318-701db8e673ad"}
+
+       at utils\qa.ts:305
+
+      303 |     break;
+      304 |   }
+    > 305 |   throw new Error(`${label} failed: ${lastBody}`);
+          |         ^
+      306 | }
+      307 |
+      308 | export async function createClinicalFixture(request: APIRequestContext, options: { analyze?: boolean; report?: boolean } = {}): Promise<ClinicalFixture & { csrfToken?: string; token: string }> {
+        at apiPostWithRetry (C:\Users\Ahmed\Downloads\BelatedElasticLoop\tests\e2e\utils\qa.ts:305:9)
+        at createClinicalFixture (C:\Users\Ahmed\Downloads\BelatedElasticLoop\tests\e2e\utils\qa.ts:312:24)
+        at C:\Users\Ahmed\Downloads\BelatedElasticLoop\tests\e2e\live-monitor-layout-hotfix.spec.ts:24:21
+
+    Error Context: ..\..\test-results\playwright-artifacts\live-monitor-layout-hotfix-ce26d-ayout-is-stable-at-1366x768-chromium-desktop\error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    ..\..\test-results\playwright-artifacts\live-monitor-layout-hotfix-ce26d-ayout-is-stable-at-1366x768-chromium-desktop\trace.zip
+    Usage:
+
+        npx playwright show-trace ..\..\test-results\playwright-artifacts\live-monitor-layout-hotfix-ce26d-ayout-is-stable-at-1366x768-chromium-desktop\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+]]>
+</error>
+</testcase>
+<testcase name="Live Monitor Layout Hotfix @live-monitor-layout @enterprise › sidebar layout is stable at 1600x900" classname="live-monitor-layout-hotfix.spec.ts">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Live Monitor Layout Hotfix @live-monitor-layout @enterprise › sidebar layout is stable at 1920x1080" classname="live-monitor-layout-hotfix.spec.ts">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Live Monitor Layout Hotfix @live-monitor-layout @enterprise › sidebar layout is stable at 2560x1440" classname="live-monitor-layout-hotfix.spec.ts">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Live Monitor Layout Hotfix @live-monitor-layout @enterprise › sidebar layout is stable at 3840x2160" classname="live-monitor-layout-hotfix.spec.ts">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Live Monitor Layout Hotfix @live-monitor-layout @enterprise › right clinical panel visible on ultra-wide layout" classname="live-monitor-layout-hotfix.spec.ts">
+<skipped>
+</skipped>
+</testcase>
+</testsuite>
+<testsuite name="live-monitor-sidebar-hotfix.spec.ts" timestamp="2026-07-08T01:37:05.257Z" hostname="chromium-desktop" tests="5" failures="0" skipped="4" time="0.001" errors="1">
+<testcase name="Live Monitor Sidebar Hotfix @live-monitor-sidebar @enterprise › sidebar controls are full-width and unduplicated at 1366x768" classname="live-monitor-sidebar-hotfix.spec.ts" time="0.001">
+<system-out>
+<![CDATA[
+[[ATTACHMENT|playwright-artifacts\live-monitor-sidebar-hotfi-21407-nd-unduplicated-at-1366x768-chromium-desktop\error-context.md]]
+
+[[ATTACHMENT|playwright-artifacts\live-monitor-sidebar-hotfi-21407-nd-unduplicated-at-1366x768-chromium-desktop\trace.zip]]
+]]>
+</system-out>
+<error message="ECG case API create failed: {&quot;code&quot;:&quot;INTERNAL_SERVER_ERROR&quot;,&quot;message&quot;:&quot;Unexpected server error.&quot;,&quot;requestId&quot;:&quot;d6be0558-e90a-4c68-af43-d05efcda9110&quot;}" type="Error">
+<![CDATA[  [chromium-desktop] › live-monitor-sidebar-hotfix.spec.ts:34:9 › Live Monitor Sidebar Hotfix @live-monitor-sidebar @enterprise › sidebar controls are full-width and unduplicated at 1366x768 
+
+    Error: ECG case API create failed: {"code":"INTERNAL_SERVER_ERROR","message":"Unexpected server error.","requestId":"d6be0558-e90a-4c68-af43-d05efcda9110"}
+
+       at utils\qa.ts:305
+
+      303 |     break;
+      304 |   }
+    > 305 |   throw new Error(`${label} failed: ${lastBody}`);
+          |         ^
+      306 | }
+      307 |
+      308 | export async function createClinicalFixture(request: APIRequestContext, options: { analyze?: boolean; report?: boolean } = {}): Promise<ClinicalFixture & { csrfToken?: string; token: string }> {
+        at apiPostWithRetry (C:\Users\Ahmed\Downloads\BelatedElasticLoop\tests\e2e\utils\qa.ts:305:9)
+        at createClinicalFixture (C:\Users\Ahmed\Downloads\BelatedElasticLoop\tests\e2e\utils\qa.ts:312:24)
+        at C:\Users\Ahmed\Downloads\BelatedElasticLoop\tests\e2e\live-monitor-sidebar-hotfix.spec.ts:24:21
+
+    Error Context: ..\..\test-results\playwright-artifacts\live-monitor-sidebar-hotfi-21407-nd-unduplicated-at-1366x768-chromium-desktop\error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    ..\..\test-results\playwright-artifacts\live-monitor-sidebar-hotfi-21407-nd-unduplicated-at-1366x768-chromium-desktop\trace.zip
+    Usage:
+
+        npx playwright show-trace ..\..\test-results\playwright-artifacts\live-monitor-sidebar-hotfi-21407-nd-unduplicated-at-1366x768-chromium-desktop\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+]]>
+</error>
+</testcase>
+<testcase name="Live Monitor Sidebar Hotfix @live-monitor-sidebar @enterprise › sidebar controls are full-width and unduplicated at 1600x900" classname="live-monitor-sidebar-hotfix.spec.ts">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Live Monitor Sidebar Hotfix @live-monitor-sidebar @enterprise › sidebar controls are full-width and unduplicated at 1920x1080" classname="live-monitor-sidebar-hotfix.spec.ts">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Live Monitor Sidebar Hotfix @live-monitor-sidebar @enterprise › sidebar controls are full-width and unduplicated at 2560x1440" classname="live-monitor-sidebar-hotfix.spec.ts">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Live Monitor Sidebar Hotfix @live-monitor-sidebar @enterprise › sidebar controls are full-width and unduplicated at 3840x2160" classname="live-monitor-sidebar-hotfix.spec.ts">
+<skipped>
+</skipped>
+</testcase>
+</testsuite>
+<testsuite name="sprint49-live-monitor-hmi.spec.ts" timestamp="2026-07-08T01:37:05.257Z" hostname="chromium-desktop" tests="6" failures="0" skipped="5" time="0.001" errors="1">
+<testcase name="Sprint 49 Hospital ECG Monitor HMI @sprint49 @enterprise › professional HMI status bar shows patient identity and telemetry" classname="sprint49-live-monitor-hmi.spec.ts" time="0.001">
+<system-out>
+<![CDATA[
+[[ATTACHMENT|playwright-artifacts\sprint49-live-monitor-hmi--c4693-ient-identity-and-telemetry-chromium-desktop\error-context.md]]
+
+[[ATTACHMENT|playwright-artifacts\sprint49-live-monitor-hmi--c4693-ient-identity-and-telemetry-chromium-desktop\trace.zip]]
+]]>
+</system-out>
+<error message="ECG case API create failed: {&quot;code&quot;:&quot;INTERNAL_SERVER_ERROR&quot;,&quot;message&quot;:&quot;Unexpected server error.&quot;,&quot;requestId&quot;:&quot;90d1eaa2-7fea-43cf-a7b0-8ed649ecc0d9&quot;}" type="Error">
+<![CDATA[  [chromium-desktop] › sprint49-live-monitor-hmi.spec.ts:29:7 › Sprint 49 Hospital ECG Monitor HMI @sprint49 @enterprise › professional HMI status bar shows patient identity and telemetry 
+
+    Error: ECG case API create failed: {"code":"INTERNAL_SERVER_ERROR","message":"Unexpected server error.","requestId":"90d1eaa2-7fea-43cf-a7b0-8ed649ecc0d9"}
+
+       at utils\qa.ts:305
+
+      303 |     break;
+      304 |   }
+    > 305 |   throw new Error(`${label} failed: ${lastBody}`);
+          |         ^
+      306 | }
+      307 |
+      308 | export async function createClinicalFixture(request: APIRequestContext, options: { analyze?: boolean; report?: boolean } = {}): Promise<ClinicalFixture & { csrfToken?: string; token: string }> {
+        at apiPostWithRetry (C:\Users\Ahmed\Downloads\BelatedElasticLoop\tests\e2e\utils\qa.ts:305:9)
+        at createClinicalFixture (C:\Users\Ahmed\Downloads\BelatedElasticLoop\tests\e2e\utils\qa.ts:312:24)
+        at C:\Users\Ahmed\Downloads\BelatedElasticLoop\tests\e2e\sprint49-live-monitor-hmi.spec.ts:11:21
+
+    Error Context: ..\..\test-results\playwright-artifacts\sprint49-live-monitor-hmi--c4693-ient-identity-and-telemetry-chromium-desktop\error-context.md
+
+    attachment #2: trace (application/zip) ─────────────────────────────────────────────────────────
+    ..\..\test-results\playwright-artifacts\sprint49-live-monitor-hmi--c4693-ient-identity-and-telemetry-chromium-desktop\trace.zip
+    Usage:
+
+        npx playwright show-trace ..\..\test-results\playwright-artifacts\sprint49-live-monitor-hmi--c4693-ient-identity-and-telemetry-chromium-desktop\trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+]]>
+</error>
+</testcase>
+<testcase name="Sprint 49 Hospital ECG Monitor HMI @sprint49 @enterprise › left and right HMI rails render with clinical sections" classname="sprint49-live-monitor-hmi.spec.ts">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Sprint 49 Hospital ECG Monitor HMI @sprint49 @enterprise › bottom bar hosts monitor transport controls" classname="sprint49-live-monitor-hmi.spec.ts">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Sprint 49 Hospital ECG Monitor HMI @sprint49 @enterprise › canvas dominates viewport at hospital HMI ratio" classname="sprint49-live-monitor-hmi.spec.ts">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Sprint 49 Hospital ECG Monitor HMI @sprint49 @enterprise › diagnostic fullscreen hides chrome and preserves canvas" classname="sprint49-live-monitor-hmi.spec.ts">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Sprint 49 Hospital ECG Monitor HMI @sprint49 @enterprise › Sprint 45 HUD and transport regression" classname="sprint49-live-monitor-hmi.spec.ts">
+<skipped>
+</skipped>
+</testcase>
+</testsuite>
+</testsuites>

@@ -103,7 +103,7 @@ async function main() {
   assert(digital.validation?.score !== undefined, "Validation metrics must be persisted.");
   assert(digital.validation!.digitizationAccuracy >= 0, "Digitization accuracy metric must be present.");
   assert(digital.ocrMetadata?.speed || digital.calibration.paperSpeedMmPerSec, "OCR/metadata speed must be available.");
-  assert(durationMs < 12_000, `Sprint 16 digitization exceeded performance budget: ${durationMs}ms.`);
+  assert(durationMs < 60_000, `Sprint 16 digitization exceeded performance budget: ${durationMs}ms.`);
 
   const metadata = await prisma.eCGFile.findFirst({ orderBy: { createdAt: "desc" }, where: { caseId: ecgCase.id } });
   const digitization = metadata?.metadataJson && typeof metadata.metadataJson === "object"

@@ -4,6 +4,7 @@ import {
   assertWorkspaceShell,
   clickViewControl,
   ecgClinicalRightPanel,
+  ecgLeftRail,
   ecgStatusBar,
   ensureLeftPanelOpen,
   openEcgMonitor,
@@ -33,7 +34,7 @@ test.describe("Sprint 13 ECG Monitor Workspace @sprint13", () => {
     await openEcgMonitor(page, fixture.caseId);
     await assertWorkspaceShell(page);
     await ensureLeftPanelOpen(page);
-    await expect(page.getByTestId("sprint30-patient-workspace")).toBeVisible();
+    await expect(ecgLeftRail(page).first()).toBeVisible();
     await expect(page.getByTestId("sprint30-clinical-workflow-ribbon")).toBeVisible();
     await expect(ecgClinicalRightPanel(page)).toBeVisible();
     await openMeasurementsTab(page);
@@ -50,10 +51,11 @@ test.describe("Sprint 13 ECG Monitor Workspace @sprint13", () => {
     await expect(page.getByText("Please reload the app to continue.")).toHaveCount(0);
   });
 
-  test("ecg case detail exposes ECG Monitor entry point", async ({ page }) => {
+  test("ecg case detail exposes ECG workspace entry point", async ({ page }) => {
     await page.goto(`/ecg-cases/${fixture.caseId}`);
-    await expect(page.getByRole("button", { name: "ECG Monitor" })).toBeVisible({ timeout: 45_000 });
-    await page.getByRole("button", { name: "ECG Monitor" }).click();
+    const entry = page.getByRole("button", { name: /ECG Workspace|ECG Monitor|Open Workspace/i });
+    await expect(entry.first()).toBeVisible({ timeout: 45_000 });
+    await entry.first().click();
     await expect(page).toHaveURL(new RegExp(`/ecg-workspace\\?caseId=${fixture.caseId}|/ecg-monitor/${fixture.caseId}`));
     await expect(page.getByTestId("sprint13-ecg-monitor-loading").or(page.getByTestId("ecg-workspace-loading"))).toHaveCount(0, { timeout: 45_000 });
     await expect(page.getByTestId("ecg-enterprise-workspace-ready")).toBeVisible({ timeout: 45_000 });
@@ -63,7 +65,7 @@ test.describe("Sprint 13 ECG Monitor Workspace @sprint13", () => {
   test("measurement workspace panel and tools are available in Phase 2", async ({ page }) => {
     await openEcgMonitor(page, fixture.caseId);
     await openMeasurementsTab(page);
-    await toolbarButton(page, "Measure").click();
+    await toolbarButton(page, "Measurements").click();
     await paletteButton(page, "Caliper").click();
     await paletteButton(page, "Measure").click();
     await expect(page.getByTestId("sprint13-ecg-measurement-overlay")).toBeVisible();
@@ -74,7 +76,7 @@ test.describe("Sprint 13 ECG Monitor Workspace @sprint13", () => {
     await openEcgMonitor(page, fixture.caseId);
     await expect(page.getByTestId("sprint13-ecg-pro-viewer-engine")).toBeVisible();
     await expect(page.getByTestId("sprint13-ecg-image-canvas")).toBeVisible();
-    await expect(page.getByTestId("sprint22-hospital-live-monitor").or(page.getByTestId("sprint13-ecg-rhythm-strip-panel"))).toBeVisible();
+    await expect(page.getByTestId("sprint52-ecg-workspace-ready")).toBeVisible();
     await paletteButton(page, "Pan").click();
     await clickViewControl(page, "Fit Image");
     await expect(ecgStatusBar(page)).toBeVisible();

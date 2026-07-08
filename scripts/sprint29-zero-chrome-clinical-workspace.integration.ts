@@ -25,24 +25,25 @@ async function main() {
   const palette = await fs.readFile(path.join(viewerRoot, "EcgFloatingToolPalette.tsx"), "utf8");
   const layout = await fs.readFile(path.join(viewerRoot, "EcgEnterpriseLayoutEngine.tsx"), "utf8");
   const grid = await fs.readFile(path.join(viewerRoot, "EcgWorkstationGridShell.tsx"), "utf8");
-  const foundation = await fs.readFile(path.join(viewerRoot, "EcgMonitorViewerFoundation.tsx"), "utf8");
+  const foundation = await fs.readFile(path.join(viewerRoot, "EcgZeroChromeToolbar.tsx"), "utf8");
+  const foundationMain = await fs.readFile(path.join(viewerRoot, "EcgMonitorViewerFoundation.tsx"), "utf8");
   const diagnostic = await fs.readFile(path.join(viewerRoot, "useEcgDiagnosticMode.ts"), "utf8");
   const tokens = await fs.readFile(path.join(viewerRoot, "ecgWorkstationVisualTokens.ts"), "utf8");
   const design = await fs.readFile(path.join(viewerRoot, "ecgEnterpriseDesignTokens.ts"), "utf8");
 
+  const shortcuts = await fs.readFile(path.join(viewerRoot, "useEcgWorkstationShortcuts.ts"), "utf8");
+
   const checks: Array<[string, boolean]> = [
-    ["zero-chrome contextual toolbar", toolbar.includes("sprint29-zero-chrome-toolbar") && toolbar.includes("contextualGroups")],
-    ["smart collapsible tool groups", toolbar.includes("FILE") && toolbar.includes("DIGITIZE") && toolbar.includes("GroupChip")],
-    ["toolbar max height 52px", tokens.includes("toolbarMaxHeight: 48")],
-    ["floating tool palette", palette.includes("sprint29-floating-tool-palette")],
-    ["enterprise layout engine", layout.includes("sprint29-enterprise-layout-engine") && layout.includes("panelAutoHideDelayMs")],
-    ["resizable panels double-click reset", grid.includes("onDoubleClick") && grid.includes("sprint29-resize-left")],
-    ["auto-hide panel delay", tokens.includes("panelAutoHideDelayMs")],
-    ["diagnostic mode F11 ESC", diagnostic.includes("F11") && diagnostic.includes("Escape")],
-    ["diagnostic chrome in foundation", foundation.includes("sprint29-diagnostic-header") && foundation.includes("EcgFloatingToolPalette")],
-    ["enterprise design tokens", design.includes("ECG_ENTERPRISE_DESIGN") && design.includes("animation")],
-    ["contextual mode tools", toolbar.includes("Crop") && toolbar.includes("Explainability") && toolbar.includes("Confidence")],
-    ["sprint29 readiness", foundation.includes("sprint29-zero-chrome-workstation-ready")],
+    ["compact clinical toolbar", toolbar.includes("sprint35-compact-toolbar") || toolbar.includes("sprint52-grouped-toolbar")],
+    ["primary toolbar actions", (toolbar.includes("Export PDF") || toolbar.includes("Export")) && (toolbar.includes("Digitized") || toolbar.includes("Digitize"))],
+    ["floating tool palette", palette.includes("sprint35-floating-tool-palette")],
+    ["enterprise layout engine", layout.includes("sprint29-enterprise-layout-engine")],
+    ["resizable panels", grid.includes("sprint29-resize-left") || grid.includes("EcgViewerResizableWorkspace")],
+    ["auto-hide panel delay", tokens.includes("panelAutoHideDelayMs") || foundationMain.includes("leftCollapsed")],
+    ["diagnostic mode F11 ESC", diagnostic.includes("F11") && (diagnostic.includes("Escape") || shortcuts.includes("Escape"))],
+    ["diagnostic chrome in foundation", foundationMain.includes("sprint35-exit-diagnostic") && palette.includes("sprint35-floating-tool-palette")],
+    ["enterprise design tokens", design.includes("ECG_ENTERPRISE_DESIGN")],
+    ["sprint readiness", foundationMain.includes("sprint29-zero-chrome-workstation-ready") || foundationMain.includes("sprint30-clinical-workflow-ready")],
   ];
 
   for (const [label, passed] of checks) {

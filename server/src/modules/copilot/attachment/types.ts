@@ -1,5 +1,5 @@
 import type { ClinicalOcrStructuredData } from "../../ocr/clinical-ocr.service";
-import type { PipelineStageRecord } from "../copilot-attachment-pipeline.service";
+import type { PipelineStageRecord } from "./pipeline-stage.types";
 
 export type ClinicalDocumentModality =
   | "ecg"

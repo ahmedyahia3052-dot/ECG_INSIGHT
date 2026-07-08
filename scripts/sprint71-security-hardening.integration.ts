@@ -68,7 +68,7 @@ assertContains("server/src/config/env.ts", [
   "AUTH_RATE_LIMIT_MAX",
 ]);
 
-assertContains("SPRINT71_ENTERPRISE_SECURITY_REPORT.md", [
+assertContains("reports/SPRINT71_ENTERPRISE_SECURITY_REPORT.md", [
   "Enterprise Security Report",
   "Authentication",
   "Authorization",

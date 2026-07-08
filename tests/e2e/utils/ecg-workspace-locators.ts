@@ -4,7 +4,8 @@ export const ECG_WORKSPACE_READY = "ecg-enterprise-workspace-ready";
 
 export function ecgToolbar(page: Page): Locator {
   return page
-    .getByTestId("sprint35-compact-toolbar")
+    .getByTestId("sprint52-grouped-toolbar")
+    .or(page.getByTestId("sprint35-compact-toolbar"))
     .or(page.getByTestId("sprint29-zero-chrome-toolbar"));
 }
 
@@ -14,7 +15,9 @@ export function ecgDiagnosticExit(page: Page): Locator {
 
 export function ecgFloatingPalette(page: Page): Locator {
   return page
-    .getByTestId("sprint35-floating-tool-palette")
+    .getByTestId("sprint53-left-tool-sections")
+    .or(page.getByTestId("sprint52-floating-tool-palette"))
+    .or(page.getByTestId("sprint35-floating-tool-palette"))
     .or(page.getByTestId("sprint335-floating-tool-palette"))
     .or(page.getByTestId("sprint33-floating-tool-palette"));
 }
@@ -30,7 +33,8 @@ export function ecgClinicalRightPanel(page: Page): Locator {
 
 export function ecgLeftRail(page: Page): Locator {
   return page
-    .getByTestId("sprint35-clinical-summary-panel")
+    .getByTestId("sprint53-workspace-left-sidebar")
+    .or(page.getByTestId("sprint35-clinical-summary-panel"))
     .or(page.getByTestId("sprint335-clinical-summary-panel"))
     .or(page.getByTestId("sprint33-clinical-summary-panel"))
     .or(page.getByTestId("sprint32-clinical-summary-panel"))
@@ -38,13 +42,31 @@ export function ecgLeftRail(page: Page): Locator {
     .or(page.getByTestId("sprint24-workstation-left-nav"));
 }
 
+export function ecgLeftSidebarTools(page: Page): Locator {
+  return page.getByTestId("sprint53-left-tool-sections");
+}
+
 export function ecgStatusBar(page: Page): Locator {
   return page
-    .getByTestId("sprint35-enterprise-status-bar")
+    .getByTestId("sprint52-enterprise-status-bar")
+    .or(page.getByTestId("sprint35-enterprise-status-bar"))
     .or(page.getByTestId("sprint335-enterprise-status-bar"))
     .or(page.getByTestId("sprint32-enterprise-status-bar"))
     .or(page.getByTestId("sprint29-enterprise-status-bar"))
     .or(page.getByTestId("sprint28-enterprise-status-bar"));
+}
+
+/** Sprint 52 — live monitor is no longer a workspace view mode; open dedicated route. */
+export async function openLiveMonitorFromWorkspace(page: Page, caseId?: string) {
+  const liveMonitorBtn = page.getByTestId("sprint52-toolbar-live-monitor");
+  if (await liveMonitorBtn.isVisible().catch(() => false)) {
+    await liveMonitorBtn.click();
+    await expect(page.getByTestId("sprint37-live-monitor-ready")).toBeVisible({ timeout: 30_000 });
+    return;
+  }
+  if (caseId) {
+    await openEcgLiveMonitor(page, caseId);
+  }
 }
 
 export function ecgRightRail(page: Page): Locator {
@@ -61,6 +83,11 @@ export function ecgToolbarGroup(page: Page, _group?: string): Locator {
 }
 
 export function ecgViewMode(page: Page, mode: string): Locator {
+  if (mode === "monitor") {
+    return page
+      .getByTestId("sprint52-toolbar-live-monitor")
+      .or(page.getByTestId("sprint21-view-mode-monitor"));
+  }
   return page.getByTestId(`sprint21-view-mode-${mode}`);
 }
 
@@ -122,6 +149,12 @@ export async function ensureLeftPanelOpen(page: Page) {
   await expect(leftPanel.first()).toBeVisible({ timeout: 15_000 });
 }
 
+/** Expand a collapsible section in the unified clinical left panel (e.g. "Workflow"). */
+export async function expandLeftPanelSection(page: Page, title: string) {
+  await ensureLeftPanelOpen(page);
+  await ecgLeftRail(page).getByText(title, { exact: true }).click();
+}
+
 export async function ensureRightPanelOpen(page: Page) {
   if (!(await ecgClinicalRightPanel(page).isVisible().catch(() => false))) {
     const toggle = paletteButton(page, "Right Panel");
@@ -149,6 +182,11 @@ export async function openAiTab(page: Page) {
   await expect(page.getByTestId("sprint14-ecg-ai-annotation-inspector")).toBeVisible({ timeout: 15_000 });
 }
 
+export async function activateMonitorView(page: Page) {
+  await ecgViewMode(page, "monitor").click();
+  await expect(page.getByTestId("sprint37-live-monitor-ready")).toBeVisible({ timeout: 30_000 });
+}
+
 export async function openEcgWorkspace(page: Page, caseId?: string) {
   const url = caseId ? `/ecg-workspace?caseId=${caseId}` : "/ecg-workspace";
   await page.goto(url, { waitUntil: "domcontentloaded" });
@@ -156,7 +194,9 @@ export async function openEcgWorkspace(page: Page, caseId?: string) {
     timeout: 45_000,
   });
   await expect(
-    page.getByTestId(ECG_WORKSPACE_READY).or(page.getByTestId("ecg-workspace-no-demo")),
+    page.getByTestId(ECG_WORKSPACE_READY)
+      .or(page.getByTestId("ecg-examination-empty-state"))
+      .or(page.getByTestId("ecg-examination-selector")),
   ).toBeVisible({ timeout: 60_000 });
   if (await page.getByTestId(ECG_WORKSPACE_READY).isVisible()) {
     await expect(page.getByTestId("sprint13-ecg-monitor-ready")).toBeVisible({ timeout: 20_000 });

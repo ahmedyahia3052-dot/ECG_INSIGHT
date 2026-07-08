@@ -1,32 +1,16 @@
 import type { AttachmentForAnalysis, ConversationMemory } from "../copilot-types";
 import { ContextManager } from "./context-manager";
 import type { SessionRecord } from "./conversation-manager";
+import type {
+  ClinicalKnowledgeDomain,
+  ClinicalKnowledgeRouteResult,
+  EducationalTopic,
+} from "./knowledge-route.types";
 import { ConversationIntentEngine } from "./v2/conversation-intent";
 import { MedicalReasoning } from "./v2/medical-reasoning";
 import { ECG_LEARNING_PATH } from "./v2/types";
 
-export type ClinicalKnowledgeDomain =
-  | "clinical_reasoning"
-  | "differential_diagnosis"
-  | "drug_information"
-  | "ecg_interpretation"
-  | "education"
-  | "emergency_assessment"
-  | "general_conversation"
-  | "guidelines"
-  | "laboratory_interpretation"
-  | "radiology_interpretation";
-
-export type EducationalTopic = "ecg_basics" | "general_medicine" | "none";
-
-export type ClinicalKnowledgeRouteResult = {
-  confidence: number;
-  domain: ClinicalKnowledgeDomain;
-  educationalMode: boolean;
-  educationalTopic: EducationalTopic;
-  learningStep: number;
-  reason: string;
-};
+export type { ClinicalKnowledgeDomain, ClinicalKnowledgeRouteResult, EducationalTopic } from "./knowledge-route.types";
 
 export { ECG_LEARNING_PATH };
 

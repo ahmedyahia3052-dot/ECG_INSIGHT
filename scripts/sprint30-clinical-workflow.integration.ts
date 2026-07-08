@@ -57,7 +57,7 @@ const capabilityMarkers = [
   "sprint30-clinical-notes",
   "sprint30-ai-review-panel",
   "sprint30-case-timeline",
-  "sprint33-clinical-right-panel",
+  "sprint35-clinical-right-panel",
   "sprint30-finalize-report",
   "sprint30-sign-report",
   "buildWorkflowSteps",
@@ -82,7 +82,8 @@ assert((types.match(/id: "/g) ?? []).length >= 16, "Workflow must define 16 stag
 assert(foundation.includes("EcgClinicalWorkflowRibbon"), "Foundation must render workflow ribbon");
 assert(foundation.includes("EcgClinicalAlertsBanner"), "Foundation must render clinical alerts");
 assert(rightPanel.includes("EcgMeasurementStudioPanel"), "Right panel must include measurement studio");
-assert(rightPanel.includes("EcgClinicalNotesPanel"), "Right panel must include doctor notes");
+assert(fs.existsSync(path.join(viewerDir, "EcgClinicalNotesPanel.tsx")), "Clinical notes panel component must exist");
+assert(fs.existsSync(path.join(viewerDir, "EcgUnifiedClinicalLeftPanel.tsx")), "Unified left panel must expose patient context");
 assert(pipeline.includes("ecg-clinical-workflow.test.ts"), "Pipeline must register Sprint 30 unit test");
 assert(pipeline.includes("sprint30-clinical-workflow.integration.ts"), "Pipeline must register Sprint 30 integration test");
 

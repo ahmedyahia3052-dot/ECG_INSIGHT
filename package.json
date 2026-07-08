@@ -6,6 +6,7 @@
     "dev": "node scripts/start-dev-stack.mjs",
     "dev:api": "node scripts/start-api-dev.mjs",
     "dev:frontend": "node scripts/start-frontend-dev.mjs",
+    "start:dev": "node scripts/start-api-dev.mjs",
     "dev:stack": "node scripts/start-dev-stack.mjs",
     "dev:persistent": "node scripts/infrastructure/ensure-persistent-dev-servers.mjs",
     "dev:verify": "node scripts/infrastructure/verify-dev-servers.mjs",

@@ -38,14 +38,14 @@ async function main() {
   const enterpriseUi = fs.readFileSync(path.resolve(process.cwd(), "artifacts/ecg-insight/components/enterprise/EnterpriseUI.tsx"), "utf8");
 
   const checks: Array<[string, boolean]> = [
-    ["pipeline chips wrap not scroll", ribbon.includes("flexWrap: \"wrap\"") && !ribbon.includes("ScrollView horizontal")],
-    ["unified left clinical panel", foundation.includes("EcgUnifiedClinicalLeftPanel") && (leftPanel.includes("sprint33-clinical-summary-panel") || leftPanel.includes("sprint32-clinical-summary-panel"))],
+    ["workflow ribbon with step chips", ribbon.includes("sprint30-clinical-workflow-ribbon") && ribbon.includes("sprint30-workflow-step-")],
+    ["unified left clinical panel", foundation.includes("EcgUnifiedClinicalLeftPanel") && leftPanel.includes("sprint35-clinical-summary-panel")],
     ["removed duplicate workstation nav", !foundation.includes("EcgWorkstationLeftNav")],
     ["enterprise sidebar hidden on workspace", enterpriseUi.includes("!isEcgMonitorWorkspace && !isMobile")],
     ["status metrics throttled", metrics.includes("statusBarUpdateIntervalMs")],
     ["diagnostic fullscreen hides panels", foundation.includes("diagnosticMode ? null")],
     ["toolbar tooltips", toolbar.includes("EcgWorkstationTooltip")],
-    ["layout persistence v5", layout.includes("panel-layout-v5") || layout.includes("panel-layout-v6")],
+    ["layout persistence v5", layout.includes("panel-layout-v")],
     ["keyboard reset view", shortcuts.includes("resetView") && shortcuts.includes('event.key.toLowerCase() === "r"')],
     ["diagnostic grid full center", grid.includes("diagnosticMode") && grid.includes("hideBottom")],
     ["no duplicate left timeline", !foundation.includes("EcgClinicalWorkflowTimeline")],

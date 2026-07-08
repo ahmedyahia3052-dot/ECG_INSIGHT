@@ -17,7 +17,7 @@ function maxCertainty(a: DiagnosticCertainty, b: DiagnosticCertainty): Diagnosti
 }
 
 export function scoreConfidence(
-  measurements: EnterpriseMeasurementBundle,
+  _measurements: EnterpriseMeasurementBundle,
   waveDetection: WaveDetectionResult,
   rhythm: RhythmResult,
   morphology: MorphologyClass[],

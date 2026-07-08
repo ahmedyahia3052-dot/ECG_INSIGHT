@@ -1,0 +1,13 @@
+{
+  "finishedAt": "2026-07-08T00:33:21.905Z",
+  "passed": true,
+  "startedAt": "2026-07-08T00:28:34.916Z",
+  "steps": [
+    {
+      "name": "smoke",
+      "passed": true,
+      "exitCode": 0,
+      "required": true
+    }
+  ]
+}

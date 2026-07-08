@@ -82,7 +82,13 @@ assert(listIschemiaEntities().some((entry) => entry.pattern === "posterior"), "I
 assert(lookupGuidelines({ organization: "ESC" }).length >= 2, "ESC guidelines required");
 assert(listDiagnoses({ category: "ischemia" }).length >= 8, "Ischemia diagnosis category under-populated");
 
-const reports = ["MIC_ARCHITECTURE.md", "KNOWLEDGE_BASE_REPORT.md", "DATABASE_SCHEMA.md", "API_REPORT.md", "CHANGELOG.md"];
+const reports = [
+  "reports/MIC_ARCHITECTURE.md",
+  "reports/KNOWLEDGE_BASE_REPORT.md",
+  "reports/DATABASE_SCHEMA.md",
+  "reports/API_REPORT.md",
+  "CHANGELOG.md",
+];
 for (const report of reports) {
   assert(fs.existsSync(path.join(repoRoot, report)), `Missing Sprint 40 report: ${report}`);
 }

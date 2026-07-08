@@ -30,6 +30,8 @@ const aiOverlay = fs.readFileSync(path.join(viewerDir, "ecgAiOverlayEngine.ts"),
 const proViewer = fs.readFileSync(path.join(viewerDir, "EcgProViewerEngine.tsx"), "utf8");
 const toolbar = fs.readFileSync(path.join(viewerDir, "EcgMeasurementFloatingToolbar.tsx"), "utf8");
 const historyPanel = fs.readFileSync(path.join(viewerDir, "EcgMeasurementHistoryPanel.tsx"), "utf8");
+const waveBridge = fs.readFileSync(path.join(viewerDir, "ecgWaveDetectionBridge.ts"), "utf8");
+const multiLeadSync = fs.readFileSync(path.join(viewerDir, "ecgMultiLeadSync.ts"), "utf8");
 const pipeline = fs.readFileSync(pipelinePath, "utf8");
 
 const markers = [
@@ -57,7 +59,9 @@ const markers = [
 ];
 
 for (const marker of markers) {
-  const source = [workspace, overlay, studio, types, aiOverlay, proViewer, toolbar, historyPanel].some((file) => file.includes(marker));
+  const source = [workspace, overlay, studio, types, aiOverlay, proViewer, toolbar, historyPanel, waveBridge, multiLeadSync].some((file) =>
+    file.includes(marker),
+  );
   assert(source, `Sprint 34 missing capability marker: ${marker}`);
 }
 

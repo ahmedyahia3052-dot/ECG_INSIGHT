@@ -6,7 +6,7 @@ export const createInternalUserSchema = z.object({
   licenseNumber: z.string().trim().max(120).optional(),
   name: z.string().trim().min(2).max(120),
   password: z.string().min(8).max(128).default("ChangeMe123!"),
-  role: z.enum(["admin", "doctor", "student"]),
+  role: z.enum(["admin", "doctor", "organization_admin", "student", "technician"]),
   specialization: z.string().trim().max(120).optional(),
 });
 

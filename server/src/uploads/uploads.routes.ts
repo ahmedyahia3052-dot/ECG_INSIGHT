@@ -5,7 +5,7 @@ import multer from "multer";
 import { Router } from "express";
 import { prisma } from "../config/prisma";
 import { buildPreprocessingArtifact, isSupportedImageOrPdfIngestionFile, mergeEcgMetadata, toJsonObject } from "../ai/preprocessing.pipeline";
-import { queueAnalysis } from "../ai/ai.service";
+import { enqueueIngestionFromUpload } from "../modules/ecg-ingestion-pipeline";
 import { assertCaseCanAcceptAnalysis } from "../cases/state-machine";
 import { requireAuth, requireRole } from "../middleware/auth";
 import { AppError } from "../middleware/error";
@@ -145,7 +145,11 @@ uploadsRouter.post(
         title: "ECG Upload Complete",
         type: ecgCase.priority === "CRITICAL" ? "CRITICAL" : "SUCCESS",
       });
-      await queueAnalysis(ecgCase.id, req.auth!.id);
+      await enqueueIngestionFromUpload({
+        caseId: ecgCase.id,
+        ecgFileId: file.id,
+        requestedById: req.auth!.id,
+      });
 
       res.status(201).json({ file: serializeFile(file) });
     } catch (error) {

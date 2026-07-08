@@ -20,7 +20,7 @@ const files = [
   { file: resolve(SERVER, "examination-session.service.ts"), markers: ["getOrCreateExaminationSession", "signExaminationSession", "buildExaminationQualitySnapshot"] },
   { file: resolve(SERVER, "examination-workflow.routes.ts"), markers: ["/examination/session", "/examination/sign"] },
   { file: resolve(FE, "useExaminationWorkflowEngine.ts"), markers: ["useExaminationWorkflowEngine", "examination-session"] },
-  { file: resolve(FE, "EcgExaminationWorkflowPanel.tsx"), markers: ["sprint48-examination-workflow-ready", "sprint48-examination-tab-pane"] },
+  { file: resolve(FE, "EcgExaminationWorkflowPanel.tsx"), markers: ["sprint48-examination-workflow-ready", "sprint48-lifecycle-status"] },
   { file: resolve(FE, "EcgExaminationDoctorReviewPanel.tsx"), markers: ["sprint48-examination-doctor-review", "Rejected"] },
   { file: resolve(FE, "EcgExaminationQualityControlPanel.tsx"), markers: ["sprint48-examination-quality-control", "Auto Recommendations"] },
   { file: resolve(ROOT, "artifacts/ecg-insight/components/ecg/viewer/EcgClinicalRightPanel.tsx"), markers: ['{ id: "examination", label: "Examination" }', "sprint48-examination-tab-pane"] },

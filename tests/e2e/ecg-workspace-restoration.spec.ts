@@ -17,11 +17,23 @@ test.describe("ECG Workspace Restoration @restoration", () => {
   test.beforeAll(async ({ request }) => {
     const fixture = await createClinicalFixture(request, { analyze: false, report: false });
     caseId = fixture.caseId;
-    const digitize = await request.post(`${API_URL}/ecg/digitize`, {
-      data: { caseId, gainMmPerMv: 10, paperSpeedMmPerSec: 25 },
-      headers: authHeaders(fixture.token, fixture.csrfToken),
-    });
-    expect(digitize.ok(), `Digitize API should succeed: ${await digitize.text()}`).toBeTruthy();
+
+    let lastError = "unknown";
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      try {
+        const digitize = await request.post(`${API_URL}/ecg/digitize`, {
+          data: { caseId, gainMmPerMv: 10, paperSpeedMmPerSec: 25 },
+          headers: authHeaders(fixture.token, fixture.csrfToken),
+          timeout: 120_000,
+        });
+        expect(digitize.ok(), `Digitize API should succeed: ${await digitize.text()}`).toBeTruthy();
+        return;
+      } catch (error) {
+        lastError = error instanceof Error ? error.message : String(error);
+        await new Promise((resolve) => setTimeout(resolve, 2_000 * (attempt + 1)));
+      }
+    }
+    throw new Error(`Digitize API failed after retries: ${lastError}`);
   });
 
   test.beforeEach(async ({ page }) => {

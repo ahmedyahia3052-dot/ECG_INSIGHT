@@ -1,0 +1,22 @@
+{
+  "startedAt": "2026-07-07T15:47:31.784Z",
+  "finishedAt": "2026-07-07T16:32:45.556Z",
+  "passed": true,
+  "remediation": "SAT-001 through SAT-005 fixed; final Playwright matrix green",
+  "steps": [
+    { "name": "lint", "passed": true },
+    { "name": "typecheck", "passed": true },
+    { "name": "build", "passed": true },
+    { "name": "integration", "passed": true, "scripts": 102 },
+    { "name": "playwright-smoke", "passed": true, "tests": 15 },
+    { "name": "playwright-clinical-workflows", "passed": true, "tests": 3 },
+    { "name": "playwright-restoration", "passed": true, "tests": 2 },
+    { "name": "playwright-sprint36", "passed": true, "tests": 8 },
+    { "name": "playwright-sprint37", "passed": true, "tests": 4 },
+    { "name": "playwright-sprint38", "passed": true, "tests": 3 },
+    { "name": "playwright-auth", "passed": true, "tests": 3 },
+    { "name": "prisma-migrate-deploy", "passed": true }
+  ],
+  "bugsFixed": ["SAT-001", "SAT-002", "SAT-003", "SAT-004", "SAT-005"],
+  "sprint41Ready": true
+}

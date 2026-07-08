@@ -23,7 +23,7 @@ export const VisionAnalysis = {
 
   mergeMemoryInsights(
     current: AttachmentInsight[],
-    memoryAttachments: Array<{ documentType?: string; kind: string; name: string }>,
+    _memoryAttachments: Array<{ documentType?: string; kind: string; name: string }>,
     rememberedInsights: AttachmentInsight[],
   ): AttachmentInsight[] {
     const names = new Set(current.map((item) => item.name));

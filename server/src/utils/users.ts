@@ -1,26 +1,8 @@
 import type { Organization, Role, SubscriptionTier, User } from "@prisma/client";
+import { toAuthenticationApiRole, fromAuthenticationApiRole, type AuthenticationApiRole } from "../modules/authentication/domain/roles";
 
-export type ApiRole = "super_admin" | "admin" | "corporate_client" | "doctor" | "student" | "user";
+export type ApiRole = AuthenticationApiRole;
 export type ApiSubscriptionTier = "free" | "clinic" | "hospital" | "basic" | "professional" | "unlimited" | "lifetime" | "enterprise";
-
-const roleToApi: Record<Role, ApiRole> = {
-  ADMIN: "admin",
-  CORPORATE_CLIENT: "corporate_client",
-  DOCTOR: "doctor",
-  OWNER: "super_admin",
-  STUDENT: "student",
-  SUPER_ADMIN: "super_admin",
-  USER: "user",
-};
-
-const roleFromApi: Record<ApiRole, Role> = {
-  admin: "ADMIN",
-  corporate_client: "CORPORATE_CLIENT",
-  doctor: "DOCTOR",
-  student: "STUDENT",
-  super_admin: "SUPER_ADMIN",
-  user: "USER",
-};
 
 const tierToApi: Record<SubscriptionTier, ApiSubscriptionTier> = {
   BASIC: "basic",
@@ -45,11 +27,11 @@ const tierFromApi: Record<ApiSubscriptionTier, SubscriptionTier> = {
 };
 
 export function toApiRole(role: Role): ApiRole {
-  return roleToApi[role];
+  return toAuthenticationApiRole(role);
 }
 
 export function fromApiRole(role: ApiRole): Role {
-  return roleFromApi[role];
+  return fromAuthenticationApiRole(role);
 }
 
 export function toApiTier(tier: SubscriptionTier): ApiSubscriptionTier {
@@ -88,30 +70,26 @@ export function serializeUser(
     | "isLifetime"
     | "lifetimeGrantedAt"
     | "lifetimeGrantedBy"
-    | "licenseNumber"
     | "name"
-    | "organizationId"
     | "ownerPasswordSetupRequired"
     | "ownerTwoFactorRequired"
-    | "positionTitle"
-    | "protectedOwner"
-    | "role"
     | "phoneNumber"
     | "phoneVerified"
+    | "positionTitle"
+    | "protectedOwner"
     | "registrationRole"
+    | "protectedOwner"
+    | "role"
     | "specialization"
-    | "username"
-    | "createdAt"
-    | "updatedAt"
   > & {
     organization?: Pick<Organization, "country" | "email" | "name" | "type"> | null;
     subscription?: { tier: SubscriptionTier } | null;
   },
 ) {
+  const organization = user.organization;
   return {
-    avatarInitials: user.avatarInitials,
     accountType: user.accountType,
-    caseCount: 0,
+    avatarInitials: user.avatarInitials,
     department: user.department ?? undefined,
     email: user.email,
     emailVerified: user.emailVerified,
@@ -119,29 +97,24 @@ export function serializeUser(
     id: user.id,
     institution: user.institution ?? undefined,
     isActive: user.isActive,
-    isOwner: user.role === "OWNER" || user.protectedOwner,
     isLifetime: user.isLifetime,
-    joinedDate: user.createdAt.toISOString().slice(0, 10),
-    lastActive: user.updatedAt.toISOString().slice(0, 10),
+    isOwner: user.protectedOwner || user.role === "OWNER",
     lifetimeGrantedAt: user.lifetimeGrantedAt?.toISOString(),
     lifetimeGrantedBy: user.lifetimeGrantedBy ?? undefined,
-    licenseNumber: user.licenseNumber ?? undefined,
     name: user.name,
-    organizationCountry: user.organization?.country ?? undefined,
-    organizationEmail: user.organization?.email ?? undefined,
-    organizationId: user.organizationId ?? undefined,
-    organizationName: user.organization?.name ?? undefined,
-    organizationType: user.organization ? organizationTypeLabel(user.organization.type) : undefined,
+    organizationCountry: organization?.country ?? undefined,
+    organizationEmail: organization?.email ?? undefined,
+    organizationName: organization?.name ?? undefined,
+    organizationType: organization ? organizationTypeLabel(organization.type) : undefined,
     ownerPasswordSetupRequired: user.ownerPasswordSetupRequired,
     ownerTwoFactorRequired: user.ownerTwoFactorRequired,
-    protectedOwner: user.protectedOwner,
-    positionTitle: user.positionTitle ?? undefined,
     phoneNumber: user.phoneNumber ?? undefined,
     phoneVerified: user.phoneVerified,
-    role: toApiRole(user.role),
+    positionTitle: user.positionTitle ?? undefined,
+    protectedOwner: user.protectedOwner,
     registrationRole: user.registrationRole ?? undefined,
+    role: toApiRole(user.role),
     specialization: user.specialization ?? undefined,
     subscriptionTier: user.subscription ? publicUserTier(user.subscription.tier) : "free",
-    username: user.username ?? undefined,
   };
 }

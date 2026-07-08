@@ -1,5 +1,5 @@
 import { getKnowledgeEntry } from "../knowledge-base";
-import type { ExplainabilityArtifact, MedicalDiagnosisCode, RuleFinding } from "../types";
+import type { ExplainabilityArtifact, RuleFinding } from "../types";
 import type { EcgClinicalMeasurementResult } from "../../ecg-measurement/types";
 
 export function buildExplainability(

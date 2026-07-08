@@ -2,9 +2,10 @@ import React from "react";
 import { useLocalSearchParams } from "expo-router";
 import { StyleSheet, View } from "react-native";
 
+import { EcgExaminationWorkflowGate } from "@/components/ecg/viewer/EcgExaminationWorkflowGate";
 import { EcgLiveMonitorWorkspaceScreen } from "@/components/ecg/viewer/EcgLiveMonitorWorkspaceScreen";
 import { useEcgWorkspaceCaseResolver } from "@/components/ecg/viewer/useEcgWorkspaceCaseResolver";
-import { EmptyState, FullScreenLoader, PageSection } from "@/components/enterprise/EnterpriseUI";
+import { EmptyState, PageSection } from "@/components/enterprise/EnterpriseUI";
 import { useAuth } from "@/context/AuthContext";
 
 export default function EcgLiveMonitorRoute() {
@@ -13,10 +14,12 @@ export default function EcgLiveMonitorRoute() {
   const token = authToken?.token;
   const resolver = useEcgWorkspaceCaseResolver({ caseId, patientId, token });
 
-  if (authLoading || resolver.isResolving) {
+  if (authLoading) {
     return (
-      <View style={styles.loadingRoot} testID="ecg-live-monitor-resolving">
-        <FullScreenLoader label="Preparing hospital live ECG monitor…" />
+      <View style={styles.loadingRoot} testID="ecg-live-monitor-auth-loading">
+        <PageSection>
+          <EmptyState message="Restoring secure clinical session…" title="Loading" />
+        </PageSection>
       </View>
     );
   }
@@ -29,25 +32,24 @@ export default function EcgLiveMonitorRoute() {
     );
   }
 
-  if (resolver.resolveError && !resolver.resolvedCaseId) {
-    return (
-      <View testID="ecg-live-monitor-no-case">
-        <PageSection>
-          <EmptyState
-            message="Open Live Monitor from an ECG case, or upload a case with an image first."
-            title="No ECG case available for live monitor"
-          />
-        </PageSection>
-      </View>
-    );
-  }
-
   return (
-    <EcgLiveMonitorWorkspaceScreen
-      caseId={resolver.resolvedCaseId}
-      demoMode={resolver.demoMode}
-      testIdPrefix="sprint37-live-monitor"
-    />
+    <EcgExaminationWorkflowGate
+      candidateCases={resolver.candidateCases}
+      demoCaseId={resolver.demoCaseId}
+      destination="ecg-live-monitor"
+      loadingLabel="Resolving ECG examination for live monitor…"
+      phase={resolver.phase}
+      refetch={() => void resolver.refetch()}
+      resolvedCaseId={resolver.resolvedCaseId}
+    >
+      {(resolvedCaseId) => (
+        <EcgLiveMonitorWorkspaceScreen
+          caseId={resolvedCaseId}
+          demoMode={resolver.demoMode}
+          testIdPrefix="sprint37-live-monitor"
+        />
+      )}
+    </EcgExaminationWorkflowGate>
   );
 }
 

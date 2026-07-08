@@ -1,5 +1,6 @@
 import { expect, test } from "./test";
 import { bootstrapAuthenticatedPage, createClinicalFixture, API_URL, authHeaders } from "./utils/qa";
+import { ecgClinicalRightPanel, ecgLeftRail } from "./utils/ecg-workspace-locators";
 
 async function openEcgWorkspace(page: import("@playwright/test").Page, caseId: string) {
   await page.goto(`/ecg-workspace?caseId=${caseId}`, { waitUntil: "domcontentloaded" });
@@ -48,8 +49,8 @@ test.describe("Sprint 30 Clinical Decision Workspace @sprint30 @enterprise", () 
 
   test("clinical workspace panels", async ({ page }) => {
     await openEcgWorkspace(page, caseId);
-    await expect(page.getByTestId("sprint33-clinical-right-panel").or(page.getByTestId("sprint30-clinical-right-panel"))).toBeVisible({ timeout: 20_000 });
-    await expect(page.getByTestId("sprint30-patient-workspace")).toBeVisible();
+    await expect(ecgClinicalRightPanel(page)).toBeVisible({ timeout: 20_000 });
+    await expect(ecgLeftRail(page).first()).toBeVisible({ timeout: 20_000 });
     await page.getByTestId("sprint26-clinical-tab-measurements").click();
     await expect(page.getByTestId("sprint30-measurement-studio")).toBeVisible({ timeout: 15_000 });
     await page.getByTestId("sprint26-clinical-tab-ai").click();

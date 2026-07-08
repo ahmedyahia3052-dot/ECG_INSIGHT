@@ -90,7 +90,7 @@ for (const spec of releaseE2eSpecs) {
   }
 }
 
-assertContains("SPRINT_37_RELEASE_CANDIDATE_REPORT.md", [
+assertContains("reports/SPRINT_37_RELEASE_CANDIDATE_REPORT.md", [
   "End-to-End Platform Validation",
   "Automated E2E Test Suite",
   "Load and Stress Testing",

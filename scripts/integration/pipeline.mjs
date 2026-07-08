@@ -149,6 +149,26 @@ export const integrationScripts = [
   "scripts/sprint68-fhir-hl7-interoperability-http.integration.ts",
   "scripts/sprint71-security-hardening.test.ts",
   "scripts/sprint71-security-hardening.integration.ts",
+  "scripts/sprint72-dependency-repair.test.ts",
+  "scripts/sprint72-dependency-repair.integration.ts",
+  "scripts/sprint75-ui-architecture.test.ts",
+  "scripts/sprint75-ui-architecture.integration.ts",
+  "scripts/sprint81-ai-foundation.test.ts",
+  "scripts/sprint76-enterprise-foundation.integration.ts",
+  "scripts/sprint82-ecg-processing-engine.test.ts",
+  "scripts/sprint82-ecg-processing-engine.integration.ts",
+  "scripts/sprint86-ai-orchestration-engine.test.ts",
+  "scripts/sprint86-ai-orchestration-engine.integration.ts",
+  "scripts/sprint87-clinical-case-management.test.ts",
+  "scripts/sprint87-clinical-case-management.integration.ts",
+  "scripts/sprint88-ecg-ingestion-pipeline.test.ts",
+  "scripts/sprint88-ecg-ingestion-pipeline.integration.ts",
+  "scripts/sprint90-medical-report-engine.test.ts",
+  "scripts/sprint90-medical-report-engine.integration.ts",
+  "scripts/sprint85-ecg-storage-engine.test.ts",
+  "scripts/sprint85-ecg-storage-engine.integration.ts",
+  "scripts/sprint89-ecg-viewer-api.test.ts",
+  "scripts/sprint89-ecg-viewer-api.integration.ts",
   "scripts/sprint47-acquisition-digitization.integration.ts",
   "scripts/sprint48-hospital-examination-workflow.integration.ts",
   "scripts/sprint49-live-monitor-hmi.integration.ts",
@@ -164,9 +184,9 @@ export const releaseE2eSpecs = [
 ];
 
 export const releaseDocs = [
-  "SPRINT_37_RELEASE_CANDIDATE_REPORT.md",
-  "PRODUCTION_DEPLOYMENT_GUIDE.md",
-  "LAUNCH_CHECKLIST.md",
+  "reports/SPRINT_37_RELEASE_CANDIDATE_REPORT.md",
+  "reports/PRODUCTION_DEPLOYMENT_GUIDE.md",
+  "reports/LAUNCH_CHECKLIST.md",
 ];
 
 export const releaseLoadScript = "scripts/release-candidate-load.ts";

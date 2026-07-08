@@ -1,0 +1,23 @@
+{
+  "apiOrigin": "http://127.0.0.1:3002",
+  "baseURL": "http://127.0.0.1:8081",
+  "ensuredAt": "2026-07-07T22:50:39.583Z",
+  "persistent": true,
+  "playwrightReuseServer": true,
+  "processes": {
+    "api": {
+      "name": "api",
+      "action": "already-healthy",
+      "pid": null,
+      "log": "C:\\Users\\Ahmed\\Downloads\\BelatedElasticLoop\\test-results\\persistent-api-dev.log",
+      "script": "start-api-dev.mjs"
+    },
+    "frontend": {
+      "name": "frontend",
+      "action": "already-healthy",
+      "pid": null,
+      "log": "C:\\Users\\Ahmed\\Downloads\\BelatedElasticLoop\\test-results\\persistent-frontend-dev.log",
+      "script": "start-frontend-dev.mjs"
+    }
+  }
+}

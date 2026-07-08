@@ -14,6 +14,14 @@ const prisma = new PrismaClient({
 
 const workspaceRoot = process.cwd();
 
+function apiErrorMessage(body: { message?: string; detail?: string } | null): string | undefined {
+  return body?.message ?? body?.detail;
+}
+
+function apiErrorCode(body: { code?: string; title?: string } | null): string | undefined {
+  return body?.code ?? body?.title;
+}
+
 function assert(condition: unknown, message: string): asserts condition {
   if (!condition) throw new Error(message);
 }
@@ -115,7 +123,10 @@ async function main() {
     for (const provider of providers.body.providers.filter((item) => !item.configured)) {
       const start = await request<{ code?: string; message?: string }>(`/auth/oauth/${provider.provider.toLowerCase()}`);
       assert(start.status === 503, `${provider.provider} must return a clear unavailable status when credentials are missing.`);
-      assert(start.body.message === "OAuth provider not configured by administrator", `${provider.provider} must not expose a broken route.`);
+      assert(
+        apiErrorMessage(start.body) === "OAuth provider not configured by administrator",
+        `${provider.provider} must not expose a broken route.`,
+      );
     }
 
     const registeredEmail = `${stamp}@ecg.test`;
@@ -219,7 +230,7 @@ async function main() {
       body: { email: registeredEmail, name: `${stamp} Duplicate`, password: "Production123!", role: "doctor" },
       method: "POST",
     });
-    assert(duplicate.status === 409 && duplicate.body.code === "EMAIL_EXISTS", "Duplicate email registration must be blocked.");
+    assert(duplicate.status === 409 && apiErrorCode(duplicate.body) === "EMAIL_EXISTS", "Duplicate email registration must be blocked.");
 
     const linkedOauth = await request<{ accessToken: string }>("/auth/oauth/login", {
       body: {

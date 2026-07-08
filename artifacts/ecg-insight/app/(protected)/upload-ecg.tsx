@@ -121,6 +121,7 @@ export default function UploadEcgScreen() {
       setAnalysis(payload.analysis);
       setCaseId(payload.caseId);
       setReport(payload.report);
+      router.replace(`/ecg-workspace?caseId=${payload.caseId}` as never);
     },
   });
 

@@ -73,7 +73,7 @@ assertContains("artifacts/ecg-insight/app/(protected)/settings.tsx", [
   "Reduce Motion",
 ]);
 
-assertContains("SPRINT_36_SECURITY_HARDENING_REPORT.md", [
+assertContains("reports/SPRINT_36_SECURITY_HARDENING_REPORT.md", [
   "Enterprise Authentication Hardening",
   "API Security",
   "Data Protection",

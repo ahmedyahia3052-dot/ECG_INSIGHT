@@ -55,9 +55,9 @@ const capabilityMarkers = [
   "sprint28-clinical-mini-navigator",
   "sprint28-clinical-timeline",
   "sprint28-signal-quality",
-  "sprint28-enterprise-status-bar",
+  "sprint35-enterprise-status-bar",
+  "sprint35-status-grid",
   "sprint28-status-gpu",
-  "sprint28-status-signal-quality",
   "EcgClinicalVisualizationCanvas",
   "GRID_PRESET_COLORS",
   "buildAiVisualRegions",
@@ -73,6 +73,11 @@ for (const marker of capabilityMarkers) {
   const source = [canvas, crosshair, miniNav, timeline, gridPresets, imageCanvas, statusBar, foundation, pipeline].some((file) => file.includes(marker));
   assert(source, `Sprint 28 clinical visualization missing capability: ${marker}`);
 }
+
+assert(
+  statusBar.includes("sprint35-enterprise-status-bar") || statusBar.includes("sprint335-enterprise-status-bar"),
+  "Status bar must expose enterprise telemetry",
+);
 
 assert(pipeline.includes("ecg-clinical-visualization.test.ts"), "Pipeline must register Sprint 28 unit test");
 assert(pipeline.includes("sprint28-clinical-visualization.integration.ts"), "Pipeline must register Sprint 28 integration test");

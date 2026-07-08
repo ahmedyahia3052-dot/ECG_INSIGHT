@@ -1,18 +1,9 @@
 import type { Role } from "@prisma/client";
 import type { NextFunction, Request, Response } from "express";
 import { prisma } from "../config/prisma";
+import { ROLE_RANK } from "../modules/authentication/domain/roles";
 import { AppError } from "./error";
 import { verifyAccessToken } from "../utils/jwt";
-
-const roleRank: Record<Role, number> = {
-  ADMIN: 3,
-  CORPORATE_CLIENT: 2,
-  DOCTOR: 2,
-  OWNER: 5,
-  STUDENT: 1,
-  SUPER_ADMIN: 4,
-  USER: 1,
-};
 
 function bearerToken(req: Request): string | null {
   const header = req.get("authorization");
@@ -66,7 +57,7 @@ export function requireRole(...roles: Role[]) {
     const actorRole = req.auth.actorRole;
     const hasSuperAdminActor =
       actorRole === "OWNER" || actorRole === "SUPER_ADMIN" || effectiveRole === "OWNER" || effectiveRole === "SUPER_ADMIN";
-    const hasRequiredRole = roles.some((role) => roleRank[effectiveRole] >= roleRank[role]);
+    const hasRequiredRole = roles.some((role) => ROLE_RANK[effectiveRole] >= ROLE_RANK[role]);
 
     if (!hasSuperAdminActor && !hasRequiredRole) {
       next(new AppError(403, "Insufficient permissions.", "FORBIDDEN"));

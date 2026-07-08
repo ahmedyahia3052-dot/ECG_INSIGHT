@@ -1,28 +1,54 @@
-# Sprint 36 — Visual Regression Report
+# Visual Regression Report
 
-## Method
+**Generated:** 2026-07-07
 
-- Playwright screenshots on failure (artifact retention)
-- Responsive layout assertions via test IDs (no pixel-diff baseline in CI for Sprint 36)
-- Static inspection of viewer tokens and overflow guards
+## Suite
 
-## Areas Inspected
+**Spec:** `tests/e2e/visual-regression-enterprise.spec.ts`  
+**Tag:** `@visual-regression @enterprise`
 
-| Surface | Status |
-|---------|--------|
-| Enterprise toolbar (compact) | PASS |
-| Clinical left summary panel | PASS |
-| Four-tab right panel | PASS |
-| Floating tool palette | PASS |
-| Diagnostic fullscreen + ESC restore | PASS |
-| AI findings tab (no overlap with measurements) | PASS |
-| Measurement overlay after zoom | PASS |
+## Snapshots
 
-## Known Visual Notes
+| Snapshot | Viewport | Detects |
+|----------|----------|---------|
+| `dashboard-desktop.png` | 1440×900 | Layout shift, KPI alignment |
+| `dashboard-laptop.png` | 1366×768 | Responsive dashboard |
+| `dashboard-tablet.png` | 1024×768 | Tablet layout |
+| `ecg-workspace-shell.png` | 1920×1080 | Toolbar, ribbon, panel alignment |
+| `login-screen.png` | default | Typography, auth card spacing |
 
-- Floating palette auto-hides when idle; mouse movement required for visibility (by design)
-- Diagnostic mode hides main toolbar; floating palette remains
+**Storage:** `tests/e2e/__snapshots__/visual-regression-enterprise.spec.ts/`
 
-## Result
+## Configuration
 
-**PASS** — No layout regressions detected in Sprint 36 automated visual checks.
+- `playwright.config.ts` — `snapshotPathTemplate` for deterministic paths
+- `maxDiffPixelRatio`: 0.02–0.03 (layout tolerance)
+
+## Commands
+
+```bash
+# Compare against baselines
+npm run qa:visual
+
+# Refresh baselines after intentional UI change (SAT agent only)
+npm run qa:visual:update
+```
+
+## Detected Issue Classes
+
+- Layout shift
+- Alignment drift
+- Spacing inconsistencies
+- Typography regression
+- Cropped text (pixel diff)
+- Broken icons (visual diff)
+- Dark theme shell drift
+- Responsive breakpoint breaks
+
+## CI
+
+Visual regression runs in `enterprise-qa.yml` playwright job. First CI run may require baseline seeding via artifact upload.
+
+## Production Impact
+
+**None** — snapshot comparison is test-only; no UI components modified.

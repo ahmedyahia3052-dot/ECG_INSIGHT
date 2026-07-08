@@ -1,0 +1,913 @@
+{
+  "config": {
+    "argv": [
+      "C:\\Program Files\\nodejs\\node.exe",
+      "C:\\Users\\Ahmed\\Downloads\\BelatedElasticLoop\\node_modules\\@playwright\\test\\cli.js",
+      "test",
+      "tests/e2e/live-monitor-sidebar-hotfix.spec.ts",
+      "tests/e2e/live-monitor-layout-hotfix.spec.ts",
+      "tests/e2e/sprint49-live-monitor-hmi.spec.ts",
+      "--project=chromium-desktop"
+    ],
+    "configFile": "C:\\Users\\Ahmed\\Downloads\\BelatedElasticLoop\\playwright.config.ts",
+    "rootDir": "C:/Users/Ahmed/Downloads/BelatedElasticLoop/tests/e2e",
+    "failOnFlakyTests": false,
+    "forbidOnly": false,
+    "fullyParallel": false,
+    "globalSetup": "C:\\Users\\Ahmed\\Downloads\\BelatedElasticLoop\\tests\\e2e\\global-setup.mjs",
+    "globalTeardown": "C:\\Users\\Ahmed\\Downloads\\BelatedElasticLoop\\tests\\e2e\\global-teardown.mjs",
+    "globalTimeout": 5400000,
+    "grep": {},
+    "grepInvert": null,
+    "maxFailures": 0,
+    "metadata": {
+      "actualWorkers": 1
+    },
+    "preserveOutput": "always",
+    "projects": [
+      {
+        "outputDir": "C:/Users/Ahmed/Downloads/BelatedElasticLoop/test-results/playwright-artifacts",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "chromium-desktop",
+        "name": "chromium-desktop",
+        "testDir": "C:/Users/Ahmed/Downloads/BelatedElasticLoop/tests/e2e",
+        "testIgnore": [
+          "/.*mobile-responsive.*\\.spec\\.ts/"
+        ],
+        "testMatch": [
+          "**/*.@(spec|test).?(c|m)[jt]s?(x)"
+        ],
+        "timeout": 120000
+      },
+      {
+        "outputDir": "C:/Users/Ahmed/Downloads/BelatedElasticLoop/test-results/playwright-artifacts",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "mobile-iphone",
+        "name": "mobile-iphone",
+        "testDir": "C:/Users/Ahmed/Downloads/BelatedElasticLoop/tests/e2e",
+        "testIgnore": [],
+        "testMatch": [
+          "/.*mobile.*\\.spec\\.ts/"
+        ],
+        "timeout": 120000
+      },
+      {
+        "outputDir": "C:/Users/Ahmed/Downloads/BelatedElasticLoop/test-results/playwright-artifacts",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "tablet-ipad",
+        "name": "tablet-ipad",
+        "testDir": "C:/Users/Ahmed/Downloads/BelatedElasticLoop/tests/e2e",
+        "testIgnore": [],
+        "testMatch": [
+          "/.*mobile.*\\.spec\\.ts/"
+        ],
+        "timeout": 120000
+      }
+    ],
+    "quiet": false,
+    "reporter": [
+      [
+        "list",
+        null
+      ],
+      [
+        "html",
+        {
+          "open": "never",
+          "outputFolder": "playwright-report"
+        }
+      ],
+      [
+        "junit",
+        {
+          "outputFile": "test-results/playwright-junit.xml"
+        }
+      ],
+      [
+        "json",
+        {
+          "outputFile": "test-results/playwright-report.json"
+        }
+      ]
+    ],
+    "reportSlowTests": {
+      "max": 5,
+      "threshold": 300000
+    },
+    "shard": null,
+    "tags": [],
+    "updateSnapshots": "missing",
+    "updateSourceMethod": "patch",
+    "version": "1.61.1",
+    "workers": 1,
+    "webServer": null
+  },
+  "suites": [
+    {
+      "title": "live-monitor-layout-hotfix.spec.ts",
+      "file": "live-monitor-layout-hotfix.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "Live Monitor Layout Hotfix @live-monitor-layout @enterprise",
+          "file": "live-monitor-layout-hotfix.spec.ts",
+          "line": 17,
+          "column": 6,
+          "specs": [
+            {
+              "title": "sidebar layout is stable at 1366x768",
+              "ok": false,
+              "tags": [
+                "live-monitor-layout",
+                "enterprise"
+              ],
+              "tests": [
+                {
+                  "timeout": 120000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium-desktop",
+                  "projectName": "chromium-desktop",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "failed",
+                      "duration": 1,
+                      "error": {
+                        "message": "Error: ECG case API create failed: {\"code\":\"INTERNAL_SERVER_ERROR\",\"message\":\"Unexpected server error.\",\"requestId\":\"bc518eef-3908-43cd-8318-701db8e673ad\"}",
+                        "stack": "Error: ECG case API create failed: {\"code\":\"INTERNAL_SERVER_ERROR\",\"message\":\"Unexpected server error.\",\"requestId\":\"bc518eef-3908-43cd-8318-701db8e673ad\"}\n    at apiPostWithRetry (C:\\Users\\Ahmed\\Downloads\\BelatedElasticLoop\\tests\\e2e\\utils\\qa.ts:305:9)\n    at createClinicalFixture (C:\\Users\\Ahmed\\Downloads\\BelatedElasticLoop\\tests\\e2e\\utils\\qa.ts:312:24)\n    at C:\\Users\\Ahmed\\Downloads\\BelatedElasticLoop\\tests\\e2e\\live-monitor-layout-hotfix.spec.ts:24:21",
+                        "location": {
+                          "file": "C:\\Users\\Ahmed\\Downloads\\BelatedElasticLoop\\tests\\e2e\\utils\\qa.ts",
+                          "column": 9,
+                          "line": 305
+                        },
+                        "snippet": "   at utils\\qa.ts:305\n\n  303 |     break;\n  304 |   }\n> 305 |   throw new Error(`${label} failed: ${lastBody}`);\n      |         ^\n  306 | }\n  307 |\n  308 | export async function createClinicalFixture(request: APIRequestContext, options: { analyze?: boolean; report?: boolean } = {}): Promise<ClinicalFixture & { csrfToken?: string; token: string }> {"
+                      },
+                      "errors": [
+                        {
+                          "location": {
+                            "file": "C:\\Users\\Ahmed\\Downloads\\BelatedElasticLoop\\tests\\e2e\\utils\\qa.ts",
+                            "column": 9,
+                            "line": 305
+                          },
+                          "message": "Error: ECG case API create failed: {\"code\":\"INTERNAL_SERVER_ERROR\",\"message\":\"Unexpected server error.\",\"requestId\":\"bc518eef-3908-43cd-8318-701db8e673ad\"}\n\n   at utils\\qa.ts:305\n\n  303 |     break;\n  304 |   }\n> 305 |   throw new Error(`${label} failed: ${lastBody}`);\n      |         ^\n  306 | }\n  307 |\n  308 | export async function createClinicalFixture(request: APIRequestContext, options: { analyze?: boolean; report?: boolean } = {}): Promise<ClinicalFixture & { csrfToken?: string; token: string }> {\n    at apiPostWithRetry (C:\\Users\\Ahmed\\Downloads\\BelatedElasticLoop\\tests\\e2e\\utils\\qa.ts:305:9)\n    at createClinicalFixture (C:\\Users\\Ahmed\\Downloads\\BelatedElasticLoop\\tests\\e2e\\utils\\qa.ts:312:24)\n    at C:\\Users\\Ahmed\\Downloads\\BelatedElasticLoop\\tests\\e2e\\live-monitor-layout-hotfix.spec.ts:24:21"
+                        }
+                      ],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-07-08T01:37:06.784Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "error-context",
+                          "contentType": "text/markdown",
+                          "path": "C:\\Users\\Ahmed\\Downloads\\BelatedElasticLoop\\test-results\\playwright-artifacts\\live-monitor-layout-hotfix-ce26d-ayout-is-stable-at-1366x768-chromium-desktop\\error-context.md"
+                        },
+                        {
+                          "name": "trace",
+                          "contentType": "application/zip",
+                          "path": "C:\\Users\\Ahmed\\Downloads\\BelatedElasticLoop\\test-results\\playwright-artifacts\\live-monitor-layout-hotfix-ce26d-ayout-is-stable-at-1366x768-chromium-desktop\\trace.zip"
+                        }
+                      ],
+                      "errorLocation": {
+                        "file": "C:\\Users\\Ahmed\\Downloads\\BelatedElasticLoop\\tests\\e2e\\utils\\qa.ts",
+                        "column": 9,
+                        "line": 305
+                      }
+                    }
+                  ],
+                  "status": "unexpected"
+                }
+              ],
+              "id": "027fc4f4f01a4b6cd8b3-c63d8094a7b95c860ceb",
+              "file": "live-monitor-layout-hotfix.spec.ts",
+              "line": 34,
+              "column": 9
+            },
+            {
+              "title": "sidebar layout is stable at 1600x900",
+              "ok": true,
+              "tags": [
+                "live-monitor-layout",
+                "enterprise"
+              ],
+              "tests": [
+                {
+                  "timeout": 120000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium-desktop",
+                  "projectName": "chromium-desktop",
+                  "results": [
+                    {
+                      "workerIndex": -1,
+                      "parallelIndex": -1,
+                      "status": "skipped",
+                      "duration": 0,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-07-08T01:37:18.377Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "skipped"
+                }
+              ],
+              "id": "027fc4f4f01a4b6cd8b3-4f626cfc893e7b713771",
+              "file": "live-monitor-layout-hotfix.spec.ts",
+              "line": 34,
+              "column": 9
+            },
+            {
+              "title": "sidebar layout is stable at 1920x1080",
+              "ok": true,
+              "tags": [
+                "live-monitor-layout",
+                "enterprise"
+              ],
+              "tests": [
+                {
+                  "timeout": 120000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium-desktop",
+                  "projectName": "chromium-desktop",
+                  "results": [
+                    {
+                      "workerIndex": -1,
+                      "parallelIndex": -1,
+                      "status": "skipped",
+                      "duration": 0,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-07-08T01:37:18.378Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "skipped"
+                }
+              ],
+              "id": "027fc4f4f01a4b6cd8b3-c675d18a151c8007974e",
+              "file": "live-monitor-layout-hotfix.spec.ts",
+              "line": 34,
+              "column": 9
+            },
+            {
+              "title": "sidebar layout is stable at 2560x1440",
+              "ok": true,
+              "tags": [
+                "live-monitor-layout",
+                "enterprise"
+              ],
+              "tests": [
+                {
+                  "timeout": 120000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium-desktop",
+                  "projectName": "chromium-desktop",
+                  "results": [
+                    {
+                      "workerIndex": -1,
+                      "parallelIndex": -1,
+                      "status": "skipped",
+                      "duration": 0,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-07-08T01:37:18.378Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "skipped"
+                }
+              ],
+              "id": "027fc4f4f01a4b6cd8b3-5884dcb7650cb3fbbb52",
+              "file": "live-monitor-layout-hotfix.spec.ts",
+              "line": 34,
+              "column": 9
+            },
+            {
+              "title": "sidebar layout is stable at 3840x2160",
+              "ok": true,
+              "tags": [
+                "live-monitor-layout",
+                "enterprise"
+              ],
+              "tests": [
+                {
+                  "timeout": 120000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium-desktop",
+                  "projectName": "chromium-desktop",
+                  "results": [
+                    {
+                      "workerIndex": -1,
+                      "parallelIndex": -1,
+                      "status": "skipped",
+                      "duration": 0,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-07-08T01:37:18.378Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "skipped"
+                }
+              ],
+              "id": "027fc4f4f01a4b6cd8b3-2c3d39d5e1581fe8bb68",
+              "file": "live-monitor-layout-hotfix.spec.ts",
+              "line": 34,
+              "column": 9
+            },
+            {
+              "title": "right clinical panel visible on ultra-wide layout",
+              "ok": true,
+              "tags": [
+                "live-monitor-layout",
+                "enterprise"
+              ],
+              "tests": [
+                {
+                  "timeout": 120000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium-desktop",
+                  "projectName": "chromium-desktop",
+                  "results": [
+                    {
+                      "workerIndex": -1,
+                      "parallelIndex": -1,
+                      "status": "skipped",
+                      "duration": 0,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-07-08T01:37:18.379Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "skipped"
+                }
+              ],
+              "id": "027fc4f4f01a4b6cd8b3-3c56413d508adad712a4",
+              "file": "live-monitor-layout-hotfix.spec.ts",
+              "line": 86,
+              "column": 7
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "live-monitor-sidebar-hotfix.spec.ts",
+      "file": "live-monitor-sidebar-hotfix.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "Live Monitor Sidebar Hotfix @live-monitor-sidebar @enterprise",
+          "file": "live-monitor-sidebar-hotfix.spec.ts",
+          "line": 17,
+          "column": 6,
+          "specs": [
+            {
+              "title": "sidebar controls are full-width and unduplicated at 1366x768",
+              "ok": false,
+              "tags": [
+                "live-monitor-sidebar",
+                "enterprise"
+              ],
+              "tests": [
+                {
+                  "timeout": 120000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium-desktop",
+                  "projectName": "chromium-desktop",
+                  "results": [
+                    {
+                      "workerIndex": 1,
+                      "parallelIndex": 0,
+                      "status": "failed",
+                      "duration": 1,
+                      "error": {
+                        "message": "Error: ECG case API create failed: {\"code\":\"INTERNAL_SERVER_ERROR\",\"message\":\"Unexpected server error.\",\"requestId\":\"d6be0558-e90a-4c68-af43-d05efcda9110\"}",
+                        "stack": "Error: ECG case API create failed: {\"code\":\"INTERNAL_SERVER_ERROR\",\"message\":\"Unexpected server error.\",\"requestId\":\"d6be0558-e90a-4c68-af43-d05efcda9110\"}\n    at apiPostWithRetry (C:\\Users\\Ahmed\\Downloads\\BelatedElasticLoop\\tests\\e2e\\utils\\qa.ts:305:9)\n    at createClinicalFixture (C:\\Users\\Ahmed\\Downloads\\BelatedElasticLoop\\tests\\e2e\\utils\\qa.ts:312:24)\n    at C:\\Users\\Ahmed\\Downloads\\BelatedElasticLoop\\tests\\e2e\\live-monitor-sidebar-hotfix.spec.ts:24:21",
+                        "location": {
+                          "file": "C:\\Users\\Ahmed\\Downloads\\BelatedElasticLoop\\tests\\e2e\\utils\\qa.ts",
+                          "column": 9,
+                          "line": 305
+                        },
+                        "snippet": "   at utils\\qa.ts:305\n\n  303 |     break;\n  304 |   }\n> 305 |   throw new Error(`${label} failed: ${lastBody}`);\n      |         ^\n  306 | }\n  307 |\n  308 | export async function createClinicalFixture(request: APIRequestContext, options: { analyze?: boolean; report?: boolean } = {}): Promise<ClinicalFixture & { csrfToken?: string; token: string }> {"
+                      },
+                      "errors": [
+                        {
+                          "location": {
+                            "file": "C:\\Users\\Ahmed\\Downloads\\BelatedElasticLoop\\tests\\e2e\\utils\\qa.ts",
+                            "column": 9,
+                            "line": 305
+                          },
+                          "message": "Error: ECG case API create failed: {\"code\":\"INTERNAL_SERVER_ERROR\",\"message\":\"Unexpected server error.\",\"requestId\":\"d6be0558-e90a-4c68-af43-d05efcda9110\"}\n\n   at utils\\qa.ts:305\n\n  303 |     break;\n  304 |   }\n> 305 |   throw new Error(`${label} failed: ${lastBody}`);\n      |         ^\n  306 | }\n  307 |\n  308 | export async function createClinicalFixture(request: APIRequestContext, options: { analyze?: boolean; report?: boolean } = {}): Promise<ClinicalFixture & { csrfToken?: string; token: string }> {\n    at apiPostWithRetry (C:\\Users\\Ahmed\\Downloads\\BelatedElasticLoop\\tests\\e2e\\utils\\qa.ts:305:9)\n    at createClinicalFixture (C:\\Users\\Ahmed\\Downloads\\BelatedElasticLoop\\tests\\e2e\\utils\\qa.ts:312:24)\n    at C:\\Users\\Ahmed\\Downloads\\BelatedElasticLoop\\tests\\e2e\\live-monitor-sidebar-hotfix.spec.ts:24:21"
+                        }
+                      ],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-07-08T01:37:19.950Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "error-context",
+                          "contentType": "text/markdown",
+                          "path": "C:\\Users\\Ahmed\\Downloads\\BelatedElasticLoop\\test-results\\playwright-artifacts\\live-monitor-sidebar-hotfi-21407-nd-unduplicated-at-1366x768-chromium-desktop\\error-context.md"
+                        },
+                        {
+                          "name": "trace",
+                          "contentType": "application/zip",
+                          "path": "C:\\Users\\Ahmed\\Downloads\\BelatedElasticLoop\\test-results\\playwright-artifacts\\live-monitor-sidebar-hotfi-21407-nd-unduplicated-at-1366x768-chromium-desktop\\trace.zip"
+                        }
+                      ],
+                      "errorLocation": {
+                        "file": "C:\\Users\\Ahmed\\Downloads\\BelatedElasticLoop\\tests\\e2e\\utils\\qa.ts",
+                        "column": 9,
+                        "line": 305
+                      }
+                    }
+                  ],
+                  "status": "unexpected"
+                }
+              ],
+              "id": "7d565dc0f40ee51a14bc-d78c06e781e78dee8887",
+              "file": "live-monitor-sidebar-hotfix.spec.ts",
+              "line": 34,
+              "column": 9
+            },
+            {
+              "title": "sidebar controls are full-width and unduplicated at 1600x900",
+              "ok": true,
+              "tags": [
+                "live-monitor-sidebar",
+                "enterprise"
+              ],
+              "tests": [
+                {
+                  "timeout": 120000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium-desktop",
+                  "projectName": "chromium-desktop",
+                  "results": [
+                    {
+                      "workerIndex": -1,
+                      "parallelIndex": -1,
+                      "status": "skipped",
+                      "duration": 0,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-07-08T01:37:31.281Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "skipped"
+                }
+              ],
+              "id": "7d565dc0f40ee51a14bc-bfd9f8c3ea9d5e66a237",
+              "file": "live-monitor-sidebar-hotfix.spec.ts",
+              "line": 34,
+              "column": 9
+            },
+            {
+              "title": "sidebar controls are full-width and unduplicated at 1920x1080",
+              "ok": true,
+              "tags": [
+                "live-monitor-sidebar",
+                "enterprise"
+              ],
+              "tests": [
+                {
+                  "timeout": 120000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium-desktop",
+                  "projectName": "chromium-desktop",
+                  "results": [
+                    {
+                      "workerIndex": -1,
+                      "parallelIndex": -1,
+                      "status": "skipped",
+                      "duration": 0,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-07-08T01:37:31.281Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "skipped"
+                }
+              ],
+              "id": "7d565dc0f40ee51a14bc-928923964e9862b605db",
+              "file": "live-monitor-sidebar-hotfix.spec.ts",
+              "line": 34,
+              "column": 9
+            },
+            {
+              "title": "sidebar controls are full-width and unduplicated at 2560x1440",
+              "ok": true,
+              "tags": [
+                "live-monitor-sidebar",
+                "enterprise"
+              ],
+              "tests": [
+                {
+                  "timeout": 120000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium-desktop",
+                  "projectName": "chromium-desktop",
+                  "results": [
+                    {
+                      "workerIndex": -1,
+                      "parallelIndex": -1,
+                      "status": "skipped",
+                      "duration": 0,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-07-08T01:37:31.281Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "skipped"
+                }
+              ],
+              "id": "7d565dc0f40ee51a14bc-ac1173e69012e0c5cf17",
+              "file": "live-monitor-sidebar-hotfix.spec.ts",
+              "line": 34,
+              "column": 9
+            },
+            {
+              "title": "sidebar controls are full-width and unduplicated at 3840x2160",
+              "ok": true,
+              "tags": [
+                "live-monitor-sidebar",
+                "enterprise"
+              ],
+              "tests": [
+                {
+                  "timeout": 120000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium-desktop",
+                  "projectName": "chromium-desktop",
+                  "results": [
+                    {
+                      "workerIndex": -1,
+                      "parallelIndex": -1,
+                      "status": "skipped",
+                      "duration": 0,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-07-08T01:37:31.281Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "skipped"
+                }
+              ],
+              "id": "7d565dc0f40ee51a14bc-abba8f7f84c059d1b666",
+              "file": "live-monitor-sidebar-hotfix.spec.ts",
+              "line": 34,
+              "column": 9
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "sprint49-live-monitor-hmi.spec.ts",
+      "file": "sprint49-live-monitor-hmi.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "Sprint 49 Hospital ECG Monitor HMI @sprint49 @enterprise",
+          "file": "sprint49-live-monitor-hmi.spec.ts",
+          "line": 5,
+          "column": 6,
+          "specs": [
+            {
+              "title": "professional HMI status bar shows patient identity and telemetry",
+              "ok": false,
+              "tags": [
+                "sprint49",
+                "enterprise"
+              ],
+              "tests": [
+                {
+                  "timeout": 120000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium-desktop",
+                  "projectName": "chromium-desktop",
+                  "results": [
+                    {
+                      "workerIndex": 2,
+                      "parallelIndex": 0,
+                      "status": "failed",
+                      "duration": 1,
+                      "error": {
+                        "message": "Error: ECG case API create failed: {\"code\":\"INTERNAL_SERVER_ERROR\",\"message\":\"Unexpected server error.\",\"requestId\":\"90d1eaa2-7fea-43cf-a7b0-8ed649ecc0d9\"}",
+                        "stack": "Error: ECG case API create failed: {\"code\":\"INTERNAL_SERVER_ERROR\",\"message\":\"Unexpected server error.\",\"requestId\":\"90d1eaa2-7fea-43cf-a7b0-8ed649ecc0d9\"}\n    at apiPostWithRetry (C:\\Users\\Ahmed\\Downloads\\BelatedElasticLoop\\tests\\e2e\\utils\\qa.ts:305:9)\n    at createClinicalFixture (C:\\Users\\Ahmed\\Downloads\\BelatedElasticLoop\\tests\\e2e\\utils\\qa.ts:312:24)\n    at C:\\Users\\Ahmed\\Downloads\\BelatedElasticLoop\\tests\\e2e\\sprint49-live-monitor-hmi.spec.ts:11:21",
+                        "location": {
+                          "file": "C:\\Users\\Ahmed\\Downloads\\BelatedElasticLoop\\tests\\e2e\\utils\\qa.ts",
+                          "column": 9,
+                          "line": 305
+                        },
+                        "snippet": "   at utils\\qa.ts:305\n\n  303 |     break;\n  304 |   }\n> 305 |   throw new Error(`${label} failed: ${lastBody}`);\n      |         ^\n  306 | }\n  307 |\n  308 | export async function createClinicalFixture(request: APIRequestContext, options: { analyze?: boolean; report?: boolean } = {}): Promise<ClinicalFixture & { csrfToken?: string; token: string }> {"
+                      },
+                      "errors": [
+                        {
+                          "location": {
+                            "file": "C:\\Users\\Ahmed\\Downloads\\BelatedElasticLoop\\tests\\e2e\\utils\\qa.ts",
+                            "column": 9,
+                            "line": 305
+                          },
+                          "message": "Error: ECG case API create failed: {\"code\":\"INTERNAL_SERVER_ERROR\",\"message\":\"Unexpected server error.\",\"requestId\":\"90d1eaa2-7fea-43cf-a7b0-8ed649ecc0d9\"}\n\n   at utils\\qa.ts:305\n\n  303 |     break;\n  304 |   }\n> 305 |   throw new Error(`${label} failed: ${lastBody}`);\n      |         ^\n  306 | }\n  307 |\n  308 | export async function createClinicalFixture(request: APIRequestContext, options: { analyze?: boolean; report?: boolean } = {}): Promise<ClinicalFixture & { csrfToken?: string; token: string }> {\n    at apiPostWithRetry (C:\\Users\\Ahmed\\Downloads\\BelatedElasticLoop\\tests\\e2e\\utils\\qa.ts:305:9)\n    at createClinicalFixture (C:\\Users\\Ahmed\\Downloads\\BelatedElasticLoop\\tests\\e2e\\utils\\qa.ts:312:24)\n    at C:\\Users\\Ahmed\\Downloads\\BelatedElasticLoop\\tests\\e2e\\sprint49-live-monitor-hmi.spec.ts:11:21"
+                        }
+                      ],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-07-08T01:37:32.988Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "error-context",
+                          "contentType": "text/markdown",
+                          "path": "C:\\Users\\Ahmed\\Downloads\\BelatedElasticLoop\\test-results\\playwright-artifacts\\sprint49-live-monitor-hmi--c4693-ient-identity-and-telemetry-chromium-desktop\\error-context.md"
+                        },
+                        {
+                          "name": "trace",
+                          "contentType": "application/zip",
+                          "path": "C:\\Users\\Ahmed\\Downloads\\BelatedElasticLoop\\test-results\\playwright-artifacts\\sprint49-live-monitor-hmi--c4693-ient-identity-and-telemetry-chromium-desktop\\trace.zip"
+                        }
+                      ],
+                      "errorLocation": {
+                        "file": "C:\\Users\\Ahmed\\Downloads\\BelatedElasticLoop\\tests\\e2e\\utils\\qa.ts",
+                        "column": 9,
+                        "line": 305
+                      }
+                    }
+                  ],
+                  "status": "unexpected"
+                }
+              ],
+              "id": "5ae17cb2d7d085406930-234112495505ab4fe78a",
+              "file": "sprint49-live-monitor-hmi.spec.ts",
+              "line": 29,
+              "column": 7
+            },
+            {
+              "title": "left and right HMI rails render with clinical sections",
+              "ok": true,
+              "tags": [
+                "sprint49",
+                "enterprise"
+              ],
+              "tests": [
+                {
+                  "timeout": 120000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium-desktop",
+                  "projectName": "chromium-desktop",
+                  "results": [
+                    {
+                      "workerIndex": -1,
+                      "parallelIndex": -1,
+                      "status": "skipped",
+                      "duration": 0,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-07-08T01:37:44.498Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "skipped"
+                }
+              ],
+              "id": "5ae17cb2d7d085406930-7ba6f8a66d53dfdaff90",
+              "file": "sprint49-live-monitor-hmi.spec.ts",
+              "line": 37,
+              "column": 7
+            },
+            {
+              "title": "bottom bar hosts monitor transport controls",
+              "ok": true,
+              "tags": [
+                "sprint49",
+                "enterprise"
+              ],
+              "tests": [
+                {
+                  "timeout": 120000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium-desktop",
+                  "projectName": "chromium-desktop",
+                  "results": [
+                    {
+                      "workerIndex": -1,
+                      "parallelIndex": -1,
+                      "status": "skipped",
+                      "duration": 0,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-07-08T01:37:44.498Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "skipped"
+                }
+              ],
+              "id": "5ae17cb2d7d085406930-7db3691b1d39a0daa0aa",
+              "file": "sprint49-live-monitor-hmi.spec.ts",
+              "line": 44,
+              "column": 7
+            },
+            {
+              "title": "canvas dominates viewport at hospital HMI ratio",
+              "ok": true,
+              "tags": [
+                "sprint49",
+                "enterprise"
+              ],
+              "tests": [
+                {
+                  "timeout": 120000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium-desktop",
+                  "projectName": "chromium-desktop",
+                  "results": [
+                    {
+                      "workerIndex": -1,
+                      "parallelIndex": -1,
+                      "status": "skipped",
+                      "duration": 0,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-07-08T01:37:44.498Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "skipped"
+                }
+              ],
+              "id": "5ae17cb2d7d085406930-460d3b822e93e3d2a63d",
+              "file": "sprint49-live-monitor-hmi.spec.ts",
+              "line": 50,
+              "column": 7
+            },
+            {
+              "title": "diagnostic fullscreen hides chrome and preserves canvas",
+              "ok": true,
+              "tags": [
+                "sprint49",
+                "enterprise"
+              ],
+              "tests": [
+                {
+                  "timeout": 120000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium-desktop",
+                  "projectName": "chromium-desktop",
+                  "results": [
+                    {
+                      "workerIndex": -1,
+                      "parallelIndex": -1,
+                      "status": "skipped",
+                      "duration": 0,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-07-08T01:37:44.498Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "skipped"
+                }
+              ],
+              "id": "5ae17cb2d7d085406930-f86525f9449bc684f220",
+              "file": "sprint49-live-monitor-hmi.spec.ts",
+              "line": 65,
+              "column": 7
+            },
+            {
+              "title": "Sprint 45 HUD and transport regression",
+              "ok": true,
+              "tags": [
+                "sprint49",
+                "enterprise"
+              ],
+              "tests": [
+                {
+                  "timeout": 120000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium-desktop",
+                  "projectName": "chromium-desktop",
+                  "results": [
+                    {
+                      "workerIndex": -1,
+                      "parallelIndex": -1,
+                      "status": "skipped",
+                      "duration": 0,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-07-08T01:37:44.498Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "skipped"
+                }
+              ],
+              "id": "5ae17cb2d7d085406930-91be34d519a8a2384469",
+              "file": "sprint49-live-monitor-hmi.spec.ts",
+              "line": 75,
+              "column": 7
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "errors": [],
+  "stats": {
+    "startTime": "2026-07-08T01:36:52.965Z",
+    "duration": 51625.556000000004,
+    "expected": 0,
+    "skipped": 14,
+    "unexpected": 3,
+    "flaky": 0
+  }
+}

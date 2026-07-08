@@ -1,12 +1,16 @@
 import { expect, test } from "./test";
 import { bootstrapAuthenticatedPage, createClinicalFixture, API_URL, authHeaders } from "./utils/qa";
-
-async function openEnterpriseWorkspace(page: import("@playwright/test").Page, caseId: string) {
-  await page.goto(`/ecg-monitor/${caseId}`, { waitUntil: "domcontentloaded" });
-  await expect(page.getByTestId("sprint13-ecg-monitor-loading")).toHaveCount(0, { timeout: 45_000 });
-  await expect(page.getByTestId("sprint13-ecg-monitor-ready")).toBeVisible({ timeout: 45_000 });
-  await expect(page.getByTestId("sprint13-ecg-viewer-toolbar")).toBeVisible({ timeout: 20_000 });
-}
+import {
+  clickViewControl,
+  ecgClinicalRightPanel,
+  ecgLeftRail,
+  ecgToolbar,
+  ecgViewMode,
+  ensureLeftPanelOpen,
+  openEcgWorkspace,
+  openMeasurementsTab,
+  paletteButton,
+  toolbarButton, activateMonitorView } from "./utils/ecg-workspace-locators";
 
 test.describe("Sprint 16.5 Enterprise Clinical Workspace @sprint165", () => {
   test.describe.configure({ mode: "serial" });
@@ -30,32 +34,34 @@ test.describe("Sprint 16.5 Enterprise Clinical Workspace @sprint165", () => {
   });
 
   test("enterprise workspace renders integrated rails, toolbar, and quality panel", async ({ page }) => {
-    await openEnterpriseWorkspace(page, caseId);
-    await expect(page.getByTestId("sprint165-ecg-left-rail")).toBeVisible();
-    await expect(page.getByTestId("sprint165-ecg-right-rail")).toBeVisible();
-    await expect(page.getByTestId("sprint165-digitization-quality-panel")).toBeVisible();
+    await openEcgWorkspace(page, caseId);
+    await ensureLeftPanelOpen(page);
+    await expect(ecgLeftRail(page)).toBeVisible();
+    await expect(ecgClinicalRightPanel(page)).toBeVisible();
+    await expect(ecgToolbar(page)).toBeVisible();
+    await openMeasurementsTab(page);
     await expect(page.getByTestId("sprint15-ecg-measurements-panel")).toBeVisible();
     await expect(page.getByTestId("sprint13-ecg-pro-viewer-engine")).toBeVisible();
   });
 
   test("compare mode, waveform toggle, and settings remain stable after zoom", async ({ page }) => {
-    await openEnterpriseWorkspace(page, caseId);
-    await page.getByRole("button", { name: "Compare", exact: true }).click();
-    await expect(page.getByTestId("sprint165-ecg-compare-viewer")).toBeVisible();
-    await page.getByRole("button", { name: /Wave On|Wave Off/ }).click();
-    await page.getByRole("button", { name: "Settings", exact: true }).click();
+    await openEcgWorkspace(page, caseId);
+    await ecgViewMode(page, "compare").click();
+    await expect(page.getByTestId("sprint165-ecg-compare-viewer").or(page.getByTestId("sprint18-ecg-compare-overlay"))).toBeVisible();
+    await page.getByRole("button", { name: "Settings", exact: true }).first().click();
     await expect(page.getByText("Viewer Settings")).toBeVisible();
     await page.getByRole("button", { name: "Close", exact: true }).click();
-    await page.getByRole("button", { name: /Zoom \d+x/ }).click();
-    await page.getByRole("button", { name: "Fit Width" }).click();
-    await expect(page.getByTestId("sprint165-ecg-compare-viewer")).toBeVisible();
+    await clickViewControl(page, "Zoom In");
+    await clickViewControl(page, "Fit Image");
+    await expect(page.getByTestId("sprint165-ecg-compare-viewer").or(page.getByTestId("sprint18-ecg-compare-overlay"))).toBeVisible();
   });
 
   test("rhythm strip and digitized overlay render after lead change", async ({ page }) => {
-    await openEnterpriseWorkspace(page, caseId);
+    await openEcgWorkspace(page, caseId);
+    await activateMonitorView(page);
+    await expect(page.getByTestId("sprint22-hospital-live-monitor").or(page.getByTestId("sprint18-live-monitor"))).toBeVisible();
     await page.getByRole("button", { name: "V1", exact: true }).first().click();
-    await expect(page.getByTestId("sprint13-ecg-rhythm-strip-panel")).toBeVisible();
-    await expect(page.getByTestId("sprint165-rhythm-strip-waveform")).toHaveCount(1, { timeout: 20_000 });
-    await expect(page.getByTestId("sprint13-ecg-layer-digitized")).toHaveCount(1, { timeout: 20_000 });
+    await ecgViewMode(page, "waveform").click();
+    await expect(page.getByTestId("sprint18-waveform-view")).toBeVisible({ timeout: 20_000 });
   });
 });

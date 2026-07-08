@@ -1,12 +1,13 @@
 import { expect, test } from "./test";
 import { bootstrapAuthenticatedPage, createClinicalFixture, API_URL, authHeaders } from "./utils/qa";
-
-async function openEcgWorkspace(page: import("@playwright/test").Page, caseId: string) {
-  await page.goto(`/ecg-workspace?caseId=${caseId}`, { waitUntil: "domcontentloaded" });
-  await expect(page.getByTestId("ecg-workspace-loading")).toHaveCount(0, { timeout: 45_000 });
-  await expect(page.getByTestId("ecg-enterprise-workspace-ready")).toBeVisible({ timeout: 45_000 });
-  await expect(page.getByTestId("sprint24-hospital-workstation-ready").or(page.getByTestId("sprint23-visual-inspector-ready"))).toBeVisible({ timeout: 20_000 });
-}
+import {
+  assertWorkspaceShell,
+  ecgClinicalRightPanel,
+  ecgToolbar,
+  ecgViewMode,
+  openEcgWorkspace,
+  activateMonitorView,
+} from "./utils/ecg-workspace-locators";
 
 test.describe("Sprint 23 Visual Inspector AI @sprint23", () => {
   test.describe.configure({ mode: "serial" });
@@ -29,29 +30,32 @@ test.describe("Sprint 23 Visual Inspector AI @sprint23", () => {
 
   test("visual inspector readiness and hospital shell", async ({ page }) => {
     await openEcgWorkspace(page, caseId);
-    await expect(page.getByText("Hospital ECG Workstation")).toBeVisible();
-    await expect(page.getByTestId("sprint24-hospital-ribbon-toolbar").or(page.getByTestId("sprint23-visual-inspector-toolbar"))).toBeVisible();
-    await expect(page.getByTestId("sprint24-clinical-right-panel").or(page.getByTestId("sprint22-clinical-right-panel"))).toBeVisible();
+    await assertWorkspaceShell(page);
+    await expect(ecgClinicalRightPanel(page)).toBeVisible();
     await page.screenshot({ fullPage: false, path: "test-results/screenshots/sprint23-inspector-shell.png" });
   });
 
   test("DOM visual audit score >= 98%", async ({ page }) => {
     await openEcgWorkspace(page, caseId);
     await page.setViewportSize({ width: 1920, height: 1080 });
-    await page.getByTestId("sprint21-view-mode-monitor").click();
+    await ecgViewMode(page, "image").click();
     await page.waitForTimeout(800);
 
     const audit = await page.evaluate(() => {
       const issues: Array<{ severity: string; type: string }> = [];
-      const viewport = { h: window.innerHeight, w: window.innerWidth };
-
-      const toolbar = document.querySelector('[data-testid="sprint24-hospital-ribbon-toolbar"], [data-testid="sprint23-visual-inspector-toolbar"]');
+      const toolbar = document.querySelector(
+        '[data-testid="sprint52-grouped-toolbar"], [data-testid="sprint35-compact-toolbar"], [data-testid="sprint29-zero-chrome-toolbar"], [data-testid="sprint26-compact-ribbon"], [data-testid="sprint24-hospital-ribbon-toolbar"], [data-testid="sprint23-visual-inspector-toolbar"]',
+      );
       if (!toolbar) issues.push({ severity: "critical", type: "missing_toolbar" });
 
-      const panel = document.querySelector('[data-testid="sprint24-clinical-right-panel"], [data-testid="sprint22-clinical-right-panel"]');
+      const panel = document.querySelector(
+        '[data-testid="sprint35-clinical-right-panel"], [data-testid="sprint335-clinical-right-panel"], [data-testid="sprint33-clinical-right-panel"], [data-testid="sprint30-clinical-right-panel"], [data-testid="sprint26-clinical-tabs"], [data-testid="sprint24-clinical-right-panel"], [data-testid="sprint22-clinical-right-panel"]',
+      );
       if (!panel) issues.push({ severity: "critical", type: "missing_panel" });
 
-      const status = document.querySelector('[data-testid="sprint24-hospital-status-bar"], [data-testid="sprint21-enterprise-status-bar"]');
+      const status = document.querySelector(
+        '[data-testid="sprint52-enterprise-status-bar"], [data-testid="sprint35-enterprise-status-bar"], [data-testid="sprint335-enterprise-status-bar"], [data-testid="sprint32-enterprise-status-bar"], [data-testid="sprint29-enterprise-status-bar"], [data-testid="sprint28-enterprise-status-bar"], [data-testid="sprint24-hospital-status-bar"], [data-testid="sprint21-enterprise-status-bar"]',
+      );
       if (!status) issues.push({ severity: "high", type: "missing_status" });
 
       const canvas = document.querySelector('[data-testid="sprint22-hospital-monitor-canvas"]');
@@ -60,7 +64,7 @@ test.describe("Sprint 23 Visual Inspector AI @sprint23", () => {
         if (r.height < 200) issues.push({ severity: "high", type: "monitor_clipped" });
       }
 
-      const titleOk = document.body.innerText.includes("Hospital ECG Workstation");
+      const titleOk = document.body.innerText.includes("Clinical Workflow") || document.querySelector('[data-testid="sprint30-clinical-workflow-ribbon"]');
       if (!titleOk) issues.push({ severity: "low", type: "title_missing" });
 
       let score = 100;
@@ -69,7 +73,7 @@ test.describe("Sprint 23 Visual Inspector AI @sprint23", () => {
         else if (issue.severity === "high") score -= 12;
         else score -= 2;
       }
-      return { issues, score: Math.max(0, score), viewport };
+      return { issues, score: Math.max(0, score) };
     });
 
     expect(audit.score).toBeGreaterThanOrEqual(98);
@@ -79,10 +83,13 @@ test.describe("Sprint 23 Visual Inspector AI @sprint23", () => {
 
   test("multi-mode visual capture for inspector baseline", async ({ page }) => {
     await openEcgWorkspace(page, caseId);
-    for (const mode of ["image", "processed", "waveform", "monitor"] as const) {
-      await page.getByTestId(`sprint21-view-mode-${mode}`).click();
+    for (const mode of ["image", "processed", "waveform"] as const) {
+      await ecgViewMode(page, mode).click();
       await page.waitForTimeout(500);
       await page.screenshot({ path: `test-results/screenshots/sprint23-mode-${mode}.png` });
     }
+    await activateMonitorView(page);
+    await page.waitForTimeout(500);
+    await page.screenshot({ path: "test-results/screenshots/sprint23-mode-monitor.png" });
   });
 });

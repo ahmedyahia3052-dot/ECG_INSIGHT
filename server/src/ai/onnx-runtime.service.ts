@@ -6,7 +6,7 @@ import { prisma } from "../config/prisma";
 import { reconstructCaseEcg } from "../modules/ecg-processing/ecg-digitization.service";
 import type { ECGAnalysisInput, ECGAnalysisOutput, ECGDiagnosis, ECGFeatureExtraction } from "./domain";
 import { analyzeECG } from "./engine";
-import type { AIProvider } from "./providers";
+import type { AIProvider } from "./ai-provider.types";
 
 const WORKSPACE_ROOT = path.resolve(__dirname, "../../..");
 const LABELS = [

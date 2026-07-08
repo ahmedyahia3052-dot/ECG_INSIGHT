@@ -81,6 +81,10 @@ export async function fetchOrAnalyzeMedicalIntelligence(accessToken: string, cas
   const listed = await listMedicalIntelligenceReports(accessToken, caseId);
   const cached = listed.reports.find((item) => item.reportJson)?.reportJson;
   if (cached) return cached;
-  const analyzed = await analyzeMedicalIntelligenceCase(accessToken, caseId);
-  return analyzed.report;
+  try {
+    const analyzed = await analyzeMedicalIntelligenceCase(accessToken, caseId);
+    return analyzed.report;
+  } catch {
+    return null;
+  }
 }

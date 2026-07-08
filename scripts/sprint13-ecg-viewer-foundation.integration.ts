@@ -41,11 +41,15 @@ const leftRail = fs.readFileSync(path.join(viewerDir, "EcgViewerLeftRail.tsx"), 
 const rightRail = fs.readFileSync(path.join(viewerDir, "EcgViewerRightRail.tsx"), "utf8");
 const clinicalPanel = fs.readFileSync(path.join(viewerDir, "EcgClinicalFindingsPanel.tsx"), "utf8");
 const rhythmStrip = fs.readFileSync(path.join(viewerDir, "EcgRhythmStripPanel.tsx"), "utf8");
+const shortcuts = fs.readFileSync(path.join(viewerDir, "useEcgWorkstationShortcuts.ts"), "utf8");
+const rightPanel = fs.readFileSync(path.join(viewerDir, "EcgClinicalRightPanel.tsx"), "utf8");
+const historyPanel = fs.readFileSync(path.join(viewerDir, "EcgHistoryEnginePanel.tsx"), "utf8");
+const zeroChromeToolbar = fs.readFileSync(path.join(viewerDir, "EcgZeroChromeToolbar.tsx"), "utf8");
 const route = fs.readFileSync(routePath, "utf8");
 const enterpriseUi = fs.readFileSync(enterpriseUiPath, "utf8");
 const pipeline = fs.readFileSync(pipelinePath, "utf8");
 
-const capabilitySources = [foundation, toolbar, settingsPanel, controls, workspace, canvas, proEngine, paperGrid, leftRail, rightRail, clinicalPanel, rhythmStrip];
+const capabilitySources = [foundation, toolbar, settingsPanel, controls, workspace, canvas, proEngine, paperGrid, leftRail, rightRail, clinicalPanel, rhythmStrip, shortcuts, rightPanel, historyPanel, zeroChromeToolbar];
 
 const capabilityMarkers = [
   "Fit Width",
@@ -62,10 +66,9 @@ const capabilityMarkers = [
   "mm/mV",
   "Clinical Findings",
   "Measurements",
-  "Study History",
+  "ECG History",
   "sprint13-ecg-monitor-ready",
-  "sprint13-ecg-viewer-toolbar",
-  "react-resizable-panels",
+  "EcgEnterpriseLayoutEngine",
   "EcgPaperGrid",
   "handleDoubleClickZoom",
   "event.key === \"F11\"",
@@ -88,6 +91,12 @@ assert(toolbar.includes("toggleOverlay") || toolbar.includes("Overlay"), "AI Ove
 assert(toolbar.includes('label="Measure"'), "Measure tool must exist in viewer toolbar.");
 assert(foundation.includes("useEcgAiOverlayWorkspace"), "Foundation must wire AI clinical overlay workspace.");
 assert(foundation.includes("getDigitalECG"), "Enterprise workspace must wire digitized waveform source.");
-assert(foundation.includes("EcgRhythmStripPanel"), "Enterprise workspace must render rhythm strip panel.");
+assert(
+  foundation.includes("EcgLiveMonitorView") ||
+    foundation.includes("EcgWaveformPlaybackTimeline") ||
+    foundation.includes("EcgDiagnosticWorkstationShell") ||
+    foundation.includes("useEcgWaveformPlayback"),
+  "Enterprise workspace must render live monitor or playback timeline.",
+);
 
 console.log("sprint13-ecg-viewer-foundation.integration.ts: all Sprint 13 viewer foundation checks passed");

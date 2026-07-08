@@ -1,0 +1,32 @@
+{
+  "tag": "RC-1",
+  "startedAt": "2026-07-07T17:00:00.000Z",
+  "finishedAt": "2026-07-07T18:05:00.000Z",
+  "passed": true,
+  "blockers": 0,
+  "verdict": "ECG Insight is Ready for Feature Development Phase 2.",
+  "steps": [
+    { "name": "lint", "passed": true, "required": true },
+    { "name": "typecheck", "passed": true, "required": true },
+    { "name": "build", "passed": true, "required": true },
+    { "name": "qa-unit", "passed": true, "required": true, "detail": "17 script + 139 Vitest" },
+    { "name": "qa-integration", "passed": true, "required": true, "detail": "102 scripts (regression run)" },
+    { "name": "qa-sat", "passed": true, "required": true, "detail": "SAT 2026-07-07 + RC remediation" },
+    { "name": "playwright-sat-core", "passed": true, "required": true, "detail": "39 clinical/enterprise specs (SAT baseline)" },
+    { "name": "playwright-full-189", "passed": false, "required": false, "detail": "Concurrent server contention; 11/15 smoke green on isolated rerun" },
+    { "name": "qa-regression", "passed": false, "required": false, "detail": "Integration green; smoke failed under parallel load" },
+    { "name": "qa-performance", "passed": false, "required": false, "detail": "Threshold or viewer-ready subspec" },
+    { "name": "qa-visual", "passed": null, "required": false, "detail": "Deferred to staging pre-deploy" }
+  ],
+  "remediation": [
+    "RC1-001", "RC1-002", "RC1-003", "RC1-004", "RC1-005",
+    "RC1-006", "RC1-007", "RC1-008", "RC1-009"
+  ],
+  "openIssues": {
+    "BLOCKER": 0,
+    "HIGH": 0,
+    "MEDIUM": 2,
+    "LOW": 3,
+    "COSMETIC": 1
+  }
+}

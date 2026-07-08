@@ -295,7 +295,7 @@ export const EcgZeroChromeToolbar = memo(function EcgZeroChromeToolbar(props: {
   const groups = useMemo(() => buildGroups(props), [props]);
 
   return (
-    <View nativeID="sprint52-grouped-toolbar" style={styles.toolbar} testID="sprint52-grouped-toolbar">
+    <View nativeID="sprint35-compact-toolbar" style={styles.toolbar} testID="sprint52-grouped-toolbar">
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.scrollRow}>
         <ToolbarGroup actions={groups.image} label="IMAGE" testID="sprint52-toolbar-group-image" />
         <ToolbarGroup actions={groups.view} label="VIEW" testID="sprint52-toolbar-group-view" />

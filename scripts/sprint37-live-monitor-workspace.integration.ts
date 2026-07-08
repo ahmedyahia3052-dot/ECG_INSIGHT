@@ -39,6 +39,7 @@ const workspaceScreen = fs.readFileSync(path.join(viewerDir, "EcgLiveMonitorWork
 const liveMonitorView = fs.readFileSync(path.join(viewerDir, "EcgLiveMonitorView.tsx"), "utf8");
 const liveMonitorRoute = fs.readFileSync(path.join(appDir, "ecg-live-monitor.tsx"), "utf8");
 const foundation = fs.readFileSync(path.join(viewerDir, "EcgMonitorViewerFoundation.tsx"), "utf8");
+const diagnosticHud = fs.readFileSync(path.join(viewerDir, "live-monitor-hmi", "EcgLiveMonitorHmiDiagnosticHud.tsx"), "utf8");
 const enterpriseUi = fs.readFileSync(
   path.join(repoRoot, "artifacts", "ecg-insight", "components", "enterprise", "EnterpriseUI.tsx"),
   "utf8",
@@ -67,7 +68,7 @@ const capabilityMarkers = [
 ];
 
 for (const marker of capabilityMarkers) {
-  const source = [shell, controls, status, leads, engine, shortcuts, workspaceScreen, liveMonitorView, liveMonitorRoute, pipeline, enterpriseUi].some((file) => file.includes(marker));
+  const source = [shell, controls, status, leads, engine, shortcuts, workspaceScreen, liveMonitorView, liveMonitorRoute, diagnosticHud, pipeline, enterpriseUi].some((file) => file.includes(marker));
   assert(source, `Sprint 37 live monitor missing capability: ${marker}`);
 }
 

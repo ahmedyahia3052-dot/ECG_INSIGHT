@@ -1,6 +1,7 @@
 import React, { type ReactNode, useCallback, useEffect, useRef, useState } from "react";
 import { Platform, StyleSheet, View } from "react-native";
 
+import { readPersistedJson, writePersistedJson } from "@/lib/presentation";
 import { EcgEnterpriseLayoutEngine } from "./EcgEnterpriseLayoutEngine";
 import {
   clampLeftPanelWidth,
@@ -28,42 +29,30 @@ function loadLayout(): SavedLayout {
   if (typeof window === "undefined") {
     return { leftSize: defaultLeft, rightSize: ECG_WORKSTATION_VISUAL.rightExpandedWidth };
   }
-  try {
-    const raw =
-      window.localStorage.getItem(LAYOUT_KEY) ??
-      window.localStorage.getItem("ecg-insight:ecg-workspace-panel-layout-v11") ??
-      window.localStorage.getItem("ecg-insight:ecg-monitor-panel-layout-v10") ??
-      window.localStorage.getItem("ecg-insight:ecg-monitor-panel-layout-v7");
-    const parsed = JSON.parse(raw ?? "{}") as SavedLayout;
-    const leftSize = clampLeftPanelWidth(parsed.leftSize ?? defaultLeft);
-    const rightSize = clampRightPanelWidth(parsed.rightSize ?? ECG_WORKSTATION_VISUAL.rightExpandedWidth);
-    return {
-      autoHidePanels: false,
-      leftCollapsed: parsed.leftCollapsed ?? false,
-      leftPinned: parsed.leftPinned ?? true,
-      rightCollapsed: parsed.rightCollapsed ?? false,
-      rightPinned: parsed.rightPinned ?? true,
-      leftSize,
-      rightSize,
-    };
-  } catch {
-    return {
-      autoHidePanels: false,
-      leftCollapsed: false,
-      leftPinned: true,
-      leftSize: defaultLeft,
-      rightSize: ECG_WORKSTATION_VISUAL.rightExpandedWidth,
-    };
-  }
+  const parsed = readPersistedJson<SavedLayout>(
+    LAYOUT_KEY,
+    {},
+    [
+      "ecg-insight:ecg-workspace-panel-layout-v11",
+      "ecg-insight:ecg-monitor-panel-layout-v10",
+      "ecg-insight:ecg-monitor-panel-layout-v7",
+    ],
+  );
+  const leftSize = clampLeftPanelWidth(parsed.leftSize ?? defaultLeft);
+  const rightSize = clampRightPanelWidth(parsed.rightSize ?? ECG_WORKSTATION_VISUAL.rightExpandedWidth);
+  return {
+    autoHidePanels: false,
+    leftCollapsed: parsed.leftCollapsed ?? false,
+    leftPinned: parsed.leftPinned ?? true,
+    rightCollapsed: parsed.rightCollapsed ?? false,
+    rightPinned: parsed.rightPinned ?? true,
+    leftSize,
+    rightSize,
+  };
 }
 
 function saveLayout(layout: SavedLayout) {
-  if (typeof window === "undefined") return;
-  try {
-    window.localStorage.setItem(LAYOUT_KEY, JSON.stringify(layout));
-  } catch {
-    // Ignore storage failures.
-  }
+  writePersistedJson(LAYOUT_KEY, layout);
 }
 
 type Props = {

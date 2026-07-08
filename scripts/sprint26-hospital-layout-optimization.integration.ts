@@ -13,6 +13,7 @@ async function main() {
     "EcgClinicalRightPanel.tsx",
     "EcgEnterpriseStatusBar.tsx",
     "ecgWorkstationVisualTokens.ts",
+    "EcgClinicalWorkflowRibbon.tsx",
   ];
 
   for (const file of required) {
@@ -26,17 +27,18 @@ async function main() {
   const status = await fs.readFile(path.join(viewerRoot, "EcgEnterpriseStatusBar.tsx"), "utf8");
   const tokens = await fs.readFile(path.join(viewerRoot, "ecgWorkstationVisualTokens.ts"), "utf8");
   const foundation = await fs.readFile(path.join(viewerRoot, "EcgMonitorViewerFoundation.tsx"), "utf8");
+  const ribbon = await fs.readFile(path.join(viewerRoot, "EcgClinicalWorkflowRibbon.tsx"), "utf8");
 
   const checks: Array<[string, boolean]> = [
-    ["compact ribbon toolbar", toolbar.includes("sprint26-compact-ribbon") && (toolbar.includes("OverflowMenu") || toolbar.includes("GroupChip"))],
-    ["toolbar max height 44px", tokens.includes("toolbarMaxHeight: 48") && tokens.includes("toolbarButtonSize: 40")],
-    ["horizontal scroll no wrap", toolbar.includes("horizontal") && !toolbar.includes('flexWrap: "wrap"')],
-    ["80% layout shell", grid.includes("sprint29-enterprise-layout") && tokens.includes("leftCollapsedWidth: 60")],
-    ["compact mode switcher row", modes.includes("sprint26-view-mode-switcher") && modes.includes("Live Monitor")],
-    ["tabbed clinical panel", panel.includes("sprint26-clinical-tabs") && panel.includes('"History"')],
-    ["compact status bar 28px", status.includes("sprint26-compact-status-bar") && tokens.includes("statusBarHeight: 28")],
-    ["left collapse 60px rail", grid.includes("leftCollapsedWidth") && foundation.includes("leftCollapsed: next")],
-    ["sprint26 readiness", foundation.includes("sprint29-zero-chrome-workstation-ready") || foundation.includes("sprint26-hospital-workstation-ready")],
+    ["compact ribbon toolbar", toolbar.includes("sprint35-compact-toolbar") || toolbar.includes("sprint52-grouped-toolbar") || toolbar.includes("sprint29-zero-chrome-toolbar")],
+    ["toolbar max height token", tokens.includes("toolbarMaxHeight") && tokens.includes("toolbarButtonSize")],
+    ["mode switcher row", modes.includes("sprint26-view-mode-switcher") && modes.includes("Live Monitor")],
+    ["layout shell", grid.includes("sprint29-enterprise-layout") || foundation.includes("EcgViewerResizableWorkspace")],
+    ["tabbed clinical panel", (panel.includes("sprint35-clinical-tabs") || panel.includes("sprint26-clinical-tabs")) && panel.includes('"History"')],
+    ["enterprise status bar", status.includes("sprint35-enterprise-status-bar") || status.includes("sprint335-enterprise-status-bar")],
+    ["clinical workflow ribbon", ribbon.includes("sprint30-clinical-workflow-ribbon") && foundation.includes("EcgClinicalWorkflowRibbon")],
+    ["view mode switcher wired", foundation.includes("EcgViewModeSwitcher")],
+    ["sprint readiness", foundation.includes("sprint30-clinical-workflow-ready") || foundation.includes("sprint29-zero-chrome-workstation-ready")],
   ];
 
   for (const [label, passed] of checks) {

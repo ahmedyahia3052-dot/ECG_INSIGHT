@@ -128,7 +128,7 @@ export async function getEnterpriseReportDocument(reportId: string, baseUrl = ""
 export async function exportEnterpriseReport(
   reportId: string,
   format: ReportExportFormat,
-  actorId: string,
+  _actorId: string,
   baseUrl = "",
 ) {
   const report = await prisma.clinicalReport.findUnique({ where: { id: reportId } });

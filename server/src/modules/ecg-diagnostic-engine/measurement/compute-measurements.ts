@@ -1,8 +1,6 @@
 import {
   clamp,
   leadSamples,
-  localMaximum,
-  localMinimum,
   msToSamples,
   samplesToMs,
 } from "../signal/signal-processing";

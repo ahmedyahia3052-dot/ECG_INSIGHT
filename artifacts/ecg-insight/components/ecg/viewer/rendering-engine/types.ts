@@ -1,6 +1,6 @@
 import type { DigitalEcg, DigitalEcgLead } from "@/services/ecgProcessing";
 
-import type { EcgGridGain, EcgLeadId, EcgPaperSpeed } from "../types";
+import type { EcgGridGain, EcgLeadId, EcgPaperSpeed, EcgViewerGridSettings } from "../types";
 
 /** Sprint 27 — hospital-grade ECG rendering pipeline types */
 
@@ -38,12 +38,8 @@ export type EcgRenderViewport = {
   zoom: number;
 };
 
-export type EcgRenderGridSettings = {
-  gain: EcgGridGain;
-  opacity: number;
-  speed: EcgPaperSpeed;
-  visible: boolean;
-};
+/** Clinical render pipeline grid — subset of {@link EcgViewerGridSettings}. */
+export type EcgRenderGridSettings = Pick<EcgViewerGridSettings, "gain" | "opacity" | "speed" | "visible">;
 
 export type EcgVectorPoint = { t: number; v: number; x: number; y: number };
 

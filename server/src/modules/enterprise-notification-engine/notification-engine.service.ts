@@ -15,7 +15,6 @@ import {
   createClinicalEventRecord,
   ensureDefaultNotificationRules,
   findNotificationTemplate,
-  listClinicalEventHistory,
   listEnabledRulesForEvent,
   listEnterpriseNotificationsForUser,
   listUnreadEnterpriseNotifications,

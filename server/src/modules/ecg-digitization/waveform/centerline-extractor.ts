@@ -54,7 +54,7 @@ function extractCenterlineColumn(
   segment: LeadSegment,
   sampleCount: number,
 ): { metrics: WaveformExtractionMetrics; path: string; samples: number[] } {
-  const { height: regionHeight, width: regionWidth, x0, x1, y0, y1 } = regionBounds(segment, width, height);
+  const { height: regionHeight, width: regionWidth, x0, y0, y1 } = regionBounds(segment, width, height);
   const midY = y0 + regionHeight / 2;
   const rawPoints: Array<{ x: number; y: number }> = [];
   let artifactRejected = 0;

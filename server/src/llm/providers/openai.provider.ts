@@ -1,4 +1,3 @@
-import { env } from "../../config/env";
 import { AppError } from "../../middleware/error";
 import { log } from "../../utils/logger";
 import { mapOllamaErrorToGracefulMessage } from "../errors";

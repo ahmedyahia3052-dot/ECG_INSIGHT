@@ -1,5 +1,3 @@
-import type { CommunicationIntent } from "./types";
-
 // Legacy shim — tool routing is handled inside Clinical AI Core V2 pipeline.
 export const IntentClassifier = {
   classify() {

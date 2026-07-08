@@ -1,0 +1,20 @@
+{
+  "passed": 14,
+  "phases": [
+    "✓ Phase 1: JPG/JPEG/PNG/PDF accepted",
+    "✓ Phase 1: Invalid format rejected with error",
+    "✓ Phase 1: Dark/bright/noisy quality assessment",
+    "✓ Phase 2: 11 preprocessing steps verified",
+    "✓ Phase 2: No-stretch fit rendering hooks present",
+    "✓ Phase 3: Grid spacing and calibration math",
+    "✓ Phase 3: Paper speed and gain inference",
+    "✓ Phase 4: All 12 leads defined uniquely",
+    "✓ Phase 5: Digitization accuracy score 90, leads 100%",
+    "✓ Phase 6: Zoom/pan/reset/fit/rotate/minimap/toolbar/fullscreen/shortcuts",
+    "✓ Phase 7: Clinical measurement kinds present",
+    "✓ Phase 8: AI overlay, confidence, and opacity",
+    "✓ Phase 9: Performance metrics instrumentation",
+    "✓ Phase 10: Layout overflow, tooltip portal, responsive grid"
+  ],
+  "timestamp": "2026-07-08T17:57:19.830Z"
+}

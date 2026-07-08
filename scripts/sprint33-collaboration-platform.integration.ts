@@ -22,7 +22,7 @@ const aiService = read("server/src/ai/ai.service.ts");
 const frontendService = read("artifacts/ecg-insight/services/collaboration.ts");
 const collaborationPanel = read("artifacts/ecg-insight/components/collaboration/CaseCollaborationPanel.tsx");
 const caseDetail = read("artifacts/ecg-insight/app/(protected)/ecg-cases/[id].tsx");
-const report = read("SPRINT_33_COLLABORATION_PLATFORM_REPORT.md");
+const report = read("reports/SPRINT_33_COLLABORATION_PLATFORM_REPORT.md");
 
 [
   "CasePresence",

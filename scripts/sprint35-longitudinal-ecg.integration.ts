@@ -21,7 +21,7 @@ const modules = read("server/src/modules/index.ts");
 const frontendService = read("artifacts/ecg-insight/services/clinicalIntelligence.ts");
 const panel = read("artifacts/ecg-insight/components/clinical/LongitudinalECGPanel.tsx");
 const caseDetail = read("artifacts/ecg-insight/app/(protected)/ecg-cases/[id].tsx");
-const report = read("SPRINT_35_LONGITUDINAL_INTELLIGENCE_REPORT.md");
+const report = read("reports/SPRINT_35_LONGITUDINAL_INTELLIGENCE_REPORT.md");
 
 [
   "LongitudinalECGComparison",

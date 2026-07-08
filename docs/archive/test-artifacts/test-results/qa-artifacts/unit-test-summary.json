@@ -1,0 +1,108 @@
+{
+  "total": 20,
+  "passed": 20,
+  "failed": 0,
+  "finishedAt": "2026-07-08T00:27:28.925Z",
+  "results": [
+    {
+      "file": "scripts/ecg-acquisition.test.ts",
+      "passed": true,
+      "exitCode": 0
+    },
+    {
+      "file": "scripts/ecg-ai-overlay-engine.test.ts",
+      "passed": true,
+      "exitCode": 0
+    },
+    {
+      "file": "scripts/ecg-calibration-math.test.ts",
+      "passed": true,
+      "exitCode": 0
+    },
+    {
+      "file": "scripts/ecg-caliper-geometry.test.ts",
+      "passed": true,
+      "exitCode": 0
+    },
+    {
+      "file": "scripts/ecg-clinical-visualization.test.ts",
+      "passed": true,
+      "exitCode": 0
+    },
+    {
+      "file": "scripts/ecg-clinical-workflow.test.ts",
+      "passed": true,
+      "exitCode": 0
+    },
+    {
+      "file": "scripts/ecg-diagnostic-engine-sprint54.test.ts",
+      "passed": true,
+      "exitCode": 0
+    },
+    {
+      "file": "scripts/ecg-digitization-engine.test.ts",
+      "passed": true,
+      "exitCode": 0
+    },
+    {
+      "file": "scripts/ecg-enterprise-viewer.test.ts",
+      "passed": true,
+      "exitCode": 0
+    },
+    {
+      "file": "scripts/ecg-measurement-engine.test.ts",
+      "passed": true,
+      "exitCode": 0
+    },
+    {
+      "file": "scripts/ecg-pro-viewer-engine.test.ts",
+      "passed": true,
+      "exitCode": 0
+    },
+    {
+      "file": "scripts/ecg-pro-viewer-workspace.test.ts",
+      "passed": true,
+      "exitCode": 0
+    },
+    {
+      "file": "scripts/ecg-rendering-engine.test.ts",
+      "passed": true,
+      "exitCode": 0
+    },
+    {
+      "file": "scripts/ecg-viewer-engine.test.ts",
+      "passed": true,
+      "exitCode": 0
+    },
+    {
+      "file": "scripts/ecg-wave-detection-bridge.test.ts",
+      "passed": true,
+      "exitCode": 0
+    },
+    {
+      "file": "scripts/ecg-waveform-coordinate.test.ts",
+      "passed": true,
+      "exitCode": 0
+    },
+    {
+      "file": "scripts/emkp-validation.test.ts",
+      "passed": true,
+      "exitCode": 0
+    },
+    {
+      "file": "scripts/medical-intelligence-engine.test.ts",
+      "passed": true,
+      "exitCode": 0
+    },
+    {
+      "file": "scripts/qa/config.test.ts",
+      "passed": true,
+      "exitCode": 0
+    },
+    {
+      "file": "scripts/render-engine-2.test.ts",
+      "passed": true,
+      "exitCode": 0
+    }
+  ]
+}

@@ -1,13 +1,10 @@
 import { env } from "../config/env";
 import { analyzeECG } from "./engine";
+import type { AIProvider } from "./ai-provider.types";
 import type { ECGAnalysisInput, ECGAnalysisOutput } from "./domain";
 import { hasLocalOnnxModel, LocalOnnxProvider } from "./onnx-runtime.service";
 
-export interface AIProvider {
-  analyze(input: ECGAnalysisInput & { actorId?: string }): Promise<ECGAnalysisOutput>;
-  modelVersion: string;
-  name: "deep_learning" | "mock" | "onnx_runtime" | "rule_based";
-}
+export type { AIProvider } from "./ai-provider.types";
 
 export class RuleBasedProvider implements AIProvider {
   modelVersion = "ecg-insight-rule-engine-v2.0.0";

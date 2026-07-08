@@ -17,7 +17,9 @@ import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { ToastProvider } from "@/components/interaction/PremiumInteraction";
 import { MobileSyncStatus } from "@/components/mobile/MobileSyncStatus";
 import { AuthProvider, useAuth } from "@/context/AuthContext";
+import { ThemeEngineProvider } from "@/design-system/theme-engine";
 import { ApiError } from "@/services/api";
+import { initializeApiFoundation } from "@/services/foundation";
 
 SplashScreen.preventAutoHideAsync();
 
@@ -93,6 +95,10 @@ export default function RootLayout() {
   }, [fontsLoaded, fontError]);
 
   useEffect(() => {
+    initializeApiFoundation();
+  }, []);
+
+  useEffect(() => {
     if (typeof window === "undefined") return undefined;
     const onError = (event: ErrorEvent) => captureFrontendError(event.error ?? event.message, "Unhandled frontend error");
     const onRejection = (event: PromiseRejectionEvent) => captureFrontendError(event.reason, "Unhandled promise rejection");
@@ -118,12 +124,14 @@ export default function RootLayout() {
       <ErrorBoundary onError={(error, stackTrace) => captureFrontendError({ error, stackTrace }, "React error boundary")}>
         <QueryClientProvider client={queryClient}>
           <GestureHandlerRootView style={{ flex: 1 }}>
-            <AuthProvider>
-              <ToastProvider>
-                <RootLayoutNav />
-                <AuthenticatedChrome />
-              </ToastProvider>
-            </AuthProvider>
+            <ThemeEngineProvider>
+              <AuthProvider>
+                <ToastProvider>
+                  <RootLayoutNav />
+                  <AuthenticatedChrome />
+                </ToastProvider>
+              </AuthProvider>
+            </ThemeEngineProvider>
           </GestureHandlerRootView>
         </QueryClientProvider>
       </ErrorBoundary>

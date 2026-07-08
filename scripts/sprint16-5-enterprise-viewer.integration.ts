@@ -14,6 +14,8 @@ const required = [
   "EcgViewerSettingsPanel.tsx",
   "useEcgEnterpriseViewerState.ts",
   "ecgDigitizedWaveformSync.ts",
+  "EcgWorkstationToolbar.tsx",
+  "EcgClinicalRightPanel.tsx",
 ];
 
 async function main() {
@@ -25,17 +27,26 @@ async function main() {
   const foundation = await fs.readFile(path.join(viewerRoot, "EcgMonitorViewerFoundation.tsx"), "utf8");
   const toolbar = await fs.readFile(path.join(viewerRoot, "EcgViewerToolbar.tsx"), "utf8");
   const rightRail = await fs.readFile(path.join(viewerRoot, "EcgViewerRightRail.tsx"), "utf8");
+  const rightPanel = await fs.readFile(path.join(viewerRoot, "EcgClinicalRightPanel.tsx"), "utf8");
+  const zeroChrome = await fs.readFile(path.join(viewerRoot, "EcgZeroChromeToolbar.tsx"), "utf8");
 
   const checks: Array<[string, boolean]> = [
     ["digital ECG query wired", foundation.includes("getDigitalECG")],
     ["enterprise viewer state", foundation.includes("useEcgEnterpriseViewerState")],
     ["compare viewer canvas", foundation.includes("compareMode")],
-    ["digitization quality panel", rightRail.includes("EcgDigitizationQualityPanel")],
+    ["digitization quality panel", rightRail.includes("EcgDigitizationQualityPanel") || rightPanel.includes("Digitization Score")],
     ["settings panel", foundation.includes("EcgViewerSettingsPanel")],
-    ["enterprise toolbar", toolbar.includes("sprint13-ecg-viewer-toolbar")],
+    ["enterprise workstation toolbar", foundation.includes("EcgWorkstationToolbar")],
+    ["legacy viewer toolbar", toolbar.includes("sprint13-ecg-viewer-toolbar")],
     ["previous/next navigation", toolbar.includes("Previous") && toolbar.includes("Next")],
-    ["waveform toggle", toolbar.includes("Wave On")],
-    ["rhythm strip waveform", foundation.includes("leadWaveform")],
+    ["waveform toggle", toolbar.includes("Wave On") || zeroChrome.includes("Waveform") || zeroChrome.includes("Digitized")],
+    ["digitized waveform sync", foundation.includes("buildSegmentAlignedDigitizedWaveformLeads")],
+    [
+      "live monitor waveform",
+      foundation.includes("EcgLiveMonitorView") ||
+        foundation.includes("EcgDiagnosticWorkstationShell") ||
+        foundation.includes("useEcgWaveformPlayback"),
+    ],
     ["clinical findings digital merge", foundation.includes("useEcgClinicalFindings(ecgCase, workspace, analysis, explainability, digitalEcg)")],
   ];
 

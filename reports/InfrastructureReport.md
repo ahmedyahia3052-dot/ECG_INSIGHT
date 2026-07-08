@@ -1,20 +1,20 @@
 # Infrastructure Report
 
-Generated: 2026-07-06T20:30:32.216Z
+Generated: 2026-07-08T01:37:04.784Z
 
 ## Summary
 
 | Metric | Value |
 |--------|-------|
-| Session ID | ef179465-9bdb-4a74-b390-052a804720a3 |
+| Session ID | aca4d59f-662d-47d3-87d9-f95b1a6d9c19 |
 | Reuse existing server | no |
-| Startup time | 23307 ms |
+| Startup time | 11752 ms |
 | API readiness | ready |
 | Ollama readiness | healthy |
-| Database latency | 236 ms |
-| Frontend startup | 8497 ms |
+| Database latency | 437 ms |
+| Frontend startup | 751 ms |
 | CPU cores | 12 |
-| Memory free / total | 3265 MB / 16240 MB |
+| Memory free / total | 4673 MB / 16240 MB |
 | Process lifecycle report | PROCESS_LIFECYCLE_REPORT.md |
 
 ## Failed connections
@@ -30,218 +30,211 @@ Generated: 2026-07-06T20:30:32.216Z
     "manifest": {
       "lifecycle": [
         {
-          "at": "2026-07-06T20:27:59.012Z",
+          "at": "2026-07-08T01:36:02.923Z",
+          "by": "ProcessManager",
+          "event": "port-cleanup",
+          "sessionId": "f70b69f8-c9de-4214-a74f-f41d6e0b2efd",
+          "killed": [
+            26236,
+            13164
+          ],
+          "port": 3002,
+          "service": "api"
+        },
+        {
+          "at": "2026-07-08T01:36:03.691Z",
           "by": "ProcessManager",
           "event": "started",
-          "sessionId": "ea323172-6163-4506-a410-e401586a1c99",
+          "sessionId": "f70b69f8-c9de-4214-a74f-f41d6e0b2efd",
           "command": "npx tsx server/src/index.ts",
           "name": "api",
-          "pid": 2564,
+          "pid": 20432,
           "startedBy": "ProcessManager.startManagedProcess"
         },
         {
-          "at": "2026-07-06T20:27:59.073Z",
+          "at": "2026-07-08T01:36:03.967Z",
+          "by": "ProcessManager",
+          "event": "port-cleanup",
+          "sessionId": "f70b69f8-c9de-4214-a74f-f41d6e0b2efd",
+          "killed": [
+            1452
+          ],
+          "port": 8081,
+          "service": "frontend"
+        },
+        {
+          "at": "2026-07-08T01:36:04.742Z",
           "by": "ProcessManager",
           "event": "started",
-          "sessionId": "ea323172-6163-4506-a410-e401586a1c99",
+          "sessionId": "f70b69f8-c9de-4214-a74f-f41d6e0b2efd",
           "command": "npx expo start --web --localhost --port 8081",
           "name": "frontend",
-          "pid": 11912,
+          "pid": 4264,
           "startedBy": "ProcessManager.startManagedProcess"
         },
         {
-          "at": "2026-07-06T20:27:59.094Z",
+          "at": "2026-07-08T01:36:04.758Z",
           "by": "ProcessManager",
           "event": "ready-retry",
-          "sessionId": "ea323172-6163-4506-a410-e401586a1c99",
+          "sessionId": "f70b69f8-c9de-4214-a74f-f41d6e0b2efd",
           "attempts": 1,
           "error": "fetch failed",
           "name": "api-live",
           "url": "http://127.0.0.1:3002/live"
         },
         {
-          "at": "2026-07-06T20:27:59.453Z",
+          "at": "2026-07-08T01:36:05.126Z",
           "by": "ProcessManager",
           "event": "ready-retry",
-          "sessionId": "ea323172-6163-4506-a410-e401586a1c99",
+          "sessionId": "f70b69f8-c9de-4214-a74f-f41d6e0b2efd",
           "attempts": 2,
           "error": "fetch failed",
           "name": "api-live",
           "url": "http://127.0.0.1:3002/live"
         },
         {
-          "at": "2026-07-06T20:27:59.920Z",
+          "at": "2026-07-08T01:36:05.585Z",
           "by": "ProcessManager",
           "event": "ready-retry",
-          "sessionId": "ea323172-6163-4506-a410-e401586a1c99",
+          "sessionId": "f70b69f8-c9de-4214-a74f-f41d6e0b2efd",
           "attempts": 3,
           "error": "fetch failed",
           "name": "api-live",
           "url": "http://127.0.0.1:3002/live"
         },
         {
-          "at": "2026-07-06T20:28:00.487Z",
+          "at": "2026-07-08T01:36:06.150Z",
           "by": "ProcessManager",
           "event": "ready-retry",
-          "sessionId": "ea323172-6163-4506-a410-e401586a1c99",
+          "sessionId": "f70b69f8-c9de-4214-a74f-f41d6e0b2efd",
           "attempts": 4,
           "error": "fetch failed",
           "name": "api-live",
           "url": "http://127.0.0.1:3002/live"
         },
         {
-          "at": "2026-07-06T20:28:01.154Z",
+          "at": "2026-07-08T01:36:06.817Z",
           "by": "ProcessManager",
           "event": "ready-retry",
-          "sessionId": "ea323172-6163-4506-a410-e401586a1c99",
+          "sessionId": "f70b69f8-c9de-4214-a74f-f41d6e0b2efd",
           "attempts": 5,
           "error": "fetch failed",
           "name": "api-live",
           "url": "http://127.0.0.1:3002/live"
         },
         {
-          "at": "2026-07-06T20:28:01.919Z",
+          "at": "2026-07-08T01:36:07.581Z",
           "by": "ProcessManager",
           "event": "ready-retry",
-          "sessionId": "ea323172-6163-4506-a410-e401586a1c99",
+          "sessionId": "f70b69f8-c9de-4214-a74f-f41d6e0b2efd",
           "attempts": 6,
           "error": "fetch failed",
           "name": "api-live",
           "url": "http://127.0.0.1:3002/live"
         },
         {
-          "at": "2026-07-06T20:28:02.786Z",
+          "at": "2026-07-08T01:36:08.450Z",
           "by": "ProcessManager",
           "event": "ready-retry",
-          "sessionId": "ea323172-6163-4506-a410-e401586a1c99",
+          "sessionId": "f70b69f8-c9de-4214-a74f-f41d6e0b2efd",
           "attempts": 7,
           "error": "fetch failed",
           "name": "api-live",
           "url": "http://127.0.0.1:3002/live"
         },
         {
-          "at": "2026-07-06T20:28:03.788Z",
+          "at": "2026-07-08T01:36:09.417Z",
           "by": "ProcessManager",
-          "event": "ready",
-          "sessionId": "ea323172-6163-4506-a410-e401586a1c99",
+          "event": "ready-retry",
+          "sessionId": "f70b69f8-c9de-4214-a74f-f41d6e0b2efd",
           "attempts": 8,
-          "durationMs": 4713,
+          "error": "fetch failed",
           "name": "api-live",
           "url": "http://127.0.0.1:3002/live"
         },
         {
-          "at": "2026-07-06T20:28:03.965Z",
+          "at": "2026-07-08T01:36:10.514Z",
           "by": "ProcessManager",
           "event": "ready",
-          "sessionId": "ea323172-6163-4506-a410-e401586a1c99",
+          "sessionId": "f70b69f8-c9de-4214-a74f-f41d6e0b2efd",
+          "attempts": 9,
+          "durationMs": 5770,
+          "name": "api-live",
+          "url": "http://127.0.0.1:3002/live"
+        },
+        {
+          "at": "2026-07-08T01:36:10.838Z",
+          "by": "ProcessManager",
+          "event": "ready",
+          "sessionId": "f70b69f8-c9de-4214-a74f-f41d6e0b2efd",
           "attempts": 1,
-          "durationMs": 174,
+          "durationMs": 320,
           "name": "api-ready",
           "url": "http://127.0.0.1:3002/ready"
         },
         {
-          "at": "2026-07-06T20:28:05.611Z",
+          "at": "2026-07-08T01:36:11.826Z",
           "by": "ProcessManager",
           "event": "ready",
-          "sessionId": "ea323172-6163-4506-a410-e401586a1c99",
+          "sessionId": "f70b69f8-c9de-4214-a74f-f41d6e0b2efd",
           "attempts": 1,
-          "durationMs": 1645,
+          "durationMs": 985,
           "name": "frontend",
           "url": "http://127.0.0.1:8081"
-        },
-        {
-          "at": "2026-07-06T20:28:50.078Z",
-          "by": "ProcessManager",
-          "event": "stop-requested",
-          "sessionId": "ea323172-6163-4506-a410-e401586a1c99",
-          "name": "frontend",
-          "pid": 11912,
-          "reason": "playwright-global-teardown",
-          "stoppedBy": "global-teardown.mjs"
-        },
-        {
-          "at": "2026-07-06T20:28:50.326Z",
-          "by": "ProcessManager",
-          "event": "stopped",
-          "sessionId": "ea323172-6163-4506-a410-e401586a1c99",
-          "name": "frontend",
-          "pid": 11912,
-          "reason": "playwright-global-teardown",
-          "stoppedBy": "global-teardown.mjs"
-        },
-        {
-          "at": "2026-07-06T20:28:50.327Z",
-          "by": "ProcessManager",
-          "event": "stop-requested",
-          "sessionId": "ea323172-6163-4506-a410-e401586a1c99",
-          "name": "api",
-          "pid": 2564,
-          "reason": "playwright-global-teardown",
-          "stoppedBy": "global-teardown.mjs"
-        },
-        {
-          "at": "2026-07-06T20:28:50.557Z",
-          "by": "ProcessManager",
-          "event": "stopped",
-          "sessionId": "ea323172-6163-4506-a410-e401586a1c99",
-          "name": "api",
-          "pid": 2564,
-          "reason": "playwright-global-teardown",
-          "stoppedBy": "global-teardown.mjs"
         }
       ],
-      "ownerPid": 6248,
+      "ownerPid": 18204,
       "reuseExistingServer": false,
       "processes": [
         {
           "command": "npx tsx server/src/index.ts",
           "name": "api",
-          "pid": 2564,
-          "startedAt": "2026-07-06T20:27:59.011Z",
+          "pid": 20432,
+          "startedAt": "2026-07-08T01:36:03.691Z",
           "startedBy": "ProcessManager.startManagedProcess",
-          "stoppedAt": "2026-07-06T20:28:50.557Z",
-          "stoppedBy": "global-teardown.mjs"
+          "stoppedAt": null,
+          "stoppedBy": null
         },
         {
           "command": "npx expo start --web --localhost --port 8081",
           "name": "frontend",
-          "pid": 11912,
-          "startedAt": "2026-07-06T20:27:59.073Z",
+          "pid": 4264,
+          "startedAt": "2026-07-08T01:36:04.742Z",
           "startedBy": "ProcessManager.startManagedProcess",
-          "stoppedAt": "2026-07-06T20:28:50.326Z",
-          "stoppedBy": "global-teardown.mjs"
+          "stoppedAt": null,
+          "stoppedBy": null
         }
       ],
-      "sessionId": "ea323172-6163-4506-a410-e401586a1c99",
-      "updatedAt": "2026-07-06T20:28:50.560Z"
+      "sessionId": "f70b69f8-c9de-4214-a74f-f41d6e0b2efd",
+      "updatedAt": "2026-07-08T01:36:11.836Z"
     },
     "recovered": []
   },
   "live": {
-    "attempts": 15,
-    "durationMs": 14287,
+    "attempts": 11,
+    "durationMs": 8243,
     "payload": {
       "ok": true,
-      "requestId": "17afcf43-7023-4bd3-b181-d7829044737a",
+      "requestId": "0d7e87e1-57eb-4b9c-b399-5b6780c0a5bd",
       "service": "ecg-insight-api",
-      "uptimeSeconds": 11
+      "uptimeSeconds": 7
     }
   },
   "apiReady": {
     "attempts": 1,
-    "durationMs": 248,
+    "durationMs": 456,
     "ok": true
   },
   "apiReadiness": {
     "checks": {
       "database": {
         "details": {
-          "activeSessions": 7337,
-          "auditEventsLast24h": 625,
+          "activeSessions": 10361,
+          "auditEventsLast24h": 3892,
           "provider": "postgresql",
-          "users": 213
+          "users": 243
         },
-        "durationMs": 236,
+        "durationMs": 437,
         "ok": true,
         "status": "healthy"
       },
@@ -269,31 +262,31 @@ Generated: 2026-07-06T20:30:32.216Z
       },
       "storage": {
         "details": {
-          "fileCount": 1390,
+          "fileCount": 1919,
           "path": "C:\\Users\\Ahmed\\Downloads\\BelatedElasticLoop\\uploads",
-          "sizeBytes": 9490637,
+          "sizeBytes": 14047124,
           "writable": true
         },
-        "durationMs": 238,
+        "durationMs": 363,
         "ok": true,
         "status": "healthy"
       }
     },
-    "durationMs": 238,
+    "durationMs": 437,
     "environment": "development",
     "ok": true,
     "service": "ecg-insight-api",
-    "timestamp": "2026-07-06T20:29:33.486Z",
-    "requestId": "b4a555d7-fe99-4c1a-9e18-c5b68bc208b2",
+    "timestamp": "2026-07-08T01:37:04.012Z",
+    "requestId": "b24946e3-4662-4ab7-805b-db9cc11d404a",
     "status": "ready"
   },
   "frontend": {
-    "attempts": 2,
-    "durationMs": 8497,
+    "attempts": 1,
+    "durationMs": 751,
     "payload": {}
   },
   "ollama": {
-    "durationMs": 4,
+    "durationMs": 6,
     "ok": true,
     "version": "0.31.1"
   },

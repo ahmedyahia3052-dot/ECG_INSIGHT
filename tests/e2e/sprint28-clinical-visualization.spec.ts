@@ -1,11 +1,6 @@
 import { expect, test } from "./test";
 import { bootstrapAuthenticatedPage, createClinicalFixture, API_URL, authHeaders } from "./utils/qa";
-
-async function openEcgWorkspace(page: import("@playwright/test").Page, caseId: string) {
-  await page.goto(`/ecg-workspace?caseId=${caseId}`, { waitUntil: "domcontentloaded" });
-  await expect(page.getByTestId("ecg-workspace-loading")).toHaveCount(0, { timeout: 45_000 });
-  await expect(page.getByTestId("ecg-enterprise-workspace-ready")).toBeVisible({ timeout: 45_000 });
-}
+import { ecgStatusBar, ecgViewMode, openEcgWorkspace } from "./utils/ecg-workspace-locators";
 
 test.describe("Sprint 28 Clinical Visualization Engine @sprint28 @enterprise", () => {
   test.describe.configure({ mode: "serial" });
@@ -28,7 +23,7 @@ test.describe("Sprint 28 Clinical Visualization Engine @sprint28 @enterprise", (
 
   test("waveform view mounts Sprint 28 clinical canvas", async ({ page }) => {
     await openEcgWorkspace(page, caseId);
-    await page.getByTestId("sprint21-view-mode-waveform").or(page.getByTestId("sprint18-view-mode-waveform")).click();
+    await ecgViewMode(page, "waveform").click();
     await expect(page.getByTestId("sprint18-waveform-view")).toBeVisible({ timeout: 20_000 });
     await expect(page.getByTestId("sprint28-clinical-visualization-canvas")).toBeVisible({ timeout: 20_000 });
     await expect(page.getByTestId("sprint28-clinical-render-svg")).toBeVisible();
@@ -36,17 +31,20 @@ test.describe("Sprint 28 Clinical Visualization Engine @sprint28 @enterprise", (
 
   test("clinical overlays and status bar telemetry", async ({ page }) => {
     await openEcgWorkspace(page, caseId);
-    await page.getByTestId("sprint21-view-mode-waveform").or(page.getByTestId("sprint18-view-mode-waveform")).click();
+    await ecgViewMode(page, "waveform").click();
     await expect(page.getByTestId("sprint28-clinical-timeline")).toBeVisible({ timeout: 20_000 });
-    await expect(page.getByTestId("sprint28-clinical-mini-navigator")).toBeVisible();
-    await expect(page.getByTestId("sprint28-enterprise-status-bar")).toBeVisible();
-    await expect(page.getByTestId("sprint28-status-render-mode")).toBeVisible();
+    await expect(page.getByTestId("sprint30-clinical-workflow-ribbon")).toBeVisible();
+    await expect(
+      page.getByTestId("sprint32-ecg-mini-navigator").or(page.getByTestId("sprint28-clinical-mini-navigator")).or(page.getByTestId("sprint22-monitor-mini-navigator")),
+    ).toBeVisible();
+    await expect(ecgStatusBar(page)).toBeVisible();
+    await expect(page.getByTestId("sprint17-status-zoom")).toBeVisible();
     await page.screenshot({ fullPage: true, path: "test-results/screenshots/sprint28-clinical-visualization.png" });
   });
 
   test("crosshair panel appears on waveform hover", async ({ page }) => {
     await openEcgWorkspace(page, caseId);
-    await page.getByTestId("sprint21-view-mode-waveform").or(page.getByTestId("sprint18-view-mode-waveform")).click();
+    await ecgViewMode(page, "waveform").click();
     const canvas = page.getByTestId("sprint28-clinical-visualization-canvas");
     await expect(canvas).toBeVisible({ timeout: 20_000 });
     await canvas.hover({ position: { x: 320, y: 240 } });

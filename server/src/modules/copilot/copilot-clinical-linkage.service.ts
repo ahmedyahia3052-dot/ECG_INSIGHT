@@ -59,7 +59,7 @@ function isEcgDocument(documentType: string, kind: AttachmentKind) {
   return kind === "ecg" || /ecg|ekg|rhythm|holter|stress|dicom/i.test(documentType);
 }
 
-async function findExistingPatient(userId: string, structured: Partial<ClinicalOcrStructuredData> & { patientId?: string }) {
+async function findExistingPatient(_userId: string, structured: Partial<ClinicalOcrStructuredData> & { patientId?: string }) {
   const or: Prisma.PatientWhereInput[] = [];
   if (structured.patientId) {
     or.push({ medicalRecordNumber: structured.patientId }, { employeeId: structured.patientId }, { patientCode: structured.patientId });

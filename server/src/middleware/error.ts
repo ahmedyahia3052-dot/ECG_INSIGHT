@@ -1,17 +1,10 @@
 import type { NextFunction, Request, Response } from "express";
 import { ZodError } from "zod";
 import { buildAppErrorBody, buildErrorBody, buildValidationErrorBody, toProblemJson } from "../api/standards/errors";
+import { AppError } from "../errors/app-error";
 import { captureException, log } from "../utils/logger";
 
-export class AppError extends Error {
-  constructor(
-    public readonly statusCode: number,
-    message: string,
-    public readonly code = "APP_ERROR",
-  ) {
-    super(message);
-  }
-}
+export { AppError } from "../errors/app-error";
 
 export function notFoundHandler(req: Request, _res: Response, next: NextFunction) {
   next(new AppError(404, `Route not found: ${req.method} ${req.path}`, "NOT_FOUND"));

@@ -34,13 +34,18 @@ assertContains("artifacts/ecg-insight/components/ecg/viewer/EcgMonitorViewerFoun
   "sprint13-ecg-monitor-ready",
   "EcgWorkstationToolbar",
   "EcgClinicalRightPanel",
+  "EcgClinicalAlertsBanner",
+  "EcgViewModeSwitcher",
   "useClinicalWorkflowEngine",
 ]);
 
-assertContains("artifacts/ecg-insight/components/ecg/viewer/EcgClinicalRightPanel.tsx", [
-  "sprint33-clinical-right-panel",
-  "EcgMeasurementStudioPanel",
-]);
+const rightPanel = read("artifacts/ecg-insight/components/ecg/viewer/EcgClinicalRightPanel.tsx");
+if (!rightPanel.includes("sprint35-clinical-right-panel") && !rightPanel.includes("sprint335-clinical-right-panel") && !rightPanel.includes("sprint33-clinical-right-panel") && !rightPanel.includes("sprint30-clinical-right-panel")) {
+  throw new Error("EcgClinicalRightPanel.tsx missing clinical right panel test marker");
+}
+if (!rightPanel.includes("EcgMeasurementStudioPanel")) {
+  throw new Error("EcgClinicalRightPanel.tsx missing EcgMeasurementStudioPanel");
+}
 
 assertContains("artifacts/ecg-insight/components/ecg/viewer/EcgViewerRightRail.tsx", [
   "EcgDigitizationQualityPanel",

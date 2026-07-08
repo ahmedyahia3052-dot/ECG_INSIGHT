@@ -32,15 +32,15 @@ async function main() {
   const navigator = await fs.readFile(path.join(viewerRoot, "EcgMonitorMiniNavigator.tsx"), "utf8");
 
   const checks: Array<[string, boolean]> = [
-    ["clinical workflow shell", foundation.includes("sprint30-clinical-workflow-ready")],
+    ["clinical workflow shell", foundation.includes("sprint30-clinical-workflow-ready") || foundation.includes("sprint29-zero-chrome-workstation-ready")],
     ["panel collapse state", foundation.includes("panelLayout") && foundation.includes("onToggleLeftPanel")],
     ["enterprise resizable layout", layout.includes("EcgEnterpriseLayoutEngine") && layout.includes("leftCollapsed")],
-    ["zero chrome toolbar", toolbar.includes("sprint35-compact-toolbar") || toolbar.includes("sprint29-zero-chrome-toolbar")],
+    ["zero chrome toolbar", toolbar.includes("sprint35-compact-toolbar") || toolbar.includes("sprint52-grouped-toolbar") || toolbar.includes("sprint29-zero-chrome-toolbar")],
     ["clinical measurement studio", panel.includes("EcgMeasurementStudioPanel")],
     ["history engine panel", panel.includes("EcgHistoryEnginePanel")],
     ["hospital monitor canvas RAF loop", monitor.includes("requestAnimationFrame") && monitor.includes("sprint22-hospital-monitor-canvas")],
     ["phosphor + major/minor grid", (canvas.includes("drawHospitalGrid") || canvas.includes("drawClinicalGrid") || canvas.includes("drawHospitalEcgGrid")) && canvas.includes("phosphorPersistence")],
-    ["PVC + pacing markers", markers.includes("detectPvcIndices") && canvas.includes("beatMarkerPositions")],
+    ["PVC + pacing markers", markers.includes("detectPvcIndices") && markers.includes("beatMarkerPositions")],
     ["mini navigator", navigator.includes("sprint22-monitor-mini-navigator") && navigator.includes("drawMonitorOverview")],
   ];
 

@@ -1,6 +1,6 @@
 import { expect, test } from "./test";
 import { bootstrapAuthenticatedPage, createClinicalFixture, API_URL, authHeaders } from "./utils/qa";
-import { ecgFloatingPalette, ecgStatusBar, ecgToolbar, ecgViewModeSwitcher, openEcgWorkspace } from "./utils/ecg-workspace-locators";
+import { ecgDiagnosticExit, ecgFloatingPalette, ecgStatusBar, ecgToolbar, ecgViewModeSwitcher, openEcgWorkspace } from "./utils/ecg-workspace-locators";
 
 async function openEcgWorkspaceLocal(page: import("@playwright/test").Page, caseId: string) {
   await page.goto(`/ecg-workspace?caseId=${caseId}`, { waitUntil: "domcontentloaded" });
@@ -47,9 +47,9 @@ test.describe("Sprint 29 Zero-Chrome Clinical Workspace @sprint29", () => {
   test("diagnostic mode maximizes viewer", async ({ page }) => {
     await openEcgWorkspaceLocal(page, caseId);
     await page.keyboard.press("F11");
-    await expect(page.getByTestId("sprint29-exit-diagnostic")).toBeVisible();
+    await expect(ecgDiagnosticExit(page)).toBeVisible();
     await expect(page.getByTestId("sprint13-ecg-image-canvas").first()).toBeVisible();
-    await page.getByTestId("sprint29-exit-diagnostic").click();
+    await ecgDiagnosticExit(page).click();
     await expect(ecgToolbar(page)).toBeVisible();
     await page.screenshot({ path: "test-results/screenshots/sprint29-diagnostic-mode.png" });
   });

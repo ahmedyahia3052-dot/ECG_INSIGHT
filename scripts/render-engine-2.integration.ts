@@ -39,8 +39,8 @@ const files = [
   { file: resolve(RE2, "hospitalRenderer.ts"), markers: ["drawPhosphorTrace", "dynamicTraceStrokeWidth", "imageSmoothingQuality"] },
   { file: resolve(RE2, "waveformProcessor.ts"), markers: ["processWaveformSamples", "baselineWander", "clinicalSmoothing"] },
   { file: resolve(RE2, "leadRenderer.ts"), markers: ["LeadRenderer", "updateSyncClock", "resampleSubPixel"] },
-  { file: resolve(ROOT, "artifacts/ecg-insight/components/ecg/viewer/ecgMonitorCanvas.ts"), markers: ["drawRenderEngine2MonitorFrame"] },
-  { file: resolve(ROOT, "artifacts/ecg-insight/components/ecg/viewer/EcgLiveMonitorView.tsx"), markers: ["HospitalRealtimeEngine", "data-render-engine"] },
+  { file: resolve(ROOT, "artifacts/ecg-insight/components/ecg/viewer/hospital-monitor/hospitalMonitorRenderer.ts"), markers: ["drawRenderEngine2MonitorFrame", "HospitalRealtimeEngine"] },
+  { file: resolve(ROOT, "artifacts/ecg-insight/components/ecg/viewer/EcgLiveMonitorView.tsx"), markers: ["paintHospitalMonitorFrame", "sprint22-hospital-monitor-canvas"] },
   { file: resolve(ROOT, "tests/e2e/render-engine-2-hospital-visualization.spec.ts"), markers: ["@render-engine-2", "data-render-engine"] },
 ];
 

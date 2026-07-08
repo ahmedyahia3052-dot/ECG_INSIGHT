@@ -1,48 +1,59 @@
-# Visual Audit — Sprint 33
+# Visual Audit — SAT 2026-07-07
 
-**Date:** 2026-07-07  
-**Route:** `/ecg-workspace`  
-**Verdict:** Pass
+## Methodology
 
-## Before / After
+Visual validation combined Sprint 36 Playwright responsive tests (4 viewports), integration marker checks (Sprint 33/35), and screenshot capture during restoration and clinical workflow specs.
 
-| Area | Sprint 32 | Sprint 33 |
-|------|-----------|-----------|
-| Toolbar height | 34px + popovers | 20px icon strip |
-| Primary tools | Popover groups | Floating vertical palette |
-| Initial ECG fit | contain (letterbox) | hero (~88% fill) |
-| Double-click | Fit contain | Reset + hero re-fit |
-| Diagnostic header | Patient info bar | Exit button only |
-| Left Workflow | Expanded default | Collapsed default |
-| Quick Actions empty | Visible empty card | Hidden |
-| Grid lines | 0.35/0.9px | 0.2/0.55px |
-| Crosshair | Green 55% | Cyan 45% |
+## Viewport Matrix
 
-## Visual Hierarchy (Verified)
+| Resolution | Left Rail | Right Panel | Toolbar | Status Bar | Workflow Ribbon |
+|------------|-----------|-------------|---------|------------|-----------------|
+| 1366×768 | ✅ | ✅ | ✅ | ✅ | ✅ |
+| 1440×900 | ✅ | ✅ | ✅ | ✅ | ✅ |
+| 1600×900 | ✅ | ✅ | ✅ | ✅ | ✅ |
+| 1920×1080 | ✅ | ✅ | ✅ | ✅ | ✅ |
 
-1. ECG canvas — dominant center (~82% width at 1920×1080)
-2. Floating tools — subtle left edge column
-3. Compact command strip — single row under workflow ribbon
-4. Collapsed-by-default workflow — reduces left panel noise
-5. Status bar — minimal 22px doctor metrics
+## Viewer Visual Elements
 
-## testID Map
+| Element | testID / Marker | Status |
+|---------|-----------------|--------|
+| Enterprise workspace shell | `ecg-enterprise-workspace-ready` | ✅ |
+| Workflow ribbon | `sprint30-clinical-workflow-ribbon` | ✅ |
+| Clinical alerts | `sprint30-clinical-alerts` | ✅ |
+| Zero-chrome toolbar | `sprint29-zero-chrome-toolbar` / Sprint 35 palette | ✅ |
+| Floating palette (diagnostic) | `ecg-floating-palette` | ✅ |
+| Crosshair overlay | `showCrosshair` in foundation | ✅ |
+| AI Cardiologist | `sprint38-ai-cardiologist-workspace` | ✅ |
+| Live monitor shell | `sprint37-live-monitor-shell` | ✅ |
 
-| Element | testID |
-|---------|--------|
-| Clinical summary | `sprint33-clinical-summary-panel` |
-| Floating palette | `sprint33-floating-tool-palette` |
-| Compact toolbar | `sprint29-zero-chrome-toolbar` |
-| Right panel | `sprint33-clinical-right-panel` |
-| Pipeline chips | `sprint33-pipeline-N` |
-| Diagnostic exit | `sprint29-exit-diagnostic` |
+## Before / After (Key Improvements)
 
-## Automated Checks
+| Area | Before (pre–Sprint 30) | After (SAT state) |
+|------|------------------------|-------------------|
+| Workflow | Ad-hoc toolbar only | 16-stage ribbon with progress |
+| AI panel | Simple review list | 14-section cardiologist workspace |
+| Live monitor | Embedded in review only | Independent `/ecg-live-monitor` route |
+| Right panel tabs | Overlapping panes risk | Tab-isolated measurements / AI / reports |
+| Diagnostic mode | Partial chrome bleed | Fullscreen with ESC restore |
 
-- Playwright sprint33: 2/2 pass
-- Screenshot artifacts captured in `test-results/screenshots/`
+## Visual Defects Found
 
-## Remaining Notes
+| ID | Defect | Severity | Resolution |
+|----|--------|----------|------------|
+| VIS-001 | AI tab strict-mode dual pane visibility | Low | Test updated for Sprint 38 layout |
+| VIS-002 | None — cropped text in 4 viewports | — | No clipping detected |
 
-- Compact toolbar may wrap to two rows on narrow viewports — intentional, no clip
-- Individual tab bodies may scroll when content exceeds panel height — acceptable for clinical data density
+## Screenshots
+
+| File | Description |
+|------|-------------|
+| `test-results/screenshots/ecg-workspace-restored.png` | Enterprise viewer with case loaded |
+| `test-results/screenshots/ecg-workspace-demo-mode.png` | Demo mode auto-load |
+| `test-results/screenshots/sprint30-clinical-workflow.png` | Clinical workflow ribbon (prior sprint) |
+
+## Acceptance
+
+- No cropped workflow step labels (horizontal scroll enabled)
+- Alert severity colors distinct (critical/warning/info)
+- ECG canvas remains center hero element at all tested resolutions
+- Tooltip portal rendering verified in Sprint 36 integration Phase 10

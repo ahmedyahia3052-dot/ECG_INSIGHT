@@ -1,4 +1,4 @@
-import type { EnterpriseRuleField, EnterpriseRuleLogic, EnterpriseRuleOperator } from "@prisma/client";
+import type { EnterpriseRuleField, EnterpriseRuleLogic } from "@prisma/client";
 import type { EvaluatedCondition, RuleConditionInput, RuleEvaluationContext } from "./types";
 
 function readField(context: RuleEvaluationContext, field: EnterpriseRuleField): string | number | boolean {

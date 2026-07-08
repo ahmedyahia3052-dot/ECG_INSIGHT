@@ -8,6 +8,15 @@
     "paths": {
       "@/*": [
         "./*"
+      ],
+      "@/design-system/*": [
+        "design-system/*"
+      ],
+      "@/presentation/*": [
+        "presentation/*"
+      ],
+      "@/features/*": [
+        "features/*"
       ]
     }
   },

@@ -13,7 +13,7 @@ import type {
   StSegmentSection,
   TWaveSection,
 } from "../types/sections";
-import { highestSeverityFinding, intervalInterpretation, lookupKnowledgeEntry, mapKnowledgeDiagnosisId, pickFinding, pickFindingsByCategory } from "../services/knowledge-bridge";
+import { highestSeverityFinding, intervalInterpretation, lookupKnowledgeEntry, pickFinding, pickFindingsByCategory } from "../services/knowledge-bridge";
 
 function knowledgeRef(entry: EcgClinicalKnowledgeEntry | null | undefined) {
   return entry?.diagnosisId ?? null;
@@ -343,7 +343,6 @@ export function interpretQWaveSection(
 }
 
 export function interpretClinicalImpressionSection(legacy: EcgClinicalInterpretation): ClinicalImpressionSection {
-  const primaryKnowledge = legacy.findings[0]?.code ? mapKnowledgeDiagnosisId(legacy.findings[0].code) : null;
   const differential = legacy.findings
     .slice(0, 5)
     .map((item) => item.label)

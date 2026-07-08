@@ -2,6 +2,7 @@ import React, { createContext, useCallback, useContext, useEffect } from "react"
 import { create } from "zustand";
 import { type ManagedUser } from "@/data/mockData";
 import { apiRequest, ApiError, clearAuthState, isSessionRefreshSuppressed, setApiAccessToken, setApiAuthFailureHandler, setApiTokenRefreshHandler, setSessionRefreshSuppressed } from "@/services/api";
+import { initializeApiFoundation } from "@/services/foundation";
 
 export type UserRole = "super_admin" | "admin" | "corporate_client" | "doctor" | "student" | "user";
 
@@ -237,6 +238,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   );
 
   useEffect(() => {
+    initializeApiFoundation({
+      getAccessToken: () => useAuthStore.getState().accessToken,
+      getUserRole: () => useAuthStore.getState().user?.role ?? null,
+    });
     setApiAccessToken(accessToken);
     setApiTokenRefreshHandler((nextAccessToken) => {
       setState({ accessToken: nextAccessToken });

@@ -1,5 +1,4 @@
 import fs from "node:fs/promises";
-import path from "node:path";
 import type { ClinicalAlertType, ECGFile, ECGFileType, Prisma } from "@prisma/client";
 import { prisma } from "../../config/prisma";
 import { AppError } from "../../middleware/error";

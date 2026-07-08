@@ -1,10 +1,9 @@
 import { expect, test } from "./test";
 import { bootstrapAuthenticatedPage, createClinicalFixture, API_URL, authHeaders } from "./utils/qa";
+import { clickViewControl, ecgViewMode, openEcgMonitor } from "./utils/ecg-workspace-locators";
 
 async function openMonitorReady(page: import("@playwright/test").Page, caseId: string) {
-  await page.goto(`/ecg-monitor/${caseId}`, { waitUntil: "domcontentloaded" });
-  await expect(page.getByTestId("sprint13-ecg-monitor-loading")).toHaveCount(0, { timeout: 45_000 });
-  await expect(page.getByTestId("sprint13-ecg-monitor-ready")).toBeVisible({ timeout: 45_000 });
+  await openEcgMonitor(page, caseId);
   await expect(page.getByTestId("sprint13-ecg-image-loading")).toHaveCount(0, { timeout: 45_000 });
 }
 
@@ -32,14 +31,19 @@ test.describe("Sprint 16 ECG Digitization Engine @sprint16", () => {
   test("monitor viewer loads digitized waveform layer when digital ECG is available", async ({ page }) => {
     await openMonitorReady(page, caseId);
     await expect(page.getByTestId("sprint13-ecg-pro-viewer-engine")).toBeVisible();
-    await expect(page.getByTestId("sprint13-ecg-layer-digitized")).toHaveCount(1, { timeout: 20_000 });
+    await ecgViewMode(page, "waveform").click();
+    await expect(page.getByTestId("sprint18-waveform-view")).toBeVisible({ timeout: 20_000 });
+    await expect(
+      page.getByTestId("sprint28-clinical-visualization-canvas").or(page.getByTestId("sprint13-ecg-layer-digitized")),
+    ).toHaveCount(1, { timeout: 20_000 });
   });
 
   test("measurement overlay and digitized layer remain synchronized after zoom", async ({ page }) => {
     await openMonitorReady(page, caseId);
-    await page.getByRole("button", { name: /Zoom \d+x/ }).click();
-    await page.getByRole("button", { name: "Fit Width" }).click();
-    await expect(page.getByTestId("sprint13-ecg-layer-digitized")).toHaveCount(1);
-    await expect(page.getByTestId("sprint13-ecg-pro-viewer-engine")).toBeVisible();
+    await clickViewControl(page, "Zoom In");
+    await clickViewControl(page, "Fit Image");
+    await ecgViewMode(page, "waveform").click();
+    await expect(page.getByTestId("sprint18-waveform-view")).toBeVisible();
+    await expect(page.getByTestId("sprint13-ecg-pro-viewer-engine").or(page.getByTestId("sprint28-clinical-visualization-canvas"))).toBeVisible();
   });
 });

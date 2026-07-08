@@ -81,6 +81,8 @@ export type EcgCompareLayoutMode = "overlay" | "side-by-side" | "split";
 
 export type EcgLeadLayoutMode = "12-lead" | "3x4" | "6x2" | "rhythm" | "sequential" | "single" | "stacked";
 
+/** Shared with live monitor via {@link MonitorSharedLeadLayoutMode} in monitorLayout.ts. */
+
 /** Sprint 53 — enterprise workspace layout presets (static interpretation only). */
 export type EcgWorkspaceLayoutMode =
   | "classic"

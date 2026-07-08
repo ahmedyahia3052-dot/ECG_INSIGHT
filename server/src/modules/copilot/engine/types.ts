@@ -1,5 +1,5 @@
 import type { Prisma } from "@prisma/client";
-import type { ClinicalKnowledgeRouteResult } from "./clinical-knowledge-router";
+import type { ClinicalKnowledgeRouteResult } from "./knowledge-route.types";
 import type {
   AttachmentForAnalysis,
   AttachmentInsight,

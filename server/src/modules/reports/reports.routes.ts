@@ -18,7 +18,6 @@ import {
   buildReportPdf,
   canManageReport,
   createReportVersion,
-  generateClinicalReport,
   ensureClinicalReportForCase,
   persistReportArtifacts,
   serializeReport,

@@ -1,6 +1,8 @@
 import React, { type ReactNode, useEffect, useState } from "react";
 import { Platform, StyleSheet, View } from "react-native";
 
+import { usePersistedJsonLayout } from "@/lib/presentation";
+
 const LAYOUT_KEY = "ecg-insight:copilot-panel-layout";
 
 type CopilotResizableWorkspaceProps = {
@@ -15,30 +17,8 @@ type SavedLayout = {
   sidebarSize?: number;
 };
 
-function loadLayout(): SavedLayout {
-  if (typeof window === "undefined") return {};
-  try {
-    return JSON.parse(window.localStorage.getItem(LAYOUT_KEY) ?? "{}") as SavedLayout;
-  } catch {
-    return {};
-  }
-}
-
-function saveLayout(layout: SavedLayout) {
-  if (typeof window === "undefined") return;
-  try {
-    window.localStorage.setItem(LAYOUT_KEY, JSON.stringify(layout));
-  } catch {
-    // Ignore storage failures.
-  }
-}
-
 export function CopilotResizableWorkspace({ chat, clinicalPanel, sidebar }: CopilotResizableWorkspaceProps) {
-  const [layout, setLayout] = useState<SavedLayout>(() => loadLayout());
-
-  useEffect(() => {
-    saveLayout(layout);
-  }, [layout]);
+  const { layout, setLayout } = usePersistedJsonLayout<SavedLayout>(LAYOUT_KEY, {});
 
   if (Platform.OS === "web") {
     return (
@@ -124,7 +104,7 @@ const styles = StyleSheet.create({
 });
 
 export function useClinicalPanelCollapse() {
-  const [layout, setLayout] = useState<SavedLayout>(() => loadLayout());
+  const { layout, setLayout } = usePersistedJsonLayout<SavedLayout>(LAYOUT_KEY, {});
   const toggleClinicalCollapse = () => setLayout((current) => ({ ...current, clinicalCollapsed: !current.clinicalCollapsed }));
   return { clinicalCollapsed: !!layout.clinicalCollapsed, toggleClinicalCollapse };
 }

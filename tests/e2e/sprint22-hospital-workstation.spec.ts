@@ -1,14 +1,14 @@
 import { expect, test } from "./test";
 import { bootstrapAuthenticatedPage, createClinicalFixture, API_URL, authHeaders } from "./utils/qa";
-
-async function openEcgWorkspace(page: import("@playwright/test").Page, caseId: string) {
-  await page.goto(`/ecg-workspace?caseId=${caseId}`, { waitUntil: "domcontentloaded" });
-  await expect(page.getByTestId("ecg-workspace-loading")).toHaveCount(0, { timeout: 45_000 });
-  await expect(page.getByTestId("ecg-enterprise-workspace-ready")).toBeVisible({ timeout: 45_000 });
-  await expect(
-    page.getByTestId("sprint24-hospital-ribbon-toolbar").or(page.getByTestId("sprint23-visual-inspector-toolbar")),
-  ).toBeVisible({ timeout: 20_000 });
-}
+import {
+  assertWorkspaceShell,
+  ecgClinicalRightPanel,
+  ecgStatusBar,
+  ecgToolbarGroup,
+  ecgViewMode,
+  ecgViewModeSwitcher,
+  openEcgWorkspace,
+  paletteButton, activateMonitorView } from "./utils/ecg-workspace-locators";
 
 test.describe("Sprint 22 Hospital ECG Workstation @sprint22", () => {
   test.describe.configure({ mode: "serial" });
@@ -31,36 +31,30 @@ test.describe("Sprint 22 Hospital ECG Workstation @sprint22", () => {
 
   test("hospital shell, toolbar groups, and clinical sidebar sections", async ({ page }) => {
     await openEcgWorkspace(page, caseId);
-    await expect(page.getByText("Hospital ECG Workstation")).toBeVisible();
-    await expect(page.getByTestId("sprint24-hospital-ribbon-toolbar").or(page.getByTestId("sprint23-visual-inspector-toolbar"))).toBeVisible();
-    await expect(page.getByTestId("sprint21-toolbar-group-file")).toBeVisible();
-    await expect(page.getByTestId("sprint24-clinical-right-panel").or(page.getByTestId("sprint22-clinical-right-panel"))).toBeVisible();
-    await expect(page.getByTestId("sprint24-clinical-right-panel").or(page.getByTestId("sprint22-clinical-right-panel")).getByText("Patient", { exact: true })).toBeVisible();
-    await expect(page.getByTestId("sprint24-clinical-right-panel").or(page.getByTestId("sprint22-clinical-right-panel")).getByText("Case", { exact: true })).toBeVisible();
-    await expect(page.getByTestId("sprint24-clinical-right-panel").or(page.getByTestId("sprint22-clinical-right-panel")).getByText("Intervals", { exact: true })).toBeVisible();
-    await expect(page.getByTestId("sprint24-clinical-right-panel").or(page.getByTestId("sprint22-clinical-right-panel")).getByText("Rhythm", { exact: true })).toBeVisible();
-    await expect(page.getByTestId("sprint24-hospital-status-bar").or(page.getByTestId("sprint21-enterprise-status-bar"))).toBeVisible();
+    await assertWorkspaceShell(page);
+    await expect(ecgToolbarGroup(page, "file")).toBeVisible();
+    await expect(ecgClinicalRightPanel(page)).toBeVisible();
+    await expect(ecgClinicalRightPanel(page).getByText("Patient", { exact: true })).toBeVisible();
+    await expect(ecgStatusBar(page)).toBeVisible();
     await page.screenshot({ fullPage: true, path: "test-results/screenshots/sprint22-hospital-shell.png" });
   });
 
   test("hospital digital monitor with canvas, mini navigator, and panel toggles", async ({ page }) => {
     await openEcgWorkspace(page, caseId);
-    await page.getByTestId("sprint21-view-mode-monitor").click();
+    await activateMonitorView(page);
     await expect(page.getByTestId("sprint22-hospital-live-monitor").or(page.getByTestId("sprint18-live-monitor"))).toBeVisible();
-    await expect(page.getByTestId("sprint22-hospital-monitor-canvas").or(page.getByTestId("sprint19-monitor-canvas"))).toBeVisible();
-    await expect(page.getByTestId("sprint22-monitor-mini-navigator")).toBeVisible();
-    const toggleLeft = page.getByTestId("sprint22-toggle-left-panel");
-    await toggleLeft.scrollIntoViewIfNeeded();
-    await toggleLeft.click();
+    await expect(page.getByTestId("sprint22-monitor-mini-navigator").or(page.getByTestId("sprint28-clinical-mini-navigator"))).toBeVisible();
+    await ecgViewMode(page, "image").click();
+    await paletteButton(page, "Left Panel").click();
     await page.screenshot({ path: "test-results/screenshots/sprint22-hospital-monitor.png" });
   });
 
   test("digitized waveform mode and view mode switcher", async ({ page }) => {
     await openEcgWorkspace(page, caseId);
-    await expect(page.getByTestId("sprint24-view-mode-switcher").or(page.getByTestId("sprint22-view-mode-switcher"))).toBeVisible();
-    await page.getByTestId("sprint21-view-mode-waveform").click();
+    await expect(ecgViewModeSwitcher(page)).toBeVisible();
+    await ecgViewMode(page, "waveform").click();
     await expect(page.getByTestId("sprint18-waveform-view")).toBeVisible();
-    await page.getByTestId("sprint21-view-mode-processed").click();
+    await ecgViewMode(page, "processed").click();
     await page.screenshot({ path: "test-results/screenshots/sprint22-mode-processed.png" });
   });
 });

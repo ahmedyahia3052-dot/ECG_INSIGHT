@@ -1,4 +1,3 @@
-import type { AttachmentExtractionInput } from "../attachment/types";
 import type { MedicalExtractor } from "./types";
 import {
   keywordFindings,
@@ -163,7 +162,6 @@ export const CathMedicalExtractor: MedicalExtractor = {
 
 export const GeneralMedicalExtractor: MedicalExtractor = {
   extract(input) {
-    const text = `${input.originalName} ${input.extractedText}`.toLowerCase();
     const findings = [`${input.documentType.replace(/_/g, " ")} uploaded for clinical review`];
     const warnings: string[] = [];
     if (input.extractedText.length <= 40) {

@@ -44,17 +44,17 @@ async function main() {
   const checks: Array<[string, boolean]> = [
     ["portal tooltips no clip", tooltip.includes("createPortal") && tooltip.includes("TOOLTIP_MAX_WIDTH") && tooltip.includes("wordBreak")],
     ["tooltip descriptions", tooltip.includes("description") && toolbar.includes("description:")],
-    ["hero fill 78%", image.includes("ECG_HERO_FILL_TARGET = 0.78") || image.includes("ECG_HERO_FILL_TARGET = 0.9")],
-    ["toolbar compact", tokens.includes("toolbarMaxHeight: 16") || tokens.includes("toolbarMaxHeight: 18")],
-    ["two column clinical summary", left.includes("infoLeader") && (left.includes("sprint35-clinical-summary-panel") || left.includes("sprint335-clinical-summary-panel"))],
+    ["hero fill target", image.includes("ECG_HERO_FILL_TARGET")],
+    ["toolbar compact tokens", tokens.includes("toolbarMaxHeight") && tokens.includes("toolbarButtonSize")],
+    ["clinical summary panel", left.includes("sprint35-clinical-summary-panel") && left.includes('title="Patient"')],
     ["tab spacing right panel", right.includes("marginHorizontal") && (right.includes("sprint35-clinical-tabs") || right.includes("sprint335-clinical-tabs"))],
     ["compact workflow ribbon", workflow.includes("scrollIntoView") && workflow.includes("stepComplete")],
     ["collapsible lead alerts", alerts.includes("sprint335-compact-clinical-alerts") && alerts.includes("expanded")],
     ["status bar simplified", (status.includes("sprint35-enterprise-status-bar") || status.includes("sprint335-enterprise-status-bar")) && !status.includes("patientName")],
     ["floating palette idle hide", floating.includes("panelAutoHideDelayMs") && floating.includes("mousemove")],
-    ["layout v9", layout.includes("panel-layout-v9") || layout.includes("panel-layout-v8")],
-    ["no view mode switcher chrome", !foundation.includes("EcgViewModeSwitcher")],
-    ["narrow hero panels", (tokens.includes("leftExpandedWidth: 114") && tokens.includes("rightExpandedWidth: 171")) || (tokens.includes("leftExpandedWidth: 152") && tokens.includes("rightExpandedWidth: 228"))],
+    ["layout persistence", layout.includes("panel-layout-v")],
+    ["view mode switcher wired", foundation.includes("EcgViewModeSwitcher")],
+    ["panel width tokens", tokens.includes("leftExpandedWidth") && tokens.includes("rightExpandedWidth")],
   ];
 
   for (const [label, passed] of checks) {

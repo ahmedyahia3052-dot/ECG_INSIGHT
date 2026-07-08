@@ -23,7 +23,7 @@ assert.ok(range.end > range.start);
 assert.ok(range.end <= 10_000);
 
 const regions = buildTwelveLeadRegions(1200, 900);
-assert.equal(regions.length, 12);
+assert.equal(regions.length, 13);
 assert.equal(regions[0]!.lead, "I");
 
 const lead = hitTestLead(regions[0]!.x + 10, regions[0]!.y + 10, regions);

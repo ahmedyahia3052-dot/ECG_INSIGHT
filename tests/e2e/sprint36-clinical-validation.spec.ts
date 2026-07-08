@@ -85,7 +85,7 @@ test.describe("Sprint 36 Clinical Validation @sprint36-qa", () => {
   test("AI findings tab renders without overlap", async ({ page }) => {
     await openMonitorReady(page, caseId);
     await page.getByTestId("sprint26-clinical-tab-ai").click();
-    await expect(page.getByTestId("sprint35-ai-findings-tab-pane")).toBeVisible();
+    await expect(page.getByTestId("sprint38-ai-cardiologist-workspace")).toBeVisible();
     await expect(page.getByTestId("sprint35-measurements-tab-pane")).toHaveCount(0);
   });
 

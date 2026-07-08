@@ -1,26 +1,95 @@
-# Screenshot Before / After — Sprint 33.5
+# Screenshot Before / After — SAT 2026-07-07
 
-## Artifacts
+## Purpose
 
-| File | Description |
-|------|-------------|
-| `test-results/screenshots/sprint33-viewer-polish-before.png` | Sprint 33 baseline (prior sprint) |
-| `test-results/screenshots/sprint335-viewer-polish-after.png` | Sprint 33.5 polished workspace |
-| `test-results/screenshots/sprint335-diagnostic-after.png` | Sprint 33.5 diagnostic mode |
+Document visual state captured during System Acceptance Test for enterprise ECG workspace and clinical workflow validation.
 
-## Visible Improvements (After)
+---
 
-1. **ECG larger** — narrower side panels + 90% hero fill
-2. **Toolbar slimmer** — 18px icon strip vs prior popover/group layout
-3. **Tooltips** — full description text, no clipping (portal rendered)
-4. **Left summary** — aligned two-column dot-leader rows
-5. **Right tabs** — equal spacing; AI Findings separated from Measurements
-6. **Alerts** — compact `⚠ Lead Issues (N)` chip instead of full banner
-7. **Floating palette** — vertical, semi-transparent, closer to canvas
-8. **Status bar** — simplified doctor metrics with larger type
+## ECG Workspace — Enterprise Viewer Restored
 
-## Capture Command
+**Spec:** `tests/e2e/ecg-workspace-restoration.spec.ts`  
+**File:** `test-results/screenshots/ecg-workspace-restored.png`
+
+### Before (pre–Sprint 16–18 enterprise rebuild)
+- Legacy import-only UI on `/ecg-workspace`
+- No docking layout, no clinical right panel tabs
+- No workflow ribbon or zero-chrome toolbar
+
+### After (SAT state)
+- Full enterprise shell: left rail, center canvas, right clinical panel
+- 16-stage workflow ribbon with progress indicator
+- Zero-chrome toolbar with digitize, export PDF, command palette
+- Measurement studio with engine reference + manual calipers
+- Status bar: lead, speed, gain, zoom, FPS, GPU, memory
+
+---
+
+## ECG Workspace — Demo Mode
+
+**Spec:** `tests/e2e/ecg-workspace-restoration.spec.ts`  
+**File:** `test-results/screenshots/ecg-workspace-demo-mode.png`
+
+### After
+- `/ecg-workspace` without caseId auto-loads sample when demo available
+- `ecg-enterprise-workspace-ready` or `ecg-workspace-no-demo` marker
+
+---
+
+## Clinical Workflow (Sprint 30 baseline)
+
+**File:** `test-results/screenshots/sprint30-clinical-workflow.png`
+
+### After
+- Workflow ribbon, alerts banner, patient workspace visible
+- AI review panel area (now Sprint 38 cardiologist workspace in SAT)
+
+---
+
+## Live Monitor (Sprint 37)
+
+**Captured during:** `tests/e2e/sprint37-live-monitor.spec.ts` (Playwright artifacts)
+
+### After
+- Independent `/ecg-live-monitor` route
+- Transport controls, lead strip, status panel
+- Diagnostic fullscreen with ESC exit
+- Review workspace `/ecg-workspace` unchanged (verified in Sprint 37 spec 4)
+
+---
+
+## AI Cardiologist (Sprint 38)
+
+**Captured during:** `tests/e2e/sprint38-ai-cardiologist.spec.ts`
+
+### Before
+- Simple AI review workflow panel in AI tab
+
+### After
+- `sprint38-ai-cardiologist-workspace` with 14 collapsible sections
+- Finding cards with lead focus (`sprint38-finding-*`)
+- Differential table (`sprint38-differential-*`)
+- Interval table (`sprint38-interval-*`)
+
+---
+
+## Responsive Layout (Sprint 36)
+
+**Viewports tested:** 1366×768, 1440×900, 1600×900, 1920×1080
+
+### After
+- No clipping of workflow steps, toolbar, or right panel at any viewport
+- Horizontal scroll on workflow ribbon when needed
+
+---
+
+## How to Regenerate
 
 ```bash
-npx playwright test tests/e2e/sprint335-enterprise-viewer-polish.spec.ts
+npx playwright test tests/e2e/ecg-workspace-restoration.spec.ts
+npx playwright test tests/e2e/sprint30-clinical-workflow.spec.ts
+npx playwright test tests/e2e/sprint37-live-monitor.spec.ts
+npx playwright test tests/e2e/sprint38-ai-cardiologist.spec.ts
 ```
+
+Screenshots write to `test-results/screenshots/` per spec `page.screenshot()` calls.

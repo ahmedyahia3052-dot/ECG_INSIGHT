@@ -15,7 +15,7 @@ type ReasonInput = {
   session?: SessionRecord;
 };
 
-function learningStepFor(memory: ConversationMemory, text: string, session?: SessionRecord) {
+function learningStepFor(_memory: ConversationMemory, text: string, session?: SessionRecord) {
   const current = session?.learningStep ?? 0;
   if (/^(where should i start|what should i learn first|how do i start)\b/i.test(text.trim()) || /\bwhere (?:do|should) i start\b/i.test(text)) {
     return 1;

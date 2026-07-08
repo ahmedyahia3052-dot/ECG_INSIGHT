@@ -13,6 +13,7 @@ const required = [
   "EcgMonitorViewerFoundation.tsx",
   "types.ts",
   "EcgViewModeSwitcher.tsx",
+  "EcgEnterpriseStatusBar.tsx",
 ];
 
 async function main() {
@@ -27,16 +28,24 @@ async function main() {
   const report = await fs.readFile(path.join(viewerRoot, "EcgReportPreviewPanel.tsx"), "utf8");
   const shortcuts = await fs.readFile(path.join(viewerRoot, "useEcgWorkstationShortcuts.ts"), "utf8");
   const canvas = await fs.readFile(path.join(viewerRoot, "ecgMonitorCanvas.ts"), "utf8");
-  const status = await fs.readFile(path.join(viewerRoot, "EcgViewerTimeline.tsx"), "utf8");
+  const status = await fs.readFile(path.join(viewerRoot, "EcgEnterpriseStatusBar.tsx"), "utf8");
 
   const checks: Array<[string, boolean]> = [
     ["report view mode type", types.includes('"report"') && types.includes('"measurement"')],
-    ["report + measurement chips", switcher.includes('"report"') && switcher.includes('"measurement"')],
+    ["primary view mode chips", switcher.includes("Live Monitor") && switcher.includes("AI Review")],
     ["report preview wired", foundation.includes("EcgReportPreviewPanel") && foundation.includes('viewMode === "report"')],
-    ["canvas monitor engine", monitor.includes("drawMonitorCanvas") && canvas.includes("CanvasRenderingContext2D")],
+    [
+      "canvas monitor engine",
+      (monitor.includes("drawMultiLeadMonitorCanvas") ||
+        monitor.includes("paintHospitalMonitorFrame") ||
+        monitor.includes("drawRhythmStripCanvas")) &&
+        canvas.includes("drawMonitorCanvas") &&
+        canvas.includes("CanvasRenderingContext2D"),
+    ],
     ["keyboard shortcuts wired", foundation.includes("useEcgWorkstationShortcuts") && shortcuts.includes("ctrlKey")],
-    ["monitor status bar", status.includes("sprint19-status-monitor")],
+    ["enterprise status bar", status.includes("sprint17-status-fps") && foundation.includes("EcgEnterpriseStatusBar")],
     ["report generate API", report.includes("generateReport") && report.includes("reportHtmlUrl")],
+    ["report finalize sign", report.includes("finalizeReport") && report.includes("signReport")],
   ];
 
   for (const [label, passed] of checks) {

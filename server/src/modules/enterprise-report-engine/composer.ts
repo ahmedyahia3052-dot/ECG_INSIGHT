@@ -1,4 +1,4 @@
-import type { EnterpriseReportType, Prisma, ReportTemplateCategory } from "@prisma/client";
+import type { EnterpriseReportType, ReportTemplateCategory } from "@prisma/client";
 import { prisma } from "../../config/prisma";
 import { AppError } from "../../middleware/error";
 import { defaultTemplateForType, templateBySlug } from "./templates";

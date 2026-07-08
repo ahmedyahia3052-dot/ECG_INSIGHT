@@ -1,0 +1,505 @@
+{
+  "generatedAt": "2026-07-07T15:38:04.571Z",
+  "targets": {
+    "coverageTargetPct": 95,
+    "criticalWorkflowCoveragePct": 100,
+    "maxFlakyRetries": 0,
+    "performanceMs": {
+      "apiHealth": 500,
+      "apiLogin": 3000,
+      "viewerReady": 60000
+    }
+  },
+  "coverage": {
+    "unitTests": {
+      "total": 0,
+      "passed": 0,
+      "failed": 0
+    },
+    "integrationDomainsPct": 100,
+    "playwrightWorkflowsPct": 100,
+    "unitCoverageEstimatePct": 0
+  },
+  "gates": {
+    "accessibility": false,
+    "performance": false,
+    "regression": false
+  },
+  "workflows": [
+    {
+      "id": "auth",
+      "label": "Authentication",
+      "specs": [
+        "auth-navigation.spec.ts",
+        "auth-logout-regression.spec.ts",
+        "login-screen-stability.spec.ts"
+      ],
+      "tags": [
+        "@smoke"
+      ],
+      "covered": true,
+      "coveredSpecs": [
+        "auth-navigation.spec.ts",
+        "auth-logout-regression.spec.ts",
+        "login-screen-stability.spec.ts"
+      ],
+      "missingSpecs": []
+    },
+    {
+      "id": "dashboard",
+      "label": "Dashboard",
+      "specs": [
+        "auth-navigation.spec.ts",
+        "enterprise-full-validation.spec.ts"
+      ],
+      "tags": [
+        "@smoke"
+      ],
+      "covered": true,
+      "coveredSpecs": [
+        "auth-navigation.spec.ts",
+        "enterprise-full-validation.spec.ts"
+      ],
+      "missingSpecs": []
+    },
+    {
+      "id": "patients",
+      "label": "Patients",
+      "specs": [
+        "clinical-workflows.spec.ts"
+      ],
+      "tags": [
+        "@smoke"
+      ],
+      "covered": true,
+      "coveredSpecs": [
+        "clinical-workflows.spec.ts"
+      ],
+      "missingSpecs": []
+    },
+    {
+      "id": "patient-details",
+      "label": "Patient Details",
+      "specs": [
+        "clinical-workflows.spec.ts",
+        "enterprise-workflow-matrix.spec.ts"
+      ],
+      "tags": [
+        "@qa-matrix"
+      ],
+      "covered": true,
+      "coveredSpecs": [
+        "clinical-workflows.spec.ts",
+        "enterprise-workflow-matrix.spec.ts"
+      ],
+      "missingSpecs": []
+    },
+    {
+      "id": "ecg-upload",
+      "label": "ECG Upload",
+      "specs": [
+        "clinical-workflows.spec.ts",
+        "enterprise-full-validation.spec.ts"
+      ],
+      "tags": [
+        "@smoke",
+        "@enterprise"
+      ],
+      "covered": true,
+      "coveredSpecs": [
+        "clinical-workflows.spec.ts",
+        "enterprise-full-validation.spec.ts"
+      ],
+      "missingSpecs": []
+    },
+    {
+      "id": "image-processing",
+      "label": "Image Processing",
+      "specs": [
+        "sprint16-ecg-digitization.spec.ts",
+        "enterprise-workflow-matrix.spec.ts"
+      ],
+      "tags": [
+        "@qa-matrix"
+      ],
+      "covered": true,
+      "coveredSpecs": [
+        "sprint16-ecg-digitization.spec.ts",
+        "enterprise-workflow-matrix.spec.ts"
+      ],
+      "missingSpecs": []
+    },
+    {
+      "id": "grid-detection",
+      "label": "Grid Detection",
+      "specs": [
+        "sprint14-clinical-calipers.spec.ts",
+        "enterprise-workflow-matrix.spec.ts"
+      ],
+      "tags": [
+        "@qa-matrix"
+      ],
+      "covered": true,
+      "coveredSpecs": [
+        "sprint14-clinical-calipers.spec.ts",
+        "enterprise-workflow-matrix.spec.ts"
+      ],
+      "missingSpecs": []
+    },
+    {
+      "id": "lead-detection",
+      "label": "Lead Detection",
+      "specs": [
+        "sprint13-ecg-monitor.spec.ts",
+        "enterprise-workflow-matrix.spec.ts"
+      ],
+      "tags": [
+        "@qa-matrix"
+      ],
+      "covered": true,
+      "coveredSpecs": [
+        "sprint13-ecg-monitor.spec.ts",
+        "enterprise-workflow-matrix.spec.ts"
+      ],
+      "missingSpecs": []
+    },
+    {
+      "id": "digitization",
+      "label": "Digitization",
+      "specs": [
+        "sprint16-ecg-digitization.spec.ts"
+      ],
+      "tags": [
+        "@sprint16"
+      ],
+      "covered": true,
+      "coveredSpecs": [
+        "sprint16-ecg-digitization.spec.ts"
+      ],
+      "missingSpecs": []
+    },
+    {
+      "id": "signal-reconstruction",
+      "label": "Signal Reconstruction",
+      "specs": [
+        "sprint27-ecg-rendering-engine.spec.ts",
+        "sprint28-clinical-visualization.spec.ts"
+      ],
+      "tags": [
+        "@enterprise"
+      ],
+      "covered": true,
+      "coveredSpecs": [
+        "sprint27-ecg-rendering-engine.spec.ts",
+        "sprint28-clinical-visualization.spec.ts"
+      ],
+      "missingSpecs": []
+    },
+    {
+      "id": "viewer",
+      "label": "Viewer",
+      "specs": [
+        "ecg-workspace-restoration.spec.ts",
+        "enterprise-workflow-matrix.spec.ts"
+      ],
+      "tags": [
+        "@restoration",
+        "@qa-matrix"
+      ],
+      "covered": true,
+      "coveredSpecs": [
+        "ecg-workspace-restoration.spec.ts",
+        "enterprise-workflow-matrix.spec.ts"
+      ],
+      "missingSpecs": []
+    },
+    {
+      "id": "zoom",
+      "label": "Zoom",
+      "specs": [
+        "enterprise-workflow-matrix.spec.ts",
+        "sprint29-zero-chrome-clinical-workspace.spec.ts"
+      ],
+      "tags": [
+        "@qa-matrix"
+      ],
+      "covered": true,
+      "coveredSpecs": [
+        "enterprise-workflow-matrix.spec.ts",
+        "sprint29-zero-chrome-clinical-workspace.spec.ts"
+      ],
+      "missingSpecs": []
+    },
+    {
+      "id": "pan",
+      "label": "Pan",
+      "specs": [
+        "enterprise-workflow-matrix.spec.ts"
+      ],
+      "tags": [
+        "@qa-matrix"
+      ],
+      "covered": true,
+      "coveredSpecs": [
+        "enterprise-workflow-matrix.spec.ts"
+      ],
+      "missingSpecs": []
+    },
+    {
+      "id": "measurements",
+      "label": "Measurements",
+      "specs": [
+        "sprint15-clinical-measurement-engine.spec.ts",
+        "sprint34-professional-measurement-engine.spec.ts"
+      ],
+      "tags": [
+        "@sprint34-measurement"
+      ],
+      "covered": true,
+      "coveredSpecs": [
+        "sprint15-clinical-measurement-engine.spec.ts",
+        "sprint34-professional-measurement-engine.spec.ts"
+      ],
+      "missingSpecs": []
+    },
+    {
+      "id": "ai-findings",
+      "label": "AI Findings",
+      "specs": [
+        "sprint14-ai-clinical-overlay.spec.ts",
+        "enterprise-workflow-matrix.spec.ts"
+      ],
+      "tags": [
+        "@qa-matrix"
+      ],
+      "covered": true,
+      "coveredSpecs": [
+        "sprint14-ai-clinical-overlay.spec.ts",
+        "enterprise-workflow-matrix.spec.ts"
+      ],
+      "missingSpecs": []
+    },
+    {
+      "id": "ai-cardiologist",
+      "label": "AI Cardiologist",
+      "specs": [
+        "sprint38-ai-cardiologist.spec.ts"
+      ],
+      "tags": [
+        "@sprint38"
+      ],
+      "parallelExcluded": true,
+      "covered": true,
+      "coveredSpecs": [
+        "sprint38-ai-cardiologist.spec.ts"
+      ],
+      "missingSpecs": []
+    },
+    {
+      "id": "live-monitor",
+      "label": "Live Monitor",
+      "specs": [
+        "sprint37-live-monitor.spec.ts",
+        "sprint13-ecg-monitor.spec.ts"
+      ],
+      "tags": [
+        "@sprint37"
+      ],
+      "covered": true,
+      "coveredSpecs": [
+        "sprint37-live-monitor.spec.ts",
+        "sprint13-ecg-monitor.spec.ts"
+      ],
+      "missingSpecs": []
+    },
+    {
+      "id": "fullscreen",
+      "label": "Fullscreen",
+      "specs": [
+        "sprint29-zero-chrome-clinical-workspace.spec.ts",
+        "enterprise-workflow-matrix.spec.ts"
+      ],
+      "tags": [
+        "@qa-matrix"
+      ],
+      "covered": true,
+      "coveredSpecs": [
+        "sprint29-zero-chrome-clinical-workspace.spec.ts",
+        "enterprise-workflow-matrix.spec.ts"
+      ],
+      "missingSpecs": []
+    },
+    {
+      "id": "overlay",
+      "label": "Overlay",
+      "specs": [
+        "sprint14-ai-clinical-overlay.spec.ts",
+        "enterprise-workflow-matrix.spec.ts"
+      ],
+      "tags": [
+        "@qa-matrix"
+      ],
+      "covered": true,
+      "coveredSpecs": [
+        "sprint14-ai-clinical-overlay.spec.ts",
+        "enterprise-workflow-matrix.spec.ts"
+      ],
+      "missingSpecs": []
+    },
+    {
+      "id": "compare",
+      "label": "Compare",
+      "specs": [
+        "sprint18-ecg-clinical-workstation.spec.ts",
+        "enterprise-workflow-matrix.spec.ts"
+      ],
+      "tags": [
+        "@qa-matrix"
+      ],
+      "covered": true,
+      "coveredSpecs": [
+        "sprint18-ecg-clinical-workstation.spec.ts",
+        "enterprise-workflow-matrix.spec.ts"
+      ],
+      "missingSpecs": []
+    },
+    {
+      "id": "reports",
+      "label": "Reports",
+      "specs": [
+        "clinical-workflows.spec.ts",
+        "auth-navigation.spec.ts"
+      ],
+      "tags": [
+        "@smoke"
+      ],
+      "covered": true,
+      "coveredSpecs": [
+        "clinical-workflows.spec.ts",
+        "auth-navigation.spec.ts"
+      ],
+      "missingSpecs": []
+    },
+    {
+      "id": "export",
+      "label": "Export",
+      "specs": [
+        "clinical-workflows.spec.ts",
+        "enterprise-workflow-matrix.spec.ts"
+      ],
+      "tags": [
+        "@qa-matrix"
+      ],
+      "covered": true,
+      "coveredSpecs": [
+        "clinical-workflows.spec.ts",
+        "enterprise-workflow-matrix.spec.ts"
+      ],
+      "missingSpecs": []
+    },
+    {
+      "id": "settings",
+      "label": "Settings",
+      "specs": [
+        "auth-navigation.spec.ts",
+        "enterprise-workflow-matrix.spec.ts"
+      ],
+      "tags": [
+        "@smoke"
+      ],
+      "covered": true,
+      "coveredSpecs": [
+        "auth-navigation.spec.ts",
+        "enterprise-workflow-matrix.spec.ts"
+      ],
+      "missingSpecs": []
+    },
+    {
+      "id": "history",
+      "label": "History",
+      "specs": [
+        "sprint30-clinical-workflow.spec.ts",
+        "enterprise-workflow-matrix.spec.ts"
+      ],
+      "tags": [
+        "@qa-matrix"
+      ],
+      "covered": true,
+      "coveredSpecs": [
+        "sprint30-clinical-workflow.spec.ts",
+        "enterprise-workflow-matrix.spec.ts"
+      ],
+      "missingSpecs": []
+    },
+    {
+      "id": "dark-theme",
+      "label": "Dark Theme",
+      "specs": [
+        "enterprise-workflow-matrix.spec.ts"
+      ],
+      "tags": [
+        "@qa-matrix"
+      ],
+      "note": "Validates enterprise dark shell; dedicated theme toggle not exposed in settings yet",
+      "covered": true,
+      "coveredSpecs": [
+        "enterprise-workflow-matrix.spec.ts"
+      ],
+      "missingSpecs": []
+    },
+    {
+      "id": "responsive",
+      "label": "Responsive Layout",
+      "specs": [
+        "mobile-responsive.spec.ts",
+        "sprint36-clinical-validation.spec.ts"
+      ],
+      "tags": [
+        "@mobile"
+      ],
+      "covered": true,
+      "coveredSpecs": [
+        "mobile-responsive.spec.ts",
+        "sprint36-clinical-validation.spec.ts"
+      ],
+      "missingSpecs": []
+    },
+    {
+      "id": "error-recovery",
+      "label": "Error Recovery",
+      "specs": [
+        "enterprise-full-validation.spec.ts",
+        "enterprise-workflow-matrix.spec.ts"
+      ],
+      "tags": [
+        "@enterprise"
+      ],
+      "covered": true,
+      "coveredSpecs": [
+        "enterprise-full-validation.spec.ts",
+        "enterprise-workflow-matrix.spec.ts"
+      ],
+      "missingSpecs": []
+    },
+    {
+      "id": "empty-states",
+      "label": "Empty States",
+      "specs": [
+        "ecg-workspace-restoration.spec.ts",
+        "enterprise-workflow-matrix.spec.ts"
+      ],
+      "tags": [
+        "@restoration"
+      ],
+      "covered": true,
+      "coveredSpecs": [
+        "ecg-workspace-restoration.spec.ts",
+        "enterprise-workflow-matrix.spec.ts"
+      ],
+      "missingSpecs": []
+    }
+  ],
+  "trend": {
+    "note": "Historical JSON snapshots stored in test-results/qa-history/"
+  }
+}

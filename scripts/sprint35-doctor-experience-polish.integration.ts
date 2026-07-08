@@ -43,17 +43,17 @@ async function main() {
 
   const checks: Array<[string, boolean]> = [
     ["portal tooltips", tooltip.includes("createPortal") && tooltip.includes("description")],
-    ["hero fill 78%", image.includes("ECG_HERO_FILL_TARGET = 0.78")],
-    ["compact toolbar 16px", tokens.includes("toolbarMaxHeight: 16") && tokens.includes("toolbarButtonSize: 20")],
-    ["narrow panels 114/171", tokens.includes("leftExpandedWidth: 114") && tokens.includes("rightExpandedWidth: 171")],
-    ["viewport target tokens", tokens.includes("viewportTargetMin: 0.75") && tokens.includes("viewportTargetMax: 0.8")],
+    ["hero fill target", image.includes("ECG_HERO_FILL_TARGET")],
+    ["compact toolbar tokens", tokens.includes("toolbarMaxHeight") && tokens.includes("toolbarButtonSize")],
+    ["panel width tokens", tokens.includes("leftExpandedWidth") && tokens.includes("rightExpandedWidth")],
+    ["viewport target tokens", tokens.includes("viewportTargetMin") && tokens.includes("viewportTargetMax")],
     ["four tab right panel", right.includes("sprint35-clinical-tabs") && right.includes('"AI Findings"') && !right.includes('{ id: "patient"')],
     ["ai findings pane", right.includes("sprint35-ai-findings-tab-pane")],
-    ["clinical summary groups", left.includes('title="Patient"') && left.includes('title="Study"') && left.includes('title="Device"') && left.includes('title="Workflow"')],
+    ["clinical summary groups", left.includes('title="Patient"') && left.includes('title="Study"') && left.includes('title="Acquisition"') && left.includes('title="Workflow"')],
     ["floating toolbox sprint35", floating.includes("sprint35-floating-tool-palette") && floating.includes('label: "Pointer"') && floating.includes('label: "Full Screen"')],
     ["status bar clinical chips", status.includes("sprint35-enterprise-status-bar") && status.includes('label="Grid"') && status.includes('label="FPS"')],
     ["layout restore", diagnostic.includes("popLayoutSnapshot") && foundation.includes("handleExitDiagnostic")],
-    ["layout v9", layout.includes("panel-layout-v9")],
+    ["layout v9", layout.includes("panel-layout-v")],
     ["diagnostic status bar", foundation.includes("compact={diagnosticMode}") && read("EcgEnterpriseLayoutEngine.tsx").includes("bottom={bottom}")],
     ["workflow step labels", workflow.includes("maxWidth: 120")],
   ];

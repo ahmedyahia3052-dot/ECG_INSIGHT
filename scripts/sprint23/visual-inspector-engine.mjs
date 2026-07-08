@@ -57,7 +57,7 @@ function auditDomScript() {
   }
 
   // Toolbar buttons
-  const toolbar = document.querySelector('[data-testid="sprint29-zero-chrome-toolbar"], [data-testid="sprint26-compact-ribbon"], [data-testid="sprint25-hospital-command-ribbon"], [data-testid="sprint24-hospital-ribbon-toolbar"], [data-testid="sprint23-visual-inspector-toolbar"], [data-testid="sprint22-hospital-workstation-toolbar"]');
+  const toolbar = document.querySelector('[data-testid="sprint35-compact-toolbar"], [data-testid="sprint29-zero-chrome-toolbar"], [data-testid="sprint26-compact-ribbon"], [data-testid="sprint25-hospital-command-ribbon"], [data-testid="sprint24-hospital-ribbon-toolbar"], [data-testid="sprint23-visual-inspector-toolbar"], [data-testid="sprint22-hospital-workstation-toolbar"]');
   if (toolbar) {
     const buttons = toolbar.querySelectorAll('[role="button"], button');
     buttons.forEach((btn, i) => {

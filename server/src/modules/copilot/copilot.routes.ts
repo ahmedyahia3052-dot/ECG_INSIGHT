@@ -10,7 +10,7 @@ import { requireAuth, requireRole } from "../../middleware/auth";
 import { AppError } from "../../middleware/error";
 import { assertResourceAccess, canAccessCase, canAccessPatient } from "../../utils/resource-access";
 import { CONVERSATION_SYSTEM_PROMPT } from "./conversation-system-prompt";
-import type { AttachmentInsight, Citation, ClinicalContext, ConversationMemory } from "./copilot-types";
+import type { Citation, ClinicalContext, ConversationMemory } from "./copilot-types";
 import {
   attachmentInsights,
   buildEngineDebugPayload,
@@ -29,7 +29,6 @@ import {
 import { autoLinkCopilotClinicalUpload } from "./copilot-clinical-linkage.service";
 import { extractZipUpload, isZipUpload } from "./copilot-upload-ingest.service";
 import { recordClinicalPipelineMetric } from "./observability/clinical-pipeline-metrics";
-import { parseCopilotProviderSettings } from "./intent-pipeline";
 import { scanFileForThreats } from "../../utils/file-security";
 
 export const copilotRouter = Router();
@@ -195,14 +194,6 @@ async function settings() {
     update: {},
     where: { id: "global" },
   }).catch(() => prisma.copilotSettings.create({ data: { id: "global", enabled: true, provider: defaultProvider } }));
-}
-
-async function copilotDeveloperModeEnabled(userId: string, provider: string) {
-  const parsed = parseCopilotProviderSettings(provider);
-  if (!parsed.developerMode) return false;
-  if (process.env.NODE_ENV !== "production") return true;
-  const user = await prisma.user.findUnique({ select: { email: true, protectedOwner: true, role: true }, where: { id: userId } });
-  return Boolean(user?.protectedOwner || user?.role === "SUPER_ADMIN" || user?.email?.toLowerCase() === OWNER_EMAIL);
 }
 
 function serializeConversation(conversation: {

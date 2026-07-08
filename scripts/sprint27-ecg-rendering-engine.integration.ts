@@ -72,7 +72,10 @@ for (const marker of capabilityMarkers) {
 
 assert(pipeline.includes("ecg-rendering-engine.test.ts"), "Integration pipeline must register rendering engine unit test");
 assert(pipeline.includes("sprint27-ecg-rendering-engine.integration.ts"), "Integration pipeline must register Sprint 27 integration test");
-assert(imageCanvas.includes("EcgRenderingEngineView"), "Waveform view must use Sprint 27 rendering engine when digitized ECG is available");
+assert(
+  imageCanvas.includes("EcgRenderingEngineView") || imageCanvas.includes("EcgClinicalVisualizationCanvas"),
+  "Waveform view must use Sprint 27 rendering engine or Sprint 28 clinical visualization canvas when digitized ECG is available",
+);
 assert(!renderPipeline.includes("TODO"), "Rendering pipeline must not contain TODO markers");
 
 console.log("sprint27-ecg-rendering-engine.integration.ts: all Sprint 27 checks passed");

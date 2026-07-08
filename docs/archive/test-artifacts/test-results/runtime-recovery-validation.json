@@ -1,0 +1,112 @@
+{
+  "apiChecks": {
+    "health": {
+      "ok": true,
+      "status": 200
+    },
+    "live": {
+      "ok": true,
+      "status": 200
+    },
+    "ready": {
+      "ok": true,
+      "payload": {
+        "checks": {
+          "database": {
+            "details": {
+              "activeSessions": 6967,
+              "auditEventsLast24h": 5759,
+              "provider": "postgresql",
+              "users": 211
+            },
+            "durationMs": 242,
+            "ok": true,
+            "status": "healthy"
+          },
+          "ollama": {
+            "details": {
+              "connected": false,
+              "mockMode": true,
+              "provider": "ollama",
+              "required": false,
+              "skipped": true
+            },
+            "durationMs": 0,
+            "ok": true,
+            "status": "healthy"
+          },
+          "redis": {
+            "details": {
+              "connected": false,
+              "required": false,
+              "skipped": true
+            },
+            "durationMs": 0,
+            "ok": true,
+            "status": "skipped"
+          },
+          "storage": {
+            "details": {
+              "fileCount": 1325,
+              "path": "C:\\Users\\Ahmed\\Downloads\\BelatedElasticLoop\\uploads",
+              "sizeBytes": 8837786,
+              "writable": true
+            },
+            "durationMs": 83,
+            "ok": true,
+            "status": "healthy"
+          }
+        },
+        "durationMs": 242,
+        "environment": "development",
+        "ok": true,
+        "service": "ecg-insight-api",
+        "timestamp": "2026-07-05T01:28:40.316Z",
+        "requestId": "a3234555-2641-4bf9-ac1e-3c8cedc9fca8",
+        "status": "ready"
+      },
+      "status": 200
+    }
+  },
+  "consoleErrors": [
+    "Failed to load resource: the server responded with a status of 401 (Unauthorized)",
+    "Failed to load resource: the server responded with a status of 401 (Unauthorized)",
+    "Failed to load resource: the server responded with a status of 401 (Unauthorized)",
+    "Failed to load resource: the server responded with a status of 401 (Unauthorized)",
+    "Failed to load resource: the server responded with a status of 401 (Unauthorized)"
+  ],
+  "frontendChecks": {},
+  "hotReload": {
+    "devServerResponsive": true,
+    "navigationStable": true
+  },
+  "navigation": {
+    "dashboard": {
+      "blank": false,
+      "connectionLost": false,
+      "path": "/dashboard",
+      "selectorVisible": false,
+      "title": "ECG Insight Enterprise",
+      "url": "http://127.0.0.1:8081/login"
+    },
+    "ecgWorkspace": {
+      "blank": false,
+      "connectionLost": false,
+      "path": "/ecg-workspace",
+      "selectorVisible": false,
+      "title": "ECG Insight Enterprise",
+      "url": "http://127.0.0.1:8081/login"
+    },
+    "ecgViewer": {
+      "blank": false,
+      "connectionLost": false,
+      "path": "/ecg-monitor/cmqtu3nsm001kcsvcamu4vh6t",
+      "selectorVisible": false,
+      "title": "ECG Insight Enterprise",
+      "url": "http://127.0.0.1:8081/login"
+    }
+  },
+  "timestamp": "2026-07-05T01:28:40.025Z",
+  "caseId": "cmqtu3nsm001kcsvcamu4vh6t",
+  "ok": false
+}

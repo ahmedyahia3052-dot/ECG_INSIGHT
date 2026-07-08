@@ -1,5 +1,5 @@
 import { MIC_DIAGNOSIS_BY_CODE, MIC_DIAGNOSIS_CATALOG } from "../data/diagnoses";
-import type { MicDiagnosisEntry, MicRecommendationEntry } from "../types";
+import type { MicRecommendationEntry } from "../types";
 
 const RECOMMENDATION_TYPES = {
   repeat_ecg: { action: "Repeat 12-lead ECG with careful lead placement", priority: "routine" as const },

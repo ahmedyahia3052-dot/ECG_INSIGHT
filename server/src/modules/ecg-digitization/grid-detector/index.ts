@@ -1,6 +1,6 @@
 import type { GridCalibration, ImageAnalysisMetrics } from "../types";
 
-function rowProjection(data: Uint8Array, width: number, height: number, y: number) {
+function rowProjection(data: Uint8Array, width: number, _height: number, y: number) {
   let sum = 0;
   for (let x = 0; x < width; x += 1) sum += 255 - (data[y * width + x] ?? 255);
   return sum / width;

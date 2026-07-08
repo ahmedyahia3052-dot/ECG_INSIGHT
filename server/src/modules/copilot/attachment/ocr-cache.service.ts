@@ -21,7 +21,7 @@ function cacheFilePath(key: string) {
   return path.join(cacheRoot, `${key}.json`);
 }
 
-export async function getCachedClinicalOcr(filePath: string, mimeType: string, originalName: string): Promise<ClinicalOcrResult | null> {
+export async function getCachedClinicalOcr(filePath: string, _mimeType: string, _originalName: string): Promise<ClinicalOcrResult | null> {
   try {
     const key = await sha256File(filePath);
     const file = cacheFilePath(key);

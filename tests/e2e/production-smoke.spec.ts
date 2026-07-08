@@ -11,8 +11,8 @@ test.describe("production deployment smoke", () => {
     }
 
     await page.goto("/login");
-    await expect(page.getByText(/Welcome Back/i)).toBeVisible();
-    await expect(page.getByRole("button", { name: /Sign In/i })).toBeVisible();
+    await expect(page.getByTestId("auth-login-screen")).toBeVisible();
+    await expect(page.getByTestId("auth-sign-in-button")).toBeVisible();
 
     await page.goto("/dashboard");
     await expect(page).toHaveURL(/login|dashboard/);

@@ -1,4 +1,4 @@
-import type { AIAnalysis, AIAnalysisStatus, AISeverity, Prisma } from "@prisma/client";
+import type { AIAnalysis, AIAnalysisStatus, AISeverity } from "@prisma/client";
 import { prisma } from "../config/prisma";
 import {
   assertCaseCanAcceptAnalysis,

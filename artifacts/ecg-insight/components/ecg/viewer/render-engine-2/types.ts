@@ -1,4 +1,4 @@
-import type { EcgGridGain, EcgPaperSpeed } from "../types";
+import type { EcgGridGain, EcgPaperSpeed, EcgViewerGridSettings } from "../types";
 
 export const RENDER_ENGINE_2_VERSION = "2.0.0";
 export const TARGET_FPS = 60;
@@ -25,8 +25,9 @@ export type RenderEngine2DisplayProfile = {
 };
 
 export type RenderEngine2GridSettings = {
-  paperSpeed: EcgPaperSpeed;
   gain: EcgGridGain;
+  /** Maps to {@link EcgViewerGridSettings.speed}. */
+  paperSpeed: EcgPaperSpeed;
   visible: boolean;
   zoom: number;
 };

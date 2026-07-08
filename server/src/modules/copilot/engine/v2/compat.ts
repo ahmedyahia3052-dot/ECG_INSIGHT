@@ -3,12 +3,11 @@ import { emptyClinicalContext } from "../../intent-manager";
 import type {
   CommunicationIntent,
   EngineResult,
-  KnowledgeRoute,
   ResponsePlan,
   ToolPlan,
 } from "../types";
 import { CLINICAL_AI_ENGINE_VERSION } from "../types";
-import type { PipelineContext, PipelineInput, PipelineOutput, ReasoningResult } from "./types";
+import type { PipelineInput, PipelineOutput, ReasoningResult } from "./types";
 
 function modeToCommunicationIntent(mode: ReasoningResult["mode"]): CommunicationIntent {
   switch (mode) {

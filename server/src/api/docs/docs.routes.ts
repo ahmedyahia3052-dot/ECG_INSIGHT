@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { Router } from "express";
+import { organizationDomainOpenApiPaths, ORGANIZATION_DOMAIN_OPENAPI_TAG } from "../../modules/organization-domain/swagger";
 
 const openapiJsonPath = path.join(process.cwd(), "lib", "api-spec", "openapi.json");
 
@@ -8,7 +9,13 @@ let cachedSpec: Record<string, unknown> | null = null;
 
 export function loadOpenApiSpec() {
   if (!cachedSpec) {
-    cachedSpec = JSON.parse(readFileSync(openapiJsonPath, "utf8")) as Record<string, unknown>;
+    const base = JSON.parse(readFileSync(openapiJsonPath, "utf8")) as Record<string, unknown>;
+    const paths = { ...(base.paths as Record<string, unknown> ?? {}), ...organizationDomainOpenApiPaths };
+    const tags = [
+      ...((base.tags as Array<{ name: string }> | undefined) ?? []),
+      { description: "Sprint 84 unified organization & patient management", name: ORGANIZATION_DOMAIN_OPENAPI_TAG },
+    ];
+    cachedSpec = { ...base, paths, tags };
   }
   return cachedSpec;
 }

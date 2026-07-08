@@ -1,4 +1,3 @@
-import fs from "node:fs";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
 import { runDigitizationPipeline } from "../ecg-digitization/digitizer";
@@ -13,28 +12,13 @@ import { classifyDocumentType } from "./extractors/document-classifier";
 import { validateAttachmentContext } from "./validation/attachment-validator";
 import { recordClinicalPipelineMetric } from "./observability/clinical-pipeline-metrics";
 
-export type PipelineStageName =
-  | "upload"
-  | "validation"
-  | "storage"
-  | "preview"
-  | "metadata"
-  | "ocr"
-  | "classification"
-  | "ecg_digitization"
-  | "measurements"
-  | "clinical_interpretation"
-  | "context_builder"
-  | "completed";
+import type {
+  PipelineStageName,
+  PipelineStageRecord,
+  PipelineStageStatus,
+} from "./attachment/pipeline-stage.types";
 
-export type PipelineStageStatus = "completed" | "failed" | "running" | "skipped" | "warning";
-
-export type PipelineStageRecord = {
-  durationMs?: number;
-  message?: string;
-  stage: PipelineStageName;
-  status: PipelineStageStatus;
-};
+export type { PipelineStageName, PipelineStageRecord, PipelineStageStatus } from "./attachment/pipeline-stage.types";
 
 export type CopilotAttachmentPipelineResult = {
   analysisSummary: string;

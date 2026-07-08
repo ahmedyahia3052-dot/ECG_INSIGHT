@@ -1,6 +1,6 @@
 import type { Request, Response } from "express";
 import type { ZodError } from "zod";
-import { AppError } from "../../middleware/error";
+import { AppError } from "../../errors/app-error";
 import type { ApiErrorBody } from "./types";
 
 export function buildErrorBody(input: {

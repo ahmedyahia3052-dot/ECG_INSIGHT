@@ -21,7 +21,7 @@ const modules = read("server/src/modules/index.ts");
 const frontendService = read("artifacts/ecg-insight/services/clinicalIntelligence.ts");
 const panel = read("artifacts/ecg-insight/components/clinical/CDSSDecisionPanel.tsx");
 const caseDetail = read("artifacts/ecg-insight/app/(protected)/ecg-cases/[id].tsx");
-const report = read("SPRINT_34_CLINICAL_DECISION_SUPPORT_REPORT.md");
+const report = read("reports/SPRINT_34_CLINICAL_DECISION_SUPPORT_REPORT.md");
 
 [
   "ClinicalDecisionRule",

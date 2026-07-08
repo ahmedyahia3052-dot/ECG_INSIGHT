@@ -67,7 +67,7 @@ const files = [
     ],
   },
   {
-    file: resolve(ROOT, "SPRINT70_PERFORMANCE_OPTIMIZATION_REPORT.md"),
+    file: resolve(ROOT, "reports/SPRINT70_PERFORMANCE_OPTIMIZATION_REPORT.md"),
     markers: ["Sprint 70", "Benchmark Comparison", "Composite Indexes"],
   },
 ];

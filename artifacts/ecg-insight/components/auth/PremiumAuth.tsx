@@ -138,18 +138,20 @@ export function PremiumAuthShell({
   eyebrow,
   maxContentWidth = 480,
   subtitle,
+  testID = "auth-login-screen",
   title,
 }: {
   children: React.ReactNode;
   eyebrow?: string;
   maxContentWidth?: number;
   subtitle: string;
+  testID?: string;
   title: string;
 }) {
   const router = useRouter();
 
   return (
-    <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={styles.root}>
+    <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={styles.root} testID={testID}>
       <AnimatedMedicalBackground />
       <ScrollView
         contentContainerStyle={styles.scroll}
@@ -224,12 +226,14 @@ export function AuthPrimaryButton({
   icon,
   label,
   onPress,
+  testID,
   variant = "primary",
 }: {
   disabled?: boolean;
   icon?: AuthIcon;
   label: string;
   onPress: () => void;
+  testID?: string;
   variant?: "ghost" | "outline" | "primary";
 }) {
   const primary = variant === "primary";
@@ -238,6 +242,7 @@ export function AuthPrimaryButton({
       accessibilityRole="button"
       disabled={disabled}
       onPress={onPress}
+      testID={testID}
       style={({ pressed }) => [
         styles.button,
         primary ? styles.buttonPrimary : variant === "outline" ? styles.buttonOutline : styles.buttonGhost,

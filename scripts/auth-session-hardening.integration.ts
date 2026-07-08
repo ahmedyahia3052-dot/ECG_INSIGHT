@@ -13,6 +13,10 @@ const prisma = new PrismaClient({
 
 type CookieJar = Map<string, string>;
 
+function apiErrorMessage(body: { message?: string; detail?: string } | null): string | undefined {
+  return body?.message ?? body?.detail;
+}
+
 function assert(condition: unknown, message: string): asserts condition {
   if (!condition) throw new Error(message);
 }
@@ -138,25 +142,37 @@ async function main() {
       body: { email: `${prefix}-missing@ecg.test`, password, rememberMe: false },
       method: "POST",
     });
-    assert(invalidEmail.status === 401 && invalidEmail.body.message === "Invalid email or password.", "Invalid email must return a friendly credential error.");
+    assert(
+      invalidEmail.status === 401 && apiErrorMessage(invalidEmail.body) === "Invalid email or password.",
+      `Invalid email must return a friendly credential error. Got status=${invalidEmail.status} body=${JSON.stringify(invalidEmail.body)}`,
+    );
 
-    const invalidPassword = await request<{ code: string; message: string }>("/auth/login", {
+    const invalidPassword = await request<{ code: string; message: string; detail?: string }>("/auth/login", {
       body: { email: activeUser.email, password: "wrong-password", rememberMe: false },
       method: "POST",
     });
-    assert(invalidPassword.status === 401 && invalidPassword.body.message === "Invalid email or password.", "Invalid password must return a friendly credential error.");
+    assert(
+      invalidPassword.status === 401 && apiErrorMessage(invalidPassword.body) === "Invalid email or password.",
+      "Invalid password must return a friendly credential error.",
+    );
 
-    const inactive = await request<{ code: string; message: string }>("/auth/login", {
+    const inactive = await request<{ code: string; message: string; detail?: string }>("/auth/login", {
       body: { email: inactiveUser.email, password, rememberMe: false },
       method: "POST",
     });
-    assert(inactive.status === 403 && inactive.body.message === "Your account is inactive.", "Inactive accounts must get the inactive account message.");
+    assert(
+      inactive.status === 403 && apiErrorMessage(inactive.body) === "Your account is inactive.",
+      "Inactive accounts must get the inactive account message.",
+    );
 
-    const deleted = await request<{ code: string; message: string }>("/auth/login", {
+    const deleted = await request<{ code: string; message: string; detail?: string }>("/auth/login", {
       body: { email: deletedUser.email, password, rememberMe: false },
       method: "POST",
     });
-    assert(deleted.status === 401 && deleted.body.message === "Invalid email or password.", "Deleted accounts must not authenticate.");
+    assert(
+      deleted.status === 401 && apiErrorMessage(deleted.body) === "Invalid email or password.",
+      "Deleted accounts must not authenticate.",
+    );
 
     const staleJar: CookieJar = new Map([["ecg_refresh_token", "stale-refresh-token"]]);
     const validLogin = await request<{ accessToken: string; user: { email: string } }>("/auth/login", {

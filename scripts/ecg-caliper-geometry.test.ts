@@ -102,6 +102,6 @@ assert.equal(dispersion?.value, 20);
 
 const csvExport = exportMeasurements([], "csv") as { csv: string; format: string };
 assert.equal(csvExport.format, "csv");
-assert.ok(csvExport.csv.includes("name,type,kind"));
+assert.ok(csvExport.csv.startsWith("id,name,abbreviation,type,kind,"));
 
 console.log("ecg-caliper-geometry.test.ts: all unit tests passed");

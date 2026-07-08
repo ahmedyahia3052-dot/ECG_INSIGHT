@@ -1,0 +1,432 @@
+openapi: 3.1.0
+info:
+  title: ECG Medical Knowledge Platform (EMKP) API
+  description: |
+    **DESIGN SPECIFICATION ONLY — NOT INTEGRATED**
+
+    Future REST API for the isolated EMKP module.
+    No routes are mounted in production. Integration planned for a future sprint.
+  version: 1.0.0
+  contact:
+    name: ECG Insight Enterprise
+
+servers:
+  - url: /api/v2/emkp
+    description: Future integration endpoint (not active)
+
+tags:
+  - name: Knowledge
+  - name: Rules
+  - name: Differential
+  - name: Leads
+  - name: Terminology
+  - name: Guidelines
+  - name: Validation
+
+paths:
+  /health:
+    get:
+      tags: [Validation]
+      summary: Platform health
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+
+  /diseases:
+    get:
+      tags: [Knowledge]
+      summary: List all disease knowledge entries
+      parameters:
+        - name: category
+          in: query
+          schema:
+            $ref: "#/components/schemas/KnowledgeCategory"
+        - name: query
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Disease list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  entries:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/DiseaseEntry"
+
+  /diseases/{code}:
+    get:
+      tags: [Knowledge]
+      summary: Get disease by code
+      parameters:
+        - name: code
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Disease entry
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DiseaseEntry"
+        "404":
+          description: Not found
+
+  /rules:
+    get:
+      tags: [Rules]
+      summary: List clinical rules
+      responses:
+        "200":
+          description: Rule list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  rules:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/ClinicalRule"
+
+  /rules/{ruleId}:
+    get:
+      tags: [Rules]
+      summary: Get rule by ID
+      parameters:
+        - name: ruleId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Clinical rule
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ClinicalRule"
+
+  /differential:
+    get:
+      tags: [Differential]
+      summary: Get differential diagnosis trees
+      responses:
+        "200":
+          description: Differential trees
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  trees:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/DifferentialNode"
+
+  /leads:
+    get:
+      tags: [Leads]
+      summary: Get 12-lead clinical knowledge
+      responses:
+        "200":
+          description: Lead knowledge
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  leads:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/LeadKnowledge"
+
+  /terminology:
+    get:
+      tags: [Terminology]
+      summary: Search ECG terminology dictionary
+      parameters:
+        - name: q
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Terminology entries
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  terms:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/TerminologyEntry"
+
+  /guidelines:
+    get:
+      tags: [Guidelines]
+      summary: List guideline references
+      responses:
+        "200":
+          description: Guidelines
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  guidelines:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/GuidelineReference"
+
+  /validate:
+    post:
+      tags: [Validation]
+      summary: Validate platform integrity
+      responses:
+        "200":
+          description: Validation result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ValidationResult"
+
+components:
+  schemas:
+    KnowledgeCategory:
+      type: string
+      enum: [normal, rhythm, conduction, ischemia, electrolyte, hypertrophy, channelopathy, structural, device, other]
+
+    EvidenceLevel:
+      type: string
+      enum: [A, B, C, D, expert_consensus]
+
+    SeverityLevel:
+      type: string
+      enum: [normal, minor, abnormal, urgent, critical]
+
+    UrgencyLevel:
+      type: string
+      enum: [routine, urgent, emergent, critical]
+
+    RiskCategory:
+      type: string
+      enum: [critical, high, intermediate, low, benign]
+
+    GuidelineReference:
+      type: object
+      required: [organization, documentId, title]
+      properties:
+        organization:
+          type: string
+          enum: [ESC, AHA, ACC, ACC/AHA, HRS, WHF, UDMI, IEC, OTHER]
+        documentId:
+          type: string
+        title:
+          type: string
+        section:
+          type: string
+        year:
+          type: integer
+        url:
+          type: string
+        evidenceLevel:
+          $ref: "#/components/schemas/EvidenceLevel"
+
+    DiseaseEntry:
+      type: object
+      required: [code, name, category, definition, diagnosticCriteria, severity, urgency, riskCategory]
+      properties:
+        code:
+          type: string
+        name:
+          type: string
+        category:
+          $ref: "#/components/schemas/KnowledgeCategory"
+        definition:
+          type: string
+        diagnosticCriteria:
+          type: array
+          items:
+            type: string
+        ecgCharacteristics:
+          type: array
+          items:
+            type: string
+        measurements:
+          type: array
+          items:
+            type: string
+        differentialDiagnosis:
+          type: array
+          items:
+            type: string
+        pitfalls:
+          type: array
+          items:
+            type: string
+        severity:
+          $ref: "#/components/schemas/SeverityLevel"
+        urgency:
+          $ref: "#/components/schemas/UrgencyLevel"
+        riskCategory:
+          $ref: "#/components/schemas/RiskCategory"
+        clinicalNotes:
+          type: array
+          items:
+            type: string
+        guidelineReferences:
+          type: array
+          items:
+            $ref: "#/components/schemas/GuidelineReference"
+
+    ClinicalRule:
+      type: object
+      required: [ruleId, diagnosisCode, definition, diagnosticCriteria, severity, riskLevel, urgency]
+      properties:
+        ruleId:
+          type: string
+        diagnosisCode:
+          type: string
+        definition:
+          type: string
+        diagnosticCriteria:
+          type: array
+          items:
+            type: string
+        requiredFindings:
+          type: array
+          items:
+            type: string
+        supportingFindings:
+          type: array
+          items:
+            type: string
+        exclusionFindings:
+          type: array
+          items:
+            type: string
+        severity:
+          $ref: "#/components/schemas/SeverityLevel"
+        clinicalSignificance:
+          type: string
+        riskLevel:
+          $ref: "#/components/schemas/RiskCategory"
+        urgency:
+          $ref: "#/components/schemas/UrgencyLevel"
+        recommendedAction:
+          type: array
+          items:
+            type: string
+        evidenceLevel:
+          $ref: "#/components/schemas/EvidenceLevel"
+        guidelineRefs:
+          type: array
+          items:
+            $ref: "#/components/schemas/GuidelineReference"
+
+    DifferentialNode:
+      type: object
+      required: [nodeId, label, children]
+      properties:
+        nodeId:
+          type: string
+        label:
+          type: string
+        diagnosisCode:
+          type: string
+        distinguishingFeatures:
+          type: array
+          items:
+            type: string
+        children:
+          type: array
+          items:
+            $ref: "#/components/schemas/DifferentialNode"
+
+    LeadKnowledge:
+      type: object
+      required: [lead, territory, clinicalImportance, viewVector]
+      properties:
+        lead:
+          type: string
+        territory:
+          type: string
+        clinicalImportance:
+          type: string
+        viewVector:
+          type: string
+        commonFindings:
+          type: array
+          items:
+            type: string
+        associatedDiseases:
+          type: array
+          items:
+            type: string
+
+    TerminologyEntry:
+      type: object
+      required: [term, category, definition]
+      properties:
+        term:
+          type: string
+        category:
+          type: string
+          enum: [wave, interval, segment, axis, morphology, rhythm, abbreviation, clinical, synonym]
+        definition:
+          type: string
+        synonyms:
+          type: array
+          items:
+            type: string
+        abbreviations:
+          type: array
+          items:
+            type: string
+        relatedTerms:
+          type: array
+          items:
+            type: string
+
+    ValidationResult:
+      type: object
+      properties:
+        ok:
+          type: boolean
+        errors:
+          type: array
+          items:
+            type: string
+        warnings:
+          type: array
+          items:
+            type: string
+        stats:
+          type: object
+          additionalProperties:
+            type: integer
+
+    HealthResponse:
+      type: object
+      properties:
+        ok:
+          type: boolean
+        moduleId:
+          type: string
+        version:
+          type: string
+        integrated:
+          type: boolean
+          description: Always false until future sprint

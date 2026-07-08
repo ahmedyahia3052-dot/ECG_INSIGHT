@@ -1,19 +1,16 @@
 import { buildTwelveLeadRegions } from "./rendering-engine/twelveLeadLayout";
+import type { EcgLeadLayoutMode } from "./types";
 import type { EcgLeadId } from "./types";
 import type { EcgTwelveLeadRegion } from "./rendering-engine/types";
 
+/** Layout modes shared with workstation {@link EcgLeadLayoutMode}. */
+export type MonitorSharedLeadLayoutMode = Extract<EcgLeadLayoutMode, "12-lead" | "3x4" | "6x2" | "single">;
+
+/** Monitor-only layouts (dual, quad, N-lead bundles, custom). */
+export type MonitorExclusiveLayoutMode = "dual" | "quad" | "3-lead" | "5-lead" | "6-lead" | "custom";
+
 /** Sprint 50 — hospital-grade layout modes (backward compatible with Sprint 45). */
-export type MonitorLayoutMode =
-  | "single"
-  | "dual"
-  | "quad"
-  | "3-lead"
-  | "5-lead"
-  | "6-lead"
-  | "6x2"
-  | "3x4"
-  | "12-lead"
-  | "custom";
+export type MonitorLayoutMode = MonitorSharedLeadLayoutMode | MonitorExclusiveLayoutMode;
 
 export type MonitorDisplayPreset = "bedside" | "central-station" | "diagnostic" | null;
 

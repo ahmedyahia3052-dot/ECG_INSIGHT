@@ -1,0 +1,746 @@
+
+<!doctype html>
+<html lang="en">
+
+<head>
+    <title>Code coverage report for artifacts/ecg-insight/components/ecg/viewer</title>
+    <meta charset="utf-8" />
+    <link rel="stylesheet" href="../../../../../prettify.css" />
+    <link rel="stylesheet" href="../../../../../base.css" />
+    <link rel="shortcut icon" type="image/x-icon" href="../../../../../favicon.png" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <style type='text/css'>
+        .coverage-summary .sorter {
+            background-image: url(../../../../../sort-arrow-sprite.png);
+        }
+    </style>
+</head>
+    
+<body>
+<div class='wrapper'>
+    <div class='pad1'>
+        <h1><a href="../../../../../index.html">All files</a> artifacts/ecg-insight/components/ecg/viewer</h1>
+        <div class='clearfix'>
+            
+            <div class='fl pad1y space-right2'>
+                <span class="strong">25.86% </span>
+                <span class="quiet">Statements</span>
+                <span class='fraction'>1212/4685</span>
+            </div>
+        
+            
+            <div class='fl pad1y space-right2'>
+                <span class="strong">69.33% </span>
+                <span class="quiet">Branches</span>
+                <span class='fraction'>312/450</span>
+            </div>
+        
+            
+            <div class='fl pad1y space-right2'>
+                <span class="strong">61.48% </span>
+                <span class="quiet">Functions</span>
+                <span class='fraction'>91/148</span>
+            </div>
+        
+            
+            <div class='fl pad1y space-right2'>
+                <span class="strong">25.86% </span>
+                <span class="quiet">Lines</span>
+                <span class='fraction'>1212/4685</span>
+            </div>
+        
+            
+        </div>
+        <p class="quiet">
+            Press <em>n</em> or <em>j</em> to go to the next uncovered block, <em>b</em>, <em>p</em> or <em>k</em> for the previous block.
+        </p>
+        <template id="filterTemplate">
+            <div class="quiet">
+                Filter:
+                <input type="search" id="fileSearch">
+            </div>
+        </template>
+    </div>
+    <div class='status-line low'></div>
+    <div class="pad1">
+<table class="coverage-summary">
+<thead>
+<tr>
+   <th data-col="file" data-fmt="html" data-html="true" class="file">File</th>
+   <th data-col="pic" data-type="number" data-fmt="html" data-html="true" class="pic"></th>
+   <th data-col="statements" data-type="number" data-fmt="pct" class="pct">Statements</th>
+   <th data-col="statements_raw" data-type="number" data-fmt="html" class="abs"></th>
+   <th data-col="branches" data-type="number" data-fmt="pct" class="pct">Branches</th>
+   <th data-col="branches_raw" data-type="number" data-fmt="html" class="abs"></th>
+   <th data-col="functions" data-type="number" data-fmt="pct" class="pct">Functions</th>
+   <th data-col="functions_raw" data-type="number" data-fmt="html" class="abs"></th>
+   <th data-col="lines" data-type="number" data-fmt="pct" class="pct">Lines</th>
+   <th data-col="lines_raw" data-type="number" data-fmt="html" class="abs"></th>
+</tr>
+</thead>
+<tbody><tr>
+	<td class="file high" data-value="aiOverlayTypes.ts"><a href="aiOverlayTypes.ts.html">aiOverlayTypes.ts</a></td>
+	<td data-value="100" class="pic high">
+	<div class="chart"><div class="cover-fill cover-full" style="width: 100%"></div><div class="cover-empty" style="width: 0%"></div></div>
+	</td>
+	<td data-value="100" class="pct high">100%</td>
+	<td data-value="37" class="abs high">37/37</td>
+	<td data-value="100" class="pct high">100%</td>
+	<td data-value="0" class="abs high">0/0</td>
+	<td data-value="100" class="pct high">100%</td>
+	<td data-value="0" class="abs high">0/0</td>
+	<td data-value="100" class="pct high">100%</td>
+	<td data-value="37" class="abs high">37/37</td>
+	</tr>
+
+<tr>
+	<td class="file low" data-value="ecgAiOverlayEngine.ts"><a href="ecgAiOverlayEngine.ts.html">ecgAiOverlayEngine.ts</a></td>
+	<td data-value="24.01" class="pic low">
+	<div class="chart"><div class="cover-fill" style="width: 24%"></div><div class="cover-empty" style="width: 76%"></div></div>
+	</td>
+	<td data-value="24.01" class="pct low">24.01%</td>
+	<td data-value="508" class="abs low">122/508</td>
+	<td data-value="84.21" class="pct high">84.21%</td>
+	<td data-value="57" class="abs high">48/57</td>
+	<td data-value="44.44" class="pct low">44.44%</td>
+	<td data-value="27" class="abs low">12/27</td>
+	<td data-value="24.01" class="pct low">24.01%</td>
+	<td data-value="508" class="abs low">122/508</td>
+	</tr>
+
+<tr>
+	<td class="file low" data-value="ecgCalibrationMath.ts"><a href="ecgCalibrationMath.ts.html">ecgCalibrationMath.ts</a></td>
+	<td data-value="44.68" class="pic low">
+	<div class="chart"><div class="cover-fill" style="width: 44%"></div><div class="cover-empty" style="width: 56%"></div></div>
+	</td>
+	<td data-value="44.68" class="pct low">44.68%</td>
+	<td data-value="188" class="abs low">84/188</td>
+	<td data-value="55.81" class="pct medium">55.81%</td>
+	<td data-value="43" class="abs medium">24/43</td>
+	<td data-value="52.38" class="pct medium">52.38%</td>
+	<td data-value="21" class="abs medium">11/21</td>
+	<td data-value="44.68" class="pct low">44.68%</td>
+	<td data-value="188" class="abs low">84/188</td>
+	</tr>
+
+<tr>
+	<td class="file high" data-value="ecgCaliperGeometry.ts"><a href="ecgCaliperGeometry.ts.html">ecgCaliperGeometry.ts</a></td>
+	<td data-value="84.74" class="pic high">
+	<div class="chart"><div class="cover-fill" style="width: 84%"></div><div class="cover-empty" style="width: 16%"></div></div>
+	</td>
+	<td data-value="84.74" class="pct high">84.74%</td>
+	<td data-value="59" class="abs high">50/59</td>
+	<td data-value="62.5" class="pct medium">62.5%</td>
+	<td data-value="32" class="abs medium">20/32</td>
+	<td data-value="100" class="pct high">100%</td>
+	<td data-value="6" class="abs high">6/6</td>
+	<td data-value="84.74" class="pct high">84.74%</td>
+	<td data-value="59" class="abs high">50/59</td>
+	</tr>
+
+<tr>
+	<td class="file low" data-value="ecgCockpitColors.ts"><a href="ecgCockpitColors.ts.html">ecgCockpitColors.ts</a></td>
+	<td data-value="0" class="pic low">
+	<div class="chart"><div class="cover-fill" style="width: 0%"></div><div class="cover-empty" style="width: 100%"></div></div>
+	</td>
+	<td data-value="0" class="pct low">0%</td>
+	<td data-value="15" class="abs low">0/15</td>
+	<td data-value="100" class="pct high">100%</td>
+	<td data-value="1" class="abs high">1/1</td>
+	<td data-value="100" class="pct high">100%</td>
+	<td data-value="1" class="abs high">1/1</td>
+	<td data-value="0" class="pct low">0%</td>
+	<td data-value="15" class="abs low">0/15</td>
+	</tr>
+
+<tr>
+	<td class="file low" data-value="ecgDigitizedWaveformSync.ts"><a href="ecgDigitizedWaveformSync.ts.html">ecgDigitizedWaveformSync.ts</a></td>
+	<td data-value="0" class="pic low">
+	<div class="chart"><div class="cover-fill" style="width: 0%"></div><div class="cover-empty" style="width: 100%"></div></div>
+	</td>
+	<td data-value="0" class="pct low">0%</td>
+	<td data-value="59" class="abs low">0/59</td>
+	<td data-value="100" class="pct high">100%</td>
+	<td data-value="1" class="abs high">1/1</td>
+	<td data-value="100" class="pct high">100%</td>
+	<td data-value="1" class="abs high">1/1</td>
+	<td data-value="0" class="pct low">0%</td>
+	<td data-value="59" class="abs low">0/59</td>
+	</tr>
+
+<tr>
+	<td class="file low" data-value="ecgEnterpriseDesignTokens.ts"><a href="ecgEnterpriseDesignTokens.ts.html">ecgEnterpriseDesignTokens.ts</a></td>
+	<td data-value="0" class="pic low">
+	<div class="chart"><div class="cover-fill" style="width: 0%"></div><div class="cover-empty" style="width: 100%"></div></div>
+	</td>
+	<td data-value="0" class="pct low">0%</td>
+	<td data-value="43" class="abs low">0/43</td>
+	<td data-value="100" class="pct high">100%</td>
+	<td data-value="1" class="abs high">1/1</td>
+	<td data-value="100" class="pct high">100%</td>
+	<td data-value="1" class="abs high">1/1</td>
+	<td data-value="0" class="pct low">0%</td>
+	<td data-value="43" class="abs low">0/43</td>
+	</tr>
+
+<tr>
+	<td class="file high" data-value="ecgImageEngine.ts"><a href="ecgImageEngine.ts.html">ecgImageEngine.ts</a></td>
+	<td data-value="94.02" class="pic high">
+	<div class="chart"><div class="cover-fill" style="width: 94%"></div><div class="cover-empty" style="width: 6%"></div></div>
+	</td>
+	<td data-value="94.02" class="pct high">94.02%</td>
+	<td data-value="134" class="abs high">126/134</td>
+	<td data-value="75.47" class="pct medium">75.47%</td>
+	<td data-value="53" class="abs medium">40/53</td>
+	<td data-value="100" class="pct high">100%</td>
+	<td data-value="13" class="abs high">13/13</td>
+	<td data-value="94.02" class="pct high">94.02%</td>
+	<td data-value="134" class="abs high">126/134</td>
+	</tr>
+
+<tr>
+	<td class="file low" data-value="ecgLiveMeasurements.ts"><a href="ecgLiveMeasurements.ts.html">ecgLiveMeasurements.ts</a></td>
+	<td data-value="0" class="pic low">
+	<div class="chart"><div class="cover-fill" style="width: 0%"></div><div class="cover-empty" style="width: 100%"></div></div>
+	</td>
+	<td data-value="0" class="pct low">0%</td>
+	<td data-value="65" class="abs low">0/65</td>
+	<td data-value="0" class="pct low">0%</td>
+	<td data-value="1" class="abs low">0/1</td>
+	<td data-value="0" class="pct low">0%</td>
+	<td data-value="1" class="abs low">0/1</td>
+	<td data-value="0" class="pct low">0%</td>
+	<td data-value="65" class="abs low">0/65</td>
+	</tr>
+
+<tr>
+	<td class="file low" data-value="ecgLiveMonitorTokens.ts"><a href="ecgLiveMonitorTokens.ts.html">ecgLiveMonitorTokens.ts</a></td>
+	<td data-value="0" class="pic low">
+	<div class="chart"><div class="cover-fill" style="width: 0%"></div><div class="cover-empty" style="width: 100%"></div></div>
+	</td>
+	<td data-value="0" class="pct low">0%</td>
+	<td data-value="19" class="abs low">0/19</td>
+	<td data-value="100" class="pct high">100%</td>
+	<td data-value="1" class="abs high">1/1</td>
+	<td data-value="100" class="pct high">100%</td>
+	<td data-value="1" class="abs high">1/1</td>
+	<td data-value="0" class="pct low">0%</td>
+	<td data-value="19" class="abs low">0/19</td>
+	</tr>
+
+<tr>
+	<td class="file medium" data-value="ecgMeasurementEngine.ts"><a href="ecgMeasurementEngine.ts.html">ecgMeasurementEngine.ts</a></td>
+	<td data-value="58.1" class="pic medium">
+	<div class="chart"><div class="cover-fill" style="width: 58%"></div><div class="cover-empty" style="width: 42%"></div></div>
+	</td>
+	<td data-value="58.1" class="pct medium">58.1%</td>
+	<td data-value="370" class="abs medium">215/370</td>
+	<td data-value="43.13" class="pct low">43.13%</td>
+	<td data-value="51" class="abs low">22/51</td>
+	<td data-value="53.33" class="pct medium">53.33%</td>
+	<td data-value="15" class="abs medium">8/15</td>
+	<td data-value="58.1" class="pct medium">58.1%</td>
+	<td data-value="370" class="abs medium">215/370</td>
+	</tr>
+
+<tr>
+	<td class="file high" data-value="ecgMeasurementExport.ts"><a href="ecgMeasurementExport.ts.html">ecgMeasurementExport.ts</a></td>
+	<td data-value="100" class="pic high">
+	<div class="chart"><div class="cover-fill cover-full" style="width: 100%"></div><div class="cover-empty" style="width: 0%"></div></div>
+	</td>
+	<td data-value="100" class="pct high">100%</td>
+	<td data-value="58" class="abs high">58/58</td>
+	<td data-value="91.66" class="pct high">91.66%</td>
+	<td data-value="12" class="abs high">11/12</td>
+	<td data-value="100" class="pct high">100%</td>
+	<td data-value="2" class="abs high">2/2</td>
+	<td data-value="100" class="pct high">100%</td>
+	<td data-value="58" class="abs high">58/58</td>
+	</tr>
+
+<tr>
+	<td class="file high" data-value="ecgMeasurementHistory.ts"><a href="ecgMeasurementHistory.ts.html">ecgMeasurementHistory.ts</a></td>
+	<td data-value="94.33" class="pic high">
+	<div class="chart"><div class="cover-fill" style="width: 94%"></div><div class="cover-empty" style="width: 6%"></div></div>
+	</td>
+	<td data-value="94.33" class="pct high">94.33%</td>
+	<td data-value="53" class="abs high">50/53</td>
+	<td data-value="61.9" class="pct medium">61.9%</td>
+	<td data-value="21" class="abs medium">13/21</td>
+	<td data-value="100" class="pct high">100%</td>
+	<td data-value="6" class="abs high">6/6</td>
+	<td data-value="94.33" class="pct high">94.33%</td>
+	<td data-value="53" class="abs high">50/53</td>
+	</tr>
+
+<tr>
+	<td class="file medium" data-value="ecgMeasurementReference.ts"><a href="ecgMeasurementReference.ts.html">ecgMeasurementReference.ts</a></td>
+	<td data-value="78.57" class="pic medium">
+	<div class="chart"><div class="cover-fill" style="width: 78%"></div><div class="cover-empty" style="width: 22%"></div></div>
+	</td>
+	<td data-value="78.57" class="pct medium">78.57%</td>
+	<td data-value="70" class="abs medium">55/70</td>
+	<td data-value="86.36" class="pct high">86.36%</td>
+	<td data-value="22" class="abs high">19/22</td>
+	<td data-value="100" class="pct high">100%</td>
+	<td data-value="2" class="abs high">2/2</td>
+	<td data-value="78.57" class="pct medium">78.57%</td>
+	<td data-value="70" class="abs medium">55/70</td>
+	</tr>
+
+<tr>
+	<td class="file high" data-value="ecgMonitorBeatMarkers.ts"><a href="ecgMonitorBeatMarkers.ts.html">ecgMonitorBeatMarkers.ts</a></td>
+	<td data-value="100" class="pic high">
+	<div class="chart"><div class="cover-fill cover-full" style="width: 100%"></div><div class="cover-empty" style="width: 0%"></div></div>
+	</td>
+	<td data-value="100" class="pct high">100%</td>
+	<td data-value="75" class="abs high">75/75</td>
+	<td data-value="72.72" class="pct medium">72.72%</td>
+	<td data-value="33" class="abs medium">24/33</td>
+	<td data-value="100" class="pct high">100%</td>
+	<td data-value="4" class="abs high">4/4</td>
+	<td data-value="100" class="pct high">100%</td>
+	<td data-value="75" class="abs high">75/75</td>
+	</tr>
+
+<tr>
+	<td class="file low" data-value="ecgMonitorCanvas.ts"><a href="ecgMonitorCanvas.ts.html">ecgMonitorCanvas.ts</a></td>
+	<td data-value="0" class="pic low">
+	<div class="chart"><div class="cover-fill" style="width: 0%"></div><div class="cover-empty" style="width: 100%"></div></div>
+	</td>
+	<td data-value="0" class="pct low">0%</td>
+	<td data-value="204" class="abs low">0/204</td>
+	<td data-value="100" class="pct high">100%</td>
+	<td data-value="1" class="abs high">1/1</td>
+	<td data-value="100" class="pct high">100%</td>
+	<td data-value="1" class="abs high">1/1</td>
+	<td data-value="0" class="pct low">0%</td>
+	<td data-value="204" class="abs low">0/204</td>
+	</tr>
+
+<tr>
+	<td class="file high" data-value="ecgMonitorPath.ts"><a href="ecgMonitorPath.ts.html">ecgMonitorPath.ts</a></td>
+	<td data-value="100" class="pic high">
+	<div class="chart"><div class="cover-fill cover-full" style="width: 100%"></div><div class="cover-empty" style="width: 0%"></div></div>
+	</td>
+	<td data-value="100" class="pct high">100%</td>
+	<td data-value="44" class="abs high">44/44</td>
+	<td data-value="87.5" class="pct high">87.5%</td>
+	<td data-value="16" class="abs high">14/16</td>
+	<td data-value="100" class="pct high">100%</td>
+	<td data-value="5" class="abs high">5/5</td>
+	<td data-value="100" class="pct high">100%</td>
+	<td data-value="44" class="abs high">44/44</td>
+	</tr>
+
+<tr>
+	<td class="file high" data-value="ecgMonitorRoute.ts"><a href="ecgMonitorRoute.ts.html">ecgMonitorRoute.ts</a></td>
+	<td data-value="100" class="pic high">
+	<div class="chart"><div class="cover-fill cover-full" style="width: 100%"></div><div class="cover-empty" style="width: 0%"></div></div>
+	</td>
+	<td data-value="100" class="pct high">100%</td>
+	<td data-value="18" class="abs high">18/18</td>
+	<td data-value="76.19" class="pct medium">76.19%</td>
+	<td data-value="21" class="abs medium">16/21</td>
+	<td data-value="100" class="pct high">100%</td>
+	<td data-value="2" class="abs high">2/2</td>
+	<td data-value="100" class="pct high">100%</td>
+	<td data-value="18" class="abs high">18/18</td>
+	</tr>
+
+<tr>
+	<td class="file high" data-value="ecgMultiLeadSync.ts"><a href="ecgMultiLeadSync.ts.html">ecgMultiLeadSync.ts</a></td>
+	<td data-value="100" class="pic high">
+	<div class="chart"><div class="cover-fill cover-full" style="width: 100%"></div><div class="cover-empty" style="width: 0%"></div></div>
+	</td>
+	<td data-value="100" class="pct high">100%</td>
+	<td data-value="60" class="abs high">60/60</td>
+	<td data-value="88.88" class="pct high">88.88%</td>
+	<td data-value="9" class="abs high">8/9</td>
+	<td data-value="100" class="pct high">100%</td>
+	<td data-value="4" class="abs high">4/4</td>
+	<td data-value="100" class="pct high">100%</td>
+	<td data-value="60" class="abs high">60/60</td>
+	</tr>
+
+<tr>
+	<td class="file low" data-value="ecgNativeId.ts"><a href="ecgNativeId.ts.html">ecgNativeId.ts</a></td>
+	<td data-value="0" class="pic low">
+	<div class="chart"><div class="cover-fill" style="width: 0%"></div><div class="cover-empty" style="width: 100%"></div></div>
+	</td>
+	<td data-value="0" class="pct low">0%</td>
+	<td data-value="9" class="abs low">0/9</td>
+	<td data-value="0" class="pct low">0%</td>
+	<td data-value="1" class="abs low">0/1</td>
+	<td data-value="0" class="pct low">0%</td>
+	<td data-value="1" class="abs low">0/1</td>
+	<td data-value="0" class="pct low">0%</td>
+	<td data-value="9" class="abs low">0/9</td>
+	</tr>
+
+<tr>
+	<td class="file low" data-value="ecgSpacingTokens.ts"><a href="ecgSpacingTokens.ts.html">ecgSpacingTokens.ts</a></td>
+	<td data-value="0" class="pic low">
+	<div class="chart"><div class="cover-fill" style="width: 0%"></div><div class="cover-empty" style="width: 100%"></div></div>
+	</td>
+	<td data-value="0" class="pct low">0%</td>
+	<td data-value="14" class="abs low">0/14</td>
+	<td data-value="100" class="pct high">100%</td>
+	<td data-value="1" class="abs high">1/1</td>
+	<td data-value="100" class="pct high">100%</td>
+	<td data-value="1" class="abs high">1/1</td>
+	<td data-value="0" class="pct low">0%</td>
+	<td data-value="14" class="abs low">0/14</td>
+	</tr>
+
+<tr>
+	<td class="file low" data-value="ecgViewerEngine.ts"><a href="ecgViewerEngine.ts.html">ecgViewerEngine.ts</a></td>
+	<td data-value="0" class="pic low">
+	<div class="chart"><div class="cover-fill" style="width: 0%"></div><div class="cover-empty" style="width: 100%"></div></div>
+	</td>
+	<td data-value="0" class="pct low">0%</td>
+	<td data-value="49" class="abs low">0/49</td>
+	<td data-value="100" class="pct high">100%</td>
+	<td data-value="1" class="abs high">1/1</td>
+	<td data-value="100" class="pct high">100%</td>
+	<td data-value="1" class="abs high">1/1</td>
+	<td data-value="0" class="pct low">0%</td>
+	<td data-value="49" class="abs low">0/49</td>
+	</tr>
+
+<tr>
+	<td class="file low" data-value="ecgViewerExport.ts"><a href="ecgViewerExport.ts.html">ecgViewerExport.ts</a></td>
+	<td data-value="0" class="pic low">
+	<div class="chart"><div class="cover-fill" style="width: 0%"></div><div class="cover-empty" style="width: 100%"></div></div>
+	</td>
+	<td data-value="0" class="pct low">0%</td>
+	<td data-value="19" class="abs low">0/19</td>
+	<td data-value="0" class="pct low">0%</td>
+	<td data-value="1" class="abs low">0/1</td>
+	<td data-value="0" class="pct low">0%</td>
+	<td data-value="1" class="abs low">0/1</td>
+	<td data-value="0" class="pct low">0%</td>
+	<td data-value="19" class="abs low">0/19</td>
+	</tr>
+
+<tr>
+	<td class="file low" data-value="ecgWaveDetectionBridge.ts"><a href="ecgWaveDetectionBridge.ts.html">ecgWaveDetectionBridge.ts</a></td>
+	<td data-value="27.41" class="pic low">
+	<div class="chart"><div class="cover-fill" style="width: 27%"></div><div class="cover-empty" style="width: 73%"></div></div>
+	</td>
+	<td data-value="27.41" class="pct low">27.41%</td>
+	<td data-value="186" class="abs low">51/186</td>
+	<td data-value="50" class="pct medium">50%</td>
+	<td data-value="4" class="abs medium">2/4</td>
+	<td data-value="25" class="pct low">25%</td>
+	<td data-value="8" class="abs low">2/8</td>
+	<td data-value="27.41" class="pct low">27.41%</td>
+	<td data-value="186" class="abs low">51/186</td>
+	</tr>
+
+<tr>
+	<td class="file low" data-value="ecgWorkstationVisualTokens.ts"><a href="ecgWorkstationVisualTokens.ts.html">ecgWorkstationVisualTokens.ts</a></td>
+	<td data-value="0" class="pic low">
+	<div class="chart"><div class="cover-fill" style="width: 0%"></div><div class="cover-empty" style="width: 100%"></div></div>
+	</td>
+	<td data-value="0" class="pct low">0%</td>
+	<td data-value="28" class="abs low">0/28</td>
+	<td data-value="100" class="pct high">100%</td>
+	<td data-value="1" class="abs high">1/1</td>
+	<td data-value="100" class="pct high">100%</td>
+	<td data-value="1" class="abs high">1/1</td>
+	<td data-value="0" class="pct low">0%</td>
+	<td data-value="28" class="abs low">0/28</td>
+	</tr>
+
+<tr>
+	<td class="file high" data-value="measurementTypes.ts"><a href="measurementTypes.ts.html">measurementTypes.ts</a></td>
+	<td data-value="100" class="pic high">
+	<div class="chart"><div class="cover-fill cover-full" style="width: 100%"></div><div class="cover-empty" style="width: 0%"></div></div>
+	</td>
+	<td data-value="100" class="pct high">100%</td>
+	<td data-value="73" class="abs high">73/73</td>
+	<td data-value="92.85" class="pct high">92.85%</td>
+	<td data-value="28" class="abs high">26/28</td>
+	<td data-value="100" class="pct high">100%</td>
+	<td data-value="2" class="abs high">2/2</td>
+	<td data-value="100" class="pct high">100%</td>
+	<td data-value="73" class="abs high">73/73</td>
+	</tr>
+
+<tr>
+	<td class="file low" data-value="useAuthenticatedEcgAsset.ts"><a href="useAuthenticatedEcgAsset.ts.html">useAuthenticatedEcgAsset.ts</a></td>
+	<td data-value="0" class="pic low">
+	<div class="chart"><div class="cover-fill" style="width: 0%"></div><div class="cover-empty" style="width: 100%"></div></div>
+	</td>
+	<td data-value="0" class="pct low">0%</td>
+	<td data-value="105" class="abs low">0/105</td>
+	<td data-value="0" class="pct low">0%</td>
+	<td data-value="1" class="abs low">0/1</td>
+	<td data-value="0" class="pct low">0%</td>
+	<td data-value="1" class="abs low">0/1</td>
+	<td data-value="0" class="pct low">0%</td>
+	<td data-value="105" class="abs low">0/105</td>
+	</tr>
+
+<tr>
+	<td class="file low" data-value="useClinicalWorkflowEngine.ts"><a href="useClinicalWorkflowEngine.ts.html">useClinicalWorkflowEngine.ts</a></td>
+	<td data-value="0" class="pic low">
+	<div class="chart"><div class="cover-fill" style="width: 0%"></div><div class="cover-empty" style="width: 100%"></div></div>
+	</td>
+	<td data-value="0" class="pct low">0%</td>
+	<td data-value="65" class="abs low">0/65</td>
+	<td data-value="0" class="pct low">0%</td>
+	<td data-value="1" class="abs low">0/1</td>
+	<td data-value="0" class="pct low">0%</td>
+	<td data-value="1" class="abs low">0/1</td>
+	<td data-value="0" class="pct low">0%</td>
+	<td data-value="65" class="abs low">0/65</td>
+	</tr>
+
+<tr>
+	<td class="file low" data-value="useEcgAiOverlayWorkspace.ts"><a href="useEcgAiOverlayWorkspace.ts.html">useEcgAiOverlayWorkspace.ts</a></td>
+	<td data-value="0" class="pic low">
+	<div class="chart"><div class="cover-fill" style="width: 0%"></div><div class="cover-empty" style="width: 100%"></div></div>
+	</td>
+	<td data-value="0" class="pct low">0%</td>
+	<td data-value="262" class="abs low">0/262</td>
+	<td data-value="0" class="pct low">0%</td>
+	<td data-value="1" class="abs low">0/1</td>
+	<td data-value="0" class="pct low">0%</td>
+	<td data-value="1" class="abs low">0/1</td>
+	<td data-value="0" class="pct low">0%</td>
+	<td data-value="262" class="abs low">0/262</td>
+	</tr>
+
+<tr>
+	<td class="file low" data-value="useEcgClinicalFindings.ts"><a href="useEcgClinicalFindings.ts.html">useEcgClinicalFindings.ts</a></td>
+	<td data-value="0" class="pic low">
+	<div class="chart"><div class="cover-fill" style="width: 0%"></div><div class="cover-empty" style="width: 100%"></div></div>
+	</td>
+	<td data-value="0" class="pct low">0%</td>
+	<td data-value="72" class="abs low">0/72</td>
+	<td data-value="0" class="pct low">0%</td>
+	<td data-value="1" class="abs low">0/1</td>
+	<td data-value="0" class="pct low">0%</td>
+	<td data-value="1" class="abs low">0/1</td>
+	<td data-value="0" class="pct low">0%</td>
+	<td data-value="72" class="abs low">0/72</td>
+	</tr>
+
+<tr>
+	<td class="file low" data-value="useEcgDiagnosticMode.ts"><a href="useEcgDiagnosticMode.ts.html">useEcgDiagnosticMode.ts</a></td>
+	<td data-value="0" class="pic low">
+	<div class="chart"><div class="cover-fill" style="width: 0%"></div><div class="cover-empty" style="width: 100%"></div></div>
+	</td>
+	<td data-value="0" class="pct low">0%</td>
+	<td data-value="65" class="abs low">0/65</td>
+	<td data-value="0" class="pct low">0%</td>
+	<td data-value="1" class="abs low">0/1</td>
+	<td data-value="0" class="pct low">0%</td>
+	<td data-value="1" class="abs low">0/1</td>
+	<td data-value="0" class="pct low">0%</td>
+	<td data-value="65" class="abs low">0/65</td>
+	</tr>
+
+<tr>
+	<td class="file low" data-value="useEcgEnterpriseViewerState.ts"><a href="useEcgEnterpriseViewerState.ts.html">useEcgEnterpriseViewerState.ts</a></td>
+	<td data-value="0" class="pic low">
+	<div class="chart"><div class="cover-fill" style="width: 0%"></div><div class="cover-empty" style="width: 100%"></div></div>
+	</td>
+	<td data-value="0" class="pct low">0%</td>
+	<td data-value="94" class="abs low">0/94</td>
+	<td data-value="0" class="pct low">0%</td>
+	<td data-value="1" class="abs low">0/1</td>
+	<td data-value="0" class="pct low">0%</td>
+	<td data-value="1" class="abs low">0/1</td>
+	<td data-value="0" class="pct low">0%</td>
+	<td data-value="94" class="abs low">0/94</td>
+	</tr>
+
+<tr>
+	<td class="file low" data-value="useEcgLiveMonitorEngine.ts"><a href="useEcgLiveMonitorEngine.ts.html">useEcgLiveMonitorEngine.ts</a></td>
+	<td data-value="0" class="pic low">
+	<div class="chart"><div class="cover-fill" style="width: 0%"></div><div class="cover-empty" style="width: 100%"></div></div>
+	</td>
+	<td data-value="0" class="pct low">0%</td>
+	<td data-value="38" class="abs low">0/38</td>
+	<td data-value="0" class="pct low">0%</td>
+	<td data-value="1" class="abs low">0/1</td>
+	<td data-value="0" class="pct low">0%</td>
+	<td data-value="1" class="abs low">0/1</td>
+	<td data-value="0" class="pct low">0%</td>
+	<td data-value="38" class="abs low">0/38</td>
+	</tr>
+
+<tr>
+	<td class="file low" data-value="useEcgLiveMonitorShortcuts.ts"><a href="useEcgLiveMonitorShortcuts.ts.html">useEcgLiveMonitorShortcuts.ts</a></td>
+	<td data-value="0" class="pic low">
+	<div class="chart"><div class="cover-fill" style="width: 0%"></div><div class="cover-empty" style="width: 100%"></div></div>
+	</td>
+	<td data-value="0" class="pct low">0%</td>
+	<td data-value="80" class="abs low">0/80</td>
+	<td data-value="0" class="pct low">0%</td>
+	<td data-value="1" class="abs low">0/1</td>
+	<td data-value="0" class="pct low">0%</td>
+	<td data-value="1" class="abs low">0/1</td>
+	<td data-value="0" class="pct low">0%</td>
+	<td data-value="80" class="abs low">0/80</td>
+	</tr>
+
+<tr>
+	<td class="file low" data-value="useEcgMeasurementWorkspace.ts"><a href="useEcgMeasurementWorkspace.ts.html">useEcgMeasurementWorkspace.ts</a></td>
+	<td data-value="0" class="pic low">
+	<div class="chart"><div class="cover-fill" style="width: 0%"></div><div class="cover-empty" style="width: 100%"></div></div>
+	</td>
+	<td data-value="0" class="pct low">0%</td>
+	<td data-value="715" class="abs low">0/715</td>
+	<td data-value="0" class="pct low">0%</td>
+	<td data-value="1" class="abs low">0/1</td>
+	<td data-value="0" class="pct low">0%</td>
+	<td data-value="1" class="abs low">0/1</td>
+	<td data-value="0" class="pct low">0%</td>
+	<td data-value="715" class="abs low">0/715</td>
+	</tr>
+
+<tr>
+	<td class="file low" data-value="useEcgViewerControls.ts"><a href="useEcgViewerControls.ts.html">useEcgViewerControls.ts</a></td>
+	<td data-value="0" class="pic low">
+	<div class="chart"><div class="cover-fill" style="width: 0%"></div><div class="cover-empty" style="width: 100%"></div></div>
+	</td>
+	<td data-value="0" class="pct low">0%</td>
+	<td data-value="249" class="abs low">0/249</td>
+	<td data-value="0" class="pct low">0%</td>
+	<td data-value="1" class="abs low">0/1</td>
+	<td data-value="0" class="pct low">0%</td>
+	<td data-value="1" class="abs low">0/1</td>
+	<td data-value="0" class="pct low">0%</td>
+	<td data-value="249" class="abs low">0/249</td>
+	</tr>
+
+<tr>
+	<td class="file low" data-value="useEcgViewerPersistence.ts"><a href="useEcgViewerPersistence.ts.html">useEcgViewerPersistence.ts</a></td>
+	<td data-value="33.33" class="pic low">
+	<div class="chart"><div class="cover-fill" style="width: 33%"></div><div class="cover-empty" style="width: 67%"></div></div>
+	</td>
+	<td data-value="33.33" class="pct low">33.33%</td>
+	<td data-value="63" class="abs low">21/63</td>
+	<td data-value="80" class="pct high">80%</td>
+	<td data-value="5" class="abs high">4/5</td>
+	<td data-value="75" class="pct medium">75%</td>
+	<td data-value="4" class="abs medium">3/4</td>
+	<td data-value="33.33" class="pct low">33.33%</td>
+	<td data-value="63" class="abs low">21/63</td>
+	</tr>
+
+<tr>
+	<td class="file low" data-value="useEcgWaveformPlayback.ts"><a href="useEcgWaveformPlayback.ts.html">useEcgWaveformPlayback.ts</a></td>
+	<td data-value="0" class="pic low">
+	<div class="chart"><div class="cover-fill" style="width: 0%"></div><div class="cover-empty" style="width: 100%"></div></div>
+	</td>
+	<td data-value="0" class="pct low">0%</td>
+	<td data-value="52" class="abs low">0/52</td>
+	<td data-value="0" class="pct low">0%</td>
+	<td data-value="1" class="abs low">0/1</td>
+	<td data-value="0" class="pct low">0%</td>
+	<td data-value="1" class="abs low">0/1</td>
+	<td data-value="0" class="pct low">0%</td>
+	<td data-value="52" class="abs low">0/52</td>
+	</tr>
+
+<tr>
+	<td class="file low" data-value="useEcgWorkspaceCaseResolver.ts"><a href="useEcgWorkspaceCaseResolver.ts.html">useEcgWorkspaceCaseResolver.ts</a></td>
+	<td data-value="0" class="pic low">
+	<div class="chart"><div class="cover-fill" style="width: 0%"></div><div class="cover-empty" style="width: 100%"></div></div>
+	</td>
+	<td data-value="0" class="pct low">0%</td>
+	<td data-value="56" class="abs low">0/56</td>
+	<td data-value="0" class="pct low">0%</td>
+	<td data-value="1" class="abs low">0/1</td>
+	<td data-value="0" class="pct low">0%</td>
+	<td data-value="1" class="abs low">0/1</td>
+	<td data-value="0" class="pct low">0%</td>
+	<td data-value="56" class="abs low">0/56</td>
+	</tr>
+
+<tr>
+	<td class="file low" data-value="useEcgWorkstationShortcuts.ts"><a href="useEcgWorkstationShortcuts.ts.html">useEcgWorkstationShortcuts.ts</a></td>
+	<td data-value="0" class="pic low">
+	<div class="chart"><div class="cover-fill" style="width: 0%"></div><div class="cover-empty" style="width: 100%"></div></div>
+	</td>
+	<td data-value="0" class="pct low">0%</td>
+	<td data-value="115" class="abs low">0/115</td>
+	<td data-value="0" class="pct low">0%</td>
+	<td data-value="1" class="abs low">0/1</td>
+	<td data-value="0" class="pct low">0%</td>
+	<td data-value="1" class="abs low">0/1</td>
+	<td data-value="0" class="pct low">0%</td>
+	<td data-value="115" class="abs low">0/115</td>
+	</tr>
+
+<tr>
+	<td class="file low" data-value="useEnterpriseStatusMetrics.ts"><a href="useEnterpriseStatusMetrics.ts.html">useEnterpriseStatusMetrics.ts</a></td>
+	<td data-value="0" class="pic low">
+	<div class="chart"><div class="cover-fill" style="width: 0%"></div><div class="cover-empty" style="width: 100%"></div></div>
+	</td>
+	<td data-value="0" class="pct low">0%</td>
+	<td data-value="77" class="abs low">0/77</td>
+	<td data-value="0" class="pct low">0%</td>
+	<td data-value="1" class="abs low">0/1</td>
+	<td data-value="0" class="pct low">0%</td>
+	<td data-value="1" class="abs low">0/1</td>
+	<td data-value="0" class="pct low">0%</td>
+	<td data-value="77" class="abs low">0/77</td>
+	</tr>
+
+<tr>
+	<td class="file high" data-value="useHistoryStack.ts"><a href="useHistoryStack.ts.html">useHistoryStack.ts</a></td>
+	<td data-value="96.05" class="pic high">
+	<div class="chart"><div class="cover-fill" style="width: 96%"></div><div class="cover-empty" style="width: 4%"></div></div>
+	</td>
+	<td data-value="96.05" class="pct high">96.05%</td>
+	<td data-value="76" class="abs high">73/76</td>
+	<td data-value="76.47" class="pct medium">76.47%</td>
+	<td data-value="17" class="abs medium">13/17</td>
+	<td data-value="100" class="pct high">100%</td>
+	<td data-value="1" class="abs high">1/1</td>
+	<td data-value="96.05" class="pct high">96.05%</td>
+	<td data-value="76" class="abs high">73/76</td>
+	</tr>
+
+<tr>
+	<td class="file low" data-value="useViewerRuntimeMetrics.ts"><a href="useViewerRuntimeMetrics.ts.html">useViewerRuntimeMetrics.ts</a></td>
+	<td data-value="0" class="pic low">
+	<div class="chart"><div class="cover-fill" style="width: 0%"></div><div class="cover-empty" style="width: 100%"></div></div>
+	</td>
+	<td data-value="0" class="pct low">0%</td>
+	<td data-value="44" class="abs low">0/44</td>
+	<td data-value="0" class="pct low">0%</td>
+	<td data-value="1" class="abs low">0/1</td>
+	<td data-value="0" class="pct low">0%</td>
+	<td data-value="1" class="abs low">0/1</td>
+	<td data-value="0" class="pct low">0%</td>
+	<td data-value="44" class="abs low">0/44</td>
+	</tr>
+
+</tbody>
+</table>
+</div>
+                <div class='push'></div><!-- for sticky footer -->
+            </div><!-- /wrapper -->
+            <div class='footer quiet pad2 space-top1 center small'>
+                Code coverage generated by
+                <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
+                at 2026-07-07T15:58:56.276Z
+            </div>
+        <script src="../../../../../prettify.js"></script>
+        <script>
+            window.onload = function () {
+                prettyPrint();
+            };
+        </script>
+        <script src="../../../../../sorter.js"></script>
+        <script src="../../../../../block-navigation.js"></script>
+    </body>
+</html>
+    

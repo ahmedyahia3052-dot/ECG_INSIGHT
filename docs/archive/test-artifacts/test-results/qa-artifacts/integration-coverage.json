@@ -1,0 +1,115 @@
+{
+  "generatedAt": "2026-07-07T15:38:04.430Z",
+  "totalIntegrationScripts": 100,
+  "domains": [
+    {
+      "domain": "API",
+      "scriptCount": 84,
+      "covered": true,
+      "sample": [
+        "scripts/ecg-digitization.integration.ts",
+        "scripts/ecg-image-pipeline-sprint6.integration.ts",
+        "scripts/ecg-measurement-sprint61.integration.ts",
+        "scripts/ecg-interpretation-sprint62.integration.ts",
+        "scripts/ecg-ai-diagnosis-sprint63.integration.ts"
+      ]
+    },
+    {
+      "domain": "Medical Intelligence Core",
+      "scriptCount": 13,
+      "covered": true,
+      "sample": [
+        "scripts/sprint40-medical-intelligence-core.integration.ts",
+        "scripts/copilot-clinical-ai-core-sprint1.integration.ts",
+        "scripts/copilot-medical-knowledge-engine-sprint2.integration.ts",
+        "scripts/copilot-clinical-ai-sprint5.integration.ts",
+        "scripts/copilot-clinical-ai-v3.integration.ts"
+      ]
+    },
+    {
+      "domain": "ECG Analysis",
+      "scriptCount": 6,
+      "covered": true,
+      "sample": [
+        "scripts/ecg-digitization.integration.ts",
+        "scripts/ecg-interpretation-sprint62.integration.ts",
+        "scripts/ecg-ai-diagnosis-sprint63.integration.ts",
+        "scripts/ecg-wave-detection-bridge.test.ts",
+        "scripts/ecg-digitization-engine.test.ts"
+      ]
+    },
+    {
+      "domain": "Measurement Engine",
+      "scriptCount": 8,
+      "covered": true,
+      "sample": [
+        "scripts/ecg-measurement-engine.test.ts",
+        "scripts/ecg-calibration-math.test.ts",
+        "scripts/ecg-measurement-sprint61.integration.ts",
+        "scripts/sprint34-professional-measurement-engine.integration.ts",
+        "scripts/sprint13-ecg-measurement-workspace.integration.ts"
+      ]
+    },
+    {
+      "domain": "Viewer",
+      "scriptCount": 23,
+      "covered": true,
+      "sample": [
+        "scripts/ecg-pro-viewer-engine.test.ts",
+        "scripts/ecg-viewer-engine.test.ts",
+        "scripts/ecg-rendering-engine.test.ts",
+        "scripts/sprint27-ecg-rendering-engine.integration.ts",
+        "scripts/ecg-clinical-visualization.test.ts"
+      ]
+    },
+    {
+      "domain": "Report Engine",
+      "scriptCount": 1,
+      "covered": true,
+      "sample": [
+        "scripts/ecg-medical-report-system.integration.ts"
+      ]
+    },
+    {
+      "domain": "Authentication",
+      "scriptCount": 5,
+      "covered": true,
+      "sample": [
+        "scripts/sprint36-security-hardening.integration.ts",
+        "scripts/auth-session-hardening.integration.ts",
+        "scripts/owner-security.integration.ts",
+        "scripts/enterprise-auth.integration.ts",
+        "scripts/auth-production-stabilization.integration.ts"
+      ]
+    },
+    {
+      "domain": "Database",
+      "scriptCount": 2,
+      "covered": true,
+      "sample": [
+        "scripts/patient-case-management.integration.ts",
+        "scripts/dashboard-production-lockdown.integration.ts"
+      ]
+    },
+    {
+      "domain": "Caching",
+      "scriptCount": 3,
+      "covered": true,
+      "sample": [
+        "scripts/auth-session-hardening.integration.ts",
+        "scripts/copilot-stabilization.integration.ts",
+        "scripts/auth-production-stabilization.integration.ts"
+      ]
+    },
+    {
+      "domain": "Session",
+      "scriptCount": 1,
+      "covered": true,
+      "sample": [
+        "scripts/auth-session-hardening.integration.ts"
+      ]
+    }
+  ],
+  "coveredDomains": 10,
+  "coveragePct": 100
+}

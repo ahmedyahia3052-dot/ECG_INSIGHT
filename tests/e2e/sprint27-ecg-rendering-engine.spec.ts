@@ -1,12 +1,6 @@
 import { expect, test } from "./test";
 import { bootstrapAuthenticatedPage, createClinicalFixture, API_URL, authHeaders } from "./utils/qa";
-
-async function openEcgWorkspace(page: import("@playwright/test").Page, caseId: string) {
-  await page.goto(`/ecg-workspace?caseId=${caseId}`, { waitUntil: "domcontentloaded" });
-  await expect(page.getByTestId("ecg-workspace-loading")).toHaveCount(0, { timeout: 45_000 });
-  await expect(page.getByTestId("ecg-enterprise-workspace-ready")).toBeVisible({ timeout: 45_000 });
-  await expect(page.getByTestId("sprint13-ecg-monitor-ready")).toBeVisible({ timeout: 20_000 });
-}
+import { ecgRenderEngine, ecgRenderMetrics, ecgViewMode, openEcgWorkspace, activateMonitorView } from "./utils/ecg-workspace-locators";
 
 test.describe("Sprint 27 ECG Rendering Engine @sprint27 @enterprise", () => {
   test.describe.configure({ mode: "serial" });
@@ -29,27 +23,23 @@ test.describe("Sprint 27 ECG Rendering Engine @sprint27 @enterprise", () => {
 
   test("waveform view mounts Sprint 27 rendering engine", async ({ page }) => {
     await openEcgWorkspace(page, caseId);
-    await page.getByTestId("sprint21-view-mode-waveform").or(page.getByTestId("sprint18-view-mode-waveform")).click();
+    await ecgViewMode(page, "waveform").click();
     await expect(page.getByTestId("sprint18-waveform-view")).toBeVisible({ timeout: 20_000 });
-    const engine = page.getByTestId("sprint27-ecg-rendering-engine");
-    const svg = page.getByTestId("sprint27-ecg-render-svg");
-    const canvas = page.getByTestId("sprint27-ecg-render-canvas");
-    await expect(engine.or(svg).or(canvas)).toBeVisible({ timeout: 20_000 });
-    await expect(page.getByTestId("sprint27-ecg-render-metrics")).toBeVisible();
+    await expect(ecgRenderEngine(page)).toBeVisible({ timeout: 20_000 });
+    await expect(ecgRenderMetrics(page)).toBeVisible();
   });
 
   test("rendering metrics bar reports FPS", async ({ page }) => {
     await openEcgWorkspace(page, caseId);
-    await page.getByTestId("sprint21-view-mode-waveform").or(page.getByTestId("sprint18-view-mode-waveform")).click();
-    await expect(page.getByTestId("sprint27-ecg-render-metrics")).toBeVisible({ timeout: 20_000 });
-    const metrics = page.getByTestId("sprint27-ecg-render-metrics");
-    await expect(metrics).toContainText(/FPS|Rendering Engine|Sprint 27/i);
+    await ecgViewMode(page, "waveform").click();
+    await expect(ecgRenderMetrics(page)).toBeVisible({ timeout: 20_000 });
+    await expect(ecgRenderMetrics(page)).toContainText(/FPS|Rendering Engine|Sprint 27|Sprint 28/i);
     await page.screenshot({ fullPage: true, path: "test-results/screenshots/sprint27-ecg-rendering-engine.png" });
   });
 
   test("monitor canvas remains available for live mode", async ({ page }) => {
     await openEcgWorkspace(page, caseId);
-    await page.getByTestId("sprint18-view-mode-monitor").click();
-    await expect(page.getByTestId("sprint22-hospital-monitor-canvas")).toBeVisible({ timeout: 20_000 });
+    await activateMonitorView(page);
+    await expect(page.getByTestId("sprint22-hospital-live-monitor").or(page.getByTestId("sprint18-live-monitor"))).toBeVisible();
   });
 });

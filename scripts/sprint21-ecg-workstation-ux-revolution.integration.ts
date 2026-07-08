@@ -14,6 +14,7 @@ async function main() {
     "EcgClinicalRightPanel.tsx",
     "EcgMonitorViewerFoundation.tsx",
     "EcgViewerResizableWorkspace.tsx",
+    "EcgZeroChromeToolbar.tsx",
   ];
 
   for (const file of required) {
@@ -21,20 +22,22 @@ async function main() {
   }
 
   const foundation = await fs.readFile(path.join(viewerRoot, "EcgMonitorViewerFoundation.tsx"), "utf8");
-  const toolbar = await fs.readFile(path.join(viewerRoot, "EcgWorkstationToolbar.tsx"), "utf8");
+  const toolbar = await fs.readFile(path.join(viewerRoot, "EcgZeroChromeToolbar.tsx"), "utf8");
   const panel = await fs.readFile(path.join(viewerRoot, "EcgClinicalRightPanel.tsx"), "utf8");
   const layout = await fs.readFile(path.join(viewerRoot, "EcgViewerResizableWorkspace.tsx"), "utf8");
   const canvas = await fs.readFile(path.join(viewerRoot, "ecgMonitorCanvas.ts"), "utf8");
+  const beatMarkers = await fs.readFile(path.join(viewerRoot, "ecgMonitorBeatMarkers.ts"), "utf8");
   const types = await fs.readFile(path.join(viewerRoot, "types.ts"), "utf8");
+  const left = await fs.readFile(path.join(viewerRoot, "EcgUnifiedClinicalLeftPanel.tsx"), "utf8");
 
   const checks: Array<[string, boolean]> = [
-    ["enterprise workstation title", foundation.includes("Hospital ECG Workstation") || foundation.includes("ECG Insight Enterprise Workstation")],
+    ["clinical workflow shell", foundation.includes("sprint30-clinical-workflow-ready") || foundation.includes("sprint29-zero-chrome-workstation-ready")],
     ["enterprise status bar", foundation.includes("EcgEnterpriseStatusBar")],
     ["ai-review mode", types.includes('"ai-review"') && foundation.includes('"ai-review"')],
-    ["toolbar groups FILE/VIEW/ECG/MEASURE/AI/EXPORT", toolbar.includes('label: "EXPORT"') && toolbar.includes('label: "MEASURE"')],
-    ["clinical sidebar patient card", panel.includes('title="Patient"') && panel.includes('title="Warnings"')],
-    ["88% viewer layout", layout.includes("defaultSize={88}") || layout.includes("defaultSize={90}")],
-    ["monitor glow + beat markers", canvas.includes("shadowBlur") && canvas.includes("beatMarkerPositions")],
+    ["toolbar export and measure", toolbar.includes("sprint18-export-pdf") && (toolbar.includes("sprint21-measurement-mode") || toolbar.includes("sprint52-toolbar-measurements") || toolbar.includes("Measurements"))],
+    ["clinical patient workspace", panel.includes("EcgPatientWorkspacePanel") || (foundation.includes("EcgUnifiedClinicalLeftPanel") && left.includes('title="Patient"'))],
+    ["enterprise layout engine", layout.includes("EcgEnterpriseLayoutEngine")],
+    ["monitor glow + beat markers", canvas.includes("shadowBlur") && beatMarkers.includes("beatMarkerPositions")],
     ["status metrics hook", foundation.includes("useEnterpriseStatusMetrics")],
   ];
 

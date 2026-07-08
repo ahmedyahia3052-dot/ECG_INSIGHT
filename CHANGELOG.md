@@ -1,5 +1,46 @@
 # Changelog — Enterprise QA Infrastructure
 
+## Sprint 82 — ECG Processing Engine — 2026-07-09
+
+### Added (backend only — zero UI changes)
+- **ECG Processing Engine** (`server/src/modules/ecg-processing-engine/`) — unified 13-stage production pipeline
+- Upload ingest, preprocessing, normalization, grid detection, perspective correction, noise reduction
+- Waveform extraction, measurement, lead mapping, quality score, validation interfaces
+- Durable `EcgProcessingJob` queue with background workers and exponential retry recovery
+- API: `/api/ecg-processing-engine` — enqueue, status, cancel, retry, case history
+- Migration: `20260709010000_sprint82_ecg_processing_engine`
+- Report: `SPRINT82_ECG_ENGINE.md`
+- Tests: `sprint82-ecg-processing-engine.test.ts`, `.integration.ts`
+
+### Preserved
+- ECG Workspace, Viewer, Live Monitor, Rendering Engine — **zero changes**
+- Legacy `/api/ecg/*` processing routes unchanged
+
+### Tag
+- `Sprint82_ECG_Processing_Engine`
+
+---
+
+## Sprint 75 — ECG UI Architecture Consolidation — 2026-07-08
+
+### Added (architecture only — zero visual changes)
+- **UI architecture layers:** `design-system/`, `presentation/`, `features/`, `lib/presentation/`, `ui-architecture/`
+- Design token consolidation barrels (app + clinical tokens unchanged in value)
+- Theme engine with dark, light, hospital, and system themes (`ThemeEngineProvider`)
+- Presentation barrels: pages, widgets, medical, charts, cards, dialogs, forms, navigation
+- Feature barrels: workspace, viewer, monitor
+- Shared persisted panel layout utilities
+- Report: `SPRINT75_UI_ARCHITECTURE_REPORT.md`
+- Tests: `sprint75-ui-architecture.test.ts`, `sprint75-ui-architecture.integration.ts`
+
+### Preserved
+- All clinical UI visuals, layouts, colors, and rendering behavior — **unchanged**
+
+### Tag
+- `Sprint75_UI_Architecture_Consolidation`
+
+---
+
 ## Sprint 71 — Enterprise Security Hardening — 2026-07-08
 
 ### Added (backend only — zero UI changes)

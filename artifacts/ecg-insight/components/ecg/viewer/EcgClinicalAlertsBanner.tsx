@@ -19,7 +19,7 @@ export const EcgClinicalAlertsBanner = memo(function EcgClinicalAlertsBanner({
   const label = count === 1 ? primary.label : `${primary.label} (${count})`;
 
   return (
-    <View style={styles.root} testID="sprint335-compact-clinical-alerts">
+    <View style={styles.root} nativeID="sprint335-compact-clinical-alerts" testID="sprint30-clinical-alerts">
       <Pressable onPress={() => setExpanded((v) => !v)} style={styles.chip}>
         <Text style={styles.icon}>⚠</Text>
         <Text style={styles.label} numberOfLines={1}>

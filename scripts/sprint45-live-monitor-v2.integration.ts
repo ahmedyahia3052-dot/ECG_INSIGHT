@@ -24,7 +24,7 @@ const files = [
   { file: resolve(VIEWER, "monitorLayout.ts"), markers: ["6-lead", "custom", "MONITOR_6_LEAD"] },
   { file: resolve(VIEWER, "useEcgLiveMonitorEngine.ts"), markers: ["cycleFilter", "horizontalScroll", "isolatedLead", "customLeads"] },
   { file: resolve(VIEWER, "ecgMonitorCanvas.ts"), markers: ["drawHospitalEcgGrid", "buildClinicalMarkers", "horizontalScroll"] },
-  { file: resolve(VIEWER, "EcgLiveMonitorShell.tsx"), markers: ["EcgLiveMonitorHospitalHud", "EcgLiveMonitorFloatingPalette", "canvasViewportRatio"] },
+  { file: resolve(VIEWER, "EcgLiveMonitorShell.tsx"), markers: ["EcgLiveMonitorHmiDiagnosticHud", "EcgLiveMonitorHmiStatusBar", "canvasViewportRatio"] },
   { file: resolve(ROOT, "tests/e2e/sprint45-hospital-monitor-v2.spec.ts"), markers: ["@sprint45", "sprint45-hospital-hud", "6 Lead"] },
 ];
 
