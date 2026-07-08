@@ -1,5 +1,35 @@
 # Changelog — Enterprise QA Infrastructure
 
+## Sprint 57 — Enterprise Report Engine — 2026-07-08
+
+### Added (backend only — isolated from ECG workspace/viewer/monitor)
+- **Enterprise Report Engine** (`server/src/modules/enterprise-report-engine/`) — 9 report types, 11 templates, full document composer
+- **Exports:** PDF, HTML, JSON, FHIR Bundle, PNG, JPEG, print, email/share payloads
+- **Security:** contentHash, verificationHash, tamper detection, QR/barcode verification
+- **History:** ReportExportLog, ReportHistoryEvent, audit trail integration
+- Migration: `20260708030000_sprint57_enterprise_report_engine`
+- API: `/api/enterprise-report-engine`
+- Tests: `sprint57-enterprise-report-engine.integration.ts`, `sprint57-report-engine.test.ts`
+- Report: `SPRINT57_REPORT_ENGINE_REPORT.md`
+
+### Preserved
+- ECG Workspace, Live Monitor, Viewer, Canvas, Rendering Engine, Layout, Sidebar — **zero changes**
+
+### Tag
+- `Sprint57-EnterpriseReportEngine`
+
+---
+
+## Hotfix — Workspace Layout Restore — 2026-07-08
+
+### Fixed
+- Rolled back Sprint 53 workspace architecture to pre-rebuild stable layout (`bf5a1ed`)
+- Restored `EcgViewerResizableWorkspace` + Sprint 29 grid shell; removed layout switcher modules
+- Sidebar-only fix in `EcgUnifiedClinicalLeftPanel` (scroll, no crop/overlap)
+- See `WORKSPACE_LAYOUT_RESTORE.md` — **not committed** (manual approval)
+
+---
+
 ## Sprint 55 — Enterprise Organization & Multi-Tenant Platform — 2026-07-08
 
 ### Added (backend only — isolated from ECG workspace/viewer)

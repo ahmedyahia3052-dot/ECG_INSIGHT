@@ -758,6 +758,43 @@ enum ReportStatus {
   ARCHIVED
 }
 
+enum EnterpriseReportType {
+  PROFESSIONAL_ECG
+  HOSPITAL
+  OCCUPATIONAL_ECG
+  MEDICAL_FITNESS
+  EMERGENCY
+  FOLLOW_UP
+  COMPARISON
+  AI_DIAGNOSTIC
+  TEACHING
+}
+
+enum ReportTemplateCategory {
+  HOSPITAL
+  CLINIC
+  EMERGENCY
+  OCCUPATIONAL_MEDICINE
+  SPORTS_MEDICINE
+  INSURANCE
+  PRE_EMPLOYMENT
+  ANNUAL_CHECKUP
+  TEACHING
+}
+
+enum ReportExportFormat {
+  PDF
+  HTML
+  PNG
+  JPEG
+  JSON
+  FHIR
+  PRINT
+  EMAIL
+  CLIPBOARD
+  SHARE
+}
+
 enum AuditAction {
   CASE_CREATED
   CASE_UPDATED
@@ -841,6 +878,8 @@ enum AuditAction {
   REPORT_FINALIZED
   REPORT_SIGNED
   REPORT_ARCHIVED
+  REPORT_EXPORTED
+  REPORT_PRINTED
   DIAGNOSIS_CHANGED
   PATIENT_CREATED
   PATIENT_UPDATED
@@ -1044,6 +1083,8 @@ model User {
   signedReports               ClinicalReport[]          @relation("SignedReports")
   reportVersions              ReportVersion[]
   reportSignatures            ReportSignature[]
+  reportExports               ReportExportLog[]         @relation("ReportExports")
+  reportHistoryEvents         ReportHistoryEvent[]      @relation("ReportHistoryActors")
   sentEmails                  EmailLog[]                @relation("SentReportEmails")
   fitnessAssessments          FitnessAssessment[]       @relation("FitnessAssessmentPhysician")
   returnToWorkDecisions       ReturnToWorkDecision[]    @relation("ReturnToWorkPhysician")
@@ -2176,51 +2217,64 @@ model LongitudinalECGFinding {
 }
 
 model ClinicalReport {
-  id                        String          @id @default(cuid())
-  caseId                    String
-  patientId                 String
-  status                    ReportStatus    @default(DRAFT)
-  reportNumber              String          @unique
-  organizationName          String?
-  contractorName            String?
-  acquisitionDate           DateTime
-  reportingDate             DateTime        @default(now())
-  referringPhysician        String?
-  clinicalIndication        String?
-  aiFindings                String?
-  ecgMeasurements           Json?
-  rhythmInterpretation      String?
-  severityClassification    String?
-  differentialDiagnosis     String[]
-  recommendations           String[]
-  urgentActions             String[]
-  finalPhysicianImpression  String?
-  occupationalReportSection Json?
-  physicianName             String
-  physicianSpecialty        String?
-  physicianLicenseNumber    String?
-  electronicSignaturePath   String?
-  pdfStoragePath            String?
-  htmlStoragePath           String?
-  verificationToken         String          @unique @default(cuid())
-  verificationUrl           String?
-  qrCodeData                String?
-  generatedAt               DateTime        @default(now())
-  finalizedAt               DateTime?
-  signedAt                  DateTime?
-  archivedAt                DateTime?
-  authorId                  String
-  finalizedById             String?
-  signedById                String?
-  createdAt                 DateTime        @default(now())
-  updatedAt                 DateTime        @updatedAt
-  case                      ECGCase         @relation(fields: [caseId], references: [id], onDelete: Cascade)
-  patient                   Patient         @relation(fields: [patientId], references: [id], onDelete: Cascade)
-  author                    User            @relation("AuthoredReports", fields: [authorId], references: [id])
-  finalizedBy               User?           @relation("FinalizedReports", fields: [finalizedById], references: [id])
-  signedBy                  User?           @relation("SignedReports", fields: [signedById], references: [id])
-  versions                  ReportVersion[]
-  emailLogs                 EmailLog[]
+  id                          String                  @id @default(cuid())
+  caseId                      String
+  patientId                   String
+  status                      ReportStatus            @default(DRAFT)
+  reportNumber                String                  @unique
+  reportType                  EnterpriseReportType    @default(PROFESSIONAL_ECG)
+  templateCategory            ReportTemplateCategory?
+  templateId                  String?
+  reportUuid                  String                  @unique @default(cuid())
+  verificationHash            String?
+  contentHash                 String?
+  departmentName              String?
+  attachmentManifest          Json?
+  brandingSnapshot            Json?
+  medicalIntelligenceReportId String?
+  organizationName            String?
+  contractorName              String?
+  acquisitionDate             DateTime
+  reportingDate               DateTime                @default(now())
+  referringPhysician          String?
+  clinicalIndication          String?
+  aiFindings                  String?
+  ecgMeasurements             Json?
+  rhythmInterpretation        String?
+  severityClassification      String?
+  differentialDiagnosis       String[]
+  recommendations             String[]
+  urgentActions               String[]
+  finalPhysicianImpression    String?
+  occupationalReportSection   Json?
+  physicianName               String
+  physicianSpecialty          String?
+  physicianLicenseNumber      String?
+  electronicSignaturePath     String?
+  pdfStoragePath              String?
+  htmlStoragePath             String?
+  verificationToken           String                  @unique @default(cuid())
+  verificationUrl             String?
+  qrCodeData                  String?
+  generatedAt                 DateTime                @default(now())
+  finalizedAt                 DateTime?
+  signedAt                    DateTime?
+  archivedAt                  DateTime?
+  authorId                    String
+  finalizedById               String?
+  signedById                  String?
+  createdAt                   DateTime                @default(now())
+  updatedAt                   DateTime                @updatedAt
+  case                        ECGCase                 @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  patient                     Patient                 @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  author                      User                    @relation("AuthoredReports", fields: [authorId], references: [id])
+  finalizedBy                 User?                   @relation("FinalizedReports", fields: [finalizedById], references: [id])
+  signedBy                    User?                   @relation("SignedReports", fields: [signedById], references: [id])
+  template                    EnterpriseReportTemplate? @relation(fields: [templateId], references: [id], onDelete: SetNull)
+  versions                    ReportVersion[]
+  emailLogs                   EmailLog[]
+  exportLogs                  ReportExportLog[]
+  historyEvents               ReportHistoryEvent[]
 
   @@index([caseId])
   @@index([patientId])
@@ -2228,6 +2282,63 @@ model ClinicalReport {
   @@index([authorId])
   @@index([createdAt])
   @@index([verificationToken])
+  @@index([reportType])
+  @@index([templateCategory])
+  @@index([reportUuid])
+  @@index([contentHash])
+}
+
+model EnterpriseReportTemplate {
+  id             String                 @id @default(cuid())
+  slug           String                 @unique
+  name           String
+  category       ReportTemplateCategory
+  reportType     EnterpriseReportType
+  description    String?
+  sections       Json
+  branding       Json?
+  isSystem       Boolean                @default(true)
+  organizationId String?
+  createdAt      DateTime               @default(now())
+  updatedAt      DateTime               @updatedAt
+  reports        ClinicalReport[]
+
+  @@index([category])
+  @@index([reportType])
+  @@index([organizationId])
+}
+
+model ReportExportLog {
+  id           String             @id @default(cuid())
+  reportId     String
+  format       ReportExportFormat
+  exportedById String
+  exportedAt   DateTime           @default(now())
+  metadata     Json?
+  report       ClinicalReport     @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  exportedBy   User               @relation("ReportExports", fields: [exportedById], references: [id])
+
+  @@index([reportId])
+  @@index([exportedById])
+  @@index([format])
+  @@index([exportedAt])
+}
+
+model ReportHistoryEvent {
+  id        String         @id @default(cuid())
+  reportId  String
+  action    String
+  actorId   String?
+  details   String?
+  metadata  Json?
+  createdAt DateTime       @default(now())
+  report    ClinicalReport @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  actor     User?          @relation("ReportHistoryActors", fields: [actorId], references: [id])
+
+  @@index([reportId])
+  @@index([actorId])
+  @@index([action])
+  @@index([createdAt])
 }
 
 model ReportVersion {
