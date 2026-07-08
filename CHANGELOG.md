@@ -1,5 +1,25 @@
 # Changelog — Enterprise QA Infrastructure
 
+## Sprint 68 — FHIR / HL7 Interoperability Engine — 2026-07-08
+
+### Added (backend only — zero UI changes)
+- **FHIR / HL7 Interoperability Engine** (`server/src/modules/fhir-hl7-interoperability-engine/`) — enterprise HIS/EMR/LIS integration layer
+- **FHIR:** Patient, Practitioner, Organization, Observation, DiagnosticReport, DocumentReference, Encounter, Device, ServiceRequest, Condition serialization + validation
+- **HL7 v2:** ORM, ORU, ADT, MDM, ACK parser, validator, and ACK builder
+- **API:** `/api/interop` — FHIR/HL7 export/import, logs, external systems registry
+- Migration: `20260708081000_sprint68_fhir_hl7_interoperability`
+- Models: `FHIRExportJob`, `FHIRImportJob`, `HL7Message`, `InteroperabilityLog`, `ExternalSystem`, `ExternalOrganization`, `FHIRAudit`
+- Tests: `sprint68-fhir-hl7-interoperability.test.ts`, `.integration.ts`, `-http.integration.ts`
+
+### Preserved
+- ECG Workspace, Live Monitor, Viewer, Canvas, Rendering Engine, Frontend UI — **zero changes**
+- Legacy `/api/fhir` hospital integration routes unchanged
+
+### Tag
+- `Sprint68-FhirHl7Interoperability`
+
+---
+
 ## Sprint 67 — Enterprise Clinical Rules Engine — 2026-07-08
 
 ### Added (backend only — zero UI changes)

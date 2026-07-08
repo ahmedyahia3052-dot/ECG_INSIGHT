@@ -1674,7 +1674,6 @@ model Organization {
   externalSystems        ExternalSystem[]
   fhirExportJobs         FHIRExportJob[]
   fhirImportJobs         FHIRImportJob[]
-  interoperabilityLogs   InteroperabilityLog[]
   fhirAudits             FHIRAudit[]
 
   @@index([name])
@@ -5577,7 +5576,6 @@ model HL7Message {
 model InteroperabilityLog {
   id               String                   @id @default(cuid())
   externalSystemId String?
-  organizationId   String?
   caseId           String?
   patientId        String?
   actorId          String
@@ -5588,13 +5586,11 @@ model InteroperabilityLog {
   validationFailed Boolean                  @default(false)
   createdAt        DateTime                 @default(now())
   externalSystem   ExternalSystem?          @relation(fields: [externalSystemId], references: [id], onDelete: SetNull)
-  organization     Organization?            @relation(fields: [organizationId], references: [id], onDelete: SetNull)
   case             ECGCase?                 @relation(fields: [caseId], references: [id], onDelete: SetNull)
   patient          Patient?                 @relation(fields: [patientId], references: [id], onDelete: SetNull)
   actor            User                     @relation("InteropLogActor", fields: [actorId], references: [id])
 
   @@index([externalSystemId])
-  @@index([organizationId])
   @@index([caseId])
   @@index([patientId])
   @@index([actorId])
