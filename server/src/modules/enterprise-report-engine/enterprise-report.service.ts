@@ -42,11 +42,25 @@ export async function seedEnterpriseReportTemplates() {
   }
 }
 
+let enterpriseTemplatesSeeded = false;
+
+async function ensureEnterpriseReportTemplatesSeeded() {
+  if (enterpriseTemplatesSeeded) return;
+  const expected = ENTERPRISE_REPORT_TEMPLATES.length;
+  const count = await prisma.enterpriseReportTemplate.count({ where: { isSystem: true } });
+  if (count >= expected) {
+    enterpriseTemplatesSeeded = true;
+    return;
+  }
+  await seedEnterpriseReportTemplates();
+  enterpriseTemplatesSeeded = true;
+}
+
 export async function listEnterpriseTemplates(filters?: {
   category?: ReportTemplateCategory;
   reportType?: EnterpriseReportType;
 }) {
-  await seedEnterpriseReportTemplates();
+  await ensureEnterpriseReportTemplatesSeeded();
   return prisma.enterpriseReportTemplate.findMany({
     orderBy: [{ category: "asc" }, { name: "asc" }],
     where: {

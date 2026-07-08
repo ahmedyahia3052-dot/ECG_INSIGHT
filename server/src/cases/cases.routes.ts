@@ -41,6 +41,16 @@ export const casesRouter = Router();
 
 casesRouter.use(requireAuth);
 
+const caseFileListSelect = {
+  caseId: true,
+  createdAt: true,
+  id: true,
+  mimeType: true,
+  originalName: true,
+  sizeBytes: true,
+  storedName: true,
+} satisfies Prisma.ECGFileSelect;
+
 const caseInclude = {
   analyses: { orderBy: { createdAt: "desc" }, take: 1 },
   assignedDoctor: { select: { email: true, id: true, name: true, role: true } },
@@ -50,6 +60,11 @@ const caseInclude = {
   reports: { orderBy: { createdAt: "desc" }, take: 3 },
   reviewedBy: { select: { email: true, id: true, name: true, role: true } },
   uploadedBy: { select: { email: true, id: true, name: true, role: true } },
+} satisfies Prisma.ECGCaseInclude;
+
+const caseListInclude = {
+  ...caseInclude,
+  files: { orderBy: { createdAt: "asc" }, select: caseFileListSelect },
 } satisfies Prisma.ECGCaseInclude;
 
 function nextCaseId() {
@@ -177,7 +192,7 @@ casesRouter.get("/", async (req, res, next) => {
     const [total, cases] = await Promise.all([
       prisma.eCGCase.count({ where }),
       prisma.eCGCase.findMany({
-        include: caseInclude,
+        include: caseListInclude,
         orderBy: [{ priority: "desc" }, { updatedAt: "desc" }],
         skip: (query.page - 1) * query.pageSize,
         take: query.pageSize,
@@ -765,12 +780,29 @@ casesRouter.post("/:caseId/ecg-viewer-workspace/export/csv", requireRole("DOCTOR
 
 casesRouter.get("/:caseId/timeline", async (req, res, next) => {
   try {
-    assertResourceAccess(await canAccessCase(String(req.params.caseId), req.auth!));
-    const logs = await prisma.auditLog.findMany({
-      orderBy: { createdAt: "asc" },
-      where: { caseId: String(req.params.caseId) },
+    const caseId = String(req.params.caseId);
+    assertResourceAccess(await canAccessCase(caseId, req.auth!));
+    const page = Math.max(1, Number(req.query.page) || 1);
+    const pageSize = Math.min(100, Math.max(1, Number(req.query.pageSize) || 50));
+    const where = { caseId };
+
+    const [total, logs] = await Promise.all([
+      prisma.auditLog.count({ where }),
+      prisma.auditLog.findMany({
+        orderBy: { createdAt: "asc" },
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+        where,
+      }),
+    ]);
+
+    res.json({
+      page,
+      pageSize,
+      timeline: logs.map(serializeAuditLog),
+      total,
+      totalPages: Math.ceil(total / pageSize),
     });
-    res.json({ timeline: logs.map(serializeAuditLog) });
   } catch (error) {
     next(error);
   }

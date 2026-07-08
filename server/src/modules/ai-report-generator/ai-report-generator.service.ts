@@ -12,6 +12,7 @@ type PersistInput = {
   clinicalIndication?: string;
   composed: ComposedAiReport;
   generatedById?: string;
+  patientId: string;
   reportGroupId?: string;
   status: "GENERATED" | "REGENERATED";
   versionNumber: number;
@@ -42,12 +43,6 @@ async function loadCaseContext(caseId: string) {
 }
 
 async function persistComposedReport(input: PersistInput) {
-  const ecgCase = await prisma.eCGCase.findUnique({
-    select: { patientId: true },
-    where: { id: input.caseId },
-  });
-  if (!ecgCase) throw new AppError(404, "ECG case not found.", "CASE_NOT_FOUND");
-
   const report = await prisma.clinicalGeneratedReport.create({
     data: {
       acquisitionQuality: input.composed.acquisitionQuality,
@@ -80,7 +75,7 @@ async function persistComposedReport(input: PersistInput) {
       fullInterpretation: input.composed.fullInterpretation as unknown as Prisma.InputJsonValue,
       generatedById: input.generatedById,
       overallImpression: input.composed.overallImpression,
-      patientId: ecgCase.patientId,
+      patientId: input.patientId,
       primaryDiagnosis: input.composed.primaryDiagnosis,
       recommendations: {
         create: input.composed.recommendations.map((item) => ({
@@ -200,6 +195,7 @@ export async function generateClinicalReport(input: {
     clinicalIndication: input.clinicalIndication,
     composed,
     generatedById: input.generatedById,
+    patientId: ecgCase.patientId,
     status: "GENERATED",
     versionNumber: 1,
   });
@@ -248,6 +244,7 @@ export async function regenerateClinicalReport(
     clinicalIndication: clinicalIndication ?? existing.clinicalIndication ?? undefined,
     composed,
     generatedById,
+    patientId: ecgCase.patientId,
     reportGroupId: existing.reportGroupId,
     status: "REGENERATED",
     versionNumber: nextVersion,

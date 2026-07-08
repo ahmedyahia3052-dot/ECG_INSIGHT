@@ -187,22 +187,18 @@ export async function evaluateCaseAlertsAndRisk(caseId: string, actorId?: string
 }
 
 export async function getCaseAlerts(caseId: string, actorId?: string) {
-  let alerts = await getActiveAlertsForCase(caseId);
-  if (!alerts.length) {
-    await evaluateCaseAlertsAndRisk(caseId, actorId, false);
-    alerts = await getActiveAlertsForCase(caseId);
-  }
-  return alerts.map(serializeAlert);
+  const alerts = await getActiveAlertsForCase(caseId);
+  if (alerts.length) return alerts.map(serializeAlert);
+  const result = await evaluateCaseAlertsAndRisk(caseId, actorId, false);
+  return result.alerts;
 }
 
 export async function getCaseRiskAssessment(caseId: string, actorId?: string) {
-  let assessment = await getLatestRiskAssessment(caseId);
-  if (!assessment) {
-    await evaluateCaseAlertsAndRisk(caseId, actorId, false);
-    assessment = await getLatestRiskAssessment(caseId);
-  }
-  if (!assessment) throw new AppError(404, "Risk assessment not available for case.", "RISK_ASSESSMENT_NOT_FOUND");
-  return serializeRiskAssessment(assessment);
+  const assessment = await getLatestRiskAssessment(caseId);
+  if (assessment) return serializeRiskAssessment(assessment);
+  const result = await evaluateCaseAlertsAndRisk(caseId, actorId, false);
+  if (!result.assessment) throw new AppError(404, "Risk assessment not available for case.", "RISK_ASSESSMENT_NOT_FOUND");
+  return result.assessment;
 }
 
 export async function recalculateCaseRisk(caseId: string, actorId?: string) {

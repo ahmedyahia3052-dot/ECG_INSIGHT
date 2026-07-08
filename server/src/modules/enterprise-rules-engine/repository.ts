@@ -248,15 +248,66 @@ export async function persistRuleExecution(input: {
   });
 }
 
+export async function persistRuleExecutionsBatch(
+  inputs: Array<{
+    caseId?: string;
+    context: Prisma.InputJsonValue;
+    executedById?: string;
+    matched: boolean;
+    output?: Prisma.InputJsonValue;
+    patientId?: string;
+    ruleId: string;
+    ruleVersion: number;
+  }>,
+) {
+  if (!inputs.length) return [];
+  return prisma.ruleExecution.createManyAndReturn({
+    data: inputs.map((input) => ({
+      caseId: input.caseId,
+      executedById: input.executedById,
+      inputSnapshot: input.context,
+      matched: input.matched,
+      outputSnapshot: input.output,
+      patientId: input.patientId,
+      ruleId: input.ruleId,
+      ruleVersion: input.ruleVersion,
+      status: input.matched ? ("MATCHED" as const) : ("NOT_MATCHED" as const),
+    })),
+    select: { id: true, matched: true, ruleId: true },
+  });
+}
+
+let systemRulesSeeded = false;
+
 export async function seedMissingSystemRules(createdById?: string) {
+  const templateKeys = ENTERPRISE_SYSTEM_RULE_TEMPLATES.map((template) => template.ruleKey);
+  if (systemRulesSeeded) {
+    const activeCount = await prisma.clinicalRule.count({
+      where: { ruleKey: { in: templateKeys }, status: { not: "ARCHIVED" } },
+    });
+    if (activeCount >= templateKeys.length) {
+      return { seeded: 0, totalTemplates: templateKeys.length };
+    }
+  }
+
+  const existing = await prisma.clinicalRule.findMany({
+    select: { ruleKey: true },
+    where: { ruleKey: { in: templateKeys } },
+  });
+  const existingKeys = new Set(existing.map((rule) => rule.ruleKey));
+
   let seeded = 0;
   for (const template of ENTERPRISE_SYSTEM_RULE_TEMPLATES) {
-    const existing = await getClinicalRuleByKey(template.ruleKey);
-    if (existing) continue;
+    if (existingKeys.has(template.ruleKey)) continue;
     await createClinicalRule(template, createdById);
     seeded += 1;
   }
-  return { seeded, totalTemplates: ENTERPRISE_SYSTEM_RULE_TEMPLATES.length };
+
+  if (seeded === 0 && existingKeys.size >= templateKeys.length) {
+    systemRulesSeeded = true;
+  }
+
+  return { seeded, totalTemplates: templateKeys.length };
 }
 
 export function toExecutableRule(rule: NonNullable<Awaited<ReturnType<typeof getClinicalRuleById>>>) {

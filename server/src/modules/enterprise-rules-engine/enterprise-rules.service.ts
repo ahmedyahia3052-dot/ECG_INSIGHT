@@ -3,7 +3,7 @@ import type { Prisma } from "@prisma/client";
 import { AppError } from "../../middleware/error";
 import { resolveCaseMeasurement } from "../ai-report-generator/measurement-adapter";
 import { runMedicalIntelligenceEngine } from "../medical-intelligence/orchestrator";
-import { recordEngineAudit } from "./audit";
+import { recordEngineAuditsBatch } from "./audit";
 import { evaluateRulesEngine, matchedRuleResults } from "./engine";
 import { parseRuleEvaluationContext } from "./evaluator";
 import {
@@ -13,7 +13,7 @@ import {
   listClinicalRules,
   listRuleExecutions,
   listRuleVersions,
-  persistRuleExecution,
+  persistRuleExecutionsBatch,
   seedMissingSystemRules,
   toExecutableRule,
   updateClinicalRule,
@@ -146,7 +146,6 @@ export async function buildContextFromCase(caseId: string): Promise<RuleEvaluati
 }
 
 export async function listRules(filters?: { category?: string; enabled?: boolean }) {
-  await seedMissingSystemRules();
   const rules = await listClinicalRules(filters);
   return rules.map(serializeRule);
 }
@@ -183,8 +182,6 @@ export async function testRules(input: {
   persist?: boolean;
   ruleIds?: string[];
 }) {
-  await seedMissingSystemRules();
-
   let context: RuleEvaluationContext;
   let caseId: string | undefined;
   let patientId: string | undefined;
@@ -207,8 +204,8 @@ export async function testRules(input: {
   const matched = matchedRuleResults(results);
 
   if (input.persist !== false) {
-    for (const result of results) {
-      const execution = await persistRuleExecution({
+    const executions = await persistRuleExecutionsBatch(
+      results.map((result) => ({
         caseId,
         context,
         executedById: input.executedById,
@@ -220,22 +217,27 @@ export async function testRules(input: {
         patientId,
         ruleId: result.ruleId,
         ruleVersion: result.ruleVersion,
-      });
+      })),
+    );
 
-      if (caseId && patientId && input.executedById && result.matched) {
-        await recordEngineAudit({
-          action: "ENTERPRISE_RULE_EXECUTED",
-          actorId: input.executedById,
-          caseId,
-          message: `Enterprise rule "${result.ruleName}" matched and executed ${result.actions.length} action(s).`,
-          metadata: {
-            actions: result.actions.map((action) => action.actionType),
-            executionId: execution.id,
-            ruleId: result.ruleId,
-          },
-          patientId,
-        });
-      }
+    if (caseId && patientId && input.executedById) {
+      const executionByRuleId = new Map(executions.map((execution) => [execution.ruleId, execution.id]));
+      await recordEngineAuditsBatch(
+        results
+          .filter((result) => result.matched)
+          .map((result) => ({
+            action: "ENTERPRISE_RULE_EXECUTED" as const,
+            actorId: input.executedById!,
+            caseId,
+            message: `Enterprise rule "${result.ruleName}" matched and executed ${result.actions.length} action(s).`,
+            metadata: {
+              actions: result.actions.map((action) => action.actionType),
+              executionId: executionByRuleId.get(result.ruleId),
+              ruleId: result.ruleId,
+            },
+            patientId,
+          })),
+      );
     }
   }
 

@@ -72,11 +72,29 @@ export async function getMedicalIntelligenceReport(reportId: string) {
   });
 }
 
-export async function listMedicalIntelligenceReports(caseId: string) {
+export async function listMedicalIntelligenceReports(caseId: string, limit = 20) {
   return prisma.medicalIntelligenceReport.findMany({
-    where: { caseId },
     orderBy: { createdAt: "desc" },
-    include: { findings: true },
+    select: {
+      caseId: true,
+      createdAt: true,
+      criticalFindingsCount: true,
+      engineId: true,
+      engineVersion: true,
+      evaluatedById: true,
+      explainabilitySummary: true,
+      findingsCount: true,
+      id: true,
+      overallConfidenceLevel: true,
+      overallConfidenceScore: true,
+      overallSeverity: true,
+      overallUrgency: true,
+      patientId: true,
+      primaryDiagnosisCode: true,
+      primaryDiagnosisLabel: true,
+    },
+    take: limit,
+    where: { caseId },
   });
 }
 

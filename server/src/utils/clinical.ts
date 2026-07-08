@@ -231,7 +231,7 @@ export function serializeCase(
   ecgCase: ECGCase & {
     analyses?: AIAnalysis[];
     assignedDoctor?: Pick<User, "email" | "id" | "name" | "role"> | null;
-    files?: ECGFile[];
+    files?: Array<Pick<ECGFile, "caseId" | "createdAt" | "id" | "mimeType" | "originalName" | "sizeBytes" | "storedName">>;
     measurements?: ECGMeasurement[];
     patient: Patient;
     reports?: ClinicalReport[];
@@ -336,7 +336,9 @@ export function serializeCase(
   };
 }
 
-export function serializeFile(file: ECGFile) {
+export function serializeFile(
+  file: Pick<ECGFile, "caseId" | "createdAt" | "id" | "mimeType" | "originalName" | "sizeBytes" | "storedName">,
+) {
   return {
     caseId: file.caseId,
     createdAt: file.createdAt.toISOString(),

@@ -3009,6 +3009,7 @@ model ECGMeasurement {
   @@index([caseId])
   @@index([signalQuality])
   @@index([createdAt])
+  @@index([caseId, createdAt])
 }
 
 model AIAnalysis {
@@ -3033,6 +3034,7 @@ model AIAnalysis {
   @@index([status])
   @@index([diagnosis])
   @@index([createdAt])
+  @@index([caseId, createdAt])
 }
 
 model ECGFile {
@@ -3070,6 +3072,7 @@ model ECGFile {
   @@index([organizationId])
   @@index([fileType])
   @@index([uploadedById])
+  @@index([caseId, createdAt])
 }
 
 model ECGLeadSignal {
@@ -3209,6 +3212,7 @@ model ECGClinicalAlert {
   @@index([status])
   @@index([sourceEngine])
   @@index([createdAt])
+  @@index([caseId, sourceEngine, status])
 }
 
 model ECGRiskAssessment {
@@ -3239,6 +3243,7 @@ model ECGRiskAssessment {
   @@index([assessmentGroupId])
   @@index([riskCategory])
   @@index([createdAt])
+  @@index([caseId, versionNumber])
 }
 
 model ECGRiskFactor {
@@ -4243,6 +4248,7 @@ model AuditLog {
   @@index([caseId])
   @@index([patientId])
   @@index([createdAt])
+  @@index([caseId, createdAt])
 }
 
 model Session {
