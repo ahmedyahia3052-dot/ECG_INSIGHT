@@ -224,6 +224,45 @@ enum ECGCaseStatus {
   ARCHIVED
 }
 
+enum CaseManagementStatus {
+  DRAFT
+  PENDING_REVIEW
+  REVIEWED
+  CONFIRMED
+  SIGNED
+  ARCHIVED
+}
+
+enum CaseHistoryEventType {
+  CREATED
+  UPDATED
+  STATUS_CHANGED
+  MANAGEMENT_STATUS_CHANGED
+  ASSIGNED
+  REVIEWER_ASSIGNED
+  COMMENT_ADDED
+  ATTACHMENT_ADDED
+  VERSION_CREATED
+  VERSION_RESTORED
+  LOCKED
+  UNLOCKED
+  ARCHIVED
+  RESTORED
+  DUPLICATE_DETECTED
+  PRIORITY_CHANGED
+  TAG_ADDED
+  CLINICAL_NOTE_ADDED
+  DELETED
+}
+
+enum CaseAttachmentCategory {
+  ECG_IMAGE
+  PDF
+  CLINICAL_DOCUMENT
+  REPORT
+  OTHER
+}
+
 enum ECGCaseSeverity {
   NORMAL
   ABNORMAL
@@ -821,6 +860,33 @@ enum EcgClinicalKnowledgeEmergencyLevel {
   CRITICAL
 }
 
+enum ClinicalGeneratedReportStatus {
+  GENERATED
+  REGENERATED
+}
+
+enum ClinicalRiskLevel {
+  LOW
+  INTERMEDIATE
+  HIGH
+  CRITICAL
+}
+
+enum ClinicalReportFlagType {
+  URGENT
+  NEEDS_REVIEW
+  ARTIFACT
+  POOR_QUALITY
+  MANUAL_REVIEW_REQUIRED
+}
+
+enum ClinicalRecommendationCategory {
+  IMMEDIATE_ACTION
+  CLINICAL_RECOMMENDATION
+  FOLLOW_UP
+  FURTHER_INVESTIGATION
+}
+
 enum AuditAction {
   CASE_CREATED
   CASE_UPDATED
@@ -924,6 +990,14 @@ enum AuditAction {
   COLLABORATION_LOCK_ACQUIRED
   COLLABORATION_LOCK_RELEASED
   COLLABORATION_VERSION_RESTORED
+  CASE_MANAGEMENT_ARCHIVED
+  CASE_MANAGEMENT_RESTORED
+  CASE_MANAGEMENT_VERSION_CREATED
+  CASE_MANAGEMENT_COMMENT_ADDED
+  CASE_MANAGEMENT_ATTACHMENT_ADDED
+  CASE_MANAGEMENT_LOCKED
+  CASE_MANAGEMENT_UNLOCKED
+  CASE_MANAGEMENT_DUPLICATE_DETECTED
   CDSS_DECISION_GENERATED
   LONGITUDINAL_ECG_COMPARISON_COMPLETED
   MFA_RECOVERY_CODE_USED
@@ -1102,6 +1176,11 @@ model User {
   uploadedCases               ECGCase[]                 @relation("UploadedCases")
   assignedCases               ECGCase[]                 @relation("AssignedCases")
   reviewedCases               ECGCase[]                 @relation("ReviewedCases")
+  reviewerCases               ECGCase[]                 @relation("ReviewerCases")
+  caseHistoryEvents           CaseHistory[]             @relation("CaseHistoryActor")
+  caseManagementComments      CaseComment[]             @relation("CaseCommentAuthor")
+  caseManagementAttachments   CaseAttachment[]          @relation("CaseAttachmentUploader")
+  caseManagementAudits        CaseAudit[]               @relation("CaseAuditActor")
   auditLogs                   AuditLog[]
   fitnessDecisions            FitnessDecision[]
   authoredReports             ClinicalReport[]          @relation("AuthoredReports")
@@ -1111,6 +1190,7 @@ model User {
   reportSignatures            ReportSignature[]
   reportExports               ReportExportLog[]         @relation("ReportExports")
   reportHistoryEvents         ReportHistoryEvent[]      @relation("ReportHistoryActors")
+  generatedClinicalReports    ClinicalGeneratedReport[] @relation("GeneratedClinicalReports")
   sentEmails                  EmailLog[]                @relation("SentReportEmails")
   fitnessAssessments          FitnessAssessment[]       @relation("FitnessAssessmentPhysician")
   returnToWorkDecisions       ReturnToWorkDecision[]    @relation("ReturnToWorkPhysician")
@@ -1289,6 +1369,7 @@ model Patient {
   fitnessDecisions       FitnessDecision[]
   timelineEvents         TimelineEvent[]
   reports                ClinicalReport[]
+  clinicalGeneratedReports ClinicalGeneratedReport[]
   fitnessAssessments     FitnessAssessment[]
   workRestrictions       WorkRestriction[]
   returnToWorkDecisions  ReturnToWorkDecision[]
@@ -1892,12 +1973,25 @@ model ECGCase {
   approvedAt            DateTime?
   rejectedAt            DateTime?
   finalizedAt           DateTime?
+  managementStatus      CaseManagementStatus   @default(DRAFT)
+  reviewerId            String?
+  tags                  String[]               @default([])
+  duplicateOfCaseId     String?
+  archivedAt            DateTime?
+  restoredAt            DateTime?
   createdAt             DateTime               @default(now())
   updatedAt             DateTime               @updatedAt
   patient               Patient                @relation(fields: [patientId], references: [id])
   uploadedBy            User                   @relation("UploadedCases", fields: [uploadedById], references: [id])
   assignedDoctor        User?                  @relation("AssignedCases", fields: [assignedDoctorId], references: [id])
   reviewedBy            User?                  @relation("ReviewedCases", fields: [reviewedById], references: [id])
+  reviewer              User?                  @relation("ReviewerCases", fields: [reviewerId], references: [id])
+  duplicateOfCase       ECGCase?               @relation("CaseDuplicates", fields: [duplicateOfCaseId], references: [id], onDelete: SetNull)
+  duplicateCases        ECGCase[]              @relation("CaseDuplicates")
+  caseHistory           CaseHistory[]
+  caseComments          CaseComment[]
+  caseAttachments       CaseAttachment[]
+  caseAudits            CaseAudit[]
   files                 ECGFile[]
   analyses              AIAnalysis[]
   measurements          ECGMeasurement[]
@@ -1922,6 +2016,7 @@ model ECGCase {
   longitudinalComparisons LongitudinalECGComparison[] @relation("CurrentLongitudinalCase")
   baselineComparisons    LongitudinalECGComparison[] @relation("BaselineLongitudinalCase")
   medicalIntelligenceReports MedicalIntelligenceReport[]
+  clinicalGeneratedReports   ClinicalGeneratedReport[]
 
   @@index([patientId])
   @@index([uploadedById])
@@ -1933,6 +2028,96 @@ model ECGCase {
   @@index([caseNumber])
   @@index([uploadDate])
   @@index([acquisitionDate])
+  @@index([managementStatus])
+  @@index([reviewerId])
+  @@index([archivedAt])
+  @@index([duplicateOfCaseId])
+}
+
+model CaseHistory {
+  id               String                 @id @default(cuid())
+  caseId           String
+  actorId          String?
+  eventType        CaseHistoryEventType
+  title            String
+  summary          String?
+  payload          Json?
+  fromStatus       CaseManagementStatus?
+  toStatus         CaseManagementStatus?
+  createdAt        DateTime               @default(now())
+  case             ECGCase                @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  actor            User?                  @relation("CaseHistoryActor", fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([caseId])
+  @@index([actorId])
+  @@index([eventType])
+  @@index([createdAt])
+}
+
+model CaseComment {
+  id          String        @id @default(cuid())
+  caseId      String
+  authorId    String
+  parentId    String?
+  body        String
+  mentions    String[]      @default([])
+  isClinical  Boolean       @default(false)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  case        ECGCase       @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  author      User          @relation("CaseCommentAuthor", fields: [authorId], references: [id])
+  parent      CaseComment?  @relation("CaseCommentThread", fields: [parentId], references: [id], onDelete: SetNull)
+  replies     CaseComment[] @relation("CaseCommentThread")
+
+  @@index([caseId])
+  @@index([authorId])
+  @@index([parentId])
+  @@index([isClinical])
+  @@index([createdAt])
+}
+
+model CaseAttachment {
+  id           String                 @id @default(cuid())
+  caseId       String
+  uploadedById String
+  fileName     String
+  mimeType     String
+  storagePath  String
+  sizeBytes    Int?
+  category     CaseAttachmentCategory @default(OTHER)
+  checksum     String?
+  metadata     Json?
+  createdAt    DateTime               @default(now())
+  case         ECGCase                @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  uploadedBy   User                   @relation("CaseAttachmentUploader", fields: [uploadedById], references: [id])
+
+  @@index([caseId])
+  @@index([uploadedById])
+  @@index([category])
+  @@index([createdAt])
+}
+
+model CaseAudit {
+  id         String   @id @default(cuid())
+  caseId     String
+  actorId    String
+  action     String
+  entityType String   @default("Case")
+  entityId   String?
+  message    String
+  oldValue   Json?
+  newValue   Json?
+  metadata   Json?
+  ipAddress  String?
+  createdAt  DateTime @default(now())
+  case       ECGCase  @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  actor      User     @relation("CaseAuditActor", fields: [actorId], references: [id])
+
+  @@index([caseId])
+  @@index([actorId])
+  @@index([action])
+  @@index([entityType])
+  @@index([createdAt])
 }
 
 model CasePresence {
@@ -2775,6 +2960,90 @@ model EcgClinicalKnowledgeDiagnosis {
   @@index([emergencyLevel])
   @@index([clinicalName])
   @@index([deletedAt])
+}
+
+model ClinicalGeneratedReport {
+  id                  String                        @id @default(cuid())
+  reportGroupId       String
+  versionNumber       Int
+  caseId              String
+  patientId           String
+  status              ClinicalGeneratedReportStatus @default(GENERATED)
+  executiveSummary    Json
+  fullInterpretation  Json
+  riskLevel           ClinicalRiskLevel
+  primaryDiagnosis    String
+  severity            String
+  clinicalUrgency     String
+  aiConfidence        Float
+  acquisitionQuality  String
+  clinicalIndication  String?
+  overallImpression   String
+  emergencyWarning    String?
+  clinicalFlags       ClinicalReportFlagType[]
+  generatedById       String?
+  sourceEngineVersion String
+  createdAt           DateTime                      @default(now())
+  updatedAt           DateTime                      @updatedAt
+  case                ECGCase                       @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  patient             Patient                       @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  generatedBy         User?                         @relation("GeneratedClinicalReports", fields: [generatedById], references: [id])
+  recommendations     ClinicalRecommendation[]
+  findings            ClinicalFinding[]
+  explanations        ClinicalExplanation[]
+
+  @@unique([reportGroupId, versionNumber])
+  @@index([caseId])
+  @@index([patientId])
+  @@index([reportGroupId])
+  @@index([riskLevel])
+  @@index([createdAt])
+}
+
+model ClinicalRecommendation {
+  id        String                         @id @default(cuid())
+  reportId  String
+  category  ClinicalRecommendationCategory
+  priority  String
+  action    String
+  rationale String?
+  createdAt DateTime                       @default(now())
+  report    ClinicalGeneratedReport        @relation(fields: [reportId], references: [id], onDelete: Cascade)
+
+  @@index([reportId])
+  @@index([category])
+}
+
+model ClinicalFinding {
+  id         String                  @id @default(cuid())
+  reportId   String
+  code       String
+  label      String
+  category   String
+  severity   String
+  confidence Float?
+  evidence   Json?
+  createdAt  DateTime                @default(now())
+  report     ClinicalGeneratedReport @relation(fields: [reportId], references: [id], onDelete: Cascade)
+
+  @@index([reportId])
+  @@index([code])
+  @@index([severity])
+}
+
+model ClinicalExplanation {
+  id                   String                  @id @default(cuid())
+  reportId             String
+  findingCode          String?
+  whyText              String
+  howText              String
+  supportingEvidence   String[]
+  clinicalReferences   String[]
+  createdAt            DateTime                @default(now())
+  report               ClinicalGeneratedReport @relation(fields: [reportId], references: [id], onDelete: Cascade)
+
+  @@index([reportId])
+  @@index([findingCode])
 }
 
 model MedicalKnowledgeDocument {

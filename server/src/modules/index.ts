@@ -10,11 +10,13 @@ import {
   trendsRouter,
 } from "./clinical-intelligence/clinical-intelligence.routes";
 import { clinicalKnowledgeEngineRouter } from "./clinical-knowledge-engine";
+import { aiReportGeneratorRouter } from "./ai-report-generator";
 import { cdssRouter } from "./clinical-intelligence/cdss.routes";
 import { longitudinalEcgRouter } from "./clinical-intelligence/longitudinal-ecg.routes";
 import { auditRouter } from "./audit/audit.routes";
 import { backupRouter } from "./backup/backup.routes";
 import { caseCollaborationRouter } from "./collaboration/case-collaboration.routes";
+import { caseManagementEngineRouter } from "./case-management-engine";
 import { alertsRouter, messagesRouter, syncRouter, tasksRouter, teamsRouter } from "./collaboration/collaboration.routes";
 import { complianceRouter } from "./compliance/compliance.routes";
 import { copilotRouter } from "./copilot/copilot.routes";
@@ -72,12 +74,14 @@ modulesRouter.use("/ai", aiRouter);
 modulesRouter.use("/alerts", alertsRouter);
 modulesRouter.use("/clinical-alerts", clinicalAlertsRouter);
 modulesRouter.use("/clinical-knowledge-engine", clinicalKnowledgeEngineRouter);
+modulesRouter.use("/ai-report-generator", aiReportGeneratorRouter);
 modulesRouter.use("/cdss", cdssRouter);
 modulesRouter.use("/longitudinal-ecg", longitudinalEcgRouter);
 modulesRouter.use("/companies", companiesRouter);
 modulesRouter.use("/analytics", populationAnalyticsRouter);
 modulesRouter.use("/backup", backupRouter);
 modulesRouter.use("/cases", casesRouter);
+modulesRouter.use("/cases", caseManagementEngineRouter);
 modulesRouter.use("/cases", examinationWorkflowRouter);
 modulesRouter.use("/case-collaboration", caseCollaborationRouter);
 modulesRouter.use("/tasks", tasksRouter);

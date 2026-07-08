@@ -1,6 +1,7 @@
 import type {
   AIAnalysis,
   AuditLog,
+  CaseManagementStatus,
   ClinicalReport,
   ECGCase,
   ECGCaseSeverity,
@@ -34,6 +35,22 @@ export type ApiCaseStatus =
 export type ApiPriority = "low" | "medium" | "high" | "critical";
 export type ApiCaseSeverity = "abnormal" | "critical" | "normal";
 export type ApiSmokingStatus = "never" | "former" | "current" | "unknown";
+export type ApiCaseManagementStatus =
+  | "archived"
+  | "confirmed"
+  | "draft"
+  | "pending_review"
+  | "reviewed"
+  | "signed";
+
+const managementStatusToApi: Record<CaseManagementStatus, ApiCaseManagementStatus> = {
+  ARCHIVED: "archived",
+  CONFIRMED: "confirmed",
+  DRAFT: "draft",
+  PENDING_REVIEW: "pending_review",
+  REVIEWED: "reviewed",
+  SIGNED: "signed",
+};
 
 const genderToApi: Record<Gender, ApiGender> = {
   CHILD: "child",
@@ -219,6 +236,7 @@ export function serializeCase(
     patient: Patient;
     reports?: ClinicalReport[];
     reviewedBy?: Pick<User, "email" | "id" | "name" | "role"> | null;
+    reviewer?: Pick<User, "email" | "id" | "name" | "role"> | null;
     uploadedBy?: Pick<User, "email" | "id" | "name" | "role">;
   },
 ) {
@@ -240,6 +258,7 @@ export function serializeCase(
       : null,
     assignedDoctorId: ecgCase.assignedDoctorId,
     approvedAt: ecgCase.approvedAt?.toISOString(),
+    archivedAt: ecgCase.archivedAt?.toISOString(),
     acquisitionDate: ecgCase.acquisitionDate.toISOString(),
     caseId: ecgCase.caseId,
     caseNumber: ecgCase.caseNumber ?? ecgCase.caseId,
@@ -259,6 +278,7 @@ export function serializeCase(
     finalizedAt: ecgCase.finalizedAt?.toISOString(),
     heartRate: ecgCase.heartRate ?? latestMeasurement?.heartRate ?? latestAnalysis?.heartRate ?? undefined,
     id: ecgCase.id,
+    duplicateOfCaseId: ecgCase.duplicateOfCaseId ?? undefined,
     ecgImage: ecgCase.imagePath ?? (imageFile ? `/api/uploads/ecg/${imageFile.storedName}` : undefined),
     imagePath: ecgCase.imagePath ?? (imageFile ? `/api/uploads/ecg/${imageFile.storedName}` : undefined),
     originalFileUrl: originalFile ? `/api/uploads/ecg/${originalFile.storedName}` : undefined,
@@ -268,6 +288,7 @@ export function serializeCase(
     preprocessedImagePath: ecgCase.preprocessedImagePath ?? undefined,
     prInterval: ecgCase.prInterval ?? latestMeasurement?.prInterval ?? undefined,
     priority: priorityToApi[ecgCase.priority],
+    managementStatus: managementStatusToApi[ecgCase.managementStatus],
     qrsDuration: ecgCase.qrsDuration ?? latestMeasurement?.qrsDuration ?? undefined,
     qtInterval: ecgCase.qtInterval ?? latestMeasurement?.qtInterval ?? undefined,
     qtcInterval: ecgCase.qtcInterval ?? latestMeasurement?.qtcInterval ?? undefined,
@@ -283,9 +304,20 @@ export function serializeCase(
         }
       : null,
     reviewedById: ecgCase.reviewedById ?? undefined,
+    reviewer: ecgCase.reviewer
+      ? {
+          email: ecgCase.reviewer.email,
+          id: ecgCase.reviewer.id,
+          name: ecgCase.reviewer.name,
+          role: toApiRole(ecgCase.reviewer.role),
+        }
+      : null,
+    reviewerId: ecgCase.reviewerId ?? undefined,
+    restoredAt: ecgCase.restoredAt?.toISOString(),
     rhythm: ecgCase.rhythm ?? latestAnalysis?.rhythm ?? undefined,
     severity: severityToApi[ecgCase.severity],
     status: statusToApi[ecgCase.status],
+    tags: ecgCase.tags,
     reportCount: ecgCase.reports?.length ?? 0,
     updatedAt: ecgCase.updatedAt.toISOString(),
     uploadDate: ecgCase.uploadDate.toISOString(),

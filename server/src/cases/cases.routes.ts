@@ -35,6 +35,7 @@ import {
   reviewCaseSchema,
   updateStatusSchema,
 } from "./schemas";
+import { onCaseCreated } from "../modules/case-management-engine";
 
 export const casesRouter = Router();
 
@@ -260,6 +261,7 @@ casesRouter.post("/", requireRole("DOCTOR"), validateBody(caseCreateSchema), asy
       title: "ECG uploaded",
       type: "ECG_UPLOADED",
     });
+    await onCaseCreated(ecgCase, req.auth!.id);
 
     if (ecgCase.assignedDoctorId) {
       await createNotification({
