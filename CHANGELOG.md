@@ -1,5 +1,43 @@
 # Changelog — Enterprise QA Infrastructure
 
+## Sprint 63 — ECG Longitudinal Timeline & Follow-up Engine — 2026-07-08
+
+### Added (backend only — zero UI changes)
+- **ECG Longitudinal Timeline Engine** (`server/src/modules/ecg-longitudinal-timeline-engine/`) — permanent patient ECG timeline, serial comparison, trend detection, and clinical follow-up summaries
+- **API:** `/api/patients/:patientId/timeline`, `/api/cases/:caseId/history`, `/previous`, `/next`, `/compare/:previousCaseId`
+- Migration: `20260708071000_sprint63_ecg_longitudinal_timeline`
+- Models: `ECGTimeline`, `ECGFollowUp`, `ECGComparisonHistory`, `ECGTrendSnapshot`
+- Tests: `sprint63-ecg-longitudinal-timeline.test.ts`, `.integration.ts`, `-http.integration.ts`
+
+### Changed
+- Sprint 60 case management history route: `GET /api/cases/:caseId/management-history` (was `/history`; Sprint 63 owns chronological `/history`)
+
+### Preserved
+- ECG Workspace, Live Monitor, Viewer, Canvas, Rendering Engine, Frontend UI — **zero changes**
+
+### Tag
+- `Sprint63-LongitudinalTimeline`
+
+---
+
+## Sprint 64 — ECG Clinical Alerts & Risk Stratification Engine — 2026-07-08
+
+### Added (backend only — zero UI changes)
+- **Clinical Alerts & Risk Engine** (`server/src/modules/clinical-alerts-risk-engine/`) — 15 alert detectors + risk stratification
+- **Extended** `ECGClinicalAlert` with Sprint 64 fields (`alertCode`, `alertSeverity`, evidence, engine version)
+- **New models:** `ECGRiskAssessment`, `ECGRiskFactor`, `ECGAlertHistory`
+- **API:** `/api/clinical-alerts-risk-engine` — alerts, risk, recalculate, audit
+- Migration: `20260708070000_sprint64_clinical_alerts_risk_engine`
+- Tests: `sprint64-clinical-alerts-risk-engine.test.ts`, `sprint64-clinical-alerts-risk-engine.integration.ts`
+
+### Preserved
+- ECG Workspace, Live Monitor, Viewer, Canvas, Rendering Engine, Frontend UI — **zero changes**
+
+### Tag
+- `Sprint64_Clinical_Alerts_Risk_Engine`
+
+---
+
 ## Sprint 59 — AI Report Generator Enterprise — 2026-07-08
 
 ### Added (backend only — zero UI changes)

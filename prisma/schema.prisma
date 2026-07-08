@@ -458,6 +458,67 @@ enum ClinicalAlertType {
   EXTREME_BRADYCARDIA
 }
 
+enum EcgAlertSeverity {
+  NORMAL
+  LOW
+  MODERATE
+  HIGH
+  CRITICAL
+}
+
+enum EcgAlertCode {
+  CRITICAL_QT_PROLONGATION
+  BRADYCARDIA
+  TACHYCARDIA
+  ATRIAL_FIBRILLATION
+  ATRIAL_FLUTTER
+  ST_ELEVATION
+  ST_DEPRESSION
+  WIDE_QRS
+  EXTREME_AXIS
+  HIGH_PVC_BURDEN
+  POSSIBLE_AV_BLOCK
+  BUNDLE_BRANCH_BLOCK
+  POSSIBLE_ACUTE_MI
+  POSSIBLE_HYPERKALEMIA
+  POSSIBLE_HYPOKALEMIA
+}
+
+enum EcgAlertStatus {
+  ACTIVE
+  ACKNOWLEDGED
+  RESOLVED
+  SUPERSEDED
+}
+
+enum EcgRiskCategory {
+  LOW
+  MODERATE
+  HIGH
+  CRITICAL
+}
+
+enum EcgClinicalPriority {
+  ROUTINE
+  ELEVATED
+  HIGH
+  CRITICAL
+}
+
+enum EcgUrgencyLevel {
+  ROUTINE
+  URGENT
+  EMERGENT
+  CRITICAL
+}
+
+enum EcgAlertHistoryEventType {
+  ALERT_GENERATED
+  ALERT_ACKNOWLEDGED
+  RISK_CALCULATED
+  RISK_RECALCULATED
+}
+
 enum TrendMetric {
   EF
   HEART_RATE
@@ -779,6 +840,9 @@ enum TimelineEventType {
   TASK_ASSIGNED
   MESSAGE_SENT
   ALERT_CREATED
+  ECG_TIMELINE_VIEWED
+  ECG_FOLLOW_UP_RECOMMENDED
+  ECG_TREND_ANALYSIS_GENERATED
 }
 
 enum FitnessDecisionValue {
@@ -887,6 +951,50 @@ enum ClinicalRecommendationCategory {
   FURTHER_INVESTIGATION
 }
 
+enum ClinicalRecommendationType {
+  REPEAT_ECG
+  HOLTER_MONITOR
+  ECHOCARDIOGRAPHY
+  TROPONIN
+  ELECTROLYTES
+  CARDIOLOGY_REFERRAL
+  EMERGENCY_EVALUATION
+  HOSPITAL_ADMISSION
+  OBSERVATION
+  REPEAT_MEASUREMENTS
+  MANUAL_REVIEW_REQUIRED
+}
+
+enum ClinicalRecommendationStatus {
+  GENERATED
+  ACCEPTED
+  REJECTED
+  SUPERSEDED
+}
+
+enum FollowUpPriority {
+  ROUTINE
+  URGENT
+  EMERGENT
+  CRITICAL
+}
+
+enum FollowUpReviewStatus {
+  PENDING
+  SCHEDULED
+  IN_REVIEW
+  COMPLETED
+  OVERDUE
+  CANCELLED
+}
+
+enum FollowUpReminderStatus {
+  PENDING
+  SENT
+  ACKNOWLEDGED
+  DISMISSED
+}
+
 enum AuditAction {
   CASE_CREATED
   CASE_UPDATED
@@ -915,6 +1023,8 @@ enum AuditAction {
   ECG_MEASURED
   ECG_COMPARISON_COMPLETED
   CLINICAL_ALERT_CREATED
+  ECG_ALERT_ENGINE_GENERATED
+  ECG_RISK_ENGINE_RECALCULATED
   PACS_OPERATION
   FHIR_OPERATION
   TELECARDIOLOGY_REVIEW_REQUESTED
@@ -999,7 +1109,17 @@ enum AuditAction {
   CASE_MANAGEMENT_UNLOCKED
   CASE_MANAGEMENT_DUPLICATE_DETECTED
   CDSS_DECISION_GENERATED
+  CLINICAL_RECOMMENDATION_GENERATED
+  CLINICAL_RECOMMENDATION_ACCEPTED
+  CLINICAL_RECOMMENDATION_REJECTED
+  FOLLOW_UP_PLAN_CREATED
   LONGITUDINAL_ECG_COMPARISON_COMPLETED
+  ECG_TIMELINE_VIEWED
+  ECG_COMPARISON_PERFORMED
+  ECG_HISTORICAL_DATA_ACCESSED
+  ECG_TREND_ANALYSIS_GENERATED
+  ECG_FOLLOW_UP_GENERATED
+  ECG_LONGITUDINAL_REPORT_GENERATED
   MFA_RECOVERY_CODE_USED
   TRUSTED_DEVICE_REVOKED
   SESSION_REVOKED
@@ -1191,6 +1311,13 @@ model User {
   reportExports               ReportExportLog[]         @relation("ReportExports")
   reportHistoryEvents         ReportHistoryEvent[]      @relation("ReportHistoryActors")
   generatedClinicalReports    ClinicalGeneratedReport[] @relation("GeneratedClinicalReports")
+  generatedCaseClinicalRecommendations CaseClinicalRecommendation[] @relation("GeneratedCaseClinicalRecommendations")
+  acceptedCaseClinicalRecommendations CaseClinicalRecommendation[] @relation("AcceptedCaseClinicalRecommendations")
+  rejectedCaseClinicalRecommendations CaseClinicalRecommendation[] @relation("RejectedCaseClinicalRecommendations")
+  generatedFollowUpPlans      FollowUpPlan[]            @relation("GeneratedFollowUpPlans")
+  generatedEcgClinicalAlerts  ECGClinicalAlert[]        @relation("GeneratedEcgClinicalAlerts")
+  calculatedEcgRiskAssessments ECGRiskAssessment[]      @relation("CalculatedEcgRiskAssessments")
+  ecgAlertHistoryEvents       ECGAlertHistory[]         @relation("EcgAlertHistoryActor")
   sentEmails                  EmailLog[]                @relation("SentReportEmails")
   fitnessAssessments          FitnessAssessment[]       @relation("FitnessAssessmentPhysician")
   returnToWorkDecisions       ReturnToWorkDecision[]    @relation("ReturnToWorkPhysician")
@@ -1242,6 +1369,10 @@ model User {
   cdssRuns                    ClinicalDecisionSupportRun[]
   longitudinalComparisons     LongitudinalECGComparison[]
   medicalIntelligenceReports  MedicalIntelligenceReport[]
+  physicianTimelines          ECGTimeline[]             @relation("ECGTimelinePhysician")
+  ecgFollowUpAssignments      ECGFollowUp[]             @relation("ECGFollowUpAssignee")
+  ecgFollowUpCreations        ECGFollowUp[]             @relation("ECGFollowUpCreator")
+  ecgComparisonEvaluations    ECGComparisonHistory[]    @relation("ECGComparisonEvaluator")
   organization                Organization?             @relation("OrganizationUsers", fields: [organizationId], references: [id], onDelete: SetNull)
   organizationMemberships     OrganizationMember[]
   managedBranches             OrganizationBranch[]      @relation("BranchManager")
@@ -1370,6 +1501,9 @@ model Patient {
   timelineEvents         TimelineEvent[]
   reports                ClinicalReport[]
   clinicalGeneratedReports ClinicalGeneratedReport[]
+  caseClinicalRecommendations CaseClinicalRecommendation[]
+  followUpPlans            FollowUpPlan[]
+  followUpReminders        FollowUpReminder[]
   fitnessAssessments     FitnessAssessment[]
   workRestrictions       WorkRestriction[]
   returnToWorkDecisions  ReturnToWorkDecision[]
@@ -1377,6 +1511,8 @@ model Patient {
   documentIndexes        DocumentSearchIndex[]
   clinicalEcgFiles       ECGFile[]              @relation("PatientECGFiles")
   clinicalAlerts         ECGClinicalAlert[]
+  ecgRiskAssessments     ECGRiskAssessment[]
+  ecgAlertHistories      ECGAlertHistory[]
   telecardiologyReviews  TelecardiologyReview[]
   clinicalConversations  ClinicalConversation[]
   patientTrends          PatientTrend[]
@@ -1393,6 +1529,10 @@ model Patient {
   cdssRuns               ClinicalDecisionSupportRun[]
   longitudinalComparisons LongitudinalECGComparison[]
   medicalIntelligenceReports MedicalIntelligenceReport[]
+  ecgTimelines            ECGTimeline[]
+  ecgFollowUps            ECGFollowUp[]
+  ecgComparisonHistories  ECGComparisonHistory[]
+  ecgTrendSnapshots       ECGTrendSnapshot[]
 
   @@unique([organizationId, employeeId])
   @@index([lastName, firstName])
@@ -1463,6 +1603,7 @@ model Organization {
   branding               OrganizationBranding?
   platformNotifications  OrganizationNotification[]
   loginHistory           LoginHistory[]
+  ecgTimelines           ECGTimeline[]
 
   @@index([name])
   @@index([status])
@@ -2001,6 +2142,8 @@ model ECGCase {
   timelineEvents        TimelineEvent[]
   reports               ClinicalReport[]
   clinicalAlerts        ECGClinicalAlert[]
+  ecgRiskAssessments    ECGRiskAssessment[]
+  ecgAlertHistories     ECGAlertHistory[]
   telecardiologyReviews TelecardiologyReview[]
   tasks                 Task[]
   conversations         Conversation[]
@@ -2017,6 +2160,14 @@ model ECGCase {
   baselineComparisons    LongitudinalECGComparison[] @relation("BaselineLongitudinalCase")
   medicalIntelligenceReports MedicalIntelligenceReport[]
   clinicalGeneratedReports   ClinicalGeneratedReport[]
+  caseClinicalRecommendations CaseClinicalRecommendation[]
+  followUpPlans              FollowUpPlan[]
+  followUpReminders          FollowUpReminder[]
+  ecgTimeline                ECGTimeline?
+  ecgFollowUps               ECGFollowUp[]
+  ecgCurrentComparisons      ECGComparisonHistory[]      @relation("CurrentComparisonCase")
+  ecgPreviousComparisons     ECGComparisonHistory[]      @relation("PreviousComparisonCase")
+  ecgTrendSnapshots          ECGTrendSnapshot[]
 
   @@index([patientId])
   @@index([uploadedById])
@@ -2781,27 +2932,112 @@ model TelecardiologyReview {
 }
 
 model ECGClinicalAlert {
-  id              String            @id @default(cuid())
-  caseId          String?
-  patientId       String
-  organizationId  String?
-  ecgFileId       String?
-  alertType       ClinicalAlertType
-  severity        AISeverity        @default(CRITICAL)
-  message         String
-  confidenceScore Float
-  acknowledgedAt  DateTime?
-  createdAt       DateTime          @default(now())
-  case            ECGCase?          @relation(fields: [caseId], references: [id], onDelete: Cascade)
-  patient         Patient           @relation(fields: [patientId], references: [id], onDelete: Cascade)
-  organization    Organization?     @relation(fields: [organizationId], references: [id], onDelete: SetNull)
-  ecgFile         ECGFile?          @relation(fields: [ecgFileId], references: [id], onDelete: SetNull)
+  id                 String            @id @default(cuid())
+  caseId             String?
+  patientId          String
+  organizationId     String?
+  ecgFileId          String?
+  alertType          ClinicalAlertType
+  alertCode          EcgAlertCode?
+  alertSeverity      EcgAlertSeverity?
+  severity           AISeverity        @default(CRITICAL)
+  message            String
+  confidenceScore    Float
+  supportingFindings Json?
+  evidence           Json?
+  engineVersion      String?
+  sourceEngine       String?
+  status             EcgAlertStatus    @default(ACTIVE)
+  generatedById      String?
+  acknowledgedAt     DateTime?
+  supersededAt       DateTime?
+  createdAt          DateTime          @default(now())
+  case               ECGCase?          @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  patient            Patient           @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  organization       Organization?     @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+  ecgFile            ECGFile?          @relation(fields: [ecgFileId], references: [id], onDelete: SetNull)
+  generatedBy        User?             @relation("GeneratedEcgClinicalAlerts", fields: [generatedById], references: [id], onDelete: SetNull)
+  histories          ECGAlertHistory[]
 
   @@index([caseId])
   @@index([patientId])
   @@index([organizationId])
   @@index([ecgFileId])
   @@index([alertType])
+  @@index([alertCode])
+  @@index([alertSeverity])
+  @@index([status])
+  @@index([sourceEngine])
+  @@index([createdAt])
+}
+
+model ECGRiskAssessment {
+  id                 String              @id @default(cuid())
+  assessmentGroupId  String
+  versionNumber      Int
+  caseId             String
+  patientId          String
+  riskScore          Float
+  riskCategory       EcgRiskCategory
+  clinicalPriority   EcgClinicalPriority
+  urgency            EcgUrgencyLevel
+  confidence         Float
+  supportingFindings Json
+  engineVersion      String
+  calculatedById     String?
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+  case               ECGCase             @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  patient            Patient             @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  calculatedBy       User?               @relation("CalculatedEcgRiskAssessments", fields: [calculatedById], references: [id], onDelete: SetNull)
+  factors            ECGRiskFactor[]
+  histories          ECGAlertHistory[]
+
+  @@unique([assessmentGroupId, versionNumber])
+  @@index([caseId])
+  @@index([patientId])
+  @@index([assessmentGroupId])
+  @@index([riskCategory])
+  @@index([createdAt])
+}
+
+model ECGRiskFactor {
+  id           String            @id @default(cuid())
+  assessmentId String
+  code         String
+  label        String
+  category     String
+  weight       Float
+  contribution Float
+  evidence     String[]
+  createdAt    DateTime          @default(now())
+  assessment   ECGRiskAssessment @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+
+  @@index([assessmentId])
+  @@index([code])
+}
+
+model ECGAlertHistory {
+  id           String                   @id @default(cuid())
+  caseId       String
+  patientId    String
+  eventType    EcgAlertHistoryEventType
+  alertId      String?
+  assessmentId String?
+  payload      Json
+  actorId      String?
+  createdAt    DateTime                 @default(now())
+  case         ECGCase                  @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  patient      Patient                  @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  alert        ECGClinicalAlert?          @relation(fields: [alertId], references: [id], onDelete: SetNull)
+  assessment   ECGRiskAssessment?       @relation(fields: [assessmentId], references: [id], onDelete: SetNull)
+  actor        User?                    @relation("EcgAlertHistoryActor", fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([caseId])
+  @@index([patientId])
+  @@index([eventType])
+  @@index([alertId])
+  @@index([assessmentId])
   @@index([createdAt])
 }
 
@@ -3044,6 +3280,111 @@ model ClinicalExplanation {
 
   @@index([reportId])
   @@index([findingCode])
+}
+
+/// Sprint 65 — case-scoped clinical decision support recommendation (distinct from AI report `ClinicalRecommendation`).
+model CaseClinicalRecommendation {
+  id                 String                       @id @default(cuid())
+  caseId             String
+  patientId          String
+  recommendationType ClinicalRecommendationType
+  title              String
+  action             String
+  reasoning          String
+  supportingFindings Json
+  clinicalEvidence   Json
+  priorityScore      Float
+  confidence         Float
+  status             ClinicalRecommendationStatus @default(GENERATED)
+  ruleCode           String?
+  generatedById        String?
+  acceptedById         String?
+  rejectedById         String?
+  acceptedAt           DateTime?
+  rejectedAt           DateTime?
+  rejectionReason      String?
+  createdAt            DateTime                     @default(now())
+  updatedAt            DateTime                     @updatedAt
+  case                 ECGCase                      @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  patient              Patient                      @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  generatedBy          User?                        @relation("GeneratedCaseClinicalRecommendations", fields: [generatedById], references: [id], onDelete: SetNull)
+  acceptedBy           User?                        @relation("AcceptedCaseClinicalRecommendations", fields: [acceptedById], references: [id], onDelete: SetNull)
+  rejectedBy           User?                        @relation("RejectedCaseClinicalRecommendations", fields: [rejectedById], references: [id], onDelete: SetNull)
+  rule                 DecisionSupportRule?         @relation(fields: [ruleCode], references: [ruleCode], onDelete: SetNull)
+
+  @@index([caseId])
+  @@index([patientId])
+  @@index([recommendationType])
+  @@index([status])
+  @@index([priorityScore])
+  @@index([createdAt])
+}
+
+model FollowUpPlan {
+  id                      String               @id @default(cuid())
+  caseId                  String
+  patientId               String
+  nextEcgDate             DateTime?
+  recommendedIntervalDays Int
+  priority                FollowUpPriority
+  reviewStatus            FollowUpReviewStatus @default(PENDING)
+  completedAt             DateTime?
+  reasoning               String?
+  generatedById           String?
+  createdAt               DateTime             @default(now())
+  updatedAt               DateTime             @updatedAt
+  case                    ECGCase              @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  patient                 Patient              @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  generatedBy             User?                @relation("GeneratedFollowUpPlans", fields: [generatedById], references: [id], onDelete: SetNull)
+  reminders               FollowUpReminder[]
+
+  @@index([caseId])
+  @@index([patientId])
+  @@index([priority])
+  @@index([reviewStatus])
+  @@index([nextEcgDate])
+  @@index([createdAt])
+}
+
+model FollowUpReminder {
+  id             String                 @id @default(cuid())
+  planId         String
+  caseId         String
+  patientId      String
+  reminderDate   DateTime
+  status         FollowUpReminderStatus @default(PENDING)
+  sentAt         DateTime?
+  acknowledgedAt DateTime?
+  createdAt      DateTime               @default(now())
+  updatedAt      DateTime               @updatedAt
+  plan           FollowUpPlan           @relation(fields: [planId], references: [id], onDelete: Cascade)
+  case           ECGCase                @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  patient        Patient                @relation(fields: [patientId], references: [id], onDelete: Cascade)
+
+  @@index([planId])
+  @@index([caseId])
+  @@index([patientId])
+  @@index([reminderDate])
+  @@index([status])
+}
+
+model DecisionSupportRule {
+  id                  String                       @id @default(cuid())
+  ruleCode            String                       @unique
+  name                String
+  description         String
+  recommendationTypes ClinicalRecommendationType[]
+  enabled             Boolean                      @default(true)
+  priorityWeight      Float                        @default(1)
+  criteriaJson        Json?
+  evidenceLevel       String                       @default("guideline")
+  version             String                       @default("sprint65-v1")
+  createdAt           DateTime                     @default(now())
+  updatedAt           DateTime                     @updatedAt
+  recommendations     CaseClinicalRecommendation[]
+
+  @@index([enabled])
+  @@index([ruleCode])
 }
 
 model MedicalKnowledgeDocument {
@@ -4459,6 +4800,7 @@ model OrganizationBranch {
   manager         User?              @relation("BranchManager", fields: [managerUserId], references: [id], onDelete: SetNull)
   department      Department?        @relation(fields: [departmentId], references: [id], onDelete: SetNull)
   members         OrganizationMember[]
+  ecgTimelines    ECGTimeline[]
 
   @@unique([organizationId, name])
   @@index([organizationId])
@@ -4592,4 +4934,159 @@ model OrganizationNotification {
   @@index([category])
   @@index([read])
   @@index([createdAt])
+}
+
+// ─── Sprint 63: Enterprise ECG Longitudinal Timeline & Follow-up Engine ───
+
+enum ECGFollowUpStatus {
+  RECOMMENDED
+  SCHEDULED
+  DUE
+  COMPLETED
+  OVERDUE
+  CANCELLED
+}
+
+enum ECGTrendDirection {
+  IMPROVING
+  WORSENING
+  STABLE
+  NEW
+  RESOLVED
+  INDETERMINATE
+}
+
+model ECGTimeline {
+  id              String              @id @default(cuid())
+  patientId       String
+  caseId          String              @unique
+  organizationId  String?
+  branchId        String?
+  physicianId     String?
+  studyDate       DateTime
+  acquisitionDate DateTime
+  reportUuid      String?
+  diagnosis       String?
+  interpretation  String?
+  aiConfidence    Float?
+  heartRate       Int?
+  prInterval      Int?
+  qrsDuration     Int?
+  qtInterval      Int?
+  qtcInterval     Int?
+  axis            Float?
+  rhythm          String?
+  measurements    Json?
+  attachments     Json?
+  sequenceNumber  Int                 @default(0)
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+  patient         Patient             @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  case            ECGCase             @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  organization    Organization?       @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+  branch          OrganizationBranch? @relation(fields: [branchId], references: [id], onDelete: SetNull)
+  physician       User?               @relation("ECGTimelinePhysician", fields: [physicianId], references: [id], onDelete: SetNull)
+  comparisons     ECGComparisonHistory[] @relation("TimelineComparisons")
+  trendSnapshots  ECGTrendSnapshot[]
+  followUps       ECGFollowUp[]
+
+  @@index([patientId])
+  @@index([caseId])
+  @@index([organizationId])
+  @@index([branchId])
+  @@index([physicianId])
+  @@index([studyDate])
+  @@index([acquisitionDate])
+  @@index([sequenceNumber])
+  @@index([createdAt])
+}
+
+model ECGFollowUp {
+  id             String            @id @default(cuid())
+  patientId      String
+  caseId         String?
+  timelineId     String?
+  recommendation String
+  summary        String?
+  status         ECGFollowUpStatus @default(RECOMMENDED)
+  dueDate        DateTime?
+  assignedToId   String?
+  createdById    String
+  completedAt    DateTime?
+  metadata       Json?
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+  patient        Patient           @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  case           ECGCase?          @relation(fields: [caseId], references: [id], onDelete: SetNull)
+  timeline       ECGTimeline?      @relation(fields: [timelineId], references: [id], onDelete: SetNull)
+  assignedTo     User?             @relation("ECGFollowUpAssignee", fields: [assignedToId], references: [id], onDelete: SetNull)
+  createdBy      User              @relation("ECGFollowUpCreator", fields: [createdById], references: [id])
+
+  @@index([patientId])
+  @@index([caseId])
+  @@index([timelineId])
+  @@index([status])
+  @@index([dueDate])
+  @@index([createdAt])
+}
+
+model ECGComparisonHistory {
+  id                   String   @id @default(cuid())
+  patientId            String
+  currentCaseId        String
+  previousCaseId       String
+  timelineId           String?
+  evaluatedById        String
+  measurementDelta     Json
+  diagnosisDelta       Json
+  interpretationDelta  Json
+  confidenceDelta      Json?
+  clinicalSignificance String
+  trendSummary         Json
+  followUpSummary      String?
+  createdAt            DateTime @default(now())
+  patient              Patient     @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  currentCase          ECGCase     @relation("CurrentComparisonCase", fields: [currentCaseId], references: [id], onDelete: Cascade)
+  previousCase         ECGCase     @relation("PreviousComparisonCase", fields: [previousCaseId], references: [id], onDelete: Cascade)
+  timeline             ECGTimeline? @relation("TimelineComparisons", fields: [timelineId], references: [id], onDelete: SetNull)
+  evaluatedBy          User        @relation("ECGComparisonEvaluator", fields: [evaluatedById], references: [id])
+  trendSnapshots       ECGTrendSnapshot[]
+
+  @@index([patientId])
+  @@index([currentCaseId])
+  @@index([previousCaseId])
+  @@index([timelineId])
+  @@index([evaluatedById])
+  @@index([createdAt])
+}
+
+model ECGTrendSnapshot {
+  id            String            @id @default(cuid())
+  patientId     String
+  caseId        String?
+  timelineId    String?
+  comparisonId  String?
+  trendType     String
+  direction     ECGTrendDirection
+  metric        String?
+  currentValue  Float?
+  previousValue Float?
+  delta         Float?
+  threshold     Float?
+  statement     String
+  significance  String?
+  metadata      Json?
+  capturedAt    DateTime          @default(now())
+  patient       Patient              @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  case          ECGCase?             @relation(fields: [caseId], references: [id], onDelete: SetNull)
+  timeline      ECGTimeline?         @relation(fields: [timelineId], references: [id], onDelete: SetNull)
+  comparison    ECGComparisonHistory? @relation(fields: [comparisonId], references: [id], onDelete: SetNull)
+
+  @@index([patientId])
+  @@index([caseId])
+  @@index([timelineId])
+  @@index([comparisonId])
+  @@index([trendType])
+  @@index([direction])
+  @@index([capturedAt])
 }

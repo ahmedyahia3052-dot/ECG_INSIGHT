@@ -9,6 +9,8 @@ import {
   riskRouter,
   trendsRouter,
 } from "./clinical-intelligence/clinical-intelligence.routes";
+import { clinicalAlertsRiskEngineRouter } from "./clinical-alerts-risk-engine";
+import { clinicalDecisionSupportRouter } from "./clinical-decision-support";
 import { clinicalKnowledgeEngineRouter } from "./clinical-knowledge-engine";
 import { aiReportGeneratorRouter } from "./ai-report-generator";
 import { cdssRouter } from "./clinical-intelligence/cdss.routes";
@@ -17,6 +19,10 @@ import { auditRouter } from "./audit/audit.routes";
 import { backupRouter } from "./backup/backup.routes";
 import { caseCollaborationRouter } from "./collaboration/case-collaboration.routes";
 import { caseManagementEngineRouter } from "./case-management-engine";
+import {
+  ecgLongitudinalCasesRouter,
+  ecgLongitudinalPatientsRouter,
+} from "./ecg-longitudinal-timeline-engine";
 import { alertsRouter, messagesRouter, syncRouter, tasksRouter, teamsRouter } from "./collaboration/collaboration.routes";
 import { complianceRouter } from "./compliance/compliance.routes";
 import { copilotRouter } from "./copilot/copilot.routes";
@@ -75,6 +81,8 @@ modulesRouter.use("/assistant", assistantRouter);
 modulesRouter.use("/ai", aiRouter);
 modulesRouter.use("/alerts", alertsRouter);
 modulesRouter.use("/clinical-alerts", clinicalAlertsRouter);
+modulesRouter.use("/clinical-alerts-risk-engine", clinicalAlertsRiskEngineRouter);
+modulesRouter.use("/clinical-decision-support", clinicalDecisionSupportRouter);
 modulesRouter.use("/clinical-knowledge-engine", clinicalKnowledgeEngineRouter);
 modulesRouter.use("/ai-report-generator", aiReportGeneratorRouter);
 modulesRouter.use("/cdss", cdssRouter);
@@ -83,6 +91,7 @@ modulesRouter.use("/companies", companiesRouter);
 modulesRouter.use("/analytics", populationAnalyticsRouter);
 modulesRouter.use("/backup", backupRouter);
 modulesRouter.use("/cases", casesRouter);
+modulesRouter.use("/cases", ecgLongitudinalCasesRouter);
 modulesRouter.use("/cases", caseManagementEngineRouter);
 modulesRouter.use("/cases", examinationWorkflowRouter);
 modulesRouter.use("/case-collaboration", caseCollaborationRouter);
@@ -112,6 +121,7 @@ modulesRouter.use("/ocr", ocrRouter);
 modulesRouter.use("/occupational-risk", occupationalRiskRouter);
 modulesRouter.use("/organization-platform", organizationPlatformRouter);
 modulesRouter.use("/organizations", organizationsRouter);
+modulesRouter.use("/patients", ecgLongitudinalPatientsRouter);
 modulesRouter.use("/patients", patientsRouter);
 modulesRouter.use("/preferences", preferencesRouter);
 modulesRouter.use("/pacs", pacsRouter);
