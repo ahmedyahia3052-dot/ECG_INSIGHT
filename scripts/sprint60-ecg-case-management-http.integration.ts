@@ -100,7 +100,7 @@ async function main() {
   const caseId = (created.body as { case?: { id: string } }).case?.id;
   assert(caseId, "Missing created case id.");
 
-  const history = await request(`/cases/${caseId}/history`, { token });
+  const history = await request(`/cases/${caseId}/management-history`, { token });
   assert(history.status === 200, `History failed: ${JSON.stringify(history.body)}`);
   const historyRows = (history.body as { history?: unknown[] }).history ?? [];
   assert(historyRows.length >= 1, "Expected case history after create.");

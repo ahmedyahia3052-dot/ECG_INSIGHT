@@ -59,7 +59,7 @@ caseManagementEngineRouter.put("/:caseId", requireRole("DOCTOR"), validateBody(c
   }
 });
 
-caseManagementEngineRouter.get("/:caseId/history", validateQuery(caseHistoryQuerySchema), async (req, res, next) => {
+caseManagementEngineRouter.get("/:caseId/management-history", validateQuery(caseHistoryQuerySchema), async (req, res, next) => {
   try {
     const ecgCase = await assertCaseAccess(String(req.params.caseId), req.auth!);
     const query = caseHistoryQuerySchema.parse(req.query);

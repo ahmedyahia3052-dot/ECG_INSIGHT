@@ -30,7 +30,7 @@ const files = [
     file: resolve(MOD, "case-management.routes.ts"),
     markers: [
       "caseManagementEngineRouter",
-      "/:caseId/history",
+      "/:caseId/management-history",
       "/:caseId/archive",
       "/:caseId/restore",
       "/:caseId/audit",
