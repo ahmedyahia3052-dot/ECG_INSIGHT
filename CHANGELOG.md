@@ -1,5 +1,23 @@
 # Changelog — Enterprise QA Infrastructure
 
+## Sprint 59 — AI Report Generator Enterprise — 2026-07-08
+
+### Added (backend only — zero UI changes)
+- **AI Report Generator** (`server/src/modules/ai-report-generator/`) — enterprise clinical report composition and persistence
+- **Report sections:** executive summary, full interpretation, recommendations, risk stratification, clinical flags, AI explainability
+- **API:** `/api/ai-report-generator` — generate, get, history, regenerate
+- Migration: `20260708050000_sprint59_ai_report_generator`
+- Models: `ClinicalGeneratedReport`, `ClinicalRecommendation`, `ClinicalFinding`, `ClinicalExplanation`
+- Tests: `sprint59-ai-report-generator.test.ts`, `sprint59-ai-report-generator.integration.ts`
+
+### Preserved
+- ECG Workspace, Live Monitor, Viewer, Canvas, Rendering Engine, Frontend UI — **zero changes**
+
+### Tag
+- `Sprint59-AiReportGenerator`
+
+---
+
 ## Sprint 58 — ECG Clinical Knowledge Engine — 2026-07-08
 
 ### Added (backend only — zero UI changes)

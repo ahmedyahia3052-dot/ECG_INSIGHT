@@ -12,6 +12,8 @@ export const integrationScripts = [
   "scripts/ecg-digitization.integration.ts",
   "scripts/ecg-image-pipeline-sprint6.integration.ts",
   "scripts/ecg-measurement-sprint61.integration.ts",
+  "scripts/ecg-diagnostic-pipeline-sprint61.test.ts",
+  "scripts/sprint61-diagnostic-pipeline.integration.ts",
   "scripts/ecg-measurement-engine-sprint59.test.ts",
   "scripts/sprint59-measurement-engine.integration.ts",
   "scripts/sprint59-measurement-engine.benchmark.ts",
