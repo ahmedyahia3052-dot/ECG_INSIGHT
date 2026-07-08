@@ -44,7 +44,7 @@ function thresholdLabel(condition: RuleConditionInput) {
 export function evaluateCondition(condition: RuleConditionInput, context: RuleEvaluationContext): EvaluatedCondition {
   const observed = readField(context, condition.field);
   const threshold = thresholdLabel(condition);
-  let matched = false;
+  let matched: boolean;
 
   switch (condition.operator) {
     case "GT":

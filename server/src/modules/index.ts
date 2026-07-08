@@ -114,6 +114,7 @@ modulesRouter.use("/ecg/benchmark", ecgBenchmarkRouter);
 modulesRouter.use("/ecg", ecgFilesRouter);
 modulesRouter.use("/employees", employeesRouter);
 modulesRouter.use("/emr", emrRouter);
+modulesRouter.use("/interop", interoperabilityEngineRouter);
 modulesRouter.use("/enterprise-report-engine", enterpriseReportEngineRouter);
 modulesRouter.use("/enterprise-rules-engine", enterpriseRulesEngineRouter);
 modulesRouter.use("/enterprise", enterpriseRouter);

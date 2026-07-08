@@ -14,6 +14,11 @@ import {
   unreadNotificationCount,
   upsertNotificationPreferences,
 } from "./notification-center.service";
+import {
+  listUnreadNotificationsForUser,
+  markNotificationsRead,
+} from "../modules/enterprise-notification-engine";
+import { markNotificationsReadSchema } from "../modules/enterprise-notification-engine/schemas";
 
 export const notificationsRouter = Router();
 
@@ -163,6 +168,29 @@ notificationsRouter.post("/", async (req, res, next) => {
 notificationsRouter.get("/unread-count", async (req, res, next) => {
   try {
     res.json({ unreadCount: await unreadNotificationCount(req.auth!.id, req.auth!.role) });
+  } catch (error) {
+    next(error);
+  }
+});
+
+notificationsRouter.get("/unread", async (req, res, next) => {
+  try {
+    const notifications = await listUnreadNotificationsForUser(req.auth!.id);
+    res.json({
+      engineVersion: "sprint66-v1",
+      notifications,
+      unreadCount: notifications.length,
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+notificationsRouter.post("/read", async (req, res, next) => {
+  try {
+    const body = markNotificationsReadSchema.parse(req.body ?? {});
+    const result = await markNotificationsRead(req.auth!.id, body);
+    res.json({ ...result, engineVersion: "sprint66-v1" });
   } catch (error) {
     next(error);
   }
