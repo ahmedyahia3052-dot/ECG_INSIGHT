@@ -1,5 +1,23 @@
 # Changelog — Enterprise QA Infrastructure
 
+## Sprint 58 — ECG Clinical Knowledge Engine — 2026-07-08
+
+### Added (backend only — zero UI changes)
+- **Clinical Knowledge Engine** (`server/src/modules/clinical-knowledge-engine/`) — structured ECG diagnosis catalog
+- **26 core diagnoses** with ECG criteria, ICD-10, SNOMED CT, AHA/ESC guidelines, differential diagnoses
+- **API:** `/api/clinical-knowledge-engine` — diagnoses, differential, categories, bootstrap seed
+- Migration: `20260708043000_sprint58_clinical_knowledge_engine`
+- Model: `EcgClinicalKnowledgeDiagnosis`
+- Tests: `sprint58-clinical-knowledge-engine.test.ts`, `sprint58-clinical-knowledge-engine.integration.ts`
+
+### Preserved
+- ECG Workspace, Live Monitor, Viewer, Canvas, Rendering Engine, Frontend UI — **zero changes**
+
+### Tag
+- `Sprint58-ClinicalKnowledgeEngine`
+
+---
+
 ## Sprint 57 — Enterprise Report Engine — 2026-07-08
 
 ### Added (backend only — isolated from ECG workspace/viewer/monitor)

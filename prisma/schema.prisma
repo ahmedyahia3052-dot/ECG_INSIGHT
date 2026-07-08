@@ -795,6 +795,32 @@ enum ReportExportFormat {
   SHARE
 }
 
+enum EcgClinicalKnowledgeCategory {
+  RHYTHM
+  ARRHYTHMIA
+  CONDUCTION
+  ISCHEMIA
+  ELECTROLYTE
+  HYPERTROPHY
+  CHANNELOPATHY
+  OTHER
+}
+
+enum EcgClinicalKnowledgeSeverity {
+  NORMAL
+  MINOR
+  ABNORMAL
+  URGENT
+  CRITICAL
+}
+
+enum EcgClinicalKnowledgeEmergencyLevel {
+  ROUTINE
+  URGENT
+  EMERGENT
+  CRITICAL
+}
+
 enum AuditAction {
   CASE_CREATED
   CASE_UPDATED
@@ -2400,6 +2426,7 @@ model ECGMeasurement {
   stDeviation      Float
   rhythmRegularity Float
   signalQuality    SignalQuality
+  detailsJson      Json?
   createdAt        DateTime      @default(now())
   case             ECGCase       @relation(fields: [caseId], references: [id], onDelete: Cascade)
 
@@ -2716,6 +2743,38 @@ model ECGKnowledgeEntry {
 
   @@index([category])
   @@index([topic])
+}
+
+model EcgClinicalKnowledgeDiagnosis {
+  id                    String                           @id @default(cuid())
+  diagnosisId           String                           @unique
+  clinicalName          String
+  category              EcgClinicalKnowledgeCategory
+  severity              EcgClinicalKnowledgeSeverity
+  emergencyLevel        EcgClinicalKnowledgeEmergencyLevel
+  description           String
+  ecgCriteria           String[]
+  diagnosticFeatures    String[]
+  supportingLeads       String[]
+  differentialDiagnoses String[]
+  recommendedNextTests  String[]
+  recommendedManagement String[]
+  contraindications     String[]
+  clinicalNotes         String[]
+  references            Json
+  icd10Code             String?
+  snomedCode            String?
+  guidelineReferences   Json
+  version               Int                              @default(1)
+  deletedAt             DateTime?
+  createdAt             DateTime                         @default(now())
+  updatedAt             DateTime                         @updatedAt
+
+  @@index([category])
+  @@index([severity])
+  @@index([emergencyLevel])
+  @@index([clinicalName])
+  @@index([deletedAt])
 }
 
 model MedicalKnowledgeDocument {
