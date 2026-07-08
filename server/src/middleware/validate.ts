@@ -7,3 +7,10 @@ export function validateBody<TSchema extends z.ZodTypeAny>(schema: TSchema) {
     next();
   };
 }
+
+export function validateQuery<TSchema extends z.ZodTypeAny>(schema: TSchema) {
+  return (req: Request, _res: Response, next: NextFunction) => {
+    req.query = schema.parse(req.query) as Request["query"];
+    next();
+  };
+}

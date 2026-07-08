@@ -13,6 +13,7 @@ declare global {
     interface Request {
       auth?: AuthUser;
       requestId?: string;
+      tenant?: { organizationId: string; isPlatformAdmin: boolean };
     }
   }
 }

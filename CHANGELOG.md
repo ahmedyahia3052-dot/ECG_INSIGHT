@@ -1,5 +1,63 @@
 # Changelog — Enterprise QA Infrastructure
 
+## Sprint 55 — Enterprise Organization & Multi-Tenant Platform — 2026-07-08
+
+### Added (backend only — isolated from ECG workspace/viewer)
+- **Organization Platform module** (`server/src/modules/organization-platform/`) — tenant isolation, RBAC, REST APIs
+- **Database models:** OrganizationBranch, OrganizationSubscription, OrganizationBranding, EnterpriseRole, OrganizationMember, LoginHistory, OrganizationNotification
+- **Extended:** Organization (quotas, branding, soft delete), Department (category presets)
+- **API:** `/api/organization-platform` — orgs, departments, branches, members, roles, subscriptions, branding, audit, notifications
+- **Permissions:** 21 granular keys + 14 system roles
+- Migration: `20260708010000_sprint55_enterprise_organization`
+- Tests: `sprint55-enterprise-organization.integration.ts`, `sprint55-rbac-security.test.ts`
+- Reports: `SPRINT55_*` deliverables
+
+### Preserved
+- ECG Workspace, Live Monitor, Render Engine, Canvas, Viewer, Image Processing, Clinical Reading UI — **zero changes**
+
+### Tag
+- `Sprint55-EnterpriseOrganization`
+
+---
+
+## Sprint 52 — ECG Workspace Professional Rebuild — 2026-07-08
+
+### Changed (Release Blocker)
+- **Removed live monitor from `/ecg-workspace`** — monitor exists only in `/ecg-live-monitor`
+- **Grouped interpretation toolbar** — IMAGE / VIEW / ANALYSIS / ANNOTATIONS / REPORT
+- **90% viewport ECG fill** — hero fit target, fit width/height/page, zoom 100–300%
+- **12-lead layout fix** — all standard leads always visible; 6×2, 3×4, sequential, stacked presets
+- **Scrollable left clinical sidebar** — 280px+ docked controls; no canvas overlap
+- **Clinical status bar** — zoom, paper speed, gain, coordinates, resolution
+
+### Validation
+- Integration: `scripts/sprint52-ecg-workspace-rebuild.integration.ts`
+- Playwright: `tests/e2e/sprint52-ecg-workspace-rebuild.spec.ts` (11/11 PASS — sidebar width + overlap at 1366–3840px)
+
+### Tag
+- `Sprint52-EcgWorkspaceRebuild`
+
+---
+
+## Sprint 51 — Hospital Workflow Stabilization — 2026-07-08
+
+### Fixed (Release Blocker)
+- **Removed "No sample ECG available" dead-end** — replaced with professional examination gate
+- **Auto-open newest examination** when a single eligible case exists
+- **Examination selector** when multiple cases exist
+- **Professional empty state** with Upload ECG, Import ECG, Open Existing Study, Load Demo Case
+- **Auto-digitization** on workspace/monitor/foundation load when case has image but no digital signal
+- **Upload → Workspace** automatic redirect after successful upload/analysis
+
+### Validation
+- Integration: `scripts/sprint51-hospital-workflow-stabilization.integration.ts`
+- Playwright: `tests/e2e/sprint51-hospital-workflow-stabilization.spec.ts`
+
+### Tag
+- `Sprint51-HospitalWorkflowStabilization`
+
+---
+
 ## Hospital Grade Rebuild — 2026-07-08
 
 ### Phase 1 — Live Monitor

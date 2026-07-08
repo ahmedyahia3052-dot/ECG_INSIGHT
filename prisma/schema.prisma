@@ -269,7 +269,12 @@ enum SignalQuality {
 enum OrganizationType {
   HOSPITAL
   CLINIC
+  MEDICAL_CENTER
+  OCCUPATIONAL_HEALTH_CENTER
   COMPANY
+  INSURANCE_PROVIDER
+  UNIVERSITY
+  RESEARCH_CENTER
   CONTRACTOR
   GOVERNMENT
   OTHER
@@ -862,6 +867,51 @@ enum AuditAction {
   SECURITY_POLICY_UPDATED
   PHI_FIELD_ENCRYPTED
   KEY_ROTATED
+  ORGANIZATION_CREATED
+  ORGANIZATION_UPDATED
+  BRANCH_CREATED
+  BRANCH_UPDATED
+  BRANCH_DELETED
+  USER_INVITED
+  USER_ROLE_CHANGED
+  SETTINGS_CHANGED
+  BILLING_UPDATED
+  BRANDING_UPDATED
+  SUBSCRIPTION_CHANGED
+}
+
+enum EnterpriseNotificationCategory {
+  SYSTEM
+  SECURITY
+  CLINICAL
+  AI
+  BILLING
+  LICENSE
+  MAINTENANCE
+}
+
+enum EnterpriseRoleScope {
+  PLATFORM
+  ORGANIZATION
+}
+
+enum DepartmentCategory {
+  CARDIOLOGY
+  EMERGENCY
+  ICU
+  CCU
+  INTERNAL_MEDICINE
+  OCCUPATIONAL_MEDICINE
+  OUTPATIENT_CLINIC
+  ADMINISTRATION
+  CUSTOM
+}
+
+enum OrganizationMemberStatus {
+  ACTIVE
+  INVITED
+  SUSPENDED
+  REMOVED
 }
 
 enum SecurityPolicyType {
@@ -1046,6 +1096,10 @@ model User {
   longitudinalComparisons     LongitudinalECGComparison[]
   medicalIntelligenceReports  MedicalIntelligenceReport[]
   organization                Organization?             @relation("OrganizationUsers", fields: [organizationId], references: [id], onDelete: SetNull)
+  organizationMemberships     OrganizationMember[]
+  managedBranches             OrganizationBranch[]      @relation("BranchManager")
+  loginHistory                LoginHistory[]
+  platformNotifications       OrganizationNotification[]
 
   @@index([role])
   @@index([isActive])
@@ -1217,6 +1271,15 @@ model Organization {
   country                String?
   city                   String?
   logo                   String?
+  brandColor             String?                  @default("#0F766E")
+  timezone               String?                  @default("UTC")
+  language               String?                  @default("en")
+  licenseNumber          String?
+  taxNumber              String?
+  storageQuotaMb         Int?                     @default(10240)
+  aiQuotaMonthly         Int?                     @default(100)
+  version                Int                      @default(1)
+  deletedAt              DateTime?
   status                 OrganizationStatus       @default(ACTIVE)
   createdAt              DateTime                 @default(now())
   updatedAt              DateTime                 @updatedAt
@@ -1245,10 +1308,19 @@ model Organization {
   tasks                  Task[]
   conversations          Conversation[]
   collaborationAlerts    Alert[]
+  branches               OrganizationBranch[]
+  members                OrganizationMember[]
+  enterpriseRoles        EnterpriseRole[]
+  subscription           OrganizationSubscription?
+  branding               OrganizationBranding?
+  platformNotifications  OrganizationNotification[]
+  loginHistory           LoginHistory[]
 
   @@index([name])
   @@index([status])
   @@index([type])
+  @@index([deletedAt])
+  @@index([country, city])
 }
 
 model Company {
@@ -1278,6 +1350,9 @@ model Department {
   organizationId         String
   companyId              String?
   name                   String
+  category               DepartmentCategory @default(CUSTOM)
+  description            String?
+  deletedAt              DateTime?
   organization           Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   company                Company?        @relation(fields: [companyId], references: [id], onDelete: SetNull)
   employees              Employee[]
@@ -1285,10 +1360,14 @@ model Department {
   clinicalDecisionAlerts ClinicalAlert[]
   teams                  Team[]
   tasks                  Task[]
+  members                OrganizationMember[]
+  branches               OrganizationBranch[]
 
   @@unique([organizationId, name])
   @@index([organizationId])
   @@index([companyId])
+  @@index([category])
+  @@index([deletedAt])
 }
 
 model ContractorCompany {
@@ -3914,4 +3993,164 @@ model MicRiskRule {
 
   @@index([level])
   @@index([enabled])
+}
+
+// ─── Sprint 55: Enterprise Organization & Multi-Tenant Platform ───
+
+model OrganizationBranch {
+  id              String             @id @default(cuid())
+  organizationId  String
+  name            String
+  address         String?
+  city            String?
+  country         String?
+  gpsLatitude     Float?
+  gpsLongitude    Float?
+  managerUserId   String?
+  departmentId    String?
+  deviceCount     Int                @default(0)
+  doctorCount     Int                @default(0)
+  patientCount    Int                @default(0)
+  caseCount       Int                @default(0)
+  status          OrganizationStatus @default(ACTIVE)
+  deletedAt       DateTime?
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+  organization    Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  manager         User?              @relation("BranchManager", fields: [managerUserId], references: [id], onDelete: SetNull)
+  department      Department?        @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+  members         OrganizationMember[]
+
+  @@unique([organizationId, name])
+  @@index([organizationId])
+  @@index([managerUserId])
+  @@index([status])
+  @@index([deletedAt])
+}
+
+model OrganizationSubscription {
+  id                  String             @id @default(cuid())
+  organizationId      String             @unique
+  tier                SubscriptionTier   @default(FREE)
+  status              SubscriptionStatus @default(ACTIVE)
+  storageLimitMb      Int                @default(10240)
+  aiCreditsMonthly    Int                @default(100)
+  ecgAnalysisLimit    Int                @default(500)
+  teamLimit           Int                @default(10)
+  featureFlags        Json?
+  licenseExpiresAt    DateTime?
+  currentPeriodStart  DateTime?
+  currentPeriodEnd    DateTime?
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime           @updatedAt
+  organization        Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([tier])
+  @@index([status])
+  @@index([licenseExpiresAt])
+}
+
+model OrganizationBranding {
+  id               String       @id @default(cuid())
+  organizationId   String       @unique
+  logoUrl          String?
+  primaryColor     String?      @default("#0F766E")
+  secondaryColor   String?      @default("#134E4A")
+  faviconUrl       String?
+  pdfHeaderHtml    String?
+  pdfFooterHtml    String?
+  emailBranding    Json?
+  loginBranding    Json?
+  reportHeader     String?
+  reportFooter     String?
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+  organization     Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+}
+
+model EnterpriseRole {
+  id              String              @id @default(cuid())
+  organizationId  String?
+  name            String
+  slug            String
+  description     String?
+  scope           EnterpriseRoleScope @default(ORGANIZATION)
+  isSystem        Boolean             @default(false)
+  permissions     Json
+  deletedAt       DateTime?
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+  organization    Organization?       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  members         OrganizationMember[]
+
+  @@unique([organizationId, slug])
+  @@index([organizationId])
+  @@index([scope])
+  @@index([isSystem])
+}
+
+model OrganizationMember {
+  id               String                   @id @default(cuid())
+  organizationId   String
+  userId           String
+  enterpriseRoleId String?
+  departmentId     String?
+  branchId         String?
+  status           OrganizationMemberStatus @default(ACTIVE)
+  invitedAt        DateTime?
+  joinedAt         DateTime?
+  deletedAt        DateTime?
+  createdAt        DateTime                 @default(now())
+  updatedAt        DateTime                 @updatedAt
+  organization     Organization             @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user             User                     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  enterpriseRole   EnterpriseRole?          @relation(fields: [enterpriseRoleId], references: [id], onDelete: SetNull)
+  department       Department?              @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+  branch           OrganizationBranch?      @relation(fields: [branchId], references: [id], onDelete: SetNull)
+
+  @@unique([organizationId, userId])
+  @@index([organizationId])
+  @@index([userId])
+  @@index([enterpriseRoleId])
+  @@index([status])
+  @@index([deletedAt])
+}
+
+model LoginHistory {
+  id             String        @id @default(cuid())
+  userId         String
+  organizationId String?
+  ipAddress      String?
+  userAgent      String?
+  deviceId       String?
+  success        Boolean       @default(true)
+  failureReason  String?
+  createdAt      DateTime      @default(now())
+  user           User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([organizationId])
+  @@index([success])
+  @@index([createdAt])
+}
+
+model OrganizationNotification {
+  id             String                       @id @default(cuid())
+  organizationId String
+  userId         String?
+  category       EnterpriseNotificationCategory
+  title          String
+  body           String
+  read           Boolean                      @default(false)
+  metadata       Json?
+  createdAt      DateTime                     @default(now())
+  organization   Organization                 @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user           User?                        @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId])
+  @@index([userId])
+  @@index([category])
+  @@index([read])
+  @@index([createdAt])
 }
