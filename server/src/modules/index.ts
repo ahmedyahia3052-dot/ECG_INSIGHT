@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { apiDocsRouter } from "../api/docs";
 import { aiRouter } from "../ai/ai.routes";
 import { authRouter } from "../auth/auth.routes";
 import { casesRouter } from "../cases/cases.routes";
@@ -76,6 +77,8 @@ export const modulesRouter = Router();
 modulesRouter.get("/healthz", (_req, res) => {
   res.json({ ok: true, service: "ecg-insight-api" });
 });
+
+modulesRouter.use(apiDocsRouter);
 
 modulesRouter.use("/health", healthRouter);
 modulesRouter.use("/auth", authRouter);

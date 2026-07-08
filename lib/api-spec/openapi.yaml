@@ -2,11 +2,16 @@ openapi: 3.1.0
 info:
   # Do not change the title, if the title changes, the import paths will be broken
   title: Api
-  version: 0.1.0
-  description: API specification
+  version: 1.0.0
+  description: |
+    ECG Insight Enterprise API (Sprint 72).
+    Full generated specification: lib/api-spec/openapi.json
+    Regenerate with: npm run api:generate
 servers:
+  - url: /api/v1
+    description: Canonical API v1
   - url: /api
-    description: Base API path
+    description: Legacy alias (deprecated)
 tags:
   - name: health
     description: Health operations
@@ -29,8 +34,46 @@ components:
     HealthStatus:
       type: object
       properties:
-        status:
+        ok:
+          type: boolean
+        service:
           type: string
       required:
-        - status
+        - ok
+    ApiErrorResponse:
+      type: object
+      required: [success, code, message]
+      properties:
+        success:
+          type: boolean
+          enum: [false]
+        code:
+          type: string
+        message:
+          type: string
+        requestId:
+          type: string
+    ApiSuccessResponse:
+      type: object
+      required: [success, data]
+      properties:
+        success:
+          type: boolean
+          enum: [true]
+        data:
+          type: object
+        meta:
+          type: object
+    PaginationMeta:
+      type: object
+      required: [page, pageSize, total, totalPages]
+      properties:
+        page:
+          type: integer
+        pageSize:
+          type: integer
+        total:
+          type: integer
+        totalPages:
+          type: integer
 

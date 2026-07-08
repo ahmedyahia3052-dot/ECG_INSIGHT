@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { sendSuccess } from "../../api/standards";
 import { requireAuth, requireRole } from "../../middleware/auth";
 import { validateBody, validateQuery } from "../../middleware/validate";
 import { assertResourceAccess, canAccessCase } from "../../utils/resource-access";
@@ -24,12 +25,17 @@ import { ENTERPRISE_RULES_ENGINE_VERSION } from "./types";
 
 export const enterpriseRulesEngineRouter = Router();
 
-enterpriseRulesEngineRouter.get("/health", (_req, res) => {
-  res.json({
-    ok: true,
-    service: "enterprise-rules-engine",
-    version: ENTERPRISE_RULES_ENGINE_VERSION,
-  });
+enterpriseRulesEngineRouter.get("/health", (req, res) => {
+  sendSuccess(
+    res,
+    {
+      ok: true,
+      service: "enterprise-rules-engine",
+      version: ENTERPRISE_RULES_ENGINE_VERSION,
+    },
+    200,
+    { engineVersion: "sprint72-v1", requestId: req.requestId },
+  );
 });
 
 enterpriseRulesEngineRouter.use(requireAuth);

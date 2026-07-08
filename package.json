@@ -7,6 +7,8 @@
     "dev:api": "node scripts/start-api-dev.mjs",
     "dev:frontend": "node scripts/start-frontend-dev.mjs",
     "dev:stack": "node scripts/start-dev-stack.mjs",
+    "dev:persistent": "node scripts/infrastructure/ensure-persistent-dev-servers.mjs",
+    "dev:verify": "node scripts/infrastructure/verify-dev-servers.mjs",
     "build": "npm run prisma:generate && npm run typecheck",
     "build:frontend": "cd artifacts/ecg-insight && npx expo export --platform web --output-dir ../../dist",
     "build:production": "npm run build && npm run build:frontend",
@@ -49,7 +51,11 @@
     "typecheck": "tsc -p server/tsconfig.json --noEmit && tsc -p artifacts/ecg-insight/tsconfig.json --noEmit",
     "qa:rc": "node scripts/qa-rc-validation.mjs",
     "validate:production": "tsx scripts/production-validation.ts",
-    "validate:rc": "node scripts/validate-rc-pipeline.mjs"
+    "validate:rc": "node scripts/validate-rc-pipeline.mjs",
+    "api:inventory": "node scripts/generate-api-inventory.mjs",
+    "api:openapi": "node scripts/generate-openapi.mjs",
+    "api:generate": "npm run api:inventory && npm run api:openapi",
+    "swagger": "npm run api:generate"
   },
   "private": true,
   "dependencies": {

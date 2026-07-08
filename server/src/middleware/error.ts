@@ -1,5 +1,6 @@
 import type { NextFunction, Request, Response } from "express";
 import { ZodError } from "zod";
+import { buildAppErrorBody, buildErrorBody, buildValidationErrorBody, toProblemJson } from "../api/standards/errors";
 import { captureException, log } from "../utils/logger";
 
 export class AppError extends Error {
@@ -28,12 +29,11 @@ export function errorHandler(
       path: req.path,
       requestId: req.requestId,
     });
-    return res.status(400).json({
-      code: "VALIDATION_ERROR",
-      errors: error.flatten(),
-      message: "Invalid request payload.",
-      requestId: req.requestId,
-    });
+    const body = buildValidationErrorBody(error, req.requestId);
+    if (req.accepts("application/problem+json")) {
+      return res.status(400).set("Content-Type", "application/problem+json").json(toProblemJson(body, 400, req));
+    }
+    return res.status(400).json(body);
   }
 
   if (error instanceof AppError) {
@@ -44,11 +44,11 @@ export function errorHandler(
       requestId: req.requestId,
       statusCode: error.statusCode,
     });
-    return res.status(error.statusCode).json({
-      code: error.code,
-      message: error.message,
-      requestId: req.requestId,
-    });
+    const body = buildAppErrorBody(error, req.requestId);
+    if (req.accepts("application/problem+json")) {
+      return res.status(error.statusCode).set("Content-Type", "application/problem+json").json(toProblemJson(body, error.statusCode, req));
+    }
+    return res.status(error.statusCode).json(body);
   }
 
   captureException(error, {
@@ -56,9 +56,13 @@ export function errorHandler(
     path: req.path,
     requestId: req.requestId,
   });
-  return res.status(500).json({
+  const body = buildErrorBody({
     code: "INTERNAL_SERVER_ERROR",
     message: "Unexpected server error.",
     requestId: req.requestId,
   });
+  if (req.accepts("application/problem+json")) {
+    return res.status(500).set("Content-Type", "application/problem+json").json(toProblemJson(body, 500, req));
+  }
+  return res.status(500).json(body);
 }

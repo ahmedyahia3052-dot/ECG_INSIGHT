@@ -1,0 +1,4970 @@
+[
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "ai-report-generator",
+    "operationId": "getAiReportGeneratorHealth",
+    "path": "/api/v1/ai-report-generator/health",
+    "tag": "reports",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "ai-report-generator",
+    "operationId": "getAiReportGeneratorReportId",
+    "path": "/api/v1/ai-report-generator/report/:id",
+    "tag": "reports",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "ai-report-generator",
+    "operationId": "getAiReportGeneratorReportIdHistory",
+    "path": "/api/v1/ai-report-generator/report/:id/history",
+    "tag": "reports",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "POST",
+    "module": "ai-report-generator",
+    "operationId": "postAiReportGeneratorReportIdRegenerate",
+    "path": "/api/v1/ai-report-generator/report/:id/regenerate",
+    "tag": "reports",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "POST",
+    "module": "ai-report-generator",
+    "operationId": "postAiReportGeneratorReportGenerate",
+    "path": "/api/v1/ai-report-generator/report/generate",
+    "tag": "reports",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "POST",
+    "module": "ai",
+    "operationId": "postAiAnalyzeCaseId",
+    "path": "/api/v1/ai/analyze/:caseId",
+    "tag": "ai",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "ai",
+    "operationId": "getAiExplainabilityCaseId",
+    "path": "/api/v1/ai/explainability/:caseId",
+    "tag": "ai",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "ai",
+    "operationId": "getAiHealth",
+    "path": "/api/v1/ai/health",
+    "tag": "ai",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "ai",
+    "operationId": "getAiHistory",
+    "path": "/api/v1/ai/history",
+    "tag": "ai",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "ai",
+    "operationId": "getAiModels",
+    "path": "/api/v1/ai/models",
+    "tag": "ai",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "ai",
+    "operationId": "getAiResultCaseId",
+    "path": "/api/v1/ai/result/:caseId",
+    "tag": "ai",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "POST",
+    "module": "ai",
+    "operationId": "postAiReviewCaseId",
+    "path": "/api/v1/ai/review/:caseId",
+    "tag": "ai",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "ai",
+    "operationId": "getAiStatistics",
+    "path": "/api/v1/ai/statistics",
+    "tag": "ai",
+    "version": "v1"
+  },
+  {
+    "auth": "public",
+    "method": "GET",
+    "module": "api",
+    "operationId": "getApiDocs",
+    "path": "/api/v1/api/docs",
+    "tag": "general",
+    "version": "v1"
+  },
+  {
+    "auth": "public",
+    "method": "GET",
+    "module": "api",
+    "operationId": "getApiOpenapi.json",
+    "path": "/api/v1/api/openapi.json",
+    "tag": "general",
+    "version": "v1"
+  },
+  {
+    "auth": "public",
+    "method": "GET",
+    "module": "api",
+    "operationId": "getApiOpenapi.yaml",
+    "path": "/api/v1/api/openapi.yaml",
+    "tag": "general",
+    "version": "v1"
+  },
+  {
+    "auth": "public",
+    "method": "GET",
+    "module": "api",
+    "operationId": "getApiStandards",
+    "path": "/api/v1/api/standards",
+    "tag": "general",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "audit",
+    "operationId": "getAudit",
+    "path": "/api/v1/audit",
+    "tag": "audit",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "POST",
+    "module": "audit",
+    "operationId": "postAudit",
+    "path": "/api/v1/audit",
+    "tag": "audit",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "auth",
+    "operationId": "getAuthApple",
+    "path": "/api/v1/auth/apple",
+    "tag": "auth",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "auth",
+    "operationId": "getAuthAppleCallback",
+    "path": "/api/v1/auth/apple/callback",
+    "tag": "auth",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "POST",
+    "module": "auth",
+    "operationId": "postAuthChangePassword",
+    "path": "/api/v1/auth/change-password",
+    "tag": "auth",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "auth",
+    "operationId": "getAuthEmailAvailability",
+    "path": "/api/v1/auth/email-availability",
+    "tag": "auth",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "POST",
+    "module": "auth",
+    "operationId": "postAuthForgotPassword",
+    "path": "/api/v1/auth/forgot-password",
+    "tag": "auth",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "auth",
+    "operationId": "getAuthGoogle",
+    "path": "/api/v1/auth/google",
+    "tag": "auth",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "auth",
+    "operationId": "getAuthGoogleCallback",
+    "path": "/api/v1/auth/google/callback",
+    "tag": "auth",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "POST",
+    "module": "auth",
+    "operationId": "postAuthLogin",
+    "path": "/api/v1/auth/login",
+    "tag": "auth",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "POST",
+    "module": "auth",
+    "operationId": "postAuthLogout",
+    "path": "/api/v1/auth/logout",
+    "tag": "auth",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "POST",
+    "module": "auth",
+    "operationId": "postAuthLogoutAll",
+    "path": "/api/v1/auth/logout-all",
+    "tag": "auth",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "auth",
+    "operationId": "getAuthMe",
+    "path": "/api/v1/auth/me",
+    "tag": "auth",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "PATCH",
+    "module": "auth",
+    "operationId": "patchAuthMe",
+    "path": "/api/v1/auth/me",
+    "tag": "auth",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "auth",
+    "operationId": "getAuthMicrosoft",
+    "path": "/api/v1/auth/microsoft",
+    "tag": "auth",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "auth",
+    "operationId": "getAuthMicrosoftCallback",
+    "path": "/api/v1/auth/microsoft/callback",
+    "tag": "auth",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "auth",
+    "operationId": "getAuthOauthApple",
+    "path": "/api/v1/auth/oauth/apple",
+    "tag": "auth",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "auth",
+    "operationId": "getAuthOauthAppleCallback",
+    "path": "/api/v1/auth/oauth/apple/callback",
+    "tag": "auth",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "auth",
+    "operationId": "getAuthOauthGoogle",
+    "path": "/api/v1/auth/oauth/google",
+    "tag": "auth",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "auth",
+    "operationId": "getAuthOauthGoogleCallback",
+    "path": "/api/v1/auth/oauth/google/callback",
+    "tag": "auth",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "POST",
+    "module": "auth",
+    "operationId": "postAuthOauthLogin",
+    "path": "/api/v1/auth/oauth/login",
+    "tag": "auth",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "auth",
+    "operationId": "getAuthOauthMicrosoft",
+    "path": "/api/v1/auth/oauth/microsoft",
+    "tag": "auth",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "auth",
+    "operationId": "getAuthOauthMicrosoftCallback",
+    "path": "/api/v1/auth/oauth/microsoft/callback",
+    "tag": "auth",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "auth",
+    "operationId": "getAuthOauthProviders",
+    "path": "/api/v1/auth/oauth/providers",
+    "tag": "auth",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "POST",
+    "module": "auth",
+    "operationId": "postAuthOwnerSetupPassword",
+    "path": "/api/v1/auth/owner/setup-password",
+    "tag": "auth",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "POST",
+    "module": "auth",
+    "operationId": "postAuthPhoneRequestOtp",
+    "path": "/api/v1/auth/phone/request-otp",
+    "tag": "auth",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "POST",
+    "module": "auth",
+    "operationId": "postAuthPhoneVerify",
+    "path": "/api/v1/auth/phone/verify",
+    "tag": "auth",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "POST",
+    "module": "auth",
+    "operationId": "postAuthRefresh",
+    "path": "/api/v1/auth/refresh",
+    "tag": "auth",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "POST",
+    "module": "auth",
+    "operationId": "postAuthRegister",
+    "path": "/api/v1/auth/register",
+    "tag": "auth",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "POST",
+    "module": "auth",
+    "operationId": "postAuthResendVerification",
+    "path": "/api/v1/auth/resend-verification",
+    "tag": "auth",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "POST",
+    "module": "auth",
+    "operationId": "postAuthResetPassword",
+    "path": "/api/v1/auth/reset-password",
+    "tag": "auth",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "POST",
+    "module": "auth",
+    "operationId": "postAuthVerifyEmail",
+    "path": "/api/v1/auth/verify-email",
+    "tag": "auth",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "backup",
+    "operationId": "getBackup",
+    "path": "/api/v1/backup",
+    "tag": "operations",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "POST",
+    "module": "backup",
+    "operationId": "postBackup",
+    "path": "/api/v1/backup",
+    "tag": "operations",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "case-collaboration",
+    "operationId": "getCaseCollaborationCasesCaseId",
+    "path": "/api/v1/case-collaboration/cases/:caseId",
+    "tag": "collaboration",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "POST",
+    "module": "case-collaboration",
+    "operationId": "postCaseCollaborationCasesCaseIdAssignments",
+    "path": "/api/v1/case-collaboration/cases/:caseId/assignments",
+    "tag": "collaboration",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "POST",
+    "module": "case-collaboration",
+    "operationId": "postCaseCollaborationCasesCaseIdDiscussions",
+    "path": "/api/v1/case-collaboration/cases/:caseId/discussions",
+    "tag": "collaboration",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "POST",
+    "module": "case-collaboration",
+    "operationId": "postCaseCollaborationCasesCaseIdDiscussionsThreadIdRead",
+    "path": "/api/v1/case-collaboration/cases/:caseId/discussions/:threadId/read",
+    "tag": "collaboration",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "POST",
+    "module": "case-collaboration",
+    "operationId": "postCaseCollaborationCasesCaseIdLocks",
+    "path": "/api/v1/case-collaboration/cases/:caseId/locks",
+    "tag": "collaboration",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "DELETE",
+    "module": "case-collaboration",
+    "operationId": "deleteCaseCollaborationCasesCaseIdLocksLockId",
+    "path": "/api/v1/case-collaboration/cases/:caseId/locks/:lockId",
+    "tag": "collaboration",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "POST",
+    "module": "case-collaboration",
+    "operationId": "postCaseCollaborationCasesCaseIdNotes",
+    "path": "/api/v1/case-collaboration/cases/:caseId/notes",
+    "tag": "collaboration",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "PATCH",
+    "module": "case-collaboration",
+    "operationId": "patchCaseCollaborationCasesCaseIdNotesNoteId",
+    "path": "/api/v1/case-collaboration/cases/:caseId/notes/:noteId",
+    "tag": "collaboration",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "POST",
+    "module": "case-collaboration",
+    "operationId": "postCaseCollaborationCasesCaseIdPresence",
+    "path": "/api/v1/case-collaboration/cases/:caseId/presence",
+    "tag": "collaboration",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "POST",
+    "module": "case-collaboration",
+    "operationId": "postCaseCollaborationCasesCaseIdStatus",
+    "path": "/api/v1/case-collaboration/cases/:caseId/status",
+    "tag": "collaboration",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "POST",
+    "module": "case-collaboration",
+    "operationId": "postCaseCollaborationCasesCaseIdVersionsVersionIdRestore",
+    "path": "/api/v1/case-collaboration/cases/:caseId/versions/:versionId/restore",
+    "tag": "collaboration",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "cases",
+    "operationId": "getCases",
+    "path": "/api/v1/cases",
+    "tag": "cases",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "POST",
+    "module": "cases",
+    "operationId": "postCases",
+    "path": "/api/v1/cases",
+    "tag": "cases",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "DELETE",
+    "module": "cases",
+    "operationId": "deleteCasesCaseId",
+    "path": "/api/v1/cases/:caseId",
+    "tag": "cases",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "cases",
+    "operationId": "getCasesCaseId",
+    "path": "/api/v1/cases/:caseId",
+    "tag": "cases",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "PATCH",
+    "module": "cases",
+    "operationId": "patchCasesCaseId",
+    "path": "/api/v1/cases/:caseId",
+    "tag": "cases",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "POST",
+    "module": "cases",
+    "operationId": "postCasesCaseIdApprove",
+    "path": "/api/v1/cases/:caseId/approve",
+    "tag": "cases",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "POST",
+    "module": "cases",
+    "operationId": "postCasesCaseIdAssign",
+    "path": "/api/v1/cases/:caseId/assign",
+    "tag": "cases",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "cases",
+    "operationId": "getCasesCaseIdEcgViewerWorkspace",
+    "path": "/api/v1/cases/:caseId/ecg-viewer-workspace",
+    "tag": "cases",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "PUT",
+    "module": "cases",
+    "operationId": "putCasesCaseIdEcgViewerWorkspace",
+    "path": "/api/v1/cases/:caseId/ecg-viewer-workspace",
+    "tag": "cases",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "POST",
+    "module": "cases",
+    "operationId": "postCasesCaseIdEcgViewerWorkspaceExport",
+    "path": "/api/v1/cases/:caseId/ecg-viewer-workspace/export",
+    "tag": "cases",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "POST",
+    "module": "cases",
+    "operationId": "postCasesCaseIdEcgViewerWorkspaceExportCsv",
+    "path": "/api/v1/cases/:caseId/ecg-viewer-workspace/export/csv",
+    "tag": "cases",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "POST",
+    "module": "cases",
+    "operationId": "postCasesCaseIdEcgViewerWorkspaceExportJson",
+    "path": "/api/v1/cases/:caseId/ecg-viewer-workspace/export/json",
+    "tag": "cases",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "POST",
+    "module": "cases",
+    "operationId": "postCasesCaseIdReject",
+    "path": "/api/v1/cases/:caseId/reject",
+    "tag": "cases",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "POST",
+    "module": "cases",
+    "operationId": "postCasesCaseIdReview",
+    "path": "/api/v1/cases/:caseId/review",
+    "tag": "cases",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "POST",
+    "module": "cases",
+    "operationId": "postCasesCaseIdRevisions",
+    "path": "/api/v1/cases/:caseId/revisions",
+    "tag": "cases",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "POST",
+    "module": "cases",
+    "operationId": "postCasesCaseIdStatus",
+    "path": "/api/v1/cases/:caseId/status",
+    "tag": "cases",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "cases",
+    "operationId": "getCasesCaseIdTimeline",
+    "path": "/api/v1/cases/:caseId/timeline",
+    "tag": "cases",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "POST",
+    "module": "cdss",
+    "operationId": "postCdssCasesCaseIdEvaluate",
+    "path": "/api/v1/cdss/cases/:caseId/evaluate",
+    "tag": "clinical-intelligence",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "cdss",
+    "operationId": "getCdssCasesCaseIdRuns",
+    "path": "/api/v1/cdss/cases/:caseId/runs",
+    "tag": "clinical-intelligence",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "cdss",
+    "operationId": "getCdssRules",
+    "path": "/api/v1/cdss/rules",
+    "tag": "clinical-intelligence",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "PUT",
+    "module": "cdss",
+    "operationId": "putCdssRulesRuleId",
+    "path": "/api/v1/cdss/rules/:ruleId",
+    "tag": "clinical-intelligence",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "clinical-alerts-risk-engine",
+    "operationId": "getClinicalAlertsRiskEngineAlertsCaseId",
+    "path": "/api/v1/clinical-alerts-risk-engine/alerts/:caseId",
+    "tag": "clinical-intelligence",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "clinical-alerts-risk-engine",
+    "operationId": "getClinicalAlertsRiskEngineAuditCaseId",
+    "path": "/api/v1/clinical-alerts-risk-engine/audit/:caseId",
+    "tag": "clinical-intelligence",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "clinical-alerts-risk-engine",
+    "operationId": "getClinicalAlertsRiskEngineHealth",
+    "path": "/api/v1/clinical-alerts-risk-engine/health",
+    "tag": "clinical-intelligence",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "clinical-alerts-risk-engine",
+    "operationId": "getClinicalAlertsRiskEngineRiskCaseId",
+    "path": "/api/v1/clinical-alerts-risk-engine/risk/:caseId",
+    "tag": "clinical-intelligence",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "POST",
+    "module": "clinical-alerts-risk-engine",
+    "operationId": "postClinicalAlertsRiskEngineRiskRecalculateCaseId",
+    "path": "/api/v1/clinical-alerts-risk-engine/risk/recalculate/:caseId",
+    "tag": "clinical-intelligence",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "clinical-decision-support",
+    "operationId": "getClinicalDecisionSupportFollowupCaseId",
+    "path": "/api/v1/clinical-decision-support/followup/:caseId",
+    "tag": "clinical-decision-support",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "POST",
+    "module": "clinical-decision-support",
+    "operationId": "postClinicalDecisionSupportFollowupGenerateCaseId",
+    "path": "/api/v1/clinical-decision-support/followup/generate/:caseId",
+    "tag": "clinical-decision-support",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "clinical-decision-support",
+    "operationId": "getClinicalDecisionSupportRecommendationsCaseId",
+    "path": "/api/v1/clinical-decision-support/recommendations/:caseId",
+    "tag": "clinical-decision-support",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "POST",
+    "module": "clinical-decision-support",
+    "operationId": "postClinicalDecisionSupportRecommendationsRecommendationIdAccept",
+    "path": "/api/v1/clinical-decision-support/recommendations/:recommendationId/accept",
+    "tag": "clinical-decision-support",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "POST",
+    "module": "clinical-decision-support",
+    "operationId": "postClinicalDecisionSupportRecommendationsRecommendationIdReject",
+    "path": "/api/v1/clinical-decision-support/recommendations/:recommendationId/reject",
+    "tag": "clinical-decision-support",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "POST",
+    "module": "clinical-decision-support",
+    "operationId": "postClinicalDecisionSupportRecommendationsRegenerateCaseId",
+    "path": "/api/v1/clinical-decision-support/recommendations/regenerate/:caseId",
+    "tag": "clinical-decision-support",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "POST",
+    "module": "clinical-knowledge-engine",
+    "operationId": "postClinicalKnowledgeEngineBootstrap",
+    "path": "/api/v1/clinical-knowledge-engine/bootstrap",
+    "tag": "knowledge",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "clinical-knowledge-engine",
+    "operationId": "getClinicalKnowledgeEngineCategories",
+    "path": "/api/v1/clinical-knowledge-engine/categories",
+    "tag": "knowledge",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "clinical-knowledge-engine",
+    "operationId": "getClinicalKnowledgeEngineDiagnoses",
+    "path": "/api/v1/clinical-knowledge-engine/diagnoses",
+    "tag": "knowledge",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "clinical-knowledge-engine",
+    "operationId": "getClinicalKnowledgeEngineDiagnosesDiagnosisId",
+    "path": "/api/v1/clinical-knowledge-engine/diagnoses/:diagnosisId",
+    "tag": "knowledge",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "clinical-knowledge-engine",
+    "operationId": "getClinicalKnowledgeEngineDiagnosesDiagnosisIdDifferential",
+    "path": "/api/v1/clinical-knowledge-engine/diagnoses/:diagnosisId/differential",
+    "tag": "knowledge",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "clinical-knowledge-engine",
+    "operationId": "getClinicalKnowledgeEngineHealth",
+    "path": "/api/v1/clinical-knowledge-engine/health",
+    "tag": "knowledge",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "clinical-knowledge-engine",
+    "operationId": "getClinicalKnowledgeEngineValidate",
+    "path": "/api/v1/clinical-knowledge-engine/validate",
+    "tag": "knowledge",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "compliance",
+    "operationId": "getComplianceConsents",
+    "path": "/api/v1/compliance/consents",
+    "tag": "compliance",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "POST",
+    "module": "compliance",
+    "operationId": "postComplianceConsents",
+    "path": "/api/v1/compliance/consents",
+    "tag": "compliance",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "compliance",
+    "operationId": "getCompliancePatientsPatientIdExport",
+    "path": "/api/v1/compliance/patients/:patientId/export",
+    "tag": "compliance",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "compliance",
+    "operationId": "getComplianceRequests",
+    "path": "/api/v1/compliance/requests",
+    "tag": "compliance",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "POST",
+    "module": "compliance",
+    "operationId": "postComplianceRequests",
+    "path": "/api/v1/compliance/requests",
+    "tag": "compliance",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "POST",
+    "module": "compliance",
+    "operationId": "postComplianceRequestsIdComplete",
+    "path": "/api/v1/compliance/requests/:id/complete",
+    "tag": "compliance",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "compliance",
+    "operationId": "getComplianceRetentionPolicies",
+    "path": "/api/v1/compliance/retention-policies",
+    "tag": "compliance",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "copilot",
+    "operationId": "getCopilotAnalytics",
+    "path": "/api/v1/copilot/analytics",
+    "tag": "copilot",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "POST",
+    "module": "copilot",
+    "operationId": "postCopilotAttachments",
+    "path": "/api/v1/copilot/attachments",
+    "tag": "copilot",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "copilot",
+    "operationId": "getCopilotAttachmentsAttachmentIdDownload",
+    "path": "/api/v1/copilot/attachments/:attachmentId/download",
+    "tag": "copilot",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "copilot",
+    "operationId": "getCopilotAttachmentsAttachmentIdProcessing",
+    "path": "/api/v1/copilot/attachments/:attachmentId/processing",
+    "tag": "copilot",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "POST",
+    "module": "copilot",
+    "operationId": "postCopilotChat",
+    "path": "/api/v1/copilot/chat",
+    "tag": "copilot",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "POST",
+    "module": "copilot",
+    "operationId": "postCopilotChatStream",
+    "path": "/api/v1/copilot/chat/stream",
+    "tag": "copilot",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "copilot",
+    "operationId": "getCopilotConversations",
+    "path": "/api/v1/copilot/conversations",
+    "tag": "copilot",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "POST",
+    "module": "copilot",
+    "operationId": "postCopilotConversations",
+    "path": "/api/v1/copilot/conversations",
+    "tag": "copilot",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "copilot",
+    "operationId": "getCopilotConversationsConversationId",
+    "path": "/api/v1/copilot/conversations/:conversationId",
+    "tag": "copilot",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "copilot",
+    "operationId": "getCopilotConversationsConversationIdExport",
+    "path": "/api/v1/copilot/conversations/:conversationId/export",
+    "tag": "copilot",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "copilot",
+    "operationId": "getCopilotConversationsConversationIdExport.txt",
+    "path": "/api/v1/copilot/conversations/:conversationId/export.txt",
+    "tag": "copilot",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "DELETE",
+    "module": "copilot",
+    "operationId": "deleteCopilotConversationsConversationIdMessagesMessageId",
+    "path": "/api/v1/copilot/conversations/:conversationId/messages/:messageId",
+    "tag": "copilot",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "copilot",
+    "operationId": "getCopilotSettings",
+    "path": "/api/v1/copilot/settings",
+    "tag": "copilot",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "PUT",
+    "module": "copilot",
+    "operationId": "putCopilotSettings",
+    "path": "/api/v1/copilot/settings",
+    "tag": "copilot",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "POST",
+    "module": "copilot",
+    "operationId": "postCopilotVoiceTranscribe",
+    "path": "/api/v1/copilot/voice/transcribe",
+    "tag": "copilot",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "documents",
+    "operationId": "getDocuments",
+    "path": "/api/v1/documents",
+    "tag": "documents",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "POST",
+    "module": "documents",
+    "operationId": "postDocuments",
+    "path": "/api/v1/documents",
+    "tag": "documents",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "DELETE",
+    "module": "documents",
+    "operationId": "deleteDocumentsDocumentId",
+    "path": "/api/v1/documents/:documentId",
+    "tag": "documents",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "PATCH",
+    "module": "documents",
+    "operationId": "patchDocumentsDocumentId",
+    "path": "/api/v1/documents/:documentId",
+    "tag": "documents",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "documents",
+    "operationId": "getDocumentsStoredName",
+    "path": "/api/v1/documents/:storedName",
+    "tag": "documents",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "POST",
+    "module": "documents",
+    "operationId": "postDocumentsExtract",
+    "path": "/api/v1/documents/extract",
+    "tag": "documents",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "POST",
+    "module": "documents",
+    "operationId": "postDocumentsIndex",
+    "path": "/api/v1/documents/index",
+    "tag": "documents",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "documents",
+    "operationId": "getDocumentsList",
+    "path": "/api/v1/documents/list",
+    "tag": "documents",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "documents",
+    "operationId": "getDocumentsSearch",
+    "path": "/api/v1/documents/search",
+    "tag": "documents",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "documents",
+    "operationId": "getDocumentsSummaryDocumentId",
+    "path": "/api/v1/documents/summary/:documentId",
+    "tag": "documents",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "POST",
+    "module": "documents",
+    "operationId": "postDocumentsUpload",
+    "path": "/api/v1/documents/upload",
+    "tag": "documents",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "POST",
+    "module": "ecg-diagnostic-pipeline",
+    "operationId": "postEcgDiagnosticPipelineRunCaseId",
+    "path": "/api/v1/ecg/diagnostic-pipeline/run/:caseId",
+    "tag": "ecg",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "emr",
+    "operationId": "getEmrImagingStoredName",
+    "path": "/api/v1/emr/imaging/:storedName",
+    "tag": "hospital-integration",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "emr",
+    "operationId": "getEmrMedicationLibrary",
+    "path": "/api/v1/emr/medication-library",
+    "tag": "hospital-integration",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "DELETE",
+    "module": "emr",
+    "operationId": "deleteEmrMedicationsMedicationId",
+    "path": "/api/v1/emr/medications/:medicationId",
+    "tag": "hospital-integration",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "PATCH",
+    "module": "emr",
+    "operationId": "patchEmrMedicationsMedicationId",
+    "path": "/api/v1/emr/medications/:medicationId",
+    "tag": "hospital-integration",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "emr",
+    "operationId": "getEmrPatientsPatientIdCardiacHistory",
+    "path": "/api/v1/emr/patients/:patientId/cardiac-history",
+    "tag": "hospital-integration",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "PUT",
+    "module": "emr",
+    "operationId": "putEmrPatientsPatientIdCardiacHistory",
+    "path": "/api/v1/emr/patients/:patientId/cardiac-history",
+    "tag": "hospital-integration",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "POST",
+    "module": "emr",
+    "operationId": "postEmrPatientsPatientIdHospitalizations",
+    "path": "/api/v1/emr/patients/:patientId/hospitalizations",
+    "tag": "hospital-integration",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "emr",
+    "operationId": "getEmrPatientsPatientIdImaging",
+    "path": "/api/v1/emr/patients/:patientId/imaging",
+    "tag": "hospital-integration",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "POST",
+    "module": "emr",
+    "operationId": "postEmrPatientsPatientIdImaging",
+    "path": "/api/v1/emr/patients/:patientId/imaging",
+    "tag": "hospital-integration",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "emr",
+    "operationId": "getEmrPatientsPatientIdMedications",
+    "path": "/api/v1/emr/patients/:patientId/medications",
+    "tag": "hospital-integration",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "POST",
+    "module": "emr",
+    "operationId": "postEmrPatientsPatientIdMedications",
+    "path": "/api/v1/emr/patients/:patientId/medications",
+    "tag": "hospital-integration",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "emr",
+    "operationId": "getEmrPatientsPatientIdProcedures",
+    "path": "/api/v1/emr/patients/:patientId/procedures",
+    "tag": "hospital-integration",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "POST",
+    "module": "emr",
+    "operationId": "postEmrPatientsPatientIdProcedures",
+    "path": "/api/v1/emr/patients/:patientId/procedures",
+    "tag": "hospital-integration",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "emr",
+    "operationId": "getEmrPatientsPatientIdTimeline",
+    "path": "/api/v1/emr/patients/:patientId/timeline",
+    "tag": "hospital-integration",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "DELETE",
+    "module": "emr",
+    "operationId": "deleteEmrProceduresProcedureId",
+    "path": "/api/v1/emr/procedures/:procedureId",
+    "tag": "hospital-integration",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "PATCH",
+    "module": "emr",
+    "operationId": "patchEmrProceduresProcedureId",
+    "path": "/api/v1/emr/procedures/:procedureId",
+    "tag": "hospital-integration",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "emr",
+    "operationId": "getEmrSearch",
+    "path": "/api/v1/emr/search",
+    "tag": "hospital-integration",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "enterprise-report-engine",
+    "operationId": "getEnterpriseReportEngineReportIdDocument",
+    "path": "/api/v1/enterprise-report-engine/:reportId/document",
+    "tag": "enterprise",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "POST",
+    "module": "enterprise-report-engine",
+    "operationId": "postEnterpriseReportEngineReportIdExport",
+    "path": "/api/v1/enterprise-report-engine/:reportId/export",
+    "tag": "enterprise",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "enterprise-report-engine",
+    "operationId": "getEnterpriseReportEngineReportIdFhir",
+    "path": "/api/v1/enterprise-report-engine/:reportId/fhir",
+    "tag": "enterprise",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "enterprise-report-engine",
+    "operationId": "getEnterpriseReportEngineReportIdHistory",
+    "path": "/api/v1/enterprise-report-engine/:reportId/history",
+    "tag": "enterprise",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "enterprise-report-engine",
+    "operationId": "getEnterpriseReportEngineReportIdHtml",
+    "path": "/api/v1/enterprise-report-engine/:reportId/html",
+    "tag": "enterprise",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "enterprise-report-engine",
+    "operationId": "getEnterpriseReportEngineReportIdJpeg",
+    "path": "/api/v1/enterprise-report-engine/:reportId/jpeg",
+    "tag": "enterprise",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "enterprise-report-engine",
+    "operationId": "getEnterpriseReportEngineReportIdJson",
+    "path": "/api/v1/enterprise-report-engine/:reportId/json",
+    "tag": "enterprise",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "enterprise-report-engine",
+    "operationId": "getEnterpriseReportEngineReportIdPdf",
+    "path": "/api/v1/enterprise-report-engine/:reportId/pdf",
+    "tag": "enterprise",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "enterprise-report-engine",
+    "operationId": "getEnterpriseReportEngineReportIdPng",
+    "path": "/api/v1/enterprise-report-engine/:reportId/png",
+    "tag": "enterprise",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "enterprise-report-engine",
+    "operationId": "getEnterpriseReportEngineReportIdPrint",
+    "path": "/api/v1/enterprise-report-engine/:reportId/print",
+    "tag": "enterprise",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "POST",
+    "module": "enterprise-report-engine",
+    "operationId": "postEnterpriseReportEngineBootstrap",
+    "path": "/api/v1/enterprise-report-engine/bootstrap",
+    "tag": "enterprise",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "POST",
+    "module": "enterprise-report-engine",
+    "operationId": "postEnterpriseReportEngineCasesCaseIdGenerate",
+    "path": "/api/v1/enterprise-report-engine/cases/:caseId/generate",
+    "tag": "enterprise",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "enterprise-report-engine",
+    "operationId": "getEnterpriseReportEngineTemplates",
+    "path": "/api/v1/enterprise-report-engine/templates",
+    "tag": "enterprise",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "enterprise-report-engine",
+    "operationId": "getEnterpriseReportEngineTemplatesSlug",
+    "path": "/api/v1/enterprise-report-engine/templates/:slug",
+    "tag": "enterprise",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "enterprise-report-engine",
+    "operationId": "getEnterpriseReportEngineVerifyReportUuid",
+    "path": "/api/v1/enterprise-report-engine/verify/:reportUuid",
+    "tag": "enterprise",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "enterprise-rules-engine",
+    "operationId": "getEnterpriseRulesEngineHealth",
+    "path": "/api/v1/enterprise-rules-engine/health",
+    "tag": "enterprise",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "enterprise-rules-engine",
+    "operationId": "getEnterpriseRulesEngineRules",
+    "path": "/api/v1/enterprise-rules-engine/rules",
+    "tag": "enterprise",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "POST",
+    "module": "enterprise-rules-engine",
+    "operationId": "postEnterpriseRulesEngineRules",
+    "path": "/api/v1/enterprise-rules-engine/rules",
+    "tag": "enterprise",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "DELETE",
+    "module": "enterprise-rules-engine",
+    "operationId": "deleteEnterpriseRulesEngineRulesId",
+    "path": "/api/v1/enterprise-rules-engine/rules/:id",
+    "tag": "enterprise",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "enterprise-rules-engine",
+    "operationId": "getEnterpriseRulesEngineRulesId",
+    "path": "/api/v1/enterprise-rules-engine/rules/:id",
+    "tag": "enterprise",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "PUT",
+    "module": "enterprise-rules-engine",
+    "operationId": "putEnterpriseRulesEngineRulesId",
+    "path": "/api/v1/enterprise-rules-engine/rules/:id",
+    "tag": "enterprise",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "enterprise-rules-engine",
+    "operationId": "getEnterpriseRulesEngineRulesIdVersions",
+    "path": "/api/v1/enterprise-rules-engine/rules/:id/versions",
+    "tag": "enterprise",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "POST",
+    "module": "enterprise-rules-engine",
+    "operationId": "postEnterpriseRulesEngineRulesBootstrap",
+    "path": "/api/v1/enterprise-rules-engine/rules/bootstrap",
+    "tag": "enterprise",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "enterprise-rules-engine",
+    "operationId": "getEnterpriseRulesEngineRulesHistory",
+    "path": "/api/v1/enterprise-rules-engine/rules/history",
+    "tag": "enterprise",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "POST",
+    "module": "enterprise-rules-engine",
+    "operationId": "postEnterpriseRulesEngineRulesTest",
+    "path": "/api/v1/enterprise-rules-engine/rules/test",
+    "tag": "enterprise",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "enterprise",
+    "operationId": "getEnterpriseClinicalDashboard",
+    "path": "/api/v1/enterprise/clinical-dashboard",
+    "tag": "enterprise",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "enterprise",
+    "operationId": "getEnterpriseOrganizations",
+    "path": "/api/v1/enterprise/organizations",
+    "tag": "enterprise",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "POST",
+    "module": "enterprise",
+    "operationId": "postEnterpriseOrganizations",
+    "path": "/api/v1/enterprise/organizations",
+    "tag": "enterprise",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "PATCH",
+    "module": "enterprise",
+    "operationId": "patchEnterpriseOrganizationsOrganizationId",
+    "path": "/api/v1/enterprise/organizations/:organizationId",
+    "tag": "enterprise",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "enterprise",
+    "operationId": "getEnterpriseOrganizationsOrganizationIdAnalytics",
+    "path": "/api/v1/enterprise/organizations/:organizationId/analytics",
+    "tag": "enterprise",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "POST",
+    "module": "enterprise",
+    "operationId": "postEnterpriseOrganizationsOrganizationIdContractors",
+    "path": "/api/v1/enterprise/organizations/:organizationId/contractors",
+    "tag": "enterprise",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "POST",
+    "module": "enterprise",
+    "operationId": "postEnterpriseOrganizationsOrganizationIdDepartments",
+    "path": "/api/v1/enterprise/organizations/:organizationId/departments",
+    "tag": "enterprise",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "enterprise",
+    "operationId": "getEnterprisePatientsPatientIdCardiacHistory",
+    "path": "/api/v1/enterprise/patients/:patientId/cardiac-history",
+    "tag": "enterprise",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "PUT",
+    "module": "enterprise",
+    "operationId": "putEnterprisePatientsPatientIdCardiacHistory",
+    "path": "/api/v1/enterprise/patients/:patientId/cardiac-history",
+    "tag": "enterprise",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "POST",
+    "module": "enterprise",
+    "operationId": "postEnterprisePatientsPatientIdClinicalNotes",
+    "path": "/api/v1/enterprise/patients/:patientId/clinical-notes",
+    "tag": "enterprise",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "enterprise",
+    "operationId": "getEnterprisePatientsPatientIdFitnessDecisions",
+    "path": "/api/v1/enterprise/patients/:patientId/fitness-decisions",
+    "tag": "enterprise",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "POST",
+    "module": "enterprise",
+    "operationId": "postEnterprisePatientsPatientIdFitnessDecisions",
+    "path": "/api/v1/enterprise/patients/:patientId/fitness-decisions",
+    "tag": "enterprise",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "enterprise",
+    "operationId": "getEnterprisePatientsPatientIdProcedures",
+    "path": "/api/v1/enterprise/patients/:patientId/procedures",
+    "tag": "enterprise",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "POST",
+    "module": "enterprise",
+    "operationId": "postEnterprisePatientsPatientIdProcedures",
+    "path": "/api/v1/enterprise/patients/:patientId/procedures",
+    "tag": "enterprise",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "enterprise",
+    "operationId": "getEnterprisePatientsPatientIdTimeline",
+    "path": "/api/v1/enterprise/patients/:patientId/timeline",
+    "tag": "enterprise",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "enterprise",
+    "operationId": "getEnterprisePatientsSearch",
+    "path": "/api/v1/enterprise/patients/search",
+    "tag": "enterprise",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "events",
+    "operationId": "getEventsHistory",
+    "path": "/api/v1/events/history",
+    "tag": "notifications",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "POST",
+    "module": "events",
+    "operationId": "postEventsPublish",
+    "path": "/api/v1/events/publish",
+    "tag": "notifications",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "health",
+    "operationId": "getHealth",
+    "path": "/api/v1/health",
+    "tag": "health",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "health",
+    "operationId": "getHealthAi",
+    "path": "/api/v1/health/ai",
+    "tag": "health",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "health",
+    "operationId": "getHealthAuditPipeline",
+    "path": "/api/v1/health/audit-pipeline",
+    "tag": "health",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "health",
+    "operationId": "getHealthAuth",
+    "path": "/api/v1/health/auth",
+    "tag": "health",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "health",
+    "operationId": "getHealthDatabase",
+    "path": "/api/v1/health/database",
+    "tag": "health",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "health",
+    "operationId": "getHealthDb",
+    "path": "/api/v1/health/db",
+    "tag": "health",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "health",
+    "operationId": "getHealthFrontend",
+    "path": "/api/v1/health/frontend",
+    "tag": "health",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "health",
+    "operationId": "getHealthQueue",
+    "path": "/api/v1/health/queue",
+    "tag": "health",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "health",
+    "operationId": "getHealthReadinessDashboard",
+    "path": "/api/v1/health/readiness-dashboard",
+    "tag": "health",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "health",
+    "operationId": "getHealthStorage",
+    "path": "/api/v1/health/storage",
+    "tag": "health",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "knowledge",
+    "operationId": "getKnowledgeArticles",
+    "path": "/api/v1/knowledge/articles",
+    "tag": "knowledge",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "POST",
+    "module": "knowledge",
+    "operationId": "postKnowledgeArticles",
+    "path": "/api/v1/knowledge/articles",
+    "tag": "knowledge",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "knowledge",
+    "operationId": "getKnowledgeCategories",
+    "path": "/api/v1/knowledge/categories",
+    "tag": "knowledge",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "POST",
+    "module": "longitudinal-ecg",
+    "operationId": "postLongitudinalEcgCasesCaseIdCompare",
+    "path": "/api/v1/longitudinal-ecg/cases/:caseId/compare",
+    "tag": "clinical-intelligence",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "longitudinal-ecg",
+    "operationId": "getLongitudinalEcgCasesCaseIdComparisons",
+    "path": "/api/v1/longitudinal-ecg/cases/:caseId/comparisons",
+    "tag": "clinical-intelligence",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "longitudinal-ecg",
+    "operationId": "getLongitudinalEcgPatientsPatientIdDashboard",
+    "path": "/api/v1/longitudinal-ecg/patients/:patientId/dashboard",
+    "tag": "clinical-intelligence",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "POST",
+    "module": "longitudinal-ecg",
+    "operationId": "postLongitudinalEcgPatientsPatientIdSurveillanceCaseId",
+    "path": "/api/v1/longitudinal-ecg/patients/:patientId/surveillance/:caseId",
+    "tag": "clinical-intelligence",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "POST",
+    "module": "medical-intelligence",
+    "operationId": "postMedicalIntelligenceAnalyze",
+    "path": "/api/v1/medical-intelligence/analyze",
+    "tag": "medical-intelligence",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "POST",
+    "module": "medical-intelligence",
+    "operationId": "postMedicalIntelligenceCasesCaseIdAnalyze",
+    "path": "/api/v1/medical-intelligence/cases/:caseId/analyze",
+    "tag": "medical-intelligence",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "medical-intelligence",
+    "operationId": "getMedicalIntelligenceCasesCaseIdReports",
+    "path": "/api/v1/medical-intelligence/cases/:caseId/reports",
+    "tag": "medical-intelligence",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "medical-intelligence",
+    "operationId": "getMedicalIntelligenceHealth",
+    "path": "/api/v1/medical-intelligence/health",
+    "tag": "medical-intelligence",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "medical-intelligence",
+    "operationId": "getMedicalIntelligenceKnowledge",
+    "path": "/api/v1/medical-intelligence/knowledge",
+    "tag": "medical-intelligence",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "medical-intelligence",
+    "operationId": "getMedicalIntelligenceKnowledgeCode",
+    "path": "/api/v1/medical-intelligence/knowledge/:code",
+    "tag": "medical-intelligence",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "POST",
+    "module": "medical-intelligence",
+    "operationId": "postMedicalIntelligenceKnowledgeSeed",
+    "path": "/api/v1/medical-intelligence/knowledge/seed",
+    "tag": "medical-intelligence",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "medical-intelligence",
+    "operationId": "getMedicalIntelligenceReportsReportId",
+    "path": "/api/v1/medical-intelligence/reports/:reportId",
+    "tag": "medical-intelligence",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "medical-intelligence",
+    "operationId": "getMedicalIntelligenceRules",
+    "path": "/api/v1/medical-intelligence/rules",
+    "tag": "medical-intelligence",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "mic",
+    "operationId": "getMicArrhythmias",
+    "path": "/api/v1/mic/arrhythmias",
+    "tag": "medical-intelligence",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "mic",
+    "operationId": "getMicDiagnoses",
+    "path": "/api/v1/mic/diagnoses",
+    "tag": "medical-intelligence",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "mic",
+    "operationId": "getMicDiagnosesCode",
+    "path": "/api/v1/mic/diagnoses/:code",
+    "tag": "medical-intelligence",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "POST",
+    "module": "mic",
+    "operationId": "postMicDifferential",
+    "path": "/api/v1/mic/differential",
+    "tag": "medical-intelligence",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "mic",
+    "operationId": "getMicDifferentialCode",
+    "path": "/api/v1/mic/differential/:code",
+    "tag": "medical-intelligence",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "mic",
+    "operationId": "getMicGuidelines",
+    "path": "/api/v1/mic/guidelines",
+    "tag": "medical-intelligence",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "mic",
+    "operationId": "getMicGuidelinesId",
+    "path": "/api/v1/mic/guidelines/:id",
+    "tag": "medical-intelligence",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "mic",
+    "operationId": "getMicHealth",
+    "path": "/api/v1/mic/health",
+    "tag": "medical-intelligence",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "mic",
+    "operationId": "getMicIschemia",
+    "path": "/api/v1/mic/ischemia",
+    "tag": "medical-intelligence",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "mic",
+    "operationId": "getMicRecommendationsCode",
+    "path": "/api/v1/mic/recommendations/:code",
+    "tag": "medical-intelligence",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "mic",
+    "operationId": "getMicReferences",
+    "path": "/api/v1/mic/references",
+    "tag": "medical-intelligence",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "mic",
+    "operationId": "getMicReferencesParameter",
+    "path": "/api/v1/mic/references/:parameter",
+    "tag": "medical-intelligence",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "mic",
+    "operationId": "getMicRiskRules",
+    "path": "/api/v1/mic/risk-rules",
+    "tag": "medical-intelligence",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "mic",
+    "operationId": "getMicRiskCode",
+    "path": "/api/v1/mic/risk/:code",
+    "tag": "medical-intelligence",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "POST",
+    "module": "mic",
+    "operationId": "postMicSeed",
+    "path": "/api/v1/mic/seed",
+    "tag": "medical-intelligence",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "mic",
+    "operationId": "getMicSeedStats",
+    "path": "/api/v1/mic/seed/stats",
+    "tag": "medical-intelligence",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "modules",
+    "operationId": "getModules",
+    "path": "/api/v1/modules",
+    "tag": "general",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "modules",
+    "operationId": "getModules",
+    "path": "/api/v1/modules",
+    "tag": "general",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "modules",
+    "operationId": "getModules",
+    "path": "/api/v1/modules",
+    "tag": "general",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "modules",
+    "operationId": "getModules",
+    "path": "/api/v1/modules",
+    "tag": "general",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "modules",
+    "operationId": "getModules",
+    "path": "/api/v1/modules",
+    "tag": "general",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "modules",
+    "operationId": "getModules",
+    "path": "/api/v1/modules",
+    "tag": "general",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "modules",
+    "operationId": "getModules",
+    "path": "/api/v1/modules",
+    "tag": "general",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "modules",
+    "operationId": "getModules",
+    "path": "/api/v1/modules",
+    "tag": "general",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "modules",
+    "operationId": "getModules",
+    "path": "/api/v1/modules",
+    "tag": "general",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "modules",
+    "operationId": "getModules",
+    "path": "/api/v1/modules",
+    "tag": "general",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "modules",
+    "operationId": "getModules",
+    "path": "/api/v1/modules",
+    "tag": "general",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "modules",
+    "operationId": "getModules",
+    "path": "/api/v1/modules",
+    "tag": "general",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "modules",
+    "operationId": "getModules",
+    "path": "/api/v1/modules",
+    "tag": "general",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "modules",
+    "operationId": "getModules",
+    "path": "/api/v1/modules",
+    "tag": "general",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "POST",
+    "module": "modules",
+    "operationId": "postModules",
+    "path": "/api/v1/modules",
+    "tag": "general",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "POST",
+    "module": "modules",
+    "operationId": "postModules",
+    "path": "/api/v1/modules",
+    "tag": "general",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "POST",
+    "module": "modules",
+    "operationId": "postModules",
+    "path": "/api/v1/modules",
+    "tag": "general",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "POST",
+    "module": "modules",
+    "operationId": "postModules",
+    "path": "/api/v1/modules",
+    "tag": "general",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "POST",
+    "module": "modules",
+    "operationId": "postModules",
+    "path": "/api/v1/modules",
+    "tag": "general",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "POST",
+    "module": "modules",
+    "operationId": "postModules",
+    "path": "/api/v1/modules",
+    "tag": "general",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "POST",
+    "module": "modules",
+    "operationId": "postModules",
+    "path": "/api/v1/modules",
+    "tag": "general",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "POST",
+    "module": "modules",
+    "operationId": "postModules",
+    "path": "/api/v1/modules",
+    "tag": "general",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "POST",
+    "module": "modules",
+    "operationId": "postModules",
+    "path": "/api/v1/modules",
+    "tag": "general",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "POST",
+    "module": "modules",
+    "operationId": "postModules",
+    "path": "/api/v1/modules",
+    "tag": "general",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "POST",
+    "module": "modules",
+    "operationId": "postModules",
+    "path": "/api/v1/modules",
+    "tag": "general",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "POST",
+    "module": "modules",
+    "operationId": "postModules",
+    "path": "/api/v1/modules",
+    "tag": "general",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "POST",
+    "module": "modules",
+    "operationId": "postModules",
+    "path": "/api/v1/modules",
+    "tag": "general",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "DELETE",
+    "module": "modules",
+    "operationId": "deleteModulesAlertId",
+    "path": "/api/v1/modules/:alertId",
+    "tag": "general",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "modules",
+    "operationId": "getModulesAlertId",
+    "path": "/api/v1/modules/:alertId",
+    "tag": "general",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "PATCH",
+    "module": "modules",
+    "operationId": "patchModulesAlertId",
+    "path": "/api/v1/modules/:alertId",
+    "tag": "general",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "DELETE",
+    "module": "modules",
+    "operationId": "deleteModulesAssessmentId",
+    "path": "/api/v1/modules/:assessmentId",
+    "tag": "general",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "modules",
+    "operationId": "getModulesAssessmentId",
+    "path": "/api/v1/modules/:assessmentId",
+    "tag": "general",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "PATCH",
+    "module": "modules",
+    "operationId": "patchModulesAssessmentId",
+    "path": "/api/v1/modules/:assessmentId",
+    "tag": "general",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "POST",
+    "module": "modules",
+    "operationId": "postModulesAssessmentIdReturnToWork",
+    "path": "/api/v1/modules/:assessmentId/return-to-work",
+    "tag": "general",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "PUT",
+    "module": "modules",
+    "operationId": "putModulesCaseId",
+    "path": "/api/v1/modules/:caseId",
+    "tag": "general",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "POST",
+    "module": "modules",
+    "operationId": "postModulesCaseIdArchive",
+    "path": "/api/v1/modules/:caseId/archive",
+    "tag": "general",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "POST",
+    "module": "modules",
+    "operationId": "postModulesCaseIdAssignReviewer",
+    "path": "/api/v1/modules/:caseId/assign-reviewer",
+    "tag": "general",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "modules",
+    "operationId": "getModulesCaseIdAttachments",
+    "path": "/api/v1/modules/:caseId/attachments",
+    "tag": "general",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "POST",
+    "module": "modules",
+    "operationId": "postModulesCaseIdAttachments",
+    "path": "/api/v1/modules/:caseId/attachments",
+    "tag": "general",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "modules",
+    "operationId": "getModulesCaseIdAudit",
+    "path": "/api/v1/modules/:caseId/audit",
+    "tag": "general",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "modules",
+    "operationId": "getModulesCaseIdComments",
+    "path": "/api/v1/modules/:caseId/comments",
+    "tag": "general",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "POST",
+    "module": "modules",
+    "operationId": "postModulesCaseIdComments",
+    "path": "/api/v1/modules/:caseId/comments",
+    "tag": "general",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "modules",
+    "operationId": "getModulesCaseIdComparePreviousCaseId",
+    "path": "/api/v1/modules/:caseId/compare/:previousCaseId",
+    "tag": "general",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "modules",
+    "operationId": "getModulesCaseIdDuplicates",
+    "path": "/api/v1/modules/:caseId/duplicates",
+    "tag": "general",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "POST",
+    "module": "modules",
+    "operationId": "postModulesCaseIdExaminationAdvance",
+    "path": "/api/v1/modules/:caseId/examination/advance",
+    "tag": "general",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "PUT",
+    "module": "modules",
+    "operationId": "putModulesCaseIdExaminationClinicalInfo",
+    "path": "/api/v1/modules/:caseId/examination/clinical-info",
+    "tag": "general",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "POST",
+    "module": "modules",
+    "operationId": "postModulesCaseIdExaminationFindingsReview",
+    "path": "/api/v1/modules/:caseId/examination/findings/review",
+    "tag": "general",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "POST",
+    "module": "modules",
+    "operationId": "postModulesCaseIdExaminationImpression",
+    "path": "/api/v1/modules/:caseId/examination/impression",
+    "tag": "general",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "POST",
+    "module": "modules",
+    "operationId": "postModulesCaseIdExaminationQuality",
+    "path": "/api/v1/modules/:caseId/examination/quality",
+    "tag": "general",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "modules",
+    "operationId": "getModulesCaseIdExaminationSession",
+    "path": "/api/v1/modules/:caseId/examination/session",
+    "tag": "general",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "POST",
+    "module": "modules",
+    "operationId": "postModulesCaseIdExaminationSign",
+    "path": "/api/v1/modules/:caseId/examination/sign",
+    "tag": "general",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "modules",
+    "operationId": "getModulesCaseIdExaminationSummary",
+    "path": "/api/v1/modules/:caseId/examination/summary",
+    "tag": "general",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "modules",
+    "operationId": "getModulesCaseIdHistory",
+    "path": "/api/v1/modules/:caseId/history",
+    "tag": "general",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "POST",
+    "module": "modules",
+    "operationId": "postModulesCaseIdLock",
+    "path": "/api/v1/modules/:caseId/lock",
+    "tag": "general",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "modules",
+    "operationId": "getModulesCaseIdManagementHistory",
+    "path": "/api/v1/modules/:caseId/management-history",
+    "tag": "general",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "modules",
+    "operationId": "getModulesCaseIdNext",
+    "path": "/api/v1/modules/:caseId/next",
+    "tag": "general",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "modules",
+    "operationId": "getModulesCaseIdPrevious",
+    "path": "/api/v1/modules/:caseId/previous",
+    "tag": "general",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "POST",
+    "module": "modules",
+    "operationId": "postModulesCaseIdRestore",
+    "path": "/api/v1/modules/:caseId/restore",
+    "tag": "general",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "PUT",
+    "module": "modules",
+    "operationId": "putModulesCaseIdTags",
+    "path": "/api/v1/modules/:caseId/tags",
+    "tag": "general",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "POST",
+    "module": "modules",
+    "operationId": "postModulesCaseIdUnlock",
+    "path": "/api/v1/modules/:caseId/unlock",
+    "tag": "general",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "modules",
+    "operationId": "getModulesCaseIdVersions",
+    "path": "/api/v1/modules/:caseId/versions",
+    "tag": "general",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "POST",
+    "module": "modules",
+    "operationId": "postModulesCaseIdVersions",
+    "path": "/api/v1/modules/:caseId/versions",
+    "tag": "general",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "DELETE",
+    "module": "modules",
+    "operationId": "deleteModulesCompanyId",
+    "path": "/api/v1/modules/:companyId",
+    "tag": "general",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "modules",
+    "operationId": "getModulesCompanyId",
+    "path": "/api/v1/modules/:companyId",
+    "tag": "general",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "PATCH",
+    "module": "modules",
+    "operationId": "patchModulesCompanyId",
+    "path": "/api/v1/modules/:companyId",
+    "tag": "general",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "DELETE",
+    "module": "modules",
+    "operationId": "deleteModulesContractorId",
+    "path": "/api/v1/modules/:contractorId",
+    "tag": "general",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "PATCH",
+    "module": "modules",
+    "operationId": "patchModulesContractorId",
+    "path": "/api/v1/modules/:contractorId",
+    "tag": "general",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "DELETE",
+    "module": "modules",
+    "operationId": "deleteModulesConversationId",
+    "path": "/api/v1/modules/:conversationId",
+    "tag": "general",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "modules",
+    "operationId": "getModulesConversationId",
+    "path": "/api/v1/modules/:conversationId",
+    "tag": "general",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "POST",
+    "module": "modules",
+    "operationId": "postModulesConversationIdRead",
+    "path": "/api/v1/modules/:conversationId/read",
+    "tag": "general",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "DELETE",
+    "module": "modules",
+    "operationId": "deleteModulesDepartmentId",
+    "path": "/api/v1/modules/:departmentId",
+    "tag": "general",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "PATCH",
+    "module": "modules",
+    "operationId": "patchModulesDepartmentId",
+    "path": "/api/v1/modules/:departmentId",
+    "tag": "general",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "DELETE",
+    "module": "modules",
+    "operationId": "deleteModulesEmployeeId",
+    "path": "/api/v1/modules/:employeeId",
+    "tag": "general",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "DELETE",
+    "module": "modules",
+    "operationId": "deleteModulesEmployeeId",
+    "path": "/api/v1/modules/:employeeId",
+    "tag": "general",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "modules",
+    "operationId": "getModulesEmployeeId",
+    "path": "/api/v1/modules/:employeeId",
+    "tag": "general",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "modules",
+    "operationId": "getModulesEmployeeId",
+    "path": "/api/v1/modules/:employeeId",
+    "tag": "general",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "PATCH",
+    "module": "modules",
+    "operationId": "patchModulesEmployeeId",
+    "path": "/api/v1/modules/:employeeId",
+    "tag": "general",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "PUT",
+    "module": "modules",
+    "operationId": "putModulesEmployeeId",
+    "path": "/api/v1/modules/:employeeId",
+    "tag": "general",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "modules",
+    "operationId": "getModulesEmployeeIdFolders",
+    "path": "/api/v1/modules/:employeeId/folders",
+    "tag": "general",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "POST",
+    "module": "modules",
+    "operationId": "postModulesEmployeeIdLinkPatient",
+    "path": "/api/v1/modules/:employeeId/link-patient",
+    "tag": "general",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "modules",
+    "operationId": "getModulesIdDigitizationQuality",
+    "path": "/api/v1/modules/:id/digitization-quality",
+    "tag": "general",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "modules",
+    "operationId": "getModulesIdDigitized",
+    "path": "/api/v1/modules/:id/digitized",
+    "tag": "general",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "modules",
+    "operationId": "getModulesIdResults",
+    "path": "/api/v1/modules/:id/results",
+    "tag": "general",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "DELETE",
+    "module": "modules",
+    "operationId": "deleteModulesOrganizationId",
+    "path": "/api/v1/modules/:organizationId",
+    "tag": "general",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "PATCH",
+    "module": "modules",
+    "operationId": "patchModulesOrganizationId",
+    "path": "/api/v1/modules/:organizationId",
+    "tag": "general",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "modules",
+    "operationId": "getModulesOrganizationIdAnalytics",
+    "path": "/api/v1/modules/:organizationId/analytics",
+    "tag": "general",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "modules",
+    "operationId": "getModulesPatientIdTimeline",
+    "path": "/api/v1/modules/:patientId/timeline",
+    "tag": "general",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "DELETE",
+    "module": "modules",
+    "operationId": "deleteModulesRestrictionId",
+    "path": "/api/v1/modules/:restrictionId",
+    "tag": "general",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "PATCH",
+    "module": "modules",
+    "operationId": "patchModulesRestrictionId",
+    "path": "/api/v1/modules/:restrictionId",
+    "tag": "general",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "DELETE",
+    "module": "modules",
+    "operationId": "deleteModulesTaskId",
+    "path": "/api/v1/modules/:taskId",
+    "tag": "general",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "modules",
+    "operationId": "getModulesTaskId",
+    "path": "/api/v1/modules/:taskId",
+    "tag": "general",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "PATCH",
+    "module": "modules",
+    "operationId": "patchModulesTaskId",
+    "path": "/api/v1/modules/:taskId",
+    "tag": "general",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "POST",
+    "module": "modules",
+    "operationId": "postModulesTaskIdComments",
+    "path": "/api/v1/modules/:taskId/comments",
+    "tag": "general",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "DELETE",
+    "module": "modules",
+    "operationId": "deleteModulesTeamId",
+    "path": "/api/v1/modules/:teamId",
+    "tag": "general",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "modules",
+    "operationId": "getModulesTeamId",
+    "path": "/api/v1/modules/:teamId",
+    "tag": "general",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "PATCH",
+    "module": "modules",
+    "operationId": "patchModulesTeamId",
+    "path": "/api/v1/modules/:teamId",
+    "tag": "general",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "modules",
+    "operationId": "getModulesAnalytics",
+    "path": "/api/v1/modules/analytics",
+    "tag": "general",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "POST",
+    "module": "modules",
+    "operationId": "postModulesAnalyze",
+    "path": "/api/v1/modules/analyze",
+    "tag": "general",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "POST",
+    "module": "modules",
+    "operationId": "postModulesAnalyzeRealAi",
+    "path": "/api/v1/modules/analyze-real-ai",
+    "tag": "general",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "POST",
+    "module": "modules",
+    "operationId": "postModulesCache",
+    "path": "/api/v1/modules/cache",
+    "tag": "general",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "POST",
+    "module": "modules",
+    "operationId": "postModulesCalculate",
+    "path": "/api/v1/modules/calculate",
+    "tag": "general",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "POST",
+    "module": "modules",
+    "operationId": "postModulesChat",
+    "path": "/api/v1/modules/chat",
+    "tag": "general",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "modules",
+    "operationId": "getModulesDashboard",
+    "path": "/api/v1/modules/dashboard",
+    "tag": "general",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "POST",
+    "module": "modules",
+    "operationId": "postModulesDiagnoseCaseId",
+    "path": "/api/v1/modules/diagnose/:caseId",
+    "tag": "general",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "modules",
+    "operationId": "getModulesDiagnosticCaseId",
+    "path": "/api/v1/modules/diagnostic/:caseId",
+    "tag": "general",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "modules",
+    "operationId": "getModulesDigitalCaseId",
+    "path": "/api/v1/modules/digital/:caseId",
+    "tag": "general",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "modules",
+    "operationId": "getModulesDigitalCaseIdExportFormat",
+    "path": "/api/v1/modules/digital/:caseId/export/:format",
+    "tag": "general",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "modules",
+    "operationId": "getModulesDigitalCaseIdGridOverlay",
+    "path": "/api/v1/modules/digital/:caseId/grid-overlay",
+    "tag": "general",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "POST",
+    "module": "modules",
+    "operationId": "postModulesDigitalCaseIdReconstruct",
+    "path": "/api/v1/modules/digital/:caseId/reconstruct",
+    "tag": "general",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "POST",
+    "module": "modules",
+    "operationId": "postModulesDigitizationJobs",
+    "path": "/api/v1/modules/digitization/jobs",
+    "tag": "general",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "DELETE",
+    "module": "modules",
+    "operationId": "deleteModulesDigitizationJobsJobId",
+    "path": "/api/v1/modules/digitization/jobs/:jobId",
+    "tag": "general",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "modules",
+    "operationId": "getModulesDigitizationJobsJobId",
+    "path": "/api/v1/modules/digitization/jobs/:jobId",
+    "tag": "general",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "POST",
+    "module": "modules",
+    "operationId": "postModulesDigitize",
+    "path": "/api/v1/modules/digitize",
+    "tag": "general",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "POST",
+    "module": "modules",
+    "operationId": "postModulesExport",
+    "path": "/api/v1/modules/export",
+    "tag": "general",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "modules",
+    "operationId": "getModulesFhirExportCaseId",
+    "path": "/api/v1/modules/fhir/export/:caseId",
+    "tag": "general",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "POST",
+    "module": "modules",
+    "operationId": "postModulesFhirImport",
+    "path": "/api/v1/modules/fhir/import",
+    "tag": "general",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "DELETE",
+    "module": "modules",
+    "operationId": "deleteModulesFilesEcgFileId",
+    "path": "/api/v1/modules/files/:ecgFileId",
+    "tag": "general",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "modules",
+    "operationId": "getModulesFilesEcgFileIdDownload",
+    "path": "/api/v1/modules/files/:ecgFileId/download",
+    "tag": "general",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "modules",
+    "operationId": "getModulesFilesEcgFileIdProcessedImage",
+    "path": "/api/v1/modules/files/:ecgFileId/processed-image",
+    "tag": "general",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "POST",
+    "module": "modules",
+    "operationId": "postModulesFilesCompare",
+    "path": "/api/v1/modules/files/compare",
+    "tag": "general",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "modules",
+    "operationId": "getModulesFilesList",
+    "path": "/api/v1/modules/files/list",
+    "tag": "general",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "POST",
+    "module": "modules",
+    "operationId": "postModulesFilesMeasure",
+    "path": "/api/v1/modules/files/measure",
+    "tag": "general",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "POST",
+    "module": "modules",
+    "operationId": "postModulesFilesParse",
+    "path": "/api/v1/modules/files/parse",
+    "tag": "general",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "POST",
+    "module": "modules",
+    "operationId": "postModulesFilesUpload",
+    "path": "/api/v1/modules/files/upload",
+    "tag": "general",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "modules",
+    "operationId": "getModulesHl7ExportCaseId",
+    "path": "/api/v1/modules/hl7/export/:caseId",
+    "tag": "general",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "POST",
+    "module": "modules",
+    "operationId": "postModulesHl7Import",
+    "path": "/api/v1/modules/hl7/import",
+    "tag": "general",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "POST",
+    "module": "modules",
+    "operationId": "postModulesImport",
+    "path": "/api/v1/modules/import",
+    "tag": "general",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "POST",
+    "module": "modules",
+    "operationId": "postModulesImport",
+    "path": "/api/v1/modules/import",
+    "tag": "general",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "POST",
+    "module": "modules",
+    "operationId": "postModulesInterpret",
+    "path": "/api/v1/modules/interpret",
+    "tag": "general",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "modules",
+    "operationId": "getModulesInterpretCaseId",
+    "path": "/api/v1/modules/interpret/:caseId",
+    "tag": "general",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "POST",
+    "module": "modules",
+    "operationId": "postModulesInterpretCaseId",
+    "path": "/api/v1/modules/interpret/:caseId",
+    "tag": "general",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "modules",
+    "operationId": "getModulesLogs",
+    "path": "/api/v1/modules/logs",
+    "tag": "general",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "POST",
+    "module": "modules",
+    "operationId": "postModulesMeasureCaseId",
+    "path": "/api/v1/modules/measure/:caseId",
+    "tag": "general",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "modules",
+    "operationId": "getModulesMeasurementEngineCaseId",
+    "path": "/api/v1/modules/measurement-engine/:caseId",
+    "tag": "general",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "modules",
+    "operationId": "getModulesMeasurementStudioCaseIdCompare",
+    "path": "/api/v1/modules/measurement-studio/:caseId/compare",
+    "tag": "general",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "modules",
+    "operationId": "getModulesMeasurementStudioCaseIdExport",
+    "path": "/api/v1/modules/measurement-studio/:caseId/export",
+    "tag": "general",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "modules",
+    "operationId": "getModulesMeasurementStudioCaseIdHistory",
+    "path": "/api/v1/modules/measurement-studio/:caseId/history",
+    "tag": "general",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "modules",
+    "operationId": "getModulesMeasurementStudioCaseIdLive",
+    "path": "/api/v1/modules/measurement-studio/:caseId/live",
+    "tag": "general",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "modules",
+    "operationId": "getModulesMeasurementStudioCaseIdTrendMetric",
+    "path": "/api/v1/modules/measurement-studio/:caseId/trend/:metric",
+    "tag": "general",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "modules",
+    "operationId": "getModulesMeasurementsCaseId",
+    "path": "/api/v1/modules/measurements/:caseId",
+    "tag": "general",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "modules",
+    "operationId": "getModulesPopulation",
+    "path": "/api/v1/modules/population",
+    "tag": "general",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "POST",
+    "module": "modules",
+    "operationId": "postModulesProcess",
+    "path": "/api/v1/modules/process",
+    "tag": "general",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "POST",
+    "module": "modules",
+    "operationId": "postModulesProcessCaseId",
+    "path": "/api/v1/modules/process/:caseId",
+    "tag": "general",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "POST",
+    "module": "modules",
+    "operationId": "postModulesQuery",
+    "path": "/api/v1/modules/query",
+    "tag": "general",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "POST",
+    "module": "modules",
+    "operationId": "postModulesQueue",
+    "path": "/api/v1/modules/queue",
+    "tag": "general",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "POST",
+    "module": "modules",
+    "operationId": "postModulesRetrieve",
+    "path": "/api/v1/modules/retrieve",
+    "tag": "general",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "POST",
+    "module": "modules",
+    "operationId": "postModulesReview",
+    "path": "/api/v1/modules/review",
+    "tag": "general",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "POST",
+    "module": "modules",
+    "operationId": "postModulesRun",
+    "path": "/api/v1/modules/run",
+    "tag": "general",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "modules",
+    "operationId": "getModulesRuns",
+    "path": "/api/v1/modules/runs",
+    "tag": "general",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "modules",
+    "operationId": "getModulesRunsRunId",
+    "path": "/api/v1/modules/runs/:runId",
+    "tag": "general",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "modules",
+    "operationId": "getModulesRunsRunIdExportFormat",
+    "path": "/api/v1/modules/runs/:runId/export/:format",
+    "tag": "general",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "POST",
+    "module": "modules",
+    "operationId": "postModulesStore",
+    "path": "/api/v1/modules/store",
+    "tag": "general",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "modules",
+    "operationId": "getModulesSystems",
+    "path": "/api/v1/modules/systems",
+    "tag": "general",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "modules",
+    "operationId": "getModulesWaveformCaseId",
+    "path": "/api/v1/modules/waveform/:caseId",
+    "tag": "general",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "notifications",
+    "operationId": "getNotifications",
+    "path": "/api/v1/notifications",
+    "tag": "notifications",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "POST",
+    "module": "notifications",
+    "operationId": "postNotifications",
+    "path": "/api/v1/notifications",
+    "tag": "notifications",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "DELETE",
+    "module": "notifications",
+    "operationId": "deleteNotificationsNotificationId",
+    "path": "/api/v1/notifications/:notificationId",
+    "tag": "notifications",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "PATCH",
+    "module": "notifications",
+    "operationId": "patchNotificationsNotificationIdRead",
+    "path": "/api/v1/notifications/:notificationId/read",
+    "tag": "notifications",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "POST",
+    "module": "notifications",
+    "operationId": "postNotificationsNotificationIdRead",
+    "path": "/api/v1/notifications/:notificationId/read",
+    "tag": "notifications",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "POST",
+    "module": "notifications",
+    "operationId": "postNotificationsAdminBroadcast",
+    "path": "/api/v1/notifications/admin/broadcast",
+    "tag": "notifications",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "POST",
+    "module": "notifications",
+    "operationId": "postNotificationsAdminProcessScheduled",
+    "path": "/api/v1/notifications/admin/process-scheduled",
+    "tag": "notifications",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "notifications",
+    "operationId": "getNotificationsHistory",
+    "path": "/api/v1/notifications/history",
+    "tag": "notifications",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "notifications",
+    "operationId": "getNotificationsPreferences",
+    "path": "/api/v1/notifications/preferences",
+    "tag": "notifications",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "POST",
+    "module": "notifications",
+    "operationId": "postNotificationsPreferences",
+    "path": "/api/v1/notifications/preferences",
+    "tag": "notifications",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "PUT",
+    "module": "notifications",
+    "operationId": "putNotificationsPreferences",
+    "path": "/api/v1/notifications/preferences",
+    "tag": "notifications",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "POST",
+    "module": "notifications",
+    "operationId": "postNotificationsRead",
+    "path": "/api/v1/notifications/read",
+    "tag": "notifications",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "PATCH",
+    "module": "notifications",
+    "operationId": "patchNotificationsReadAll",
+    "path": "/api/v1/notifications/read-all",
+    "tag": "notifications",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "notifications",
+    "operationId": "getNotificationsTemplates",
+    "path": "/api/v1/notifications/templates",
+    "tag": "notifications",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "POST",
+    "module": "notifications",
+    "operationId": "postNotificationsTemplates",
+    "path": "/api/v1/notifications/templates",
+    "tag": "notifications",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "notifications",
+    "operationId": "getNotificationsUnread",
+    "path": "/api/v1/notifications/unread",
+    "tag": "notifications",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "notifications",
+    "operationId": "getNotificationsUnreadCount",
+    "path": "/api/v1/notifications/unread-count",
+    "tag": "notifications",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "POST",
+    "module": "ocr",
+    "operationId": "postOcrExtract",
+    "path": "/api/v1/ocr/extract",
+    "tag": "documents",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "POST",
+    "module": "ocr",
+    "operationId": "postOcrProcess",
+    "path": "/api/v1/ocr/process",
+    "tag": "documents",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "organization-platform",
+    "operationId": "getOrganizationPlatform",
+    "path": "/api/v1/organization-platform",
+    "tag": "enterprise",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "POST",
+    "module": "organization-platform",
+    "operationId": "postOrganizationPlatform",
+    "path": "/api/v1/organization-platform",
+    "tag": "enterprise",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "DELETE",
+    "module": "organization-platform",
+    "operationId": "deleteOrganizationPlatformOrganizationId",
+    "path": "/api/v1/organization-platform/:organizationId",
+    "tag": "enterprise",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "organization-platform",
+    "operationId": "getOrganizationPlatformOrganizationId",
+    "path": "/api/v1/organization-platform/:organizationId",
+    "tag": "enterprise",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "PATCH",
+    "module": "organization-platform",
+    "operationId": "patchOrganizationPlatformOrganizationId",
+    "path": "/api/v1/organization-platform/:organizationId",
+    "tag": "enterprise",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "organization-platform",
+    "operationId": "getOrganizationPlatformOrganizationIdAudit",
+    "path": "/api/v1/organization-platform/:organizationId/audit",
+    "tag": "enterprise",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "POST",
+    "module": "organization-platform",
+    "operationId": "postOrganizationPlatformOrganizationIdBranches",
+    "path": "/api/v1/organization-platform/:organizationId/branches",
+    "tag": "enterprise",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "PATCH",
+    "module": "organization-platform",
+    "operationId": "patchOrganizationPlatformOrganizationIdBranding",
+    "path": "/api/v1/organization-platform/:organizationId/branding",
+    "tag": "enterprise",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "POST",
+    "module": "organization-platform",
+    "operationId": "postOrganizationPlatformOrganizationIdDepartments",
+    "path": "/api/v1/organization-platform/:organizationId/departments",
+    "tag": "enterprise",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "POST",
+    "module": "organization-platform",
+    "operationId": "postOrganizationPlatformOrganizationIdMembers",
+    "path": "/api/v1/organization-platform/:organizationId/members",
+    "tag": "enterprise",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "organization-platform",
+    "operationId": "getOrganizationPlatformOrganizationIdNotifications",
+    "path": "/api/v1/organization-platform/:organizationId/notifications",
+    "tag": "enterprise",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "POST",
+    "module": "organization-platform",
+    "operationId": "postOrganizationPlatformOrganizationIdNotifications",
+    "path": "/api/v1/organization-platform/:organizationId/notifications",
+    "tag": "enterprise",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "POST",
+    "module": "organization-platform",
+    "operationId": "postOrganizationPlatformOrganizationIdRoles",
+    "path": "/api/v1/organization-platform/:organizationId/roles",
+    "tag": "enterprise",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "PATCH",
+    "module": "organization-platform",
+    "operationId": "patchOrganizationPlatformOrganizationIdSubscription",
+    "path": "/api/v1/organization-platform/:organizationId/subscription",
+    "tag": "enterprise",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "POST",
+    "module": "organization-platform",
+    "operationId": "postOrganizationPlatformBootstrap",
+    "path": "/api/v1/organization-platform/bootstrap",
+    "tag": "enterprise",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "organization-platform",
+    "operationId": "getOrganizationPlatformPermissionsCatalog",
+    "path": "/api/v1/organization-platform/permissions/catalog",
+    "tag": "enterprise",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "patients",
+    "operationId": "getPatients",
+    "path": "/api/v1/patients",
+    "tag": "patients",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "POST",
+    "module": "patients",
+    "operationId": "postPatients",
+    "path": "/api/v1/patients",
+    "tag": "patients",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "DELETE",
+    "module": "patients",
+    "operationId": "deletePatientsPatientId",
+    "path": "/api/v1/patients/:patientId",
+    "tag": "patients",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "patients",
+    "operationId": "getPatientsPatientId",
+    "path": "/api/v1/patients/:patientId",
+    "tag": "patients",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "PATCH",
+    "module": "patients",
+    "operationId": "patchPatientsPatientId",
+    "path": "/api/v1/patients/:patientId",
+    "tag": "patients",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "patients",
+    "operationId": "getPatientsPatientIdEcgHistory",
+    "path": "/api/v1/patients/:patientId/ecg-history",
+    "tag": "patients",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "patients",
+    "operationId": "getPatientsExportFormat",
+    "path": "/api/v1/patients/export/:format",
+    "tag": "patients",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "preferences",
+    "operationId": "getPreferences",
+    "path": "/api/v1/preferences",
+    "tag": "users",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "PATCH",
+    "module": "preferences",
+    "operationId": "patchPreferences",
+    "path": "/api/v1/preferences",
+    "tag": "users",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "PUT",
+    "module": "preferences",
+    "operationId": "putPreferences",
+    "path": "/api/v1/preferences",
+    "tag": "users",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "release-candidate",
+    "operationId": "getReleaseCandidateBugBash",
+    "path": "/api/v1/release-candidate/bug-bash",
+    "tag": "operations",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "release-candidate",
+    "operationId": "getReleaseCandidateDashboard",
+    "path": "/api/v1/release-candidate/dashboard",
+    "tag": "operations",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "release-candidate",
+    "operationId": "getReleaseCandidatePerformance",
+    "path": "/api/v1/release-candidate/performance",
+    "tag": "operations",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "release-candidate",
+    "operationId": "getReleaseCandidateWorkflows",
+    "path": "/api/v1/release-candidate/workflows",
+    "tag": "operations",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "reports",
+    "operationId": "getReports",
+    "path": "/api/v1/reports",
+    "tag": "reports",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "POST",
+    "module": "reports",
+    "operationId": "postReports",
+    "path": "/api/v1/reports",
+    "tag": "reports",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "DELETE",
+    "module": "reports",
+    "operationId": "deleteReportsReportId",
+    "path": "/api/v1/reports/:reportId",
+    "tag": "reports",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "reports",
+    "operationId": "getReportsReportId",
+    "path": "/api/v1/reports/:reportId",
+    "tag": "reports",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "PATCH",
+    "module": "reports",
+    "operationId": "patchReportsReportId",
+    "path": "/api/v1/reports/:reportId",
+    "tag": "reports",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "POST",
+    "module": "reports",
+    "operationId": "postReportsReportIdArchive",
+    "path": "/api/v1/reports/:reportId/archive",
+    "tag": "reports",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "POST",
+    "module": "reports",
+    "operationId": "postReportsReportIdEmail",
+    "path": "/api/v1/reports/:reportId/email",
+    "tag": "reports",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "POST",
+    "module": "reports",
+    "operationId": "postReportsReportIdFinalize",
+    "path": "/api/v1/reports/:reportId/finalize",
+    "tag": "reports",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "reports",
+    "operationId": "getReportsReportIdHtml",
+    "path": "/api/v1/reports/:reportId/html",
+    "tag": "reports",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "reports",
+    "operationId": "getReportsReportIdPdf",
+    "path": "/api/v1/reports/:reportId/pdf",
+    "tag": "reports",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "reports",
+    "operationId": "getReportsReportIdPrint",
+    "path": "/api/v1/reports/:reportId/print",
+    "tag": "reports",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "POST",
+    "module": "reports",
+    "operationId": "postReportsReportIdSaveToRecord",
+    "path": "/api/v1/reports/:reportId/save-to-record",
+    "tag": "reports",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "POST",
+    "module": "reports",
+    "operationId": "postReportsReportIdSign",
+    "path": "/api/v1/reports/:reportId/sign",
+    "tag": "reports",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "POST",
+    "module": "reports",
+    "operationId": "postReportsReportIdStatus",
+    "path": "/api/v1/reports/:reportId/status",
+    "tag": "reports",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "reports",
+    "operationId": "getReportsReportIdVersions",
+    "path": "/api/v1/reports/:reportId/versions",
+    "tag": "reports",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "POST",
+    "module": "reports",
+    "operationId": "postReportsCasesCaseIdGenerate",
+    "path": "/api/v1/reports/cases/:caseId/generate",
+    "tag": "reports",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "PATCH",
+    "module": "reports",
+    "operationId": "patchReportsPhysicianProfile",
+    "path": "/api/v1/reports/physician-profile",
+    "tag": "reports",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "POST",
+    "module": "reports",
+    "operationId": "postReportsSignatureDraw",
+    "path": "/api/v1/reports/signature/draw",
+    "tag": "reports",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "reports",
+    "operationId": "getReportsSignatureMe",
+    "path": "/api/v1/reports/signature/me",
+    "tag": "reports",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "POST",
+    "module": "reports",
+    "operationId": "postReportsSignatureUpload",
+    "path": "/api/v1/reports/signature/upload",
+    "tag": "reports",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "reports",
+    "operationId": "getReportsVerifyReportNumber",
+    "path": "/api/v1/reports/verify/:reportNumber",
+    "tag": "reports",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "search",
+    "operationId": "getSearch",
+    "path": "/api/v1/search",
+    "tag": "search",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "search",
+    "operationId": "getSearchDocuments",
+    "path": "/api/v1/search/documents",
+    "tag": "search",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "search",
+    "operationId": "getSearchGlobal",
+    "path": "/api/v1/search/global",
+    "tag": "search",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "search",
+    "operationId": "getSearchOccupational",
+    "path": "/api/v1/search/occupational",
+    "tag": "search",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "search",
+    "operationId": "getSearchPatients",
+    "path": "/api/v1/search/patients",
+    "tag": "search",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "security",
+    "operationId": "getSecurityDevices",
+    "path": "/api/v1/security/devices",
+    "tag": "security",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "POST",
+    "module": "security",
+    "operationId": "postSecurityDevices",
+    "path": "/api/v1/security/devices",
+    "tag": "security",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "POST",
+    "module": "security",
+    "operationId": "postSecurityDevicesIdRevoke",
+    "path": "/api/v1/security/devices/:id/revoke",
+    "tag": "security",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "security",
+    "operationId": "getSecurityEvents",
+    "path": "/api/v1/security/events",
+    "tag": "security",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "POST",
+    "module": "security",
+    "operationId": "postSecurityEvents",
+    "path": "/api/v1/security/events",
+    "tag": "security",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "POST",
+    "module": "security",
+    "operationId": "postSecurityFileSignedUrl",
+    "path": "/api/v1/security/file/signed-url",
+    "tag": "security",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "POST",
+    "module": "security",
+    "operationId": "postSecurityKeysRotate",
+    "path": "/api/v1/security/keys/rotate",
+    "tag": "security",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "security",
+    "operationId": "getSecurityMfa",
+    "path": "/api/v1/security/mfa",
+    "tag": "security",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "POST",
+    "module": "security",
+    "operationId": "postSecurityMfa",
+    "path": "/api/v1/security/mfa",
+    "tag": "security",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "DELETE",
+    "module": "security",
+    "operationId": "deleteSecurityMfaId",
+    "path": "/api/v1/security/mfa/:id",
+    "tag": "security",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "POST",
+    "module": "security",
+    "operationId": "postSecurityMfaIdVerify",
+    "path": "/api/v1/security/mfa/:id/verify",
+    "tag": "security",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "POST",
+    "module": "security",
+    "operationId": "postSecurityMfaRecoveryRegenerate",
+    "path": "/api/v1/security/mfa/recovery/regenerate",
+    "tag": "security",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "POST",
+    "module": "security",
+    "operationId": "postSecurityMfaRecoveryVerify",
+    "path": "/api/v1/security/mfa/recovery/verify",
+    "tag": "security",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "security",
+    "operationId": "getSecurityMonitoringSummary",
+    "path": "/api/v1/security/monitoring/summary",
+    "tag": "security",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "security",
+    "operationId": "getSecurityPermissions",
+    "path": "/api/v1/security/permissions",
+    "tag": "security",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "POST",
+    "module": "security",
+    "operationId": "postSecurityPermissions",
+    "path": "/api/v1/security/permissions",
+    "tag": "security",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "POST",
+    "module": "security",
+    "operationId": "postSecurityPhiEncryptionRecords",
+    "path": "/api/v1/security/phi/encryption-records",
+    "tag": "security",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "security",
+    "operationId": "getSecurityPolicies",
+    "path": "/api/v1/security/policies",
+    "tag": "security",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "PUT",
+    "module": "security",
+    "operationId": "putSecurityPoliciesPolicyType",
+    "path": "/api/v1/security/policies/:policyType",
+    "tag": "security",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "security",
+    "operationId": "getSecuritySessions",
+    "path": "/api/v1/security/sessions",
+    "tag": "security",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "POST",
+    "module": "security",
+    "operationId": "postSecuritySessionsIdRevoke",
+    "path": "/api/v1/security/sessions/:id/revoke",
+    "tag": "security",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "POST",
+    "module": "security",
+    "operationId": "postSecuritySessionsRegister",
+    "path": "/api/v1/security/sessions/register",
+    "tag": "security",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "POST",
+    "module": "security",
+    "operationId": "postSecuritySessionsRevokeAll",
+    "path": "/api/v1/security/sessions/revoke-all",
+    "tag": "security",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "subscriptions",
+    "operationId": "getSubscriptions",
+    "path": "/api/v1/subscriptions",
+    "tag": "billing",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "PATCH",
+    "module": "subscriptions",
+    "operationId": "patchSubscriptionsUserId",
+    "path": "/api/v1/subscriptions/:userId",
+    "tag": "billing",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "POST",
+    "module": "subscriptions",
+    "operationId": "postSubscriptionsActivate",
+    "path": "/api/v1/subscriptions/activate",
+    "tag": "billing",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "POST",
+    "module": "subscriptions",
+    "operationId": "postSubscriptionsAdminUsersUserIdActivate",
+    "path": "/api/v1/subscriptions/admin/users/:userId/activate",
+    "tag": "billing",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "POST",
+    "module": "subscriptions",
+    "operationId": "postSubscriptionsAdminUsersUserIdExtend",
+    "path": "/api/v1/subscriptions/admin/users/:userId/extend",
+    "tag": "billing",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "POST",
+    "module": "subscriptions",
+    "operationId": "postSubscriptionsAdminUsersUserIdImpersonate",
+    "path": "/api/v1/subscriptions/admin/users/:userId/impersonate",
+    "tag": "billing",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "POST",
+    "module": "subscriptions",
+    "operationId": "postSubscriptionsAdminUsersUserIdInvoices",
+    "path": "/api/v1/subscriptions/admin/users/:userId/invoices",
+    "tag": "billing",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "POST",
+    "module": "subscriptions",
+    "operationId": "postSubscriptionsAdminUsersUserIdSuspend",
+    "path": "/api/v1/subscriptions/admin/users/:userId/suspend",
+    "tag": "billing",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "subscriptions",
+    "operationId": "getSubscriptionsAnalytics",
+    "path": "/api/v1/subscriptions/analytics",
+    "tag": "billing",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "subscriptions",
+    "operationId": "getSubscriptionsBillingHistory",
+    "path": "/api/v1/subscriptions/billing-history",
+    "tag": "billing",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "POST",
+    "module": "subscriptions",
+    "operationId": "postSubscriptionsCheckout",
+    "path": "/api/v1/subscriptions/checkout",
+    "tag": "billing",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "subscriptions",
+    "operationId": "getSubscriptionsFinancialAdminCenter",
+    "path": "/api/v1/subscriptions/financial/admin-center",
+    "tag": "billing",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "subscriptions",
+    "operationId": "getSubscriptionsFinancialDashboard",
+    "path": "/api/v1/subscriptions/financial/dashboard",
+    "tag": "billing",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "POST",
+    "module": "subscriptions",
+    "operationId": "postSubscriptionsFinancialRenewDue",
+    "path": "/api/v1/subscriptions/financial/renew-due",
+    "tag": "billing",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "subscriptions",
+    "operationId": "getSubscriptionsLicenses",
+    "path": "/api/v1/subscriptions/licenses",
+    "tag": "billing",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "POST",
+    "module": "subscriptions",
+    "operationId": "postSubscriptionsLicenses",
+    "path": "/api/v1/subscriptions/licenses",
+    "tag": "billing",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "PATCH",
+    "module": "subscriptions",
+    "operationId": "patchSubscriptionsLicensesLicenseId",
+    "path": "/api/v1/subscriptions/licenses/:licenseId",
+    "tag": "billing",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "DELETE",
+    "module": "subscriptions",
+    "operationId": "deleteSubscriptionsLicensesUserId",
+    "path": "/api/v1/subscriptions/licenses/:userId",
+    "tag": "billing",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "POST",
+    "module": "subscriptions",
+    "operationId": "postSubscriptionsLicensesLifetime",
+    "path": "/api/v1/subscriptions/licenses/lifetime",
+    "tag": "billing",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "subscriptions",
+    "operationId": "getSubscriptionsMe",
+    "path": "/api/v1/subscriptions/me",
+    "tag": "billing",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "subscriptions",
+    "operationId": "getSubscriptionsPaymentMethods",
+    "path": "/api/v1/subscriptions/payment-methods",
+    "tag": "billing",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "POST",
+    "module": "subscriptions",
+    "operationId": "postSubscriptionsPaymentMethods",
+    "path": "/api/v1/subscriptions/payment-methods",
+    "tag": "billing",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "POST",
+    "module": "subscriptions",
+    "operationId": "postSubscriptionsPaymentsPaymentIdReceipt",
+    "path": "/api/v1/subscriptions/payments/:paymentId/receipt",
+    "tag": "billing",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "POST",
+    "module": "subscriptions",
+    "operationId": "postSubscriptionsPaymentsPaymentIdReview",
+    "path": "/api/v1/subscriptions/payments/:paymentId/review",
+    "tag": "billing",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "POST",
+    "module": "subscriptions",
+    "operationId": "postSubscriptionsPaymentsInitiate",
+    "path": "/api/v1/subscriptions/payments/initiate",
+    "tag": "billing",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "POST",
+    "module": "subscriptions",
+    "operationId": "postSubscriptionsPaymentsPaymobWebhook",
+    "path": "/api/v1/subscriptions/payments/paymob/webhook",
+    "tag": "billing",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "POST",
+    "module": "subscriptions",
+    "operationId": "postSubscriptionsPaymentsRetry",
+    "path": "/api/v1/subscriptions/payments/retry",
+    "tag": "billing",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "POST",
+    "module": "subscriptions",
+    "operationId": "postSubscriptionsPaymentsWebhooksProvider",
+    "path": "/api/v1/subscriptions/payments/webhooks/:provider",
+    "tag": "billing",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "subscriptions",
+    "operationId": "getSubscriptionsPlans",
+    "path": "/api/v1/subscriptions/plans",
+    "tag": "billing",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "POST",
+    "module": "subscriptions",
+    "operationId": "postSubscriptionsPlans",
+    "path": "/api/v1/subscriptions/plans",
+    "tag": "billing",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "PATCH",
+    "module": "subscriptions",
+    "operationId": "patchSubscriptionsPlansPlanId",
+    "path": "/api/v1/subscriptions/plans/:planId",
+    "tag": "billing",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "POST",
+    "module": "subscriptions",
+    "operationId": "postSubscriptionsRefunds",
+    "path": "/api/v1/subscriptions/refunds",
+    "tag": "billing",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "POST",
+    "module": "subscriptions",
+    "operationId": "postSubscriptionsRefundsRefundIdReview",
+    "path": "/api/v1/subscriptions/refunds/:refundId/review",
+    "tag": "billing",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "POST",
+    "module": "subscriptions",
+    "operationId": "postSubscriptionsSubscriptionCancel",
+    "path": "/api/v1/subscriptions/subscription/cancel",
+    "tag": "billing",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "POST",
+    "module": "subscriptions",
+    "operationId": "postSubscriptionsSubscriptionConvertTrial",
+    "path": "/api/v1/subscriptions/subscription/convert-trial",
+    "tag": "billing",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "POST",
+    "module": "subscriptions",
+    "operationId": "postSubscriptionsSubscriptionDowngrade",
+    "path": "/api/v1/subscriptions/subscription/downgrade",
+    "tag": "billing",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "POST",
+    "module": "subscriptions",
+    "operationId": "postSubscriptionsSubscriptionUpgrade",
+    "path": "/api/v1/subscriptions/subscription/upgrade",
+    "tag": "billing",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "subscriptions",
+    "operationId": "getSubscriptionsUsage",
+    "path": "/api/v1/subscriptions/usage",
+    "tag": "billing",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "super-admin",
+    "operationId": "getSuperAdminAudit",
+    "path": "/api/v1/super-admin/audit",
+    "tag": "admin",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "super-admin",
+    "operationId": "getSuperAdminDashboard",
+    "path": "/api/v1/super-admin/dashboard",
+    "tag": "admin",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "POST",
+    "module": "super-admin",
+    "operationId": "postSuperAdminGiftLicenses",
+    "path": "/api/v1/super-admin/gift-licenses",
+    "tag": "admin",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "super-admin",
+    "operationId": "getSuperAdminLicenses",
+    "path": "/api/v1/super-admin/licenses",
+    "tag": "admin",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "POST",
+    "module": "super-admin",
+    "operationId": "postSuperAdminPayments",
+    "path": "/api/v1/super-admin/payments",
+    "tag": "admin",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "super-admin",
+    "operationId": "getSuperAdminPlans",
+    "path": "/api/v1/super-admin/plans",
+    "tag": "admin",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "POST",
+    "module": "super-admin",
+    "operationId": "postSuperAdminPlans",
+    "path": "/api/v1/super-admin/plans",
+    "tag": "admin",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "PATCH",
+    "module": "super-admin",
+    "operationId": "patchSuperAdminPlansPlanId",
+    "path": "/api/v1/super-admin/plans/:planId",
+    "tag": "admin",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "super-admin",
+    "operationId": "getSuperAdminRevenue",
+    "path": "/api/v1/super-admin/revenue",
+    "tag": "admin",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "super-admin",
+    "operationId": "getSuperAdminUsers",
+    "path": "/api/v1/super-admin/users",
+    "tag": "admin",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "POST",
+    "module": "super-admin",
+    "operationId": "postSuperAdminUsers",
+    "path": "/api/v1/super-admin/users",
+    "tag": "admin",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "DELETE",
+    "module": "super-admin",
+    "operationId": "deleteSuperAdminUsersUserId",
+    "path": "/api/v1/super-admin/users/:userId",
+    "tag": "admin",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "PATCH",
+    "module": "super-admin",
+    "operationId": "patchSuperAdminUsersUserId",
+    "path": "/api/v1/super-admin/users/:userId",
+    "tag": "admin",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "POST",
+    "module": "super-admin",
+    "operationId": "postSuperAdminUsersUserIdActionsAction",
+    "path": "/api/v1/super-admin/users/:userId/actions/:action",
+    "tag": "admin",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "DELETE",
+    "module": "super-admin",
+    "operationId": "deleteSuperAdminUsersUserIdLifetime",
+    "path": "/api/v1/super-admin/users/:userId/lifetime",
+    "tag": "admin",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "POST",
+    "module": "super-admin",
+    "operationId": "postSuperAdminUsersUserIdLifetime",
+    "path": "/api/v1/super-admin/users/:userId/lifetime",
+    "tag": "admin",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "POST",
+    "module": "super-admin",
+    "operationId": "postSuperAdminUsersUserIdPlan",
+    "path": "/api/v1/super-admin/users/:userId/plan",
+    "tag": "admin",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "POST",
+    "module": "super-admin",
+    "operationId": "postSuperAdminUsersUserIdSubscriptionExtend",
+    "path": "/api/v1/super-admin/users/:userId/subscription/extend",
+    "tag": "admin",
+    "version": "v1"
+  },
+  {
+    "auth": "public",
+    "method": "POST",
+    "module": "support",
+    "operationId": "postSupportTickets",
+    "path": "/api/v1/support/tickets",
+    "tag": "support",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "POST",
+    "module": "uploads",
+    "operationId": "postUploadsEcgCaseId",
+    "path": "/api/v1/uploads/ecg/:caseId",
+    "tag": "uploads",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "uploads",
+    "operationId": "getUploadsEcgStoredName",
+    "path": "/api/v1/uploads/ecg/:storedName",
+    "tag": "uploads",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "GET",
+    "module": "users",
+    "operationId": "getUsers",
+    "path": "/api/v1/users",
+    "tag": "users",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "POST",
+    "module": "users",
+    "operationId": "postUsersUserIdImpersonate",
+    "path": "/api/v1/users/:userId/impersonate",
+    "tag": "users",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "PATCH",
+    "module": "users",
+    "operationId": "patchUsersUserIdStatus",
+    "path": "/api/v1/users/:userId/status",
+    "tag": "users",
+    "version": "v1"
+  },
+  {
+    "auth": "authenticated",
+    "method": "POST",
+    "module": "users",
+    "operationId": "postUsersInternal",
+    "path": "/api/v1/users/internal",
+    "tag": "users",
+    "version": "v1"
+  }
+]
