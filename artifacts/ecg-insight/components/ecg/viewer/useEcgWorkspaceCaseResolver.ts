@@ -1,7 +1,14 @@
 import { useQuery } from "@tanstack/react-query";
-import { useMemo } from "react";
+import { useCallback, useMemo } from "react";
 
 import { getPatientEcgHistory, listCases, type ApiECGCase } from "@/services/clinical";
+
+export type EcgWorkspaceResolvePhase =
+  | "empty"
+  | "error"
+  | "ready"
+  | "resolving"
+  | "select-examination";
 
 function caseHasImage(ecgCase: ApiECGCase) {
   return Boolean(
@@ -14,6 +21,10 @@ function caseHasImage(ecgCase: ApiECGCase) {
 
 function pickDemoCase(cases: ApiECGCase[]) {
   return cases.find(caseHasImage)?.id;
+}
+
+function imageReadyCases(cases: ApiECGCase[]) {
+  return cases.filter(caseHasImage);
 }
 
 export function useEcgWorkspaceCaseResolver(input: {
@@ -41,11 +52,22 @@ export function useEcgWorkspaceCaseResolver(input: {
     staleTime: 60_000,
   });
 
+  const sourceCases = useMemo(() => {
+    if (explicitCaseId) return [];
+    if (patientId) return patientHistoryQuery.data?.cases ?? [];
+    return demoCasesQuery.data?.cases ?? [];
+  }, [demoCasesQuery.data?.cases, explicitCaseId, patientHistoryQuery.data?.cases, patientId]);
+
+  const candidateCases = useMemo(() => imageReadyCases(sourceCases), [sourceCases]);
+
   const resolvedCaseId = useMemo(() => {
     if (explicitCaseId) return explicitCaseId;
-    if (patientId) return pickDemoCase(patientHistoryQuery.data?.cases ?? []);
-    return pickDemoCase(demoCasesQuery.data?.cases ?? []);
-  }, [demoCasesQuery.data?.cases, explicitCaseId, patientHistoryQuery.data?.cases, patientId]);
+    if (candidateCases.length === 1) return candidateCases[0]?.id;
+    if (candidateCases.length > 1) return undefined;
+    return pickDemoCase(sourceCases);
+  }, [candidateCases, explicitCaseId, sourceCases]);
+
+  const demoCaseId = useMemo(() => pickDemoCase(sourceCases), [sourceCases]);
 
   const isResolving =
     !explicitCaseId
@@ -60,11 +82,44 @@ export function useEcgWorkspaceCaseResolver(input: {
     && !isResolving
     && !!input.token
     && !resolvedCaseId
+    && candidateCases.length === 0
     && (patientHistoryQuery.isError || demoCasesQuery.isError || patientHistoryQuery.isSuccess || demoCasesQuery.isSuccess);
 
+  const phase = useMemo((): EcgWorkspaceResolvePhase => {
+    if (explicitCaseId && resolvedCaseId) return "ready";
+    if (!input.token) return "empty";
+    if (isResolving) return "resolving";
+    if (resolveError) return "error";
+    if (candidateCases.length > 1 && !explicitCaseId) return "select-examination";
+    if (resolvedCaseId) return "ready";
+    if (candidateCases.length === 0 && (patientHistoryQuery.isSuccess || demoCasesQuery.isSuccess)) return "empty";
+    return "error";
+  }, [
+    candidateCases.length,
+    demoCasesQuery.isSuccess,
+    explicitCaseId,
+    input.token,
+    isResolving,
+    patientHistoryQuery.isSuccess,
+    resolveError,
+    resolvedCaseId,
+  ]);
+
+  const refetch = useCallback(() => {
+    if (patientId) {
+      void patientHistoryQuery.refetch();
+      return;
+    }
+    void demoCasesQuery.refetch();
+  }, [demoCasesQuery, patientHistoryQuery, patientId]);
+
   return {
+    candidateCases,
+    demoCaseId,
     demoMode: !explicitCaseId && !patientId,
     isResolving,
+    phase,
+    refetch,
     resolveError,
     resolvedCaseId,
   };

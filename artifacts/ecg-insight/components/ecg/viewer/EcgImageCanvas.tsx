@@ -12,7 +12,7 @@ import { EcgDigitizedWaveformLayer } from "./EcgDigitizedWaveformLayer";
 import { EcgPaperGrid } from "./EcgPaperGrid";
 import { EcgClinicalVisualizationCanvas } from "./EcgClinicalVisualizationCanvas";
 import { EcgProViewerEngine } from "./EcgProViewerEngine";
-import type { EcgCompareLayoutMode, EcgWorkstationViewMode } from "./types";
+import type { EcgCompareLayoutMode, EcgLeadLayoutMode, EcgWorkstationViewMode } from "./types";
 import { useAuthenticatedEcgAsset } from "./useAuthenticatedEcgAsset";
 import type { EcgAiOverlayWorkspace } from "./useEcgAiOverlayWorkspace";
 import type { EcgMeasurementWorkspace } from "./useEcgMeasurementWorkspace";
@@ -36,6 +36,7 @@ type Props = {
   digitizedLeads?: DigitizedWaveformLead[];
   explainability?: AIExplainability | null;
   imageUrl?: string;
+  leadLayout?: EcgLeadLayoutMode;
   onFpsUpdate?: (fps: number) => void;
   onMetricsUpdate?: (metrics: import("./rendering-engine").EcgRenderMetrics) => void;
   onPointerMove?: (coords: { imageX: number; imageY: number; x: number; y: number }) => void;

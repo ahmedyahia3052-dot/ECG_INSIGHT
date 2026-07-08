@@ -6,7 +6,7 @@ import { EcgDiagnosticPanelsRibbon } from "./EcgDiagnosticPanelsRibbon";
 import { EcgDiagnosticRhythmStrip } from "./EcgDiagnosticRhythmStrip";
 import type { DiagnosticWorkstationEngine } from "./useDiagnosticWorkstationEngine";
 import type { DigitalEcgLead } from "@/services/ecgProcessing";
-import type { EcgLeadId } from "../types";
+import type { EcgLeadId, EcgLeadLayoutMode } from "../types";
 import type { EcgViewerControls } from "../useEcgViewerControls";
 import type { EcgWaveformPlaybackState } from "../useEcgWaveformPlayback";
 
@@ -14,8 +14,10 @@ export const EcgDiagnosticWorkstationShell = memo(function EcgDiagnosticWorkstat
   children,
   controls,
   diagnostic,
+  leadLayout,
+  onLeadLayoutChange,
   onSelectLead,
-  rhythmLead,
+  rhythmLead = null,
   playback,
   selectedLead,
   showRhythmStrip = true,
@@ -23,12 +25,16 @@ export const EcgDiagnosticWorkstationShell = memo(function EcgDiagnosticWorkstat
   children: React.ReactNode;
   controls: EcgViewerControls;
   diagnostic: DiagnosticWorkstationEngine;
+  leadLayout?: EcgLeadLayoutMode;
+  onLeadLayoutChange?: (layout: EcgLeadLayoutMode) => void;
   onSelectLead: (lead: EcgLeadId) => void;
-  rhythmLead: DigitalEcgLead | null;
-  playback: EcgWaveformPlaybackState;
+  rhythmLead?: DigitalEcgLead | null;
+  playback?: EcgWaveformPlaybackState;
   selectedLead: EcgLeadId;
   showRhythmStrip?: boolean;
 }) {
+  void leadLayout;
+  void onLeadLayoutChange;
   return (
     <View style={styles.root} testID="sprint46-diagnostic-workstation-ready">
       <EcgDiagnosticPanelsRibbon activePanel={diagnostic.activePanel} onSelectPanel={diagnostic.setActivePanel} />
@@ -47,7 +53,7 @@ export const EcgDiagnosticWorkstationShell = memo(function EcgDiagnosticWorkstat
       <View style={styles.center} testID="sprint46-diagnostic-center-canvas">
         {children}
       </View>
-      {showRhythmStrip ? (
+      {showRhythmStrip && rhythmLead && playback ? (
         <EcgDiagnosticRhythmStrip controls={controls} lead={rhythmLead} playback={playback} selectedLead={selectedLead} />
       ) : null}
     </View>

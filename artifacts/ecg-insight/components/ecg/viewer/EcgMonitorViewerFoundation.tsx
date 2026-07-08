@@ -9,7 +9,7 @@ import { useAuth } from "@/context/AuthContext";
 import { getAIExplainability, getAIResult, type AIExplainability } from "@/services/ai";
 import { API_URL } from "@/services/api";
 import type { ApiECGCase, ApiPatient } from "@/services/clinical";
-import { digitizeECG, getDigitalECG } from "@/services/ecgProcessing";
+import { digitizeECG, getDigitalECG, type DigitalEcgLead } from "@/services/ecgProcessing";
 import { fetchOrAnalyzeMedicalIntelligence } from "@/services/medicalIntelligence";
 import { listReports } from "@/services/reports";
 import { downloadEcgViewerWorkspacePdf, downloadEcgViewerWorkspaceJson } from "@/services/ecgViewerWorkspace";
@@ -47,6 +47,7 @@ import { useEcgEnterpriseViewerState } from "./useEcgEnterpriseViewerState";
 import { useEcgMeasurementWorkspace } from "./useEcgMeasurementWorkspace";
 import { useEcgViewerControls } from "./useEcgViewerControls";
 import { useEcgViewerPersistence } from "./useEcgViewerPersistence";
+import { useEcgWaveformPlayback } from "./useEcgWaveformPlayback";
 import { useEcgWorkspaceLayoutMode } from "./useEcgWorkspaceLayoutMode";
 import { useEcgWorkstationShortcuts } from "./useEcgWorkstationShortcuts";
 import { useAutoDigitizeCase } from "./useAutoDigitizeCase";
@@ -282,6 +283,13 @@ export function EcgMonitorViewerFoundation({
     () => enterprise.filterDigitizedLeads(alignedDigitizedLeads, selectedLead),
     [alignedDigitizedLeads, enterprise, selectedLead],
   );
+
+  const rhythmLead = useMemo<DigitalEcgLead | null>(
+    () => digitalEcg?.leads.find((lead) => lead.lead === selectedLead) ?? digitalEcg?.leads.find((lead) => lead.lead === "II") ?? null,
+    [digitalEcg, selectedLead],
+  );
+  const rhythmDurationMs = rhythmLead ? (rhythmLead.samples.length / (rhythmLead.samplingRate || 500)) * 1000 : 10_000;
+  const playback = useEcgWaveformPlayback(rhythmDurationMs);
 
   const compareCase = historyCases.find((item) => item.id === enterprise.compareStudy?.caseId);
   const compareImageUrl = absoluteUrl(
@@ -672,7 +680,10 @@ export function EcgMonitorViewerFoundation({
                 leadLayout={enterprise.leadLayout}
                 onLeadLayoutChange={enterprise.setLeadLayout}
                 onSelectLead={setSelectedLead}
+                playback={playback}
+                rhythmLead={rhythmLead}
                 selectedLead={selectedLead}
+                showRhythmStrip={!!rhythmLead}
               >
                 {enterprise.viewMode === "ai-review" ? (
                   <EcgImageCanvas

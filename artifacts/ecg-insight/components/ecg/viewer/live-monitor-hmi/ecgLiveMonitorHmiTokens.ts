@@ -15,6 +15,17 @@ export const HMI_LAYOUT = {
   ultraWideBreakpoint: 1600,
 } as const;
 
+/** Sprint 53 hotfix grid shell compatibility alias. */
+export const LIVE_MONITOR_LAYOUT = {
+  bottomBarHeight: HMI_LAYOUT.bottomBarHeight,
+  gridGap: 8,
+  rightPanelMinWidth: HMI_LAYOUT.rightRailCollapsed,
+  rightPanelWidth: HMI_LAYOUT.rightRailExpanded,
+  sidebarMinWidth: HMI_LAYOUT.leftRailCollapsed,
+  sidebarWidth: HMI_LAYOUT.leftRailExpanded,
+  statusBarHeight: HMI_LAYOUT.statusBarHeight,
+} as const;
+
 export const HMI_COLORS = {
   panelBg: "rgba(1, 4, 9, 0.96)",
   panelBorder: "#14532D",

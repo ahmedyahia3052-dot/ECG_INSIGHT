@@ -19,20 +19,26 @@ function StatusChip({ label, testID, value }: { label: string; testID?: string; 
 /** Sprint 35 — clinical status bar: Lead, Speed, Gain, Grid, Zoom, FPS, GPU, Memory. */
 export const EcgEnterpriseStatusBar = memo(function EcgEnterpriseStatusBar({
   compact = false,
+  coords,
   fps,
   gain,
   gpuRenderer,
   gridVisible,
+  imageHeight,
+  imageWidth,
   lead,
   memory,
   paperSpeed,
   zoom,
 }: {
   compact?: boolean;
+  coords?: { imageX: number; imageY: number; x: number; y: number } | null;
   fps?: number;
   gain?: number;
   gpuRenderer?: string;
   gridVisible?: boolean;
+  imageHeight?: number;
+  imageWidth?: number;
   lead?: string;
   memory?: { jsHeapMb?: number; jsHeapLimitMb?: number };
   paperSpeed?: number;
@@ -50,6 +56,10 @@ export const EcgEnterpriseStatusBar = memo(function EcgEnterpriseStatusBar({
         <StatusChip label="Grid" testID="sprint35-status-grid" value={gridVisible ? "On" : "Off"} />
         <StatusChip label="Zoom" testID="sprint17-status-zoom" value={`${Math.round(zoom * 100)}%`} />
         {typeof fps === "number" ? <StatusChip label="FPS" testID="sprint17-status-fps" value={`${fps}`} /> : null}
+        {coords ? <StatusChip label="X/Y" testID="sprint35-status-coords" value={`${Math.round(coords.imageX)},${Math.round(coords.imageY)}`} /> : null}
+        {typeof imageWidth === "number" && typeof imageHeight === "number" ? (
+          <StatusChip label="Image" testID="sprint35-status-image-size" value={`${Math.round(imageWidth)}×${Math.round(imageHeight)}`} />
+        ) : null}
         <StatusChip label="GPU" testID="sprint28-status-gpu" value={gpuLabel} />
         <StatusChip label="Mem" testID="sprint28-status-memory" value={memLabel} />
       </ScrollView>

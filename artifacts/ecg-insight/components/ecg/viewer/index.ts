@@ -74,4 +74,4 @@ export { buildEcgClinicalFindings, useEcgClinicalFindings } from "./useEcgClinic
 export { useEcgMeasurementWorkspace } from "./useEcgMeasurementWorkspace";
 export { useEcgViewerControls } from "./useEcgViewerControls";
 export { useEcgViewerPersistence } from "./useEcgViewerPersistence";
-export { useEcgWorkspaceCaseResolver } from "./useEcgWorkspaceCaseResolver";
+export { useEcgWorkspaceCaseResolver, type EcgWorkspaceResolvePhase } from "./useEcgWorkspaceCaseResolver";

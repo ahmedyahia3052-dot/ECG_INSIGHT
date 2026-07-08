@@ -71,6 +71,7 @@ export type EcgWorkstationViewMode =
   | "compare"
   | "image"
   | "measurement"
+  | "monitor"
   | "overlay"
   | "processed"
   | "report"
