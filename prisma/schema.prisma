@@ -161,6 +161,46 @@ enum NotificationCategory {
   USER_INVITATION
   OCCUPATIONAL_CLEARANCE
   SYSTEM_ALERT
+  HIGH_RISK_ECG
+  PHYSICIAN_REVIEW_REQUIRED
+  FOLLOW_UP_DUE
+  FOLLOW_UP_OVERDUE
+  AI_ANALYSIS_COMPLETED
+  REPORT_APPROVED
+  REPORT_REJECTED
+  CASE_ARCHIVED
+  CASE_RESTORED
+  TIMELINE_UPDATED
+}
+
+enum ClinicalEventType {
+  CRITICAL_ECG
+  HIGH_RISK_ECG
+  PHYSICIAN_REVIEW_REQUIRED
+  FOLLOW_UP_DUE
+  FOLLOW_UP_OVERDUE
+  AI_ANALYSIS_COMPLETED
+  REPORT_APPROVED
+  REPORT_REJECTED
+  REPORT_EXPORTED
+  CASE_ARCHIVED
+  CASE_RESTORED
+  TIMELINE_UPDATED
+}
+
+enum EnterpriseDeliveryMode {
+  IN_APP
+  EMAIL_READY
+  WEBHOOK_READY
+  PUSH_READY
+  SMS_READY
+}
+
+enum NotificationRecipientStatus {
+  PENDING
+  DELIVERED
+  READ
+  FAILED
 }
 
 enum NotificationChannel {
@@ -1033,6 +1073,7 @@ enum AuditAction {
   PATIENT_TREND_RECORDED
   RISK_ASSESSMENT_COMPLETED
   CLINICAL_DECISION_ALERT_CREATED
+  ENTERPRISE_RULE_EXECUTED
   LOGIN
   LOGOUT
   FAILED_LOGIN
@@ -1113,6 +1154,9 @@ enum AuditAction {
   CLINICAL_RECOMMENDATION_ACCEPTED
   CLINICAL_RECOMMENDATION_REJECTED
   FOLLOW_UP_PLAN_CREATED
+  CLINICAL_EVENT_PUBLISHED
+  NOTIFICATION_ENGINE_DELIVERED
+  NOTIFICATION_ENGINE_READ
   LONGITUDINAL_ECG_COMPARISON_COMPLETED
   ECG_TIMELINE_VIEWED
   ECG_COMPARISON_PERFORMED
@@ -1120,6 +1164,12 @@ enum AuditAction {
   ECG_TREND_ANALYSIS_GENERATED
   ECG_FOLLOW_UP_GENERATED
   ECG_LONGITUDINAL_REPORT_GENERATED
+  FHIR_INTEROP_EXPORT
+  FHIR_INTEROP_IMPORT
+  HL7_INTEROP_EXPORT
+  HL7_INTEROP_IMPORT
+  INTEROPERABILITY_VALIDATION_FAILED
+  EXTERNAL_SYSTEM_REQUEST
   MFA_RECOVERY_CODE_USED
   TRUSTED_DEVICE_REVOKED
   SESSION_REVOKED
@@ -1292,6 +1342,8 @@ model User {
   notifications               Notification[]
   notificationPreferences     NotificationPreference[]
   notificationDeliveryLogs    NotificationDeliveryLog[]
+  notificationRecipients      NotificationRecipient[]
+  clinicalEventsPublished     ClinicalEvent[]           @relation("ClinicalEventActor")
   preferences                 UserPreference?
   uploadedCases               ECGCase[]                 @relation("UploadedCases")
   assignedCases               ECGCase[]                 @relation("AssignedCases")
@@ -1366,6 +1418,9 @@ model User {
   caseLocks                   CaseLock[]
   createdCaseVersions         CaseVersion[]
   authoredCdssRules           ClinicalDecisionRule[]
+  authoredClinicalRules       ClinicalRule[]            @relation("AuthoredClinicalRules")
+  enterpriseRuleExecutions    RuleExecution[]           @relation("EnterpriseRuleExecutions")
+  enterpriseRuleVersions      RuleVersion[]             @relation("EnterpriseRuleVersions")
   cdssRuns                    ClinicalDecisionSupportRun[]
   longitudinalComparisons     LongitudinalECGComparison[]
   medicalIntelligenceReports  MedicalIntelligenceReport[]
@@ -1373,6 +1428,11 @@ model User {
   ecgFollowUpAssignments      ECGFollowUp[]             @relation("ECGFollowUpAssignee")
   ecgFollowUpCreations        ECGFollowUp[]             @relation("ECGFollowUpCreator")
   ecgComparisonEvaluations    ECGComparisonHistory[]    @relation("ECGComparisonEvaluator")
+  fhirExportJobsRequested     FHIRExportJob[]           @relation("FHIRExportRequestedBy")
+  fhirImportJobsRequested     FHIRImportJob[]           @relation("FHIRImportRequestedBy")
+  hl7MessagesCreated          HL7Message[]              @relation("HL7MessageCreator")
+  interoperabilityLogs        InteroperabilityLog[]     @relation("InteropLogActor")
+  fhirAudits                  FHIRAudit[]               @relation("FHIRAuditActor")
   organization                Organization?             @relation("OrganizationUsers", fields: [organizationId], references: [id], onDelete: SetNull)
   organizationMemberships     OrganizationMember[]
   managedBranches             OrganizationBranch[]      @relation("BranchManager")
@@ -1504,6 +1564,7 @@ model Patient {
   caseClinicalRecommendations CaseClinicalRecommendation[]
   followUpPlans            FollowUpPlan[]
   followUpReminders        FollowUpReminder[]
+  clinicalEvents           ClinicalEvent[]
   fitnessAssessments     FitnessAssessment[]
   workRestrictions       WorkRestriction[]
   returnToWorkDecisions  ReturnToWorkDecision[]
@@ -1533,6 +1594,11 @@ model Patient {
   ecgFollowUps            ECGFollowUp[]
   ecgComparisonHistories  ECGComparisonHistory[]
   ecgTrendSnapshots       ECGTrendSnapshot[]
+  fhirExportJobs          FHIRExportJob[]
+  fhirImportJobs          FHIRImportJob[]
+  hl7Messages             HL7Message[]
+  interoperabilityLogs    InteroperabilityLog[]
+  fhirAudits              FHIRAudit[]
 
   @@unique([organizationId, employeeId])
   @@index([lastName, firstName])
@@ -1604,6 +1670,12 @@ model Organization {
   platformNotifications  OrganizationNotification[]
   loginHistory           LoginHistory[]
   ecgTimelines           ECGTimeline[]
+  externalOrganizations  ExternalOrganization[]
+  externalSystems        ExternalSystem[]
+  fhirExportJobs         FHIRExportJob[]
+  fhirImportJobs         FHIRImportJob[]
+  interoperabilityLogs   InteroperabilityLog[]
+  fhirAudits             FHIRAudit[]
 
   @@index([name])
   @@index([status])
@@ -2156,6 +2228,7 @@ model ECGCase {
   collaborationLocks    CaseLock[]
   collaborationVersions CaseVersion[]
   cdssRuns              ClinicalDecisionSupportRun[]
+  ruleExecutions        RuleExecution[]
   longitudinalComparisons LongitudinalECGComparison[] @relation("CurrentLongitudinalCase")
   baselineComparisons    LongitudinalECGComparison[] @relation("BaselineLongitudinalCase")
   medicalIntelligenceReports MedicalIntelligenceReport[]
@@ -2168,6 +2241,12 @@ model ECGCase {
   ecgCurrentComparisons      ECGComparisonHistory[]      @relation("CurrentComparisonCase")
   ecgPreviousComparisons     ECGComparisonHistory[]      @relation("PreviousComparisonCase")
   ecgTrendSnapshots          ECGTrendSnapshot[]
+  clinicalEvents             ClinicalEvent[]
+  fhirExportJobs             FHIRExportJob[]
+  fhirImportJobs             FHIRImportJob[]
+  hl7Messages                HL7Message[]
+  interoperabilityLogs       InteroperabilityLog[]
+  fhirAudits                 FHIRAudit[]
 
   @@index([patientId])
   @@index([uploadedById])
@@ -2525,6 +2604,168 @@ model ClinicalDecisionFinding {
   @@index([ruleId])
   @@index([severity])
   @@index([priority])
+}
+
+enum EnterpriseRuleStatus {
+  DRAFT
+  ACTIVE
+  ARCHIVED
+}
+
+enum EnterpriseRuleField {
+  QT_INTERVAL
+  QTC_INTERVAL
+  HEART_RATE
+  QRS_DURATION
+  PR_INTERVAL
+  ST_DEVIATION
+  ST_ELEVATION
+  RISK_SCORE
+  CLINICAL_PRIORITY
+  PVC_COUNT
+  AF_DETECTED
+  BBB_DETECTED
+}
+
+enum EnterpriseRuleOperator {
+  GT
+  GTE
+  LT
+  LTE
+  EQ
+  NEQ
+  CONTAINS
+  IS_TRUE
+  IS_FALSE
+}
+
+enum EnterpriseRuleLogic {
+  AND
+  OR
+}
+
+enum EnterpriseRuleActionType {
+  GENERATE_ALERT
+  CREATE_RECOMMENDATION
+  SCHEDULE_FOLLOW_UP
+  NOTIFY_PHYSICIAN
+  NOTIFY_ADMIN
+  ESCALATE_CASE
+  MARK_CRITICAL
+  REQUIRE_MANUAL_REVIEW
+}
+
+enum EnterpriseRuleExecutionStatus {
+  MATCHED
+  NOT_MATCHED
+  ERROR
+}
+
+model ClinicalRule {
+  id               String              @id @default(cuid())
+  ruleKey          String              @unique
+  name             String
+  description      String
+  category         String
+  priority         Int                 @default(100)
+  enabled          Boolean             @default(true)
+  status           EnterpriseRuleStatus @default(ACTIVE)
+  conditionRootLogic EnterpriseRuleLogic @default(AND)
+  currentVersion   Int                 @default(1)
+  organizationId   String?
+  createdById      String?
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
+  createdBy        User?               @relation("AuthoredClinicalRules", fields: [createdById], references: [id], onDelete: SetNull)
+  conditions       RuleCondition[]
+  actions          RuleAction[]
+  versions         RuleVersion[]
+  executions       RuleExecution[]
+
+  @@index([category])
+  @@index([enabled])
+  @@index([status])
+  @@index([priority])
+  @@index([organizationId])
+}
+
+model RuleVersion {
+  id            String       @id @default(cuid())
+  ruleId        String
+  versionNumber Int
+  name          String
+  description   String
+  category      String
+  priority      Int
+  enabled       Boolean
+  status        EnterpriseRuleStatus
+  conditionRootLogic EnterpriseRuleLogic
+  snapshotJson  Json
+  changeNotes   String?
+  createdById   String?
+  createdAt     DateTime     @default(now())
+  rule          ClinicalRule @relation(fields: [ruleId], references: [id], onDelete: Cascade)
+  createdBy     User?        @relation("EnterpriseRuleVersions", fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@unique([ruleId, versionNumber])
+  @@index([ruleId])
+  @@index([createdAt])
+}
+
+model RuleCondition {
+  id          String                 @id @default(cuid())
+  ruleId      String
+  groupId     String                 @default("default")
+  groupLogic  EnterpriseRuleLogic    @default(AND)
+  field       EnterpriseRuleField
+  operator    EnterpriseRuleOperator
+  threshold   Float?
+  stringValue String?
+  boolValue   Boolean?
+  sortOrder   Int                    @default(0)
+  createdAt   DateTime               @default(now())
+  rule        ClinicalRule           @relation(fields: [ruleId], references: [id], onDelete: Cascade)
+
+  @@index([ruleId])
+  @@index([groupId])
+  @@index([field])
+}
+
+model RuleAction {
+  id         String                   @id @default(cuid())
+  ruleId     String
+  actionType EnterpriseRuleActionType
+  payload    Json?
+  sortOrder  Int                      @default(0)
+  createdAt  DateTime                 @default(now())
+  rule       ClinicalRule             @relation(fields: [ruleId], references: [id], onDelete: Cascade)
+
+  @@index([ruleId])
+  @@index([actionType])
+}
+
+model RuleExecution {
+  id             String                        @id @default(cuid())
+  ruleId         String
+  ruleVersion    Int
+  caseId         String?
+  patientId      String?
+  status         EnterpriseRuleExecutionStatus
+  matched        Boolean
+  inputSnapshot  Json
+  outputSnapshot Json?
+  executedById   String?
+  executedAt     DateTime                      @default(now())
+  rule           ClinicalRule                  @relation(fields: [ruleId], references: [id], onDelete: Cascade)
+  case           ECGCase?                      @relation(fields: [caseId], references: [id], onDelete: SetNull)
+  executedBy     User?                         @relation("EnterpriseRuleExecutions", fields: [executedById], references: [id], onDelete: SetNull)
+
+  @@index([ruleId])
+  @@index([caseId])
+  @@index([patientId])
+  @@index([status])
+  @@index([matched])
+  @@index([executedAt])
 }
 
 model LongitudinalECGComparison {
@@ -4464,16 +4705,21 @@ model Notification {
   preferences Json?
   createdAt   DateTime         @default(now())
   updatedAt   DateTime         @updatedAt
+  clinicalEventId  String?
+  engineVersion    String?          @default("sprint66-v1")
   user        User?            @relation(fields: [userId], references: [id], onDelete: Cascade)
   case        ECGCase?         @relation(fields: [caseId], references: [id], onDelete: Cascade)
   template    NotificationTemplate? @relation(fields: [templateId], references: [id], onDelete: SetNull)
+  clinicalEvent ClinicalEvent? @relation(fields: [clinicalEventId], references: [id], onDelete: SetNull)
   deliveryLogs NotificationDeliveryLog[]
+  recipients  NotificationRecipient[]
 
   @@index([userId])
   @@index([caseId])
   @@index([patientId])
   @@index([reportId])
   @@index([templateId])
+  @@index([clinicalEventId])
   @@index([category])
   @@index([targetRole])
   @@index([read])
@@ -4547,6 +4793,71 @@ model NotificationDeliveryLog {
   @@index([provider])
   @@index([status])
   @@index([createdAt])
+}
+
+model ClinicalEvent {
+  id            String            @id @default(cuid())
+  eventType     ClinicalEventType
+  caseId        String?
+  patientId     String?
+  actorId       String?
+  title         String
+  message       String
+  payloadJson   Json?
+  engineVersion String            @default("sprint66-v1")
+  createdAt     DateTime          @default(now())
+  actor         User?             @relation("ClinicalEventActor", fields: [actorId], references: [id], onDelete: SetNull)
+  case          ECGCase?          @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  patient       Patient?          @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  notifications Notification[]
+
+  @@index([eventType])
+  @@index([caseId])
+  @@index([patientId])
+  @@index([actorId])
+  @@index([createdAt])
+}
+
+model NotificationRecipient {
+  id             String                      @id @default(cuid())
+  notificationId String
+  userId         String
+  deliveryMode   EnterpriseDeliveryMode      @default(IN_APP)
+  status         NotificationRecipientStatus @default(PENDING)
+  readAt         DateTime?
+  deliveredAt    DateTime?
+  createdAt      DateTime                    @default(now())
+  updatedAt      DateTime                    @updatedAt
+  notification   Notification                @relation(fields: [notificationId], references: [id], onDelete: Cascade)
+  user           User                        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([notificationId, userId, deliveryMode])
+  @@index([notificationId])
+  @@index([userId])
+  @@index([status])
+  @@index([readAt])
+}
+
+model NotificationRule {
+  id              String               @id @default(cuid())
+  ruleCode        String               @unique
+  name            String
+  description     String
+  eventType       ClinicalEventType
+  category        NotificationCategory
+  notificationType NotificationType    @default(INFO)
+  priority        TaskPriority         @default(MEDIUM)
+  deliveryModes   EnterpriseDeliveryMode[]
+  templateKey     String?
+  enabled         Boolean              @default(true)
+  criteriaJson    Json?
+  version         String               @default("sprint66-v1")
+  createdAt       DateTime             @default(now())
+  updatedAt       DateTime             @updatedAt
+
+  @@index([eventType])
+  @@index([enabled])
+  @@index([category])
 }
 
 enum MedicalConfidenceLevel {
@@ -5089,4 +5400,240 @@ model ECGTrendSnapshot {
   @@index([trendType])
   @@index([direction])
   @@index([capturedAt])
+}
+
+// ─── Sprint 68: Enterprise FHIR / HL7 Interoperability Engine ───
+
+enum InteroperabilityJobStatus {
+  QUEUED
+  PROCESSING
+  COMPLETED
+  FAILED
+  VALIDATION_FAILED
+}
+
+enum InteropHl7MessageType {
+  ORM
+  ORU
+  ADT
+  MDM
+  ACK
+}
+
+enum InteroperabilityDirection {
+  EXPORT
+  IMPORT
+}
+
+enum ExternalSystemProtocol {
+  FHIR
+  HL7
+  HYBRID
+}
+
+enum InteroperabilityLogLevel {
+  INFO
+  WARNING
+  ERROR
+  AUDIT
+}
+
+model ExternalOrganization {
+  id               String           @id @default(cuid())
+  organizationId   String?
+  externalId       String           @unique
+  name             String
+  fhirEndpoint     String?
+  hl7Endpoint      String?
+  identifierSystem String?
+  metadata         Json?
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+  organization     Organization?    @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+  externalSystems  ExternalSystem[]
+  fhirAudits       FHIRAudit[]
+
+  @@index([organizationId])
+  @@index([name])
+  @@index([createdAt])
+}
+
+model ExternalSystem {
+  id                     String                 @id @default(cuid())
+  externalOrganizationId String?
+  organizationId         String?
+  name                   String
+  protocol               ExternalSystemProtocol
+  baseUrl                String?
+  aeTitle                String?
+  status                 String                 @default("ACTIVE")
+  supportedResources     String[]               @default([])
+  supportedHl7Types      InteropHl7MessageType[] @default([])
+  metadata               Json?
+  createdAt              DateTime               @default(now())
+  updatedAt              DateTime               @updatedAt
+  externalOrganization   ExternalOrganization?  @relation(fields: [externalOrganizationId], references: [id], onDelete: SetNull)
+  organization           Organization?          @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+  fhirExportJobs         FHIRExportJob[]
+  fhirImportJobs         FHIRImportJob[]
+  hl7Messages            HL7Message[]
+  interoperabilityLogs   InteroperabilityLog[]
+  fhirAudits             FHIRAudit[]
+
+  @@index([externalOrganizationId])
+  @@index([organizationId])
+  @@index([protocol])
+  @@index([status])
+  @@index([createdAt])
+}
+
+model FHIRExportJob {
+  id               String                    @id @default(cuid())
+  caseId           String?
+  patientId        String?
+  externalSystemId String?
+  requestedById    String
+  organizationId   String?
+  status           InteroperabilityJobStatus @default(QUEUED)
+  resourceTypes    String[]                  @default([])
+  bundleType       String?
+  payloadJson      Json?
+  validationErrors Json?
+  completedAt      DateTime?
+  createdAt        DateTime                  @default(now())
+  updatedAt        DateTime                  @updatedAt
+  case             ECGCase?                  @relation(fields: [caseId], references: [id], onDelete: SetNull)
+  patient          Patient?                  @relation(fields: [patientId], references: [id], onDelete: SetNull)
+  externalSystem   ExternalSystem?           @relation(fields: [externalSystemId], references: [id], onDelete: SetNull)
+  requestedBy      User                      @relation("FHIRExportRequestedBy", fields: [requestedById], references: [id])
+  organization     Organization?             @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+
+  @@index([caseId])
+  @@index([patientId])
+  @@index([externalSystemId])
+  @@index([requestedById])
+  @@index([organizationId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+model FHIRImportJob {
+  id                 String                    @id @default(cuid())
+  caseId             String?
+  patientId          String?
+  externalSystemId   String?
+  requestedById      String
+  organizationId     String?
+  status             InteroperabilityJobStatus @default(QUEUED)
+  sourcePayload      Json
+  importedResources  Json?
+  validationErrors   Json?
+  completedAt        DateTime?
+  createdAt          DateTime                  @default(now())
+  updatedAt          DateTime                  @updatedAt
+  case               ECGCase?                  @relation(fields: [caseId], references: [id], onDelete: SetNull)
+  patient            Patient?                  @relation(fields: [patientId], references: [id], onDelete: SetNull)
+  externalSystem     ExternalSystem?           @relation(fields: [externalSystemId], references: [id], onDelete: SetNull)
+  requestedBy        User                      @relation("FHIRImportRequestedBy", fields: [requestedById], references: [id])
+  organization       Organization?             @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+
+  @@index([caseId])
+  @@index([patientId])
+  @@index([externalSystemId])
+  @@index([requestedById])
+  @@index([organizationId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+model HL7Message {
+  id               String                    @id @default(cuid())
+  caseId           String?
+  patientId        String?
+  externalSystemId String?
+  messageType      InteropHl7MessageType
+  direction        InteroperabilityDirection
+  rawMessage       String
+  parsedSegments   Json?
+  status           InteroperabilityJobStatus @default(COMPLETED)
+  validationErrors Json?
+  ackMessage       String?
+  createdById      String
+  createdAt        DateTime                  @default(now())
+  case             ECGCase?                  @relation(fields: [caseId], references: [id], onDelete: SetNull)
+  patient          Patient?                  @relation(fields: [patientId], references: [id], onDelete: SetNull)
+  externalSystem   ExternalSystem?           @relation(fields: [externalSystemId], references: [id], onDelete: SetNull)
+  createdBy        User                      @relation("HL7MessageCreator", fields: [createdById], references: [id])
+
+  @@index([caseId])
+  @@index([patientId])
+  @@index([externalSystemId])
+  @@index([messageType])
+  @@index([direction])
+  @@index([status])
+  @@index([createdAt])
+}
+
+model InteroperabilityLog {
+  id               String                   @id @default(cuid())
+  externalSystemId String?
+  organizationId   String?
+  caseId           String?
+  patientId        String?
+  actorId          String
+  level            InteroperabilityLogLevel @default(INFO)
+  operation        String
+  message          String
+  metadata         Json?
+  validationFailed Boolean                  @default(false)
+  createdAt        DateTime                 @default(now())
+  externalSystem   ExternalSystem?          @relation(fields: [externalSystemId], references: [id], onDelete: SetNull)
+  organization     Organization?            @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+  case             ECGCase?                 @relation(fields: [caseId], references: [id], onDelete: SetNull)
+  patient          Patient?                 @relation(fields: [patientId], references: [id], onDelete: SetNull)
+  actor            User                     @relation("InteropLogActor", fields: [actorId], references: [id])
+
+  @@index([externalSystemId])
+  @@index([organizationId])
+  @@index([caseId])
+  @@index([patientId])
+  @@index([actorId])
+  @@index([level])
+  @@index([operation])
+  @@index([validationFailed])
+  @@index([createdAt])
+}
+
+model FHIRAudit {
+  id                     String                @id @default(cuid())
+  externalSystemId       String?
+  externalOrganizationId String?
+  organizationId         String?
+  actorId                String
+  action                 String
+  resourceType           String?
+  resourceId             String?
+  caseId                 String?
+  patientId              String?
+  success                Boolean               @default(true)
+  message                String
+  metadata               Json?
+  createdAt              DateTime              @default(now())
+  externalSystem         ExternalSystem?       @relation(fields: [externalSystemId], references: [id], onDelete: SetNull)
+  externalOrganization   ExternalOrganization? @relation(fields: [externalOrganizationId], references: [id], onDelete: SetNull)
+  organization           Organization?         @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+  actor                  User                  @relation("FHIRAuditActor", fields: [actorId], references: [id])
+  case                   ECGCase?              @relation(fields: [caseId], references: [id], onDelete: SetNull)
+  patient                Patient?              @relation(fields: [patientId], references: [id], onDelete: SetNull)
+
+  @@index([externalSystemId])
+  @@index([externalOrganizationId])
+  @@index([actorId])
+  @@index([action])
+  @@index([resourceType])
+  @@index([caseId])
+  @@index([patientId])
+  @@index([organizationId])
+  @@index([success])
+  @@index([createdAt])
 }

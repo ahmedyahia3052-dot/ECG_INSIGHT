@@ -1,5 +1,23 @@
 # Changelog — Enterprise QA Infrastructure
 
+## Sprint 67 — Enterprise Clinical Rules Engine — 2026-07-08
+
+### Added (backend only — zero UI changes)
+- **Enterprise Rules Engine** (`server/src/modules/enterprise-rules-engine/`) — configurable clinical rules with conditions, actions, versioning, execution history
+- **11 system rule templates** — QT, HR, QRS, AF, ST, BBB, PVC, risk score, clinical priority
+- **API:** `/api/enterprise-rules-engine` — CRUD, test, history, bootstrap
+- Migration: `20260708080000_sprint67_enterprise_rules_engine`
+- Models: `ClinicalRule`, `RuleCondition`, `RuleAction`, `RuleExecution`, `RuleVersion`
+- Tests: `sprint67-enterprise-rules-engine.test.ts`, `sprint67-enterprise-rules-engine.integration.ts`
+
+### Preserved
+- ECG Workspace, Live Monitor, Viewer, Canvas, Rendering Engine, Frontend UI — **zero changes**
+
+### Tag
+- `Sprint67_Enterprise_Rules_Engine`
+
+---
+
 ## Sprint 63 — ECG Longitudinal Timeline & Follow-up Engine — 2026-07-08
 
 ### Added (backend only — zero UI changes)
