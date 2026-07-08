@@ -4,6 +4,7 @@ import { z } from "zod";
 import { prisma } from "../../config/prisma";
 import { requireAuth, requireRole } from "../../middleware/auth";
 import { createSignedDownloadToken } from "../../utils/file-security";
+import { resolveAuthorizedSignedDownloadPath } from "../../utils/upload-access";
 import {
   currentKeyVersion,
   encryptField,
@@ -425,8 +426,18 @@ securityRouter.post("/permissions", requireRole("ADMIN"), async (req, res, next)
 
 securityRouter.post("/file/signed-url", async (req, res, next) => {
   try {
-    const body = z.object({ path: z.string().trim().min(1) }).parse(req.body);
-    res.json({ token: createSignedDownloadToken(body.path) });
+    const body = z
+      .object({
+        fileId: z.string().trim().min(1).optional(),
+        path: z.string().trim().min(1).optional(),
+        storedName: z.string().trim().min(1).optional(),
+      })
+      .refine((value) => Boolean(value.fileId || value.path || value.storedName), {
+        message: "fileId, storedName, or path is required.",
+      })
+      .parse(req.body);
+    const authorizedPath = await resolveAuthorizedSignedDownloadPath(body, req.auth!);
+    res.json({ token: createSignedDownloadToken(authorizedPath) });
   } catch (error) {
     next(error);
   }

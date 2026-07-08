@@ -2,8 +2,11 @@ import { Router } from "express";
 import { z } from "zod";
 import { prisma } from "../../config/prisma";
 import { requireAuth, requireRole } from "../../middleware/auth";
+import { AppError } from "../../middleware/error";
 
 export const auditRouter = Router();
+
+const clientAuditActionSchema = z.enum(["PATIENT_VIEWED", "REPORT_DOWNLOADED", "REPORT_VIEWED"]);
 
 auditRouter.use(requireAuth);
 
@@ -42,10 +45,10 @@ auditRouter.post("/", requireRole("DOCTOR"), async (req, res, next) => {
   try {
     const body = z
       .object({
-        action: z.string().trim().min(1),
+        action: clientAuditActionSchema,
         entityId: z.string().trim().optional(),
         entityType: z.string().trim().optional(),
-        message: z.string().trim().min(1),
+        message: z.string().trim().min(1).max(500),
         newValue: z.unknown().optional(),
         oldValue: z.unknown().optional(),
         patientId: z.string().trim().optional(),
@@ -53,7 +56,7 @@ auditRouter.post("/", requireRole("DOCTOR"), async (req, res, next) => {
       .parse(req.body);
     const log = await prisma.auditLog.create({
       data: {
-        action: body.action as "CASE_UPDATED",
+        action: body.action,
         actorId: req.auth!.id,
         entityId: body.entityId,
         entityType: body.entityType,
@@ -67,6 +70,10 @@ auditRouter.post("/", requireRole("DOCTOR"), async (req, res, next) => {
     });
     res.status(201).json({ log });
   } catch (error) {
+    if (error instanceof z.ZodError) {
+      next(new AppError(400, "Audit action is not permitted for client submission.", "AUDIT_ACTION_FORBIDDEN"));
+      return;
+    }
     next(error);
   }
 });

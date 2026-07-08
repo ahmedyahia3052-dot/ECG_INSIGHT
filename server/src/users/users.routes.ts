@@ -135,6 +135,23 @@ usersRouter.post("/:userId/impersonate", requireRole("SUPER_ADMIN"), async (req,
       userId: target.id,
     });
 
+    await prisma.auditLog.create({
+      data: {
+        action: "IMPERSONATION_STARTED",
+        actorId: req.auth!.id,
+        entityId: target.id,
+        entityType: "User",
+        ipAddress: req.ip,
+        message: `Super admin started impersonating ${target.email}.`,
+        metadata: {
+          actorRole: req.auth!.role,
+          targetEmail: target.email,
+          targetRole: target.role,
+        },
+        userAgent: req.get("user-agent"),
+      },
+    });
+
     res.json({ accessToken, user: serializeUser(target) });
   } catch (error) {
     next(error);

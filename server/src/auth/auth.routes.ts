@@ -1,7 +1,9 @@
 import { Router } from "express";
 import { prisma } from "../config/prisma";
+import { authRateLimitMiddleware } from "../middleware/auth-rate-limit";
 import { requireAuth } from "../middleware/auth";
 import { validateBody } from "../middleware/validate";
+import { redactAuthSecrets } from "../utils/auth-response-safety";
 import { serializeUser } from "../utils/users";
 import { completeOAuth, oauthProviderStatuses, startOAuth } from "./oauth-passport";
 import {
@@ -38,6 +40,8 @@ import {
 
 export const authRouter = Router();
 
+authRouter.use(authRateLimitMiddleware);
+
 authRouter.get("/email-availability", async (req, res, next) => {
   try {
     const email = typeof req.query.email === "string" ? req.query.email.trim().toLowerCase() : "";
@@ -55,7 +59,7 @@ authRouter.get("/email-availability", async (req, res, next) => {
 authRouter.post("/register", validateBody(registerSchema), async (req, res, next) => {
   try {
     const payload = await registerUser(req.body, req, res);
-    res.status(201).json(payload);
+    res.status(201).json(redactAuthSecrets(payload));
   } catch (error) {
     next(error);
   }
@@ -71,7 +75,7 @@ authRouter.post("/login", validateBody(loginSchema), async (req, res, next) => {
 
 authRouter.post("/phone/request-otp", validateBody(requestPhoneOtpSchema), async (req, res, next) => {
   try {
-    res.status(201).json(await requestPhoneOtp(req.body));
+    res.status(201).json(redactAuthSecrets(await requestPhoneOtp(req.body)));
   } catch (error) {
     next(error);
   }
@@ -152,10 +156,12 @@ authRouter.post(
   async (req, res, next) => {
     try {
       const { resetToken } = await requestPasswordReset(req.body.email);
-      res.json({
-        message: "If an account exists, password reset instructions have been generated.",
-        resetToken,
-      });
+      res.json(
+        redactAuthSecrets({
+          message: "If an account exists, password reset instructions have been generated.",
+          resetToken,
+        }),
+      );
     } catch (error) {
       next(error);
     }
@@ -182,7 +188,7 @@ authRouter.post("/verify-email", validateBody(verifyEmailSchema), async (req, re
 
 authRouter.post("/resend-verification", validateBody(resendVerificationSchema), async (req, res, next) => {
   try {
-    res.json(await resendVerificationEmail(req.body.email));
+    res.json(redactAuthSecrets(await resendVerificationEmail(req.body.email)));
   } catch (error) {
     next(error);
   }

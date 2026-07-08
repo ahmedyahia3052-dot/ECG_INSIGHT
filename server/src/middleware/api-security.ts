@@ -54,6 +54,10 @@ async function recordSecurityEvent(req: Request, eventType: "REQUEST_SIGNATURE_F
   }
 }
 
+function requestSigningSecret() {
+  return env.REQUEST_SIGNING_SECRET ?? env.JWT_SECRET;
+}
+
 function validSignature(req: Request) {
   const signature = req.get("x-request-signature");
   if (!signature) return true;
@@ -61,7 +65,7 @@ function validSignature(req: Request) {
   if (!timestamp || Math.abs(Date.now() - Number(timestamp)) > 5 * 60 * 1000) return false;
   const bodyDigest = hashSecurityValue(JSON.stringify(req.body ?? {}));
   const payload = `${req.method}:${req.originalUrl}:${timestamp}:${bodyDigest}`;
-  const expected = crypto.createHmac("sha256", env.JWT_SECRET).update(payload).digest("hex");
+  const expected = crypto.createHmac("sha256", requestSigningSecret()).update(payload).digest("hex");
   if (signature.length !== expected.length) return false;
   return crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expected));
 }

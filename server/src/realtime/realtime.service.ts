@@ -1,10 +1,21 @@
 import type { Server as HttpServer } from "node:http";
 import { Server } from "socket.io";
+import { env } from "../config/env";
 import { prisma } from "../config/prisma";
 import { verifyAccessToken } from "../utils/jwt";
 import { canAccessCase } from "../utils/resource-access";
 
 let io: Server | null = null;
+
+function socketAllowedOrigins() {
+  const configuredOrigins = env.CLIENT_ORIGIN.split(",")
+    .map((origin) => origin.trim())
+    .filter(Boolean);
+  const developmentOrigins = ["http://localhost:8082", "http://localhost:8081", "http://localhost:5173", "http://localhost:3000"];
+  return env.NODE_ENV === "development"
+    ? Array.from(new Set([...configuredOrigins, ...developmentOrigins]))
+    : configuredOrigins;
+}
 
 export type RealtimeEvent =
   | "ecg.created"
@@ -29,7 +40,14 @@ export function initializeRealtime(server: HttpServer) {
   io = new Server(server, {
     cors: {
       credentials: true,
-      origin: true,
+      origin(origin, callback) {
+        const allowed = socketAllowedOrigins();
+        if (!origin || allowed.includes(origin)) {
+          callback(null, true);
+          return;
+        }
+        callback(new Error("Origin not allowed."), false);
+      },
     },
   });
   io.use(async (socket, next) => {
@@ -61,13 +79,16 @@ export function initializeRealtime(server: HttpServer) {
 
   io.on("connection", (socket) => {
     socket.on("join", (room: string) => {
-      if (room) socket.join(room);
+      if (!room || !socket.data.auth) return;
+      if (room === `user:${socket.data.auth.id}` || room === `role:${socket.data.auth.role}`) {
+        socket.join(room);
+      }
     });
     socket.on("join:user", (userId: string) => {
-      if (userId) socket.join(`user:${userId}`);
+      if (userId && socket.data.auth?.id === userId) socket.join(`user:${userId}`);
     });
     socket.on("join:role", (role: string) => {
-      if (role) socket.join(`role:${role}`);
+      if (role && socket.data.auth?.role === role) socket.join(`role:${role}`);
     });
     socket.on("join:case", async (caseId: string, ack?: (payload: { joined: boolean; room?: string; error?: string }) => void) => {
       try {

@@ -1,5 +1,50 @@
 # Changelog — Enterprise QA Infrastructure
 
+## Sprint 71 — Enterprise Security Hardening — 2026-07-08
+
+### Added (backend only — zero UI changes)
+- **Security audit & hardening pass** across auth, authorization, uploads, secrets, realtime, and audit logging
+- Upload IDOR fix: case/patient access enforced on ECG download and signed URLs
+- Magic-byte upload validation (`upload-security.ts`)
+- Auth token redaction in production responses (`auth-response-safety.ts`)
+- Dedicated auth rate limiter (`auth-rate-limit.ts`)
+- Separate optional crypto secrets: `PHI_ENCRYPTION_KEY`, `REQUEST_SIGNING_SECRET`, `DOWNLOAD_TOKEN_SECRET`
+- Realtime room join restrictions and Socket.io CORS alignment
+- Client audit POST allowlist; impersonation audit logging
+- Report: `SPRINT71_ENTERPRISE_SECURITY_REPORT.md`
+- Tests: `sprint71-security-hardening.test.ts`, `sprint71-security-hardening.integration.ts`
+
+### Preserved
+- ECG Workspace, Live Monitor, Viewer, Canvas, Rendering Engine, Frontend UI — **zero changes**
+
+### Tag
+- `Sprint71_Enterprise_Security_Hardening`
+
+---
+
+## Sprint 70 — Enterprise Performance & Database Optimization — 2026-07-08
+
+### Added (backend only — zero UI changes)
+- **Performance optimization pass** across Prisma queries, batch writes, pagination, and composite indexes
+- **Enterprise Rules Engine:** batch rule execution persistence (`createManyAndReturn`) + batch audit logs; seeding removed from list/test hot paths
+- **Clinical Alerts/Risk:** eliminate duplicate re-fetch after cold evaluation
+- **AI Report Generator:** remove redundant `patientId` lookup on persist
+- **Medical Intelligence:** capped/slim report list (20 rows, no nested findings)
+- **Cases API:** slim file select on list; paginated audit timeline
+- **Enterprise Report Engine:** count-guarded lazy template seeding
+- Migration: `20260708090000_sprint70_performance_optimization` — 6 composite indexes
+- Utility: `server/src/performance/query-profiler.ts`
+- Report: `SPRINT70_PERFORMANCE_OPTIMIZATION_REPORT.md`
+- Tests: `sprint70-performance-benchmark.test.ts`, `sprint70-performance-optimization.integration.ts`
+
+### Preserved
+- ECG Workspace, Live Monitor, Viewer, Canvas, Rendering Engine, Frontend UI — **zero changes**
+
+### Tag
+- `Sprint70_Performance_Optimization`
+
+---
+
 ## Sprint 68 — FHIR / HL7 Interoperability Engine — 2026-07-08
 
 ### Added (backend only — zero UI changes)

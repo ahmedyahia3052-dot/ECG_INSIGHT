@@ -11,6 +11,9 @@ import { requireAuth, requireRole } from "../middleware/auth";
 import { AppError } from "../middleware/error";
 import { serializeFile } from "../utils/clinical";
 import { createNotification } from "../utils/notifications";
+import { assertResourceAccess, canAccessCase } from "../utils/resource-access";
+import { assertUploadContentMatchesMime } from "../utils/upload-security";
+import { assertEcgFileDownloadAccess } from "../utils/upload-access";
 
 const uploadRoot = path.resolve(process.cwd(), "uploads", "ecg");
 fs.mkdirSync(uploadRoot, { recursive: true });
@@ -78,8 +81,16 @@ uploadsRouter.post(
         fs.rmSync(req.file.path, { force: true });
         throw new AppError(404, "ECG case not found.", "CASE_NOT_FOUND");
       }
+      assertResourceAccess(await canAccessCase(ecgCase.id, req.auth!), "You do not have access to this case.");
       try {
         assertCaseCanAcceptAnalysis(ecgCase);
+      } catch (error) {
+        fs.rmSync(req.file.path, { force: true });
+        throw error;
+      }
+
+      try {
+        assertUploadContentMatchesMime(req.file.path, req.file.mimetype);
       } catch (error) {
         fs.rmSync(req.file.path, { force: true });
         throw error;
@@ -145,11 +156,7 @@ uploadsRouter.post(
 
 uploadsRouter.get("/ecg/:storedName", requireAuth, async (req, res, next) => {
   try {
-    const storedName = path.basename(String(req.params.storedName));
-    const file = await prisma.eCGFile.findFirst({ where: { storedName } });
-    if (!file) {
-      throw new AppError(404, "ECG file not found.", "FILE_NOT_FOUND");
-    }
+    const file = await assertEcgFileDownloadAccess(String(req.params.storedName), req.auth!);
     res.download(file.storagePath, file.originalName);
   } catch (error) {
     next(error);

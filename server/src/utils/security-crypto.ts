@@ -3,8 +3,12 @@ import { env } from "../config/env";
 
 const KEY_VERSION = 1;
 
+function encryptionSecret() {
+  return env.PHI_ENCRYPTION_KEY ?? env.JWT_SECRET;
+}
+
 function keyMaterial(version = KEY_VERSION) {
-  return crypto.createHash("sha256").update(`${env.JWT_SECRET}:phi:${version}`).digest();
+  return crypto.createHash("sha256").update(`${encryptionSecret()}:phi:${version}`).digest();
 }
 
 export function hashSecurityValue(value: string) {

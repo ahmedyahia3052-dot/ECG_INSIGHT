@@ -57,7 +57,9 @@ export function createApp() {
       contentSecurityPolicy: env.NODE_ENV === "production" ? undefined : false,
       crossOriginEmbedderPolicy: false,
       crossOriginResourcePolicy: { policy: "cross-origin" },
+      frameguard: { action: "deny" },
       hsts: env.NODE_ENV === "production" ? { includeSubDomains: true, maxAge: 31_536_000, preload: true } : false,
+      referrerPolicy: { policy: "strict-origin-when-cross-origin" },
     }),
   );
   app.use(

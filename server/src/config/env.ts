@@ -29,6 +29,8 @@ const developmentDefaults = {
     API_SECURITY_IP_MAX: "180",
     API_SECURITY_USER_MAX: "240",
     API_SECURITY_WINDOW_MS: "60000",
+    AUTH_RATE_LIMIT_MAX: "30",
+    AUTH_RATE_LIMIT_WINDOW_MS: String(15 * 60 * 1000),
     TRUST_PROXY: "false",
 };
 
@@ -113,6 +115,11 @@ const envSchema = z
     API_SECURITY_IP_MAX: z.coerce.number().int().positive().default(180),
     API_SECURITY_USER_MAX: z.coerce.number().int().positive().default(240),
     API_SECURITY_WINDOW_MS: z.coerce.number().int().positive().default(60_000),
+    AUTH_RATE_LIMIT_MAX: z.coerce.number().int().positive().default(30),
+    AUTH_RATE_LIMIT_WINDOW_MS: z.coerce.number().int().positive().default(15 * 60 * 1000),
+    DOWNLOAD_TOKEN_SECRET: z.string().min(32).optional(),
+    PHI_ENCRYPTION_KEY: z.string().min(32).optional(),
+    REQUEST_SIGNING_SECRET: z.string().min(32).optional(),
     STORAGE_PATH: z.string().default("uploads"),
     TRUST_PROXY: z
       .enum(["true", "false"])
