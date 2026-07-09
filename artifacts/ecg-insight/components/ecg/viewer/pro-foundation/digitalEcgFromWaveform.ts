@@ -3,37 +3,65 @@ import type { EcgViewerWaveformDto } from "@/services/ecgViewerApi";
 
 import type { EcgGridGain, EcgPaperSpeed } from "../types";
 
-function emptyAiDiagnosis(): EcgAiDiagnosis {
+export type DigitalEcgClinicalSeed = {
+  aiDiagnosis?: string;
+  confidence?: number;
+  electricalAxisDeg?: number;
+  heartRate?: number;
+  pWaveDurationMs?: number;
+  prIntervalMs?: number;
+  qrsDurationMs?: number;
+  qtIntervalMs?: number;
+  qtcIntervalMs?: number;
+  rrIntervalMs?: number;
+  stDeviationMm?: number;
+  tWaveDurationMs?: number;
+};
+
+function buildAiDiagnosis(seed?: DigitalEcgClinicalSeed): EcgAiDiagnosis {
+  const diagnosis = seed?.aiDiagnosis?.trim();
   return {
-    agreementWithRules: 0,
-    clinicalReasoning: "",
-    confidence: 0,
+    agreementWithRules: seed?.confidence ?? 0,
+    clinicalReasoning: diagnosis ? "Derived from case clinical record." : "",
+    confidence: seed?.confidence ?? 0,
     disagreementExplanation: "",
     ensembleSources: [],
-    evidence: [],
-    markdownReport: "",
-    primaryDiagnosis: "Pending",
+    evidence: diagnosis ? [diagnosis] : [],
+    markdownReport: diagnosis ?? "",
+    primaryDiagnosis: diagnosis || "Unavailable",
     recommendations: [],
-    topDiagnoses: [],
+    topDiagnoses: diagnosis
+      ? [
+          {
+            agreementWithRules: seed?.confidence ?? 0,
+            confidence: seed?.confidence ?? 0,
+            evidence: [diagnosis],
+            label: diagnosis,
+            probability: seed?.confidence ?? 0,
+            source: "measurement" as const,
+          },
+        ]
+      : [],
     urgency: "normal",
   };
 }
 
-function emptyInterpretation(): EcgClinicalInterpretation {
+function buildInterpretation(seed?: DigitalEcgClinicalSeed): EcgClinicalInterpretation {
+  const diagnosis = seed?.aiDiagnosis?.trim() || "Unavailable";
   return {
-    confidence: 0,
+    confidence: seed?.confidence ?? 0,
     findings: [],
-    markdownReport: "",
+    markdownReport: diagnosis,
     measurementsUsed: {},
-    primaryDiagnosis: "Pending",
+    primaryDiagnosis: diagnosis,
     recommendations: [],
     report: {
-      confidence: 0,
+      confidence: seed?.confidence ?? 0,
       evidence: [],
       findings: [],
       measurementsUsed: {},
       recommendations: [],
-      summary: "",
+      summary: diagnosis,
       urgency: "normal",
     },
     severity: "normal",
@@ -41,37 +69,44 @@ function emptyInterpretation(): EcgClinicalInterpretation {
   };
 }
 
-function emptyMeasurements(): EcgClinicalMeasurements {
+function buildMeasurements(seed?: DigitalEcgClinicalSeed): EcgClinicalMeasurements {
+  const heartRate = seed?.heartRate ?? 0;
+  const rrIntervalMs = seed?.rrIntervalMs ?? (heartRate > 0 ? Math.round(60_000 / heartRate) : 0);
   return {
     amplitudes: {
       pWaveAmplitudeMv: 0,
       qrsAmplitudeMv: 0,
       rWaveProgression: "normal",
-      stDeviationMm: 0,
+      stDeviationMm: seed?.stDeviationMm ?? 0,
       tWaveAmplitudeMv: 0,
     },
-    axis: { electricalAxisDeg: 0, frontalPlaneAxisDeg: 0, meanQrsAxisDeg: 0 },
-    confidence: 0,
-    heartRate: 0,
+    axis: {
+      electricalAxisDeg: seed?.electricalAxisDeg ?? 0,
+      frontalPlaneAxisDeg: seed?.electricalAxisDeg ?? 0,
+      meanQrsAxisDeg: seed?.electricalAxisDeg ?? 0,
+    },
+    confidence: seed?.confidence ?? 0,
+    heartRate,
     intervals: {
-      pWaveDurationMs: 0,
-      prIntervalMs: 0,
-      qrsDurationMs: 0,
-      qtIntervalMs: 0,
-      qtcBazettMs: 0,
+      pWaveDurationMs: seed?.pWaveDurationMs ?? 0,
+      prIntervalMs: seed?.prIntervalMs ?? 0,
+      qrsDurationMs: seed?.qrsDurationMs ?? 0,
+      qtIntervalMs: seed?.qtIntervalMs ?? 0,
+      qtcBazettMs: seed?.qtcIntervalMs ?? 0,
       qtcFridericiaMs: 0,
-      rrIntervalMs: 0,
+      rrIntervalMs,
     },
     measurements: [],
     morphology: [],
     rhythm: "regular",
-    stDeviation: 0,
+    stDeviation: seed?.stDeviationMm ?? 0,
   };
 }
 
 export function buildDigitalEcgFromWaveforms(
   waveforms: EcgViewerWaveformDto[],
   paper: { gain: EcgGridGain; speed: EcgPaperSpeed },
+  clinical?: DigitalEcgClinicalSeed | null,
 ): DigitalEcg | null {
   if (!waveforms.length) return null;
   const leads = waveforms.map((entry) => ({
@@ -81,8 +116,9 @@ export function buildDigitalEcgFromWaveforms(
     samplingRate: entry.samplingRate,
   }));
   const durationSeconds = Math.max(...leads.map((lead) => lead.durationSeconds), 0);
+  const measurementEngine = buildMeasurements(clinical ?? undefined);
   return {
-    aiDiagnosis: emptyAiDiagnosis(),
+    aiDiagnosis: buildAiDiagnosis(clinical ?? undefined),
     annotations: [],
     calibration: {
       confidence: 1,
@@ -94,15 +130,15 @@ export function buildDigitalEcgFromWaveforms(
     ecgFileId: waveforms[0]?.ecgFileId,
     leadSegments: [],
     leads,
-    interpretationEngine: emptyInterpretation(),
-    measurementEngine: emptyMeasurements(),
+    interpretationEngine: buildInterpretation(clinical ?? undefined),
+    measurementEngine,
     measurements: {
-      heartRate: 0,
-      prIntervalMs: 0,
-      qrsDurationMs: 0,
-      qtIntervalMs: 0,
-      qtcBazettMs: 0,
-      rrIntervalMs: 0,
+      heartRate: measurementEngine.heartRate,
+      prIntervalMs: measurementEngine.intervals.prIntervalMs,
+      qrsDurationMs: measurementEngine.intervals.qrsDurationMs,
+      qtIntervalMs: measurementEngine.intervals.qtIntervalMs,
+      qtcBazettMs: measurementEngine.intervals.qtcBazettMs,
+      rrIntervalMs: measurementEngine.intervals.rrIntervalMs,
     },
     quality: { score: 1, warnings: [] },
     status: "available",

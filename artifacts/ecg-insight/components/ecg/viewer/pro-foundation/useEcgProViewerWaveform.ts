@@ -4,10 +4,11 @@ import { useMemo } from "react";
 import { getEcgViewerWaveform } from "@/services/ecgViewerApi";
 
 import type { EcgGridGain, EcgPaperSpeed } from "../types";
-import { buildDigitalEcgFromWaveforms } from "./digitalEcgFromWaveform";
+import { buildDigitalEcgFromWaveforms, type DigitalEcgClinicalSeed } from "./digitalEcgFromWaveform";
 
 export function useEcgProViewerWaveform(input: {
   caseId?: string;
+  clinicalSeed?: DigitalEcgClinicalSeed | null;
   enabled?: boolean;
   paper: { gain: EcgGridGain; speed: EcgPaperSpeed };
   token?: string;
@@ -24,8 +25,25 @@ export function useEcgProViewerWaveform(input: {
     staleTime: 30_000,
   });
 
+  const digitalEcg = useMemo(() => {
+    if (!query.data) return null;
+    if (!input.clinicalSeed) return query.data;
+    return buildDigitalEcgFromWaveforms(
+      query.data.leads.map((lead) => ({
+        caseId: input.caseId ?? "",
+        durationSeconds: lead.durationSeconds,
+        ecgFileId: query.data!.ecgFileId ?? "",
+        lead: lead.lead,
+        samples: lead.samples,
+        samplingRate: lead.samplingRate,
+      })),
+      input.paper,
+      input.clinicalSeed,
+    );
+  }, [input.caseId, input.clinicalSeed, input.paper, query.data]);
+
   return {
-    digitalEcg: query.data ?? null,
+    digitalEcg,
     isError: query.isError,
     isLoading: query.isLoading,
     refetch: query.refetch,

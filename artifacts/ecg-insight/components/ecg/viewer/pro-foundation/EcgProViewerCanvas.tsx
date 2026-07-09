@@ -1,4 +1,4 @@
-import React, { memo, useCallback, useEffect, useRef, useState } from "react";
+import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ActivityIndicator, LayoutChangeEvent, Platform, StyleSheet, Text, View } from "react-native";
 import { PanGestureHandler, PinchGestureHandler, State } from "react-native-gesture-handler";
 
@@ -22,7 +22,7 @@ export const EcgProViewerCanvas = memo(function EcgProViewerCanvas({
   displayMode,
   imageUrl,
   onPointerMove,
-  testID = "sprint93-ecg-pro-viewer-canvas",
+  testID = "sprint101-ecg-pro-viewer-canvas",
   theme,
 }: Props) {
   const palette = ECG_PRO_VIEWER_THEMES[theme];
@@ -31,6 +31,7 @@ export const EcgProViewerCanvas = memo(function EcgProViewerCanvas({
   const imageRef = useRef<HTMLImageElement | null>(null);
   const pinchBase = useRef(controls.transform.zoom);
   const panBase = useRef({ x: controls.transform.panX, y: controls.transform.panY });
+  const paintFrameRef = useRef<number | null>(null);
   const viewport = controls.viewport;
   const showImage = displayMode !== "grid";
   const showGrid = displayMode !== "image";
@@ -90,6 +91,15 @@ export const EcgProViewerCanvas = memo(function EcgProViewerCanvas({
     ctx.restore();
   }, [controls, palette.background, showImage, viewport]);
 
+  const schedulePaint = useCallback(() => {
+    if (Platform.OS !== "web" || typeof window === "undefined") return;
+    if (paintFrameRef.current != null) return;
+    paintFrameRef.current = window.requestAnimationFrame(() => {
+      paintFrameRef.current = null;
+      paintCanvas();
+    });
+  }, [paintCanvas]);
+
   useEffect(() => {
     if (Platform.OS !== "web" || !imageUrl) return undefined;
     const image = new Image();
@@ -99,18 +109,27 @@ export const EcgProViewerCanvas = memo(function EcgProViewerCanvas({
       cacheImageDimensions(imageUrl, image.naturalWidth, image.naturalHeight);
       controls.setViewportDimensions({ imageHeight: image.naturalHeight, imageWidth: image.naturalWidth });
       setLoading(false);
-      paintCanvas();
+      schedulePaint();
     };
     image.onerror = () => setLoading(false);
     image.src = imageUrl;
     return () => {
       imageRef.current = null;
     };
-  }, [controls.setViewportDimensions, imageUrl, paintCanvas]);
+  }, [controls.setViewportDimensions, imageUrl, schedulePaint]);
 
   useEffect(() => {
-    paintCanvas();
-  }, [controls.adjustments, controls.transform, paintCanvas, showImage, theme]);
+    schedulePaint();
+  }, [controls.adjustments, controls.transform, schedulePaint, showImage, theme]);
+
+  useEffect(
+    () => () => {
+      if (paintFrameRef.current != null && typeof window !== "undefined") {
+        window.cancelAnimationFrame(paintFrameRef.current);
+      }
+    },
+    [],
+  );
 
   useEffect(() => {
     if (Platform.OS !== "web" || typeof document === "undefined") return undefined;
@@ -185,6 +204,22 @@ export const EcgProViewerCanvas = memo(function EcgProViewerCanvas({
   const imageHeight = viewport.imageHeight;
   const gridColors: EcgProViewerGridColors = palette.grid;
 
+  const gridTransformStyle = useMemo(() => {
+    const { adjustments, transform } = controls;
+    const centerX = viewport.containerWidth / 2 + transform.panX;
+    const centerY = viewport.containerHeight / 2 + transform.panY;
+    const scaleX = (adjustments.flipHorizontal ? -1 : 1) * transform.zoom;
+    const scaleY = (adjustments.flipVertical ? -1 : 1) * transform.zoom;
+    return {
+      height: imageHeight,
+      left: centerX - imageWidth / 2,
+      position: "absolute" as const,
+      top: centerY - imageHeight / 2,
+      transform: [{ rotate: `${transform.rotation}deg` }, { scaleX }, { scaleY }],
+      width: imageWidth,
+    };
+  }, [controls, imageHeight, imageWidth, viewport.containerHeight, viewport.containerWidth]);
+
   const canvasBody = (
     <View nativeID={testID} onLayout={onLayout} style={[styles.canvasHost, { backgroundColor: palette.background }]} testID={testID}>
       {loading ? (
@@ -202,14 +237,9 @@ export const EcgProViewerCanvas = memo(function EcgProViewerCanvas({
           style={{ height: "100%", width: "100%" }}
         />
       ) : null}
-      {showGrid ? (
-        <View pointerEvents="none" style={styles.gridLayer}>
-          <EcgPaperGrid
-            grid={{ ...controls.grid, colors: gridColors }}
-            height={imageHeight}
-            width={imageWidth}
-            zoom={controls.transform.zoom}
-          />
+      {showGrid && imageWidth > 0 && imageHeight > 0 ? (
+        <View pointerEvents="none" style={[styles.gridLayer, gridTransformStyle]}>
+          <EcgPaperGrid grid={{ ...controls.grid, colors: gridColors }} height={imageHeight} width={imageWidth} zoom={1} />
         </View>
       ) : null}
     </View>
@@ -230,7 +260,7 @@ export const EcgProViewerCanvas = memo(function EcgProViewerCanvas({
 
 const styles = StyleSheet.create({
   canvasHost: { flex: 1, minHeight: 320, overflow: "hidden", position: "relative" },
-  gridLayer: { ...StyleSheet.absoluteFillObject, alignItems: "center", justifyContent: "center" },
+  gridLayer: { overflow: "hidden" },
   loader: { alignItems: "center", gap: 8, justifyContent: "center", ...StyleSheet.absoluteFillObject, zIndex: 2 },
   root: { flex: 1, minHeight: 320 },
 });

@@ -2,7 +2,10 @@
 export { EcgProViewerCanvas } from "./EcgProViewerCanvas";
 export { EcgProViewerCaseTabs } from "./EcgProViewerCaseTabs";
 export { EcgProViewerComparisonPanel } from "./EcgProViewerComparisonPanel";
+export { EcgProViewerClinicalMeasurementsPanel } from "./EcgProViewerClinicalMeasurementsPanel";
+export { EcgProViewerAiFindingsSidebar } from "./EcgProViewerAiFindingsSidebar";
 export { EcgProViewerWaveformCanvas } from "./EcgProViewerWaveformCanvas";
+export { buildClinicalMeasurementCards, bundleSeedFromMeasurements } from "./clinicalMeasurementCards";
 export { buildDigitalEcgFromWaveforms } from "./digitalEcgFromWaveform";
 export { useEcgProViewerSession } from "./useEcgProViewerSession";
 export { useEcgProViewerTabs } from "./useEcgProViewerTabs";

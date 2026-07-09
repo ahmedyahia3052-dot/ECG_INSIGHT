@@ -14,7 +14,9 @@ type Props = {
   layoutPreset: EcgProViewerLayoutPreset;
   onCanvasModeChange: (mode: EcgProViewerCanvasMode) => void;
   onDisplayModeChange: (mode: EcgProViewerDisplayMode) => void;
+  onExportJson?: () => void;
   onLayoutPresetChange: (preset: EcgProViewerLayoutPreset) => void;
+  onSnapshot?: () => void;
   theme: EcgProViewerTheme;
   workspace?: EcgMeasurementWorkspace;
 };
@@ -54,7 +56,9 @@ export function EcgProViewerToolsPanel({
   layoutPreset,
   onCanvasModeChange,
   onDisplayModeChange,
+  onExportJson,
   onLayoutPresetChange,
+  onSnapshot,
   theme,
   workspace,
 }: Props) {
@@ -90,6 +94,8 @@ export function EcgProViewerToolsPanel({
         <ToolItem icon="sun" label="Grid Opacity" onPress={controls.cycleGridOpacity} palette={palette} />
         <ToolItem icon="rotate-cw" label="Rotate" onPress={controls.rotate} palette={palette} />
         <ToolItem icon="refresh-cw" label="Reset View" onPress={controls.resetView} palette={palette} />
+        <ToolItem icon="camera" label="Snapshot" onPress={() => onSnapshot?.()} palette={palette} testID="sprint101-tool-snapshot" />
+        <ToolItem icon="share" label="Export JSON" onPress={() => onExportJson?.()} palette={palette} testID="sprint101-tool-export" />
         <ToolItem active={canvasMode === "image"} icon="image" label="Image" onPress={() => onCanvasModeChange("image")} palette={palette} testID="sprint95-tool-canvas-image" />
         <ToolItem active={canvasMode === "waveform"} icon="trending-up" label="Waveform" onPress={() => onCanvasModeChange("waveform")} palette={palette} testID="sprint95-tool-canvas-waveform" />
         <ToolItem active={canvasMode === "hybrid"} icon="layers" label="Hybrid" onPress={() => onCanvasModeChange("hybrid")} palette={palette} testID="sprint95-tool-canvas-hybrid" />
