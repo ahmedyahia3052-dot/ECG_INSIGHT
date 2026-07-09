@@ -231,7 +231,7 @@ External components should depend on adapter outputs and domain hooks, not on `@
 ## Git
 
 - **Branch:** `feature/sprint102-frontend-foundation`
-- **Commit:** `Sprint102_Frontend_Foundation`
+- **Commits:** `c789494` (foundation layers + page hooks), `0df63b7` (EnterpriseUI route registry wiring)
 
 ---
 
