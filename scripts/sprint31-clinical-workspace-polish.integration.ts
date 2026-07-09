@@ -41,7 +41,7 @@ async function main() {
     ["workflow ribbon with step chips", ribbon.includes("sprint30-clinical-workflow-ribbon") && ribbon.includes("sprint30-workflow-step-")],
     ["unified left clinical panel", foundation.includes("EcgUnifiedClinicalLeftPanel") && leftPanel.includes("sprint35-clinical-summary-panel")],
     ["removed duplicate workstation nav", !foundation.includes("EcgWorkstationLeftNav")],
-    ["enterprise sidebar hidden on workspace", enterpriseUi.includes("!isEcgMonitorWorkspace && !isMobile")],
+    ["enterprise sidebar hidden on workspace", enterpriseUi.includes("hideSidebar={isEcgMonitorWorkspace}")],
     ["status metrics throttled", metrics.includes("statusBarUpdateIntervalMs")],
     ["diagnostic fullscreen hides panels", foundation.includes("diagnosticMode ? null")],
     ["toolbar tooltips", toolbar.includes("EcgWorkstationTooltip")],
