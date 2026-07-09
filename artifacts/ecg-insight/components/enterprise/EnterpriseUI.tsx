@@ -45,6 +45,7 @@ const NAV_ITEMS: NavItem[] = [
   { group: "CLINICAL", href: "/ecg-cases", icon: "clipboard", title: "ECG Cases" },
   { group: "CLINICAL", href: "/upload-ecg", icon: "upload-cloud", title: "Upload ECG" },
   { group: "CLINICAL", href: "/ecg-workspace", icon: "image", title: "ECG Workspace" },
+  { group: "CLINICAL", href: "/ecg-viewer", icon: "monitor", title: "ECG Pro Viewer" },
   { group: "CLINICAL", href: "/ecg-live-monitor", icon: "monitor", title: "Live Monitor" },
   { group: "CLINICAL", href: "/patients", icon: "users", title: "Patients" },
   { group: "CLINICAL", href: "/reports", icon: "file-text", title: "Reports" },
@@ -89,6 +90,7 @@ const PAGE_TITLES: Record<string, { subtitle: string; title: string }> = {
   "/upload-ecg": { subtitle: "Capture, upload, preview, analyze, validate, and save ECG records.", title: "Upload ECG" },
   "/ecg-live-monitor": { subtitle: "Dedicated hospital bedside live ECG monitor workspace — separate from the clinical review workstation.", title: "Live ECG Monitor" },
   "/ecg-workspace": { subtitle: "Hospital-grade ECG clinical workstation with digitization, live monitor, measurements, AI review, and export.", title: "Hospital ECG Workstation" },
+  "/ecg-viewer": { subtitle: "Professional hospital ECG image viewer with calibrated grid, zoom, pan, and study metadata.", title: "ECG Pro Viewer" },
 };
 
 function roleRank(role?: string) {
@@ -161,7 +163,10 @@ export function EnterpriseShell({ children }: PropsWithChildren) {
   const meta = pageMeta(pathname);
   const isCopilotWorkspace = pathname.startsWith("/copilot");
   const isEcgMonitorWorkspace =
-    pathname.startsWith("/ecg-monitor") || pathname.startsWith("/ecg-workspace") || pathname.startsWith("/ecg-live-monitor");
+    pathname.startsWith("/ecg-monitor")
+    || pathname.startsWith("/ecg-workspace")
+    || pathname.startsWith("/ecg-viewer")
+    || pathname.startsWith("/ecg-live-monitor");
   const isFullBleedWorkspace = isCopilotWorkspace || isEcgMonitorWorkspace;
   const navItems = useMemo(() => NAV_ITEMS.filter((item) => {
     if (item.ownerOnly && user?.email?.toLowerCase() !== "ahmedyahia3052@gmail.com") return false;

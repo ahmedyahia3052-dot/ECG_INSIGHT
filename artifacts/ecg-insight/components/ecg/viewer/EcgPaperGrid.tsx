@@ -6,7 +6,8 @@ import { gridSpacingPx } from "./ecgCalibrationMath";
 import type { EcgViewerGridSettings } from "./types";
 
 type Props = {
-  grid: EcgViewerGridSettings;
+  colors?: { major: string; minor: string };
+  grid: EcgViewerGridSettings & { colors?: { major: string; minor: string } };
   height: number;
   width: number;
   zoom?: number;
@@ -17,8 +18,8 @@ export const EcgPaperGrid = memo(function EcgPaperGrid({ grid, height, width, zo
 
   if (!grid.visible || width <= 0 || height <= 0) return null;
 
-  const minor = "#F3A6A6";
-  const major = "#E36A6A";
+  const minor = grid.colors?.minor ?? "#F3A6A6";
+  const major = grid.colors?.major ?? "#E36A6A";
   const verticalCount = Math.ceil(width / spacing) + 2;
   const horizontalCount = Math.ceil(height / spacing) + 2;
 
