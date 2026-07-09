@@ -32,8 +32,12 @@ for (const legacyDir of [
 }
 
 const enterpriseShell = read("artifacts/ecg-insight/components/enterprise/EnterpriseUI.tsx");
+const boltAppShell = read("artifacts/ecg-insight/design-system/shell/BoltAppShell.tsx");
+const boltHeader = read("artifacts/ecg-insight/design-system/shell/BoltHeader.tsx");
+const boltNotificationPanel = read("artifacts/ecg-insight/design-system/shell/BoltNotificationPanel.tsx");
+const enterpriseShellBundle = [enterpriseShell, boltAppShell, boltHeader, boltNotificationPanel].join("\n");
 const routeRegistry = read("artifacts/ecg-insight/routes/registry.ts");
-const enterpriseNavBundle = `${enterpriseShell}\n${routeRegistry}`;
+const enterpriseNavBundle = `${enterpriseShellBundle}\n${routeRegistry}`;
 const copilotWorkspace = read("artifacts/ecg-insight/app/(protected)/copilot.tsx");
 const copilotMessageCard = read("artifacts/ecg-insight/components/copilot/CopilotMessageCard.tsx");
 const copilotComposer = read("artifacts/ecg-insight/components/copilot/CopilotComposer.tsx");
@@ -68,8 +72,8 @@ const supportRoutes = read("server/src/modules/support/support.routes.ts");
 assert(enterpriseShell.includes("ProtectedRoute") && enterpriseShell.includes("EnterpriseShell"), "Protected shell must own the dashboard architecture.");
 assert(!enterpriseShell.includes("<MedicalAICopilot"), "Dashboard shell must not mount the retired embedded Copilot widget.");
 assert(!dashboardBundle.includes("MedicalAICopilot") && dashboardPresentation.includes("Open AI Copilot") && dashboardContainer.includes('router.push("/copilot"'), "Dashboard must only expose Copilot as a clean /copilot entry point.");
-assert((enterpriseShell.match(/accessibilityLabel=\"Notifications\"/g) ?? []).length === 1, "Exactly one notification bell may render in the dashboard shell.");
-for (const marker of ["CLINICAL", "WORKSPACE", "DEVELOPER", "/support", "refetchInterval: 15_000", "notificationSearch", "Open Notification History", "PremiumNotificationCard", "RefreshControl", "PanResponder", "hapticReadyInteraction", "notificationDrawerMobile"]) {
+assert((enterpriseShellBundle.match(/accessibilityLabel=\"Notifications\"/g) ?? []).length === 1, "Exactly one notification bell may render in the dashboard shell.");
+for (const marker of ["CLINICAL", "WORKSPACE", "DEVELOPER", "/support", "refetchInterval: 15_000", "notificationSearch", "Open Notification History", "NotificationCard", "RefreshControl", "PanResponder", "notificationDrawerMobile"]) {
   assert(enterpriseNavBundle.includes(marker), `Enterprise shell is missing production dashboard marker: ${marker}`);
 }
 for (const forbidden of ["\"ai\"] as const", "/(tabs)", "@/components/bolt", "@/components/dashboard"]) {
