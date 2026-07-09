@@ -7,7 +7,7 @@ import { useAuth } from "@/context/AuthContext";
 import { useDashboardData } from "@/hooks/domain/useDashboardData";
 import { DashboardBoltPresentation } from "@/presentation/bolt";
 
-/** Container — business logic + data only. Bolt UI replaces DashboardLegacyPresentation. */
+/** Container — business logic + data only. Renders Bolt dashboard presentation. */
 export function DashboardContainer() {
   const router = useRouter();
   const { authToken, user } = useAuth();

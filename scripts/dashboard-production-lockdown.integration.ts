@@ -51,8 +51,9 @@ const copilotMessageList = read("artifacts/ecg-insight/components/copilot/Copilo
 const copilotBundle = [copilotWorkspace, copilotMessageCard, copilotComposer, copilotMessageList].join("\n");
 const dashboard = read("artifacts/ecg-insight/app/(protected)/dashboard.tsx");
 const dashboardContainer = read("artifacts/ecg-insight/containers/DashboardContainer.tsx");
-const dashboardPresentation = read("artifacts/ecg-insight/legacy-ui/screens/DashboardLegacyPresentation.tsx");
-const dashboardBundle = [dashboard, dashboardContainer, dashboardPresentation].join("\n");
+const dashboardPresentation = readIfExists("artifacts/ecg-insight/presentation/bolt/DashboardBoltPresentation.tsx");
+const dashboardLegacyPresentation = readIfExists("artifacts/ecg-insight/legacy-ui/screens/DashboardLegacyPresentation.tsx");
+const dashboardBundle = [dashboard, dashboardContainer, dashboardPresentation, dashboardLegacyPresentation].join("\n");
 const copilotService = read("artifacts/ecg-insight/services/copilot.ts");
 const dashboardStore = read("artifacts/ecg-insight/context/DashboardStore.ts");
 const notificationPage = read("artifacts/ecg-insight/app/(protected)/notifications.tsx");
@@ -77,7 +78,8 @@ const supportRoutes = read("server/src/modules/support/support.routes.ts");
 
 assert(enterpriseShell.includes("ProtectedRoute") && enterpriseShell.includes("EnterpriseShell"), "Protected shell must own the dashboard architecture.");
 assert(!enterpriseShell.includes("<MedicalAICopilot"), "Dashboard shell must not mount the retired embedded Copilot widget.");
-assert(!dashboardBundle.includes("MedicalAICopilot") && dashboardPresentation.includes("Open AI Copilot") && dashboardContainer.includes('router.push("/copilot"'), "Dashboard must only expose Copilot as a clean /copilot entry point.");
+assert(!dashboardContainer.includes("DashboardLegacyPresentation"), "Active dashboard container must not render legacy presentation.");
+assert(!dashboardBundle.includes("MedicalAICopilot") && dashboardContainer.includes("DashboardBoltPresentation") && dashboardPresentation.includes("Welcome back") && dashboardContainer.includes('router.push("/copilot"'), "Dashboard must render Bolt presentation and expose Copilot as a clean /copilot entry point.");
 assert((enterpriseShellBundle.match(/accessibilityLabel=\"Notifications\"/g) ?? []).length === 1, "Exactly one notification bell may render in the dashboard shell.");
 const notificationMarkers = usesBoltShell
   ? ["Open Notification History", "NotificationCard", "RefreshControl", "PanResponder"]
