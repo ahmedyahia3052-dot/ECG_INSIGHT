@@ -1,4 +1,4 @@
-import React from "react";
+﻿import React from "react";
 import { useLocalSearchParams } from "expo-router";
 import { StyleSheet, View } from "react-native";
 
@@ -8,7 +8,7 @@ import { EmptyState, FullScreenLoader } from "@/components/enterprise/Enterprise
 import { useAuth } from "@/context/AuthContext";
 
 export default function EcgViewerRoute() {
-  const { caseId, patientId } = useLocalSearchParams<{ caseId?: string; patientId?: string }>();
+  const { caseId, patientId, tabs } = useLocalSearchParams<{ caseId?: string; patientId?: string; tabs?: string }>();
   const { authToken, isLoading: authLoading } = useAuth();
   const token = authToken?.token;
   const resolver = useEcgWorkspaceCaseResolver({ caseId, patientId, token });
@@ -34,7 +34,7 @@ export default function EcgViewerRoute() {
     );
   }
 
-  return <EcgProViewerFoundationScreen caseId={resolver.resolvedCaseId} token={token} />;
+  return <EcgProViewerFoundationScreen caseId={resolver.resolvedCaseId} tabsParam={tabs} token={token} />;
 }
 
 const styles = StyleSheet.create({
