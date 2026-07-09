@@ -81,9 +81,11 @@ const supportRoutes = read("server/src/modules/support/support.routes.ts");
 assert(enterpriseShell.includes("ProtectedRoute") && enterpriseShell.includes("EnterpriseShell"), "Protected shell must own the dashboard architecture.");
 assert(!enterpriseShell.includes("<MedicalAICopilot"), "Dashboard shell must not mount the retired embedded Copilot widget.");
 assert(!dashboardContainer.includes("DashboardLegacyPresentation"), "Active dashboard container must not render legacy presentation.");
-assert(dashboardContainer.includes("DashboardBoltPresentation"), "Active dashboard container must use Expo-compatible Bolt presentation for Metro web startup.");
-assert(!dashboardContainer.includes("BoltDashboardHost"), "Dashboard container must not import Vite Bolt host into Expo Metro bundle graph.");
-assert(!dashboardBundle.includes("MedicalAICopilot") && dashboardRecreation.includes("DashboardBoltPresentation") && dashboardContainer.includes('router.push("/copilot"'), "Dashboard must use Expo-compatible Bolt presentation and expose Copilot as a clean /copilot entry point.");
+assert(!dashboardContainer.includes("DashboardBoltPresentation"), "Active dashboard container must not render recreated RN dashboard on web.");
+assert(dashboardContainer.includes("BoltDashboardHost"), "Active dashboard container must render imported original Bolt dashboard host.");
+assert(dashboardPresentation.includes("export function DashboardPage"), "Imported Bolt dashboard page must exist.");
+assert(dashboardPresentation.includes("Welcome back"), "Imported Bolt dashboard must retain original welcome hero copy.");
+assert(!dashboardBundle.includes("MedicalAICopilot") && dashboardContainer.includes('router.push("/copilot"'), "Dashboard must expose Copilot as a clean /copilot entry point.");
 assert((enterpriseShellBundle.match(/accessibilityLabel=\"Notifications\"/g) ?? []).length === 1, "Exactly one notification bell may render in the dashboard shell.");
 const notificationMarkers = usesBoltShell
   ? ["Open Notification History", "NotificationCard", "RefreshControl", "PanResponder"]
