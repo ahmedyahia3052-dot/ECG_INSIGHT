@@ -1,72 +1,42 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
 
 import { Badge, Card, EmptyState, formatDate, medicalTheme, PageSection, patientDisplayName, PrimaryButton, SectionHeader } from "@/components/enterprise/EnterpriseUI";
+import { AsyncStateView } from "@/components/async-states/AsyncStateView";
 import { CaseCollaborationPanel } from "@/components/collaboration/CaseCollaborationPanel";
 import { CDSSDecisionPanel } from "@/components/clinical/CDSSDecisionPanel";
 import { LongitudinalECGPanel } from "@/components/clinical/LongitudinalECGPanel";
 import { EcgProViewer } from "@/components/ecg/EcgProViewer";
 import { useAuth } from "@/context/AuthContext";
-import { analyzeCase, getAIExplainability, getAIResult } from "@/services/ai";
-import { approveCase, createCaseRevision, getCase, getPatientEcgHistory, rejectCase, updateCaseStatus } from "@/services/clinical";
-import { getDigitalECG } from "@/services/ecgProcessing";
-import { generateReport } from "@/services/reports";
+import { useEcgCaseDetail } from "@/hooks/domain/useEcgCaseDetail";
+import { clinicalDomainService } from "@/services/domain";
 import { API_URL } from "@/services/api";
 
 export default function EcgCaseDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
-  const queryClient = useQueryClient();
   const { authToken } = useAuth();
   const token = authToken?.token;
 
-  const caseQuery = useQuery({
-    enabled: !!token && !!id,
-    queryFn: () => getCase(token!, id),
-    queryKey: ["enterprise-ecg-case", token, id],
-    retry: false,
-  });
-  const analysisQuery = useQuery({
-    enabled: !!token && !!id,
-    queryFn: () => getAIResult(token!, id),
-    queryKey: ["enterprise-ecg-case-ai", token, id],
-    retry: false,
-  });
-  const explainabilityQuery = useQuery({
-    enabled: !!token && !!id,
-    queryFn: () => getAIExplainability(token!, id),
-    queryKey: ["enterprise-ecg-case-explainability", token, id],
-    retry: false,
-  });
-  const digitalEcgQuery = useQuery({
-    enabled: !!token && !!id,
-    queryFn: () => getDigitalECG(token!, id),
-    queryKey: ["enterprise-ecg-case-digital", token, id],
-    retry: false,
-  });
-
-  const invalidate = async () => {
-    await queryClient.invalidateQueries({ queryKey: ["enterprise-ecg-case", token, id] });
-    await queryClient.invalidateQueries({ queryKey: ["enterprise-ecg-cases", token] });
-  };
-  const analyzeMutation = useMutation({ mutationFn: () => analyzeCase(token!, id), onSuccess: invalidate });
-  const processMutation = useMutation({ mutationFn: () => updateCaseStatus(token!, id, "processing"), onSuccess: invalidate });
-  const approveMutation = useMutation({ mutationFn: () => approveCase(token!, id), onSuccess: invalidate });
-  const rejectMutation = useMutation({ mutationFn: () => rejectCase(token!, id, { reason: "Rejected from detail review." }), onSuccess: invalidate });
-  const finalizeMutation = useMutation({ mutationFn: () => updateCaseStatus(token!, id, "finalized"), onSuccess: invalidate });
-  const reportMutation = useMutation({ mutationFn: () => generateReport(token!, id), onSuccess: invalidate });
-  const revisionMutation = useMutation({
-    mutationFn: () => createCaseRevision(token!, id),
-    onSuccess: (payload) => router.push(`/ecg-cases/${payload.case.id}` as never),
-  });
-
-  const [showAdvancedPanels, setShowAdvancedPanels] = useState(false);
-  const ecgCase = caseQuery.data?.case;
+  const {
+    analysisQuery,
+    analyzeMutation,
+    approveMutation,
+    caseQuery,
+    digitalEcgQuery,
+    ecgCase,
+    explainabilityQuery,
+    finalizeMutation,
+    processMutation,
+    rejectMutation,
+    reportMutation,
+    revisionMutation,
+  } = useEcgCaseDetail(token, id);
   const historyQuery = useQuery({
     enabled: !!token && !!ecgCase?.patientId,
-    queryFn: () => getPatientEcgHistory(token!, ecgCase!.patientId),
+    queryFn: () => clinicalDomainService.getPatientHistory(token!, ecgCase!.patientId),
     queryKey: ["enterprise-ecg-case-history", token, ecgCase?.patientId],
     retry: false,
   });
@@ -81,7 +51,14 @@ export default function EcgCaseDetailScreen() {
   const explainability = explainabilityQuery.data?.explainability;
   const digitalEcg = digitalEcgQuery.data?.digitalEcg;
 
-  if (caseQuery.isLoading) return <Text style={styles.muted}>Loading ECG case...</Text>;
+  const [showAdvancedPanels, setShowAdvancedPanels] = useState(false);
+  if (caseQuery.isLoading) {
+    return (
+      <PageSection>
+        <AsyncStateView isLoading />
+      </PageSection>
+    );
+  }
   if (!ecgCase) return <EmptyState title="ECG case not found" message="The selected ECG case could not be loaded." />;
   const readOnly = ecgCase.status === "finalized";
   const canProcess = ecgCase.status === "uploaded";
@@ -114,7 +91,17 @@ export default function EcgCaseDetailScreen() {
           <PrimaryButton label="Live Monitor" onPress={() => router.push(`/ecg-live-monitor/${ecgCase.id}` as never)} />
           <PrimaryButton label="ECG Workspace" onPress={() => router.push(`/ecg-workspace?caseId=${ecgCase.id}` as never)} variant="outline" />
           <PrimaryButton label={showAdvancedPanels ? "Hide Advanced Panels" : "Load Advanced Panels"} onPress={() => setShowAdvancedPanels((value) => !value)} variant="outline" />
-          {readOnly || ecgCase.status === "approved" || ecgCase.status === "rejected" ? <PrimaryButton label="Create New Revision" onPress={() => revisionMutation.mutate()} variant="outline" /> : null}
+          {readOnly || ecgCase.status === "approved" || ecgCase.status === "rejected" ? (
+            <PrimaryButton
+              label="Create New Revision"
+              onPress={() =>
+                revisionMutation.mutate(undefined, {
+                  onSuccess: (payload) => router.push(`/ecg-cases/${payload.case.id}` as never),
+                })
+              }
+              variant="outline"
+            />
+          ) : null}
         </View>
       </Card>
 
