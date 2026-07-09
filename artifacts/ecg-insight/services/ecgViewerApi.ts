@@ -64,3 +64,68 @@ export async function getEcgStorageFileMetadata(accessToken: string, ecgFileId: 
 export async function getEcgViewerZoomPresets(accessToken: string) {
   return apiRequest<{ presets: number[] }>("/ecg-viewer/zoom-presets", { accessToken });
 }
+export type EcgViewerWaveformDto = {
+  caseId: string;
+  durationSeconds: number;
+  ecgFileId: string;
+  lead: string;
+  samples: number[];
+  samplingRate: number;
+};
+
+export type EcgViewerLeadDto = {
+  durationSeconds: number;
+  gain: number;
+  leadName: string;
+  metadata: Record<string, unknown> | null;
+  paperSpeed: number;
+  sampleCount: number;
+  samplingRate: number;
+};
+
+export type EcgViewerComparisonDto = {
+  baseline: Record<string, number>;
+  baselineCaseId?: string;
+  caseId: string;
+  current: Record<string, number>;
+  deltas: Record<string, number>;
+  trendDirection: Record<string, "down" | "stable" | "up">;
+};
+
+export async function getEcgViewerWaveform(
+  accessToken: string,
+  caseId: string,
+  options?: { lead?: string; maxSeconds?: number },
+) {
+  const query = new URLSearchParams();
+  if (options?.lead) query.set("lead", options.lead);
+  if (options?.maxSeconds) query.set("maxSeconds", String(options.maxSeconds));
+  const suffix = query.toString() ? `?${query.toString()}` : "";
+  return apiRequest<{ waveform: EcgViewerWaveformDto | EcgViewerWaveformDto[] }>(
+    `/ecg-viewer/cases/${caseId}/waveform${suffix}`,
+    { accessToken },
+  );
+}
+
+export async function getEcgViewerLeads(accessToken: string, caseId: string) {
+  return apiRequest<{ leads: EcgViewerLeadDto[] }>(`/ecg-viewer/cases/${caseId}/leads`, { accessToken });
+}
+
+export async function compareEcgViewerCases(accessToken: string, caseId: string, baselineCaseId: string) {
+  return apiRequest<{ comparison: EcgViewerComparisonDto }>(
+    `/ecg-viewer/cases/${caseId}/compare?baselineCaseId=${encodeURIComponent(baselineCaseId)}`,
+    { accessToken },
+  );
+}
+
+export async function getEcgViewerPreferences(accessToken: string) {
+  return apiRequest<{ preferences: Record<string, unknown> }>("/ecg-viewer/preferences", { accessToken });
+}
+
+export async function saveEcgViewerPreferences(accessToken: string, preferences: Record<string, unknown>) {
+  return apiRequest<{ preferences: Record<string, unknown> }>("/ecg-viewer/preferences", {
+    accessToken,
+    body: JSON.stringify(preferences),
+    method: "PUT",
+  });
+}

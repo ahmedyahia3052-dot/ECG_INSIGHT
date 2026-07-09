@@ -2,7 +2,11 @@ import type { EcgGridGain, EcgLeadId, EcgPaperSpeed } from "../types";
 
 export type EcgProViewerTheme = "dark" | "light";
 
-export type EcgProViewerDisplayMode = "grid" | "image" | "image-grid";
+export type EcgProViewerDisplayMode = "grid" | "image" | "image-grid" | "waveform";
+
+export type EcgProViewerCanvasMode = "image" | "waveform" | "hybrid";
+
+export type EcgProViewerLayoutPreset = "12-lead" | "rhythm" | "single" | "3x4" | "6x2";
 
 export type EcgProViewerGridColors = {
   major: string;

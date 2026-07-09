@@ -196,7 +196,6 @@ export function EcgProViewerFoundationScreen({ caseId, tabsParam, token }: Props
       currentDigitizedLeads={[]}
       currentImageUrl={enrichedSession!.imageUrl}
       currentLabel={caseId}
-      testID="sprint95-ecg-pro-viewer-compare"
     />
   ) : null;
 

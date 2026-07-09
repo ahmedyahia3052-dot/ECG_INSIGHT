@@ -20,7 +20,7 @@ assertContains("artifacts/ecg-insight/app/(protected)/ecg-viewer.tsx", [
 ]);
 
 assertContains("artifacts/ecg-insight/components/ecg/viewer/pro-foundation/EcgProViewerFoundationScreen.tsx", [
-  "sprint93-ecg-pro-viewer-root",
+  "sprint95-ecg-pro-viewer-root",
   "EcgProViewerToolbar",
   "EcgProViewerToolsPanel",
   "EcgProViewerInfoPanel",
