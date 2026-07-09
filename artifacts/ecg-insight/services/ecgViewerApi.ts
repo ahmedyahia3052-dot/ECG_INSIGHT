@@ -64,6 +64,7 @@ export async function getEcgStorageFileMetadata(accessToken: string, ecgFileId: 
 export async function getEcgViewerZoomPresets(accessToken: string) {
   return apiRequest<{ presets: number[] }>("/ecg-viewer/zoom-presets", { accessToken });
 }
+
 export type EcgViewerWaveformDto = {
   caseId: string;
   durationSeconds: number;
