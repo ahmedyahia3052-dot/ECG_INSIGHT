@@ -1,0 +1,30 @@
+{
+  "version": "sprint103-v1",
+  "basePaths": ["/api", "/api/v1"],
+  "errorContract": "shared/types/errors.ts",
+  "paginationContract": "shared/types/pagination.ts",
+  "modules": [
+    { "tag": "auth", "prefix": "/auth", "auth": "public|authenticated", "endpoints": ["POST /register", "POST /login", "POST /refresh", "GET /me", "POST /change-password"] },
+    { "tag": "cases", "prefix": "/cases", "auth": "authenticated", "pagination": true, "filtering": ["q", "status", "severity", "priority", "assignedDoctorId"], "sorting": ["uploadDate", "priority"], "endpoints": ["GET /", "POST /", "GET /:caseId", "PATCH /:caseId", "POST /:caseId/review", "POST /:caseId/approve", "POST /:caseId/reject", "POST /:caseId/revisions", "GET /:caseId/timeline", "GET /:caseId/ecg-viewer-workspace", "PUT /:caseId/ecg-viewer-workspace"] },
+    { "tag": "patients", "prefix": "/patients", "auth": "authenticated", "pagination": true, "filtering": ["q", "gender", "status"], "endpoints": ["GET /", "POST /", "GET /:id", "PATCH /:id", "DELETE /:id", "POST /:id/archive"] },
+    { "tag": "reports", "prefix": "/reports", "auth": "authenticated", "pagination": true, "endpoints": ["GET /", "GET /:id", "POST /:id/finalize", "POST /:id/sign", "GET /:id/html", "GET /:id/pdf", "POST /:id/email"] },
+    { "tag": "subscriptions", "prefix": "/subscriptions", "auth": "authenticated", "endpoints": ["GET /me", "GET /billing-history", "GET /usage", "POST /checkout"] },
+    { "tag": "enterprise", "prefix": "/enterprise", "auth": "authenticated", "endpoints": ["GET /clinical-dashboard", "GET /analytics", "GET /organizations"] },
+    { "tag": "notifications", "prefix": "/notifications", "auth": "authenticated", "pagination": true, "endpoints": ["GET /", "PATCH /:id/read", "PATCH /read-all", "DELETE /:id"] },
+    { "tag": "uploads", "prefix": "/uploads", "auth": "authenticated", "endpoints": ["POST /", "GET /ecg/:storedName"] },
+    { "tag": "users", "prefix": "/users", "auth": "admin", "endpoints": ["GET /", "GET /:id", "PATCH /:id"] },
+    { "tag": "audit", "prefix": "/audit", "auth": "admin", "pagination": true, "endpoints": ["GET /"] },
+    { "tag": "copilot", "prefix": "/copilot", "auth": "authenticated", "endpoints": ["GET /conversations", "POST /chat", "POST /chat/stream"] },
+    { "tag": "ecg-viewer", "prefix": "/ecg-viewer", "auth": "authenticated", "endpoints": ["GET /cases/:caseId/bundle", "GET /cases/:caseId/image", "GET /cases/:caseId/measurements", "GET /cases/:caseId/waveform"] },
+    { "tag": "ecg-processing", "prefix": "/ecg-processing-engine", "auth": "authenticated", "endpoints": ["POST /digitize", "GET /:caseId/digitized", "POST /measure/:caseId"] }
+  ],
+  "standardResponses": {
+    "401": { "code": "UNAUTHORIZED", "schema": "ApiErrorBody" },
+    "403": { "code": "FORBIDDEN", "schema": "ApiErrorBody" },
+    "404": { "code": "NOT_FOUND", "schema": "ApiErrorBody" },
+    "409": { "code": "CONFLICT", "schema": "ApiErrorBody" },
+    "422": { "code": "VALIDATION_ERROR", "schema": "ApiErrorBody" },
+    "429": { "code": "RATE_LIMITED", "schema": "ApiErrorBody" },
+    "500": { "code": "INTERNAL_ERROR", "schema": "ApiErrorBody" }
+  }
+}

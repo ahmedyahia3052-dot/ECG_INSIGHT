@@ -15,6 +15,9 @@ const workspace = read("artifacts/ecg-insight/app/(protected)/copilot.tsx");
 const composer = read("artifacts/ecg-insight/components/copilot/CopilotComposer.tsx");
 const conversationRoute = read("artifacts/ecg-insight/app/(protected)/copilot/[conversationId].tsx");
 const dashboard = read("artifacts/ecg-insight/app/(protected)/dashboard.tsx");
+const dashboardContainer = read("artifacts/ecg-insight/containers/DashboardContainer.tsx");
+const dashboardPresentation = read("artifacts/ecg-insight/legacy-ui/screens/DashboardLegacyPresentation.tsx");
+const dashboardBundle = [dashboard, dashboardContainer, dashboardPresentation].join("\n");
 const enterpriseShell = read("artifacts/ecg-insight/components/enterprise/EnterpriseUI.tsx");
 const routeRegistry = read("artifacts/ecg-insight/routes/registry.ts");
 const enterpriseNavBundle = `${enterpriseShell}\n${routeRegistry}`;
@@ -51,7 +54,7 @@ for (const removed of ["Rename", "Pin", "Favorite", "Archive", "Duplicate", "ren
 }
 
 assert(conversationRoute.includes("useLocalSearchParams") && conversationRoute.includes("conversationId") && conversationRoute.includes("CopilotWorkspaceScreen"), "Dynamic /copilot/:conversationId route must restore chat history.");
-assert(dashboard.includes('label="Open AI Copilot"') && dashboard.includes('router.push("/copilot"'), "Dashboard must expose Copilot only as a clean route entry point.");
+assert(dashboardPresentation.includes('label="Open AI Copilot"') && dashboardContainer.includes('router.push("/copilot"'), "Dashboard must expose Copilot only as a clean route entry point.");
 assert(enterpriseNavBundle.includes('href: "/copilot"'), "Enterprise navigation must expose /copilot.");
 assert(!enterpriseShell.includes("<MedicalAICopilot"), "Enterprise shell must not mount the retired floating Copilot widget.");
 

@@ -40,6 +40,9 @@ const copilotComposer = read("artifacts/ecg-insight/components/copilot/CopilotCo
 const copilotMessageList = read("artifacts/ecg-insight/components/copilot/CopilotMessageList.tsx");
 const copilotBundle = [copilotWorkspace, copilotMessageCard, copilotComposer, copilotMessageList].join("\n");
 const dashboard = read("artifacts/ecg-insight/app/(protected)/dashboard.tsx");
+const dashboardContainer = read("artifacts/ecg-insight/containers/DashboardContainer.tsx");
+const dashboardPresentation = read("artifacts/ecg-insight/legacy-ui/screens/DashboardLegacyPresentation.tsx");
+const dashboardBundle = [dashboard, dashboardContainer, dashboardPresentation].join("\n");
 const copilotService = read("artifacts/ecg-insight/services/copilot.ts");
 const dashboardStore = read("artifacts/ecg-insight/context/DashboardStore.ts");
 const notificationPage = read("artifacts/ecg-insight/app/(protected)/notifications.tsx");
@@ -64,7 +67,7 @@ const supportRoutes = read("server/src/modules/support/support.routes.ts");
 
 assert(enterpriseShell.includes("ProtectedRoute") && enterpriseShell.includes("EnterpriseShell"), "Protected shell must own the dashboard architecture.");
 assert(!enterpriseShell.includes("<MedicalAICopilot"), "Dashboard shell must not mount the retired embedded Copilot widget.");
-assert(!dashboard.includes("MedicalAICopilot") && dashboard.includes("Open AI Copilot") && dashboard.includes('router.push("/copilot"'), "Dashboard must only expose Copilot as a clean /copilot entry point.");
+assert(!dashboardBundle.includes("MedicalAICopilot") && dashboardPresentation.includes("Open AI Copilot") && dashboardContainer.includes('router.push("/copilot"'), "Dashboard must only expose Copilot as a clean /copilot entry point.");
 assert((enterpriseShell.match(/accessibilityLabel=\"Notifications\"/g) ?? []).length === 1, "Exactly one notification bell may render in the dashboard shell.");
 for (const marker of ["CLINICAL", "WORKSPACE", "DEVELOPER", "/support", "refetchInterval: 15_000", "notificationSearch", "Open Notification History", "PremiumNotificationCard", "RefreshControl", "PanResponder", "hapticReadyInteraction", "notificationDrawerMobile"]) {
   assert(enterpriseNavBundle.includes(marker), `Enterprise shell is missing production dashboard marker: ${marker}`);

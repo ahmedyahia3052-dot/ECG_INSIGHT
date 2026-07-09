@@ -16,13 +16,16 @@ const composer = read("artifacts/ecg-insight/components/copilot/CopilotComposer.
 const messageList = read("artifacts/ecg-insight/components/copilot/CopilotMessageList.tsx");
 const bundle = [workspace, composer, messageList].join("\n");
 const dashboard = read("artifacts/ecg-insight/app/(protected)/dashboard.tsx");
+const dashboardContainer = read("artifacts/ecg-insight/containers/DashboardContainer.tsx");
+const dashboardPresentation = read("artifacts/ecg-insight/legacy-ui/screens/DashboardLegacyPresentation.tsx");
+const dashboardBundle = [dashboard, dashboardContainer, dashboardPresentation].join("\n");
 const copilotService = read("artifacts/ecg-insight/services/copilot.ts");
 const copilotRoutes = read("server/src/modules/copilot/copilot.routes.ts");
 const enterpriseShell = read("artifacts/ecg-insight/components/enterprise/EnterpriseUI.tsx");
 
 assert(!enterpriseShell.includes("<MedicalAICopilot"), "Floating Copilot widget must not be mounted in the shell.");
-assert(!dashboard.includes("MedicalAICopilot"), "Dashboard must not embed the Copilot widget.");
-assert(dashboard.includes("Open AI Copilot"), "Dashboard must expose a clean route button for Copilot.");
+assert(!dashboardBundle.includes("MedicalAICopilot"), "Dashboard must not embed the Copilot widget.");
+assert(dashboardBundle.includes("Open AI Copilot"), "Dashboard must expose a clean route button for Copilot.");
 
 for (const marker of [
   "New Chat",

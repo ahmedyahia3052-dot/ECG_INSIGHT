@@ -90,6 +90,15 @@ export {
   organizationRepository,
   type ClinicalDoctor,
 } from "./repositories/organization-repository";
+export { WorkspaceRepository, workspaceRepository } from "./repositories/workspace-repository";
+export { ViewerRepository, viewerRepository } from "./repositories/viewer-repository";
+export { MonitorRepository, monitorRepository } from "./repositories/monitor-repository";
+export { SubscriptionRepository, subscriptionRepository } from "./repositories/subscription-repository";
+export { DeveloperRepository, developerRepository } from "./repositories/developer-repository";
+export { ReportRepository, reportRepository } from "./repositories/report-repository";
+export { NotificationRepository, notificationRepository } from "./repositories/notification-repository";
+export { AuditRepository, auditRepository } from "./repositories/audit-repository";
+export { DoctorRepository, doctorRepository } from "./repositories/doctor-repository";
 
 export { BaseService } from "./services/base-service";
 export { ClinicalApiService, clinicalApiService } from "./services/clinical-api-service";
