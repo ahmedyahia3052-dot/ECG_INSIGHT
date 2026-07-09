@@ -36,9 +36,9 @@ describe("clinical workflow engine — extended SAT", () => {
     });
   });
 
-  it("exposes monitor toolbar group only in monitor view mode", () => {
-    expect(smartToolGroupForViewMode("monitor")).toContain("MONITOR");
-    expect(smartToolGroupForViewMode("monitor")).toEqual(["FILE", "MONITOR", "MEASURE", "EXPORT"]);
+  it("exposes waveform toolbar group in digitized view mode", () => {
+    expect(smartToolGroupForViewMode("waveform")).toContain("MEASURE");
+    expect(smartToolGroupForViewMode("waveform")).toEqual(["FILE", "DIGITIZE", "MEASURE", "EXPORT"]);
     expect(smartToolGroupForViewMode("image")).not.toContain("MONITOR");
     expect(smartToolGroupForViewMode("measurement")).not.toContain("MONITOR");
   });

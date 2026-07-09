@@ -10,7 +10,6 @@ const MODES: Array<{ id: EcgWorkstationViewMode; label: string }> = [
   { id: "image", label: "Original" },
   { id: "processed", label: "Processed" },
   { id: "waveform", label: "Digitized" },
-  { id: "monitor", label: "Live Monitor" },
   { id: "ai-review", label: "AI Review" },
   { id: "compare", label: "Compare" },
   { id: "overlay", label: "Overlay" },

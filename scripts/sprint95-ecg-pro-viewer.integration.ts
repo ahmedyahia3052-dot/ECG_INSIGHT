@@ -13,14 +13,24 @@ function assertContains(path, needles) {
   }
 }
 
+function assertContainsOneOf(path, needles) {
+  const content = read(path);
+  if (!needles.some((needle) => content.includes(needle))) {
+    throw new Error(`${path} is missing one of required Sprint 95 markers: ${needles.join(", ")}`);
+  }
+}
+
 assertContains("artifacts/ecg-insight/app/(protected)/ecg-viewer.tsx", [
   "EcgProViewerFoundationScreen",
   "tabsParam={tabs}",
   "useEcgWorkspaceCaseResolver",
 ]);
 
-assertContains("artifacts/ecg-insight/components/ecg/viewer/pro-foundation/EcgProViewerFoundationScreen.tsx", [
+assertContainsOneOf("artifacts/ecg-insight/components/ecg/viewer/pro-foundation/EcgProViewerFoundationScreen.tsx", [
   "sprint95-ecg-pro-viewer-root",
+  "sprint101-ecg-pro-viewer-root",
+]);
+assertContains("artifacts/ecg-insight/components/ecg/viewer/pro-foundation/EcgProViewerFoundationScreen.tsx", [
   "EcgProViewerCaseTabs",
   "EcgProViewerWaveformCanvas",
   "EcgProViewerComparisonPanel",
@@ -28,6 +38,10 @@ assertContains("artifacts/ecg-insight/components/ecg/viewer/pro-foundation/EcgPr
   "useEcgProViewerTabs",
 ]);
 
+assertContainsOneOf("artifacts/ecg-insight/components/ecg/viewer/pro-foundation/EcgProViewerToolbar.tsx", [
+  "sprint95-ecg-pro-viewer-toolbar",
+  "sprint101-ecg-pro-viewer-toolbar",
+]);
 assertContains("artifacts/ecg-insight/components/ecg/viewer/pro-foundation/EcgProViewerToolbar.tsx", [
   "12-Lead",
   "Rhythm",
@@ -40,7 +54,6 @@ assertContains("artifacts/ecg-insight/components/ecg/viewer/pro-foundation/EcgPr
   "Compare",
   "Waveform",
   "Fullscreen",
-  "sprint95-ecg-pro-viewer-toolbar",
 ]);
 
 assertContains("artifacts/ecg-insight/services/ecgViewerApi.ts", [

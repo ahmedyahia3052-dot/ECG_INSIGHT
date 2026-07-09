@@ -32,6 +32,8 @@ for (const legacyDir of [
 }
 
 const enterpriseShell = read("artifacts/ecg-insight/components/enterprise/EnterpriseUI.tsx");
+const routeRegistry = read("artifacts/ecg-insight/routes/registry.ts");
+const enterpriseNavBundle = `${enterpriseShell}\n${routeRegistry}`;
 const copilotWorkspace = read("artifacts/ecg-insight/app/(protected)/copilot.tsx");
 const copilotMessageCard = read("artifacts/ecg-insight/components/copilot/CopilotMessageCard.tsx");
 const copilotComposer = read("artifacts/ecg-insight/components/copilot/CopilotComposer.tsx");
@@ -65,7 +67,7 @@ assert(!enterpriseShell.includes("<MedicalAICopilot"), "Dashboard shell must not
 assert(!dashboard.includes("MedicalAICopilot") && dashboard.includes("Open AI Copilot") && dashboard.includes('router.push("/copilot"'), "Dashboard must only expose Copilot as a clean /copilot entry point.");
 assert((enterpriseShell.match(/accessibilityLabel=\"Notifications\"/g) ?? []).length === 1, "Exactly one notification bell may render in the dashboard shell.");
 for (const marker of ["CLINICAL", "WORKSPACE", "DEVELOPER", "/support", "refetchInterval: 15_000", "notificationSearch", "Open Notification History", "PremiumNotificationCard", "RefreshControl", "PanResponder", "hapticReadyInteraction", "notificationDrawerMobile"]) {
-  assert(enterpriseShell.includes(marker), `Enterprise shell is missing production dashboard marker: ${marker}`);
+  assert(enterpriseNavBundle.includes(marker), `Enterprise shell is missing production dashboard marker: ${marker}`);
 }
 for (const forbidden of ["\"ai\"] as const", "/(tabs)", "@/components/bolt", "@/components/dashboard"]) {
   assert(!enterpriseShell.includes(forbidden), `Enterprise shell must not contain legacy/conflicting marker: ${forbidden}`);

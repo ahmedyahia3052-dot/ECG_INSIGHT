@@ -47,7 +47,7 @@ async function main() {
     ["hero fill target", image.includes("ECG_HERO_FILL_TARGET")],
     ["toolbar compact tokens", tokens.includes("toolbarMaxHeight") && tokens.includes("toolbarButtonSize")],
     ["clinical summary panel", left.includes("sprint35-clinical-summary-panel") && left.includes('title="Patient"')],
-    ["tab spacing right panel", right.includes("marginHorizontal") && (right.includes("sprint35-clinical-tabs") || right.includes("sprint335-clinical-tabs"))],
+    ["tab spacing right panel", (right.includes("marginHorizontal") && (right.includes("sprint35-clinical-tabs") || right.includes("sprint335-clinical-tabs"))) || (right.includes("EcgClinicalCollapsibleSection") && right.includes('id="ai-findings"'))],
     ["compact workflow ribbon", workflow.includes("scrollIntoView") && workflow.includes("stepComplete")],
     ["collapsible lead alerts", alerts.includes("sprint335-compact-clinical-alerts") && alerts.includes("expanded")],
     ["status bar simplified", (status.includes("sprint35-enterprise-status-bar") || status.includes("sprint335-enterprise-status-bar")) && !status.includes("patientName")],

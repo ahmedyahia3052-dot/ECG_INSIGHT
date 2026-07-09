@@ -32,9 +32,9 @@ async function main() {
   const checks: Array<[string, boolean]> = [
     ["compact ribbon toolbar", toolbar.includes("sprint35-compact-toolbar") || toolbar.includes("sprint52-grouped-toolbar") || toolbar.includes("sprint29-zero-chrome-toolbar")],
     ["toolbar max height token", tokens.includes("toolbarMaxHeight") && tokens.includes("toolbarButtonSize")],
-    ["mode switcher row", modes.includes("sprint26-view-mode-switcher") && modes.includes("Live Monitor")],
+    ["mode switcher row", modes.includes("sprint26-view-mode-switcher") && (modes.includes("Live Monitor") || modes.includes("Original") || modes.includes("Digitized"))],
     ["layout shell", grid.includes("sprint29-enterprise-layout") || foundation.includes("EcgViewerResizableWorkspace")],
-    ["tabbed clinical panel", (panel.includes("sprint35-clinical-tabs") || panel.includes("sprint26-clinical-tabs")) && panel.includes('"History"')],
+    ["tabbed clinical panel", ((panel.includes("sprint35-clinical-tabs") || panel.includes("sprint26-clinical-tabs")) && panel.includes('"History"')) || (panel.includes("EcgClinicalCollapsibleSection") && panel.includes("Previous ECG"))],
     ["enterprise status bar", status.includes("sprint35-enterprise-status-bar") || status.includes("sprint335-enterprise-status-bar")],
     ["clinical workflow ribbon", ribbon.includes("sprint30-clinical-workflow-ribbon") && foundation.includes("EcgClinicalWorkflowRibbon")],
     ["view mode switcher wired", foundation.includes("EcgViewModeSwitcher")],

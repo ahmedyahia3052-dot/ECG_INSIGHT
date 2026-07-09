@@ -108,7 +108,7 @@ function viewModeMatchesStep(id: ClinicalWorkflowStepId, ctx: ClinicalWorkflowCo
     case "lead-detection":
     case "digitization":
     case "signal-reconstruction":
-      return mode === "waveform" || mode === "monitor";
+      return mode === "waveform";
     case "measurements":
       return mode === "measurement";
     case "ai-review":
@@ -198,8 +198,6 @@ export function smartToolGroupForViewMode(mode: string): string[] {
       return ["FILE", "VIEW", "DIGITIZE", "EXPORT"];
     case "waveform":
       return ["FILE", "DIGITIZE", "MEASURE", "EXPORT"];
-    case "monitor":
-      return ["FILE", "MONITOR", "MEASURE", "EXPORT"];
     case "measurement":
       return ["FILE", "MEASURE", "VIEW", "EXPORT"];
     case "ai-review":

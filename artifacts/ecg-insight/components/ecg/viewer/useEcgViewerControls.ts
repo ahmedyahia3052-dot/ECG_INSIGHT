@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Platform } from "react-native";
 
-import { clampZoom, ECG_ZOOM_PRESETS, fitZoomForDimensions, zoomAtPoint, zoomStep, type EcgZoomPreset } from "./ecgImageEngine";
+import { clampZoom, centeredPanForFit, ECG_ZOOM_PRESETS, fitZoomForDimensions, zoomAtPoint, zoomStep, type EcgZoomPreset } from "./ecgImageEngine";
 import {
   DEFAULT_ADJUSTMENTS,
   DEFAULT_GRID,
@@ -87,7 +87,18 @@ export function useEcgViewerControls() {
         currentViewport.imageHeight,
         mode,
       );
-      setTransform({ panX: 0, panY: 0, rotation: transformRef.current.rotation, zoom: clampZoom(zoom) });
+      const clampedZoom = clampZoom(zoom);
+      const shouldCenter = mode === "width" || mode === "height" || mode === "contain" || mode === "hero";
+      const pan = shouldCenter
+        ? centeredPanForFit(
+            currentViewport.containerWidth,
+            currentViewport.containerHeight,
+            currentViewport.imageWidth,
+            currentViewport.imageHeight,
+            clampedZoom,
+          )
+        : { panX: 0, panY: 0 };
+      setTransform({ panX: pan.panX, panY: pan.panY, rotation: transformRef.current.rotation, zoom: clampedZoom });
       setFitMode(mode);
     },
     [resetView],

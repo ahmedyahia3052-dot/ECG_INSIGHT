@@ -116,8 +116,8 @@ export function zoomAtPoint(
   };
 }
 
-/** Sprint 53 — ECG interpretation viewport fill (90–95% clinical target). */
-export const ECG_HERO_FILL_TARGET = 0.94;
+/** Sprint 99 — ECG paper viewport fill target (75–80% of canvas). */
+export const ECG_HERO_FILL_TARGET = 0.78;
 
 export function heroFitZoom(
   containerWidth: number,
@@ -154,6 +154,26 @@ export function fitZoomForDimensions(
   const displayWidth = imageWidth * contain;
   const displayHeight = imageHeight * contain;
   if (mode === "contain") return clampZoom(contain);
-  if (mode === "width") return containerWidth / Math.max(displayWidth, 1);
-  return containerHeight / Math.max(displayHeight, 1);
+  if (mode === "width") return clampZoom(containerWidth / Math.max(displayWidth, 1));
+  return clampZoom(containerHeight / Math.max(displayHeight, 1));
+}
+
+/** Center fitted ECG paper within the viewport after zoom is applied. */
+export function centeredPanForFit(
+  containerWidth: number,
+  containerHeight: number,
+  imageWidth: number,
+  imageHeight: number,
+  zoom: number,
+) {
+  if (!containerWidth || !containerHeight || !imageWidth || !imageHeight) {
+    return { panX: 0, panY: 0 };
+  }
+  const contain = Math.min(containerWidth / imageWidth, containerHeight / imageHeight);
+  const scaledWidth = imageWidth * contain * zoom;
+  const scaledHeight = imageHeight * contain * zoom;
+  return {
+    panX: Math.round((containerWidth - scaledWidth) / 2),
+    panY: Math.round((containerHeight - scaledHeight) / 2),
+  };
 }

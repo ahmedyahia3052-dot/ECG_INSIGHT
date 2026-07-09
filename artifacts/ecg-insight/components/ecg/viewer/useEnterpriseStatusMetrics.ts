@@ -69,7 +69,7 @@ export function useEnterpriseStatusMetrics(input: {
             ? "Review"
             : "Idle",
         cpuUsage: Math.min(100, Math.max(0, Math.round((renderTimeMs / 16.7) * 100))),
-        gpuRenderer: input.viewMode === "monitor" ? "Canvas 2D GPU" : "Canvas/SVG",
+        gpuRenderer: input.viewMode === "waveform" ? "Canvas 2D GPU" : "Canvas/SVG",
         memory: perf.memory
           ? {
               jsHeapLimitMb: Math.round(perf.memory.jsHeapSizeLimit / 1024 / 1024),

@@ -32,7 +32,7 @@ async function main() {
 
   const checks: Array<[string, boolean]> = [
     ["report view mode type", types.includes('"report"') && types.includes('"measurement"')],
-    ["primary view mode chips", switcher.includes("Live Monitor") && switcher.includes("AI Review")],
+    ["primary view mode chips", switcher.includes("AI Review") && (switcher.includes("Live Monitor") || switcher.includes("Original") || switcher.includes("Digitized"))],
     ["report preview wired", foundation.includes("EcgReportPreviewPanel") && foundation.includes('viewMode === "report"')],
     [
       "canvas monitor engine",

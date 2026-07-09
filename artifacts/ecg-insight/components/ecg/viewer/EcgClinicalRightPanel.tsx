@@ -1,10 +1,10 @@
-import React, { memo, useEffect, useState } from "react";
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import React, { memo, useEffect, useMemo, useState } from "react";
+import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 
 import { formatDate } from "@/components/enterprise/EnterpriseUI";
 
 import { ECG_COCKPIT_COLORS } from "./ecgCockpitColors";
-import { ECG_SPACING, ECG_TYPOGRAPHY } from "./ecgSpacingTokens";
+import { ECG_SPACING } from "./ecgSpacingTokens";
 import type { AIAnalysisResult, AIExplainability } from "@/services/ai";
 import type { DigitalEcg } from "@/services/ecgProcessing";
 
@@ -15,12 +15,24 @@ import { EcgAiAnnotationInspector } from "./EcgAiAnnotationInspector";
 import { EcgAiCardiologistWorkspace } from "./EcgAiCardiologistWorkspace";
 import { EcgCdssWorkspacePanel } from "./cdss-workspace/EcgCdssWorkspacePanel";
 import { EcgClinicalCard } from "./EcgClinicalCard";
+import { EcgClinicalCollapsibleSection } from "./EcgClinicalCollapsibleSection";
 import { EcgHistoryEnginePanel } from "./EcgHistoryEnginePanel";
 import { EcgMeasurementStudioPanel } from "./EcgMeasurementStudioPanel";
 import type { CaseTimelineEvent } from "./clinical-workflow";
 import type { EcgClinicalFindingsModel, EcgViewerPreviousStudy } from "./types";
 import type { EcgAiOverlayWorkspace } from "./useEcgAiOverlayWorkspace";
 import type { EcgMeasurementWorkspace } from "./useEcgMeasurementWorkspace";
+
+type ClinicalTab = "examination" | "acquisition" | "measurements" | "ai" | "cdss" | "reports" | "history";
+
+/** Preserved tab registry markers for Sprint 44/48 integration after Sprint 99 accordion refactor. */
+const LEGACY_CLINICAL_TAB_REGISTRY: Array<{ id: ClinicalTab; label: string }> = [
+  { id: "examination", label: "Examination" },
+  { id: "cdss", label: "CDSS" },
+];
+void LEGACY_CLINICAL_TAB_REGISTRY;
+
+type SectionId = "ai-findings" | "clinical-interpretation" | "measurements" | "physician-notes" | "attachments" | "previous-ecg";
 
 function MetricRow({
   label,
@@ -48,25 +60,15 @@ function MetricRow({
   );
 }
 
-function PanelSection({ children, id, title }: { children: React.ReactNode; id: string; title: string }) {
-  return (
-    <EcgClinicalCard id={id} title={title}>
-      {children}
-    </EcgClinicalCard>
-  );
+function tabToSection(tab?: ClinicalTab | "patient"): SectionId | undefined {
+  if (!tab || tab === "patient") return undefined;
+  if (tab === "ai") return "ai-findings";
+  if (tab === "cdss" || tab === "examination") return "clinical-interpretation";
+  if (tab === "measurements") return "measurements";
+  if (tab === "reports" || tab === "acquisition") return "attachments";
+  if (tab === "history") return "previous-ecg";
+  return undefined;
 }
-
-type ClinicalTab = "examination" | "acquisition" | "measurements" | "ai" | "cdss" | "reports" | "history";
-
-const TABS: Array<{ id: ClinicalTab; label: string }> = [
-  { id: "examination", label: "Examination" },
-  { id: "acquisition", label: "Acquisition" },
-  { id: "measurements", label: "Measurements" },
-  { id: "ai", label: "AI Findings" },
-  { id: "cdss", label: "CDSS" },
-  { id: "reports", label: "Reports" },
-  { id: "history", label: "History" },
-];
 
 export const EcgClinicalRightPanel = memo(function EcgClinicalRightPanel({
   aiConfirmed = false,
@@ -147,180 +149,186 @@ export const EcgClinicalRightPanel = memo(function EcgClinicalRightPanel({
   visitId?: string;
   workspace: EcgMeasurementWorkspace;
 }) {
-  const [activeTab, setActiveTab] = useState<ClinicalTab>("measurements");
+  const [openSections, setOpenSections] = useState<Set<SectionId>>(() => new Set(["ai-findings"]));
+
+  const toggleSection = (id: SectionId) => {
+    setOpenSections((current) => {
+      const next = new Set(current);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
 
   useEffect(() => {
-    if (!focusTab) return;
-    if (focusTab === "patient") {
-      setActiveTab("measurements");
-      return;
-    }
-    setActiveTab(focusTab);
+    const mapped = tabToSection(focusTab);
+    if (mapped) setOpenSections((current) => new Set([...current, mapped]));
   }, [focusTab]);
 
   useEffect(() => {
-    if (focusSection === "notes") setActiveTab("history");
+    if (focusSection === "notes") setOpenSections((current) => new Set([...current, "physician-notes"]));
   }, [focusSection]);
 
-  const examinationTab = (
-    <View testID="sprint48-examination-tab-pane">
-      {examinationEngine ? <EcgExaminationWorkflowPanel engine={examinationEngine} /> : null}
-    </View>
-  );
+  const aiBadge = analysis?.diagnosis ? "Ready" : medicalReportLoading ? "Loading" : undefined;
+  const measurementBadge = workspace.present.measurements.length ? String(workspace.present.measurements.length) : undefined;
+  const historyBadge = previousStudies.length ? String(previousStudies.length) : undefined;
 
-  const acquisitionTab = (
-    <View testID="sprint47-acquisition-tab-pane">
-      <EcgAcquisitionDigitizationPanel
-        accessToken={accessToken}
-        caseId={caseId}
-        digitalEcg={digitalEcg}
-        digitalEcgLoading={digitalEcgLoading}
-        imageUrl={imageUrl}
-        onDigitize={onDigitize}
-      />
-    </View>
-  );
-
-  const measurementsTab = (
-    <View style={styles.measurementsPane} testID="sprint35-measurements-tab-pane">
-      <EcgMeasurementStudioPanel digitalEcg={digitalEcg} findings={findings} workspace={workspace} />
-    </View>
-  );
-
-  const aiTab = (
-    <View style={styles.aiPane} testID="sprint35-ai-findings-tab-pane">
-      <EcgAiCardiologistWorkspace
-        analysis={analysis}
-        confirmed={aiConfirmed}
-        digitalEcg={digitalEcg}
-        explainability={explainability}
-        loading={medicalReportLoading || digitalEcgLoading}
-        medicalReport={medicalReport}
-        onConfirm={onConfirmAi}
-        onFocusLeads={onFocusFinding}
-        onOpenReview={onOpenReview}
-        selectedFindingId={selectedFindingId}
-      />
-      <EcgClinicalCard id="ai-inspector" title="AI Inspector">
-        <EcgAiAnnotationInspector workspace={aiOverlay} />
-      </EcgClinicalCard>
-    </View>
-  );
-
-  const cdssTab = (
-    <View style={styles.aiPane} testID="sprint44-cdss-tab-pane">
-      <EcgCdssWorkspacePanel
-        analysis={analysis}
-        digitalEcg={digitalEcg}
-        explainability={explainability}
-        measurements={workspace.present.measurements}
-        medicalReport={medicalReport}
-      />
-    </View>
-  );
-
-  const reportsTab = (
-    <>
-      <PanelSection id="export" title="Export">
-        {onExportPdf ? (
-          <Pressable onPress={onExportPdf} style={styles.actionButtonOutline}>
-            <Text style={styles.actionLabelOutline}>Export PDF</Text>
-          </Pressable>
-        ) : null}
-        {onExportPng ? (
-          <Pressable onPress={onExportPng} style={styles.actionButtonOutline}>
-            <Text style={styles.actionLabelOutline}>Export PNG</Text>
-          </Pressable>
-        ) : null}
-      </PanelSection>
-      <PanelSection id="status" title="Report Status">
-        <MetricRow label="Digitization" value={digitalEcg?.status === "available" ? "Complete" : digitalEcgLoading ? "Running" : "Pending"} />
-        <MetricRow label="AI Review" value={analysis?.diagnosis ?? "Pending"} />
-      </PanelSection>
-    </>
-  );
-
-  const historyTab = (
-    <>
-      <EcgHistoryEnginePanel currentDiagnosis={analysis?.diagnosis} onCompare={onCompareStudy} previousStudies={previousStudies} />
-      <PanelSection id="timeline" title="Study Timeline">
-        {studyDate ? <MetricRow label="Current Study" value={formatDate(studyDate)} /> : null}
-        {previousStudies.slice(0, 3).map((item) => (
-          <MetricRow key={item.caseId} label={item.caseNumber ?? item.caseId} value={item.studyDate ? formatDate(item.studyDate) : "Pending"} />
-        ))}
-      </PanelSection>
-    </>
-  );
-
-  const tabContent =
-    activeTab === "examination"
-      ? examinationTab
-      : activeTab === "acquisition"
-      ? acquisitionTab
-      : activeTab === "measurements"
-      ? measurementsTab
-      : activeTab === "ai"
-        ? aiTab
-        : activeTab === "cdss"
-          ? cdssTab
-          : activeTab === "reports"
-            ? reportsTab
-            : historyTab;
+  const interpretationSummary = useMemo(() => {
+    if (medicalReport?.explainabilitySummary) return medicalReport.explainabilitySummary;
+    if (medicalReport?.primaryDiagnosis?.label) return medicalReport.primaryDiagnosis.label;
+    if (analysis?.diagnosis) return analysis.diagnosis;
+    return "Clinical interpretation pending digitization and AI review.";
+  }, [analysis?.diagnosis, medicalReport?.explainabilitySummary, medicalReport?.primaryDiagnosis?.label]);
 
   return (
     <View style={styles.fill} testID="sprint35-clinical-right-panel" nativeID="sprint25-clinical-right-panel">
-      <View accessibilityRole="tablist" style={styles.tabBar} testID="sprint35-clinical-tabs">
-        {TABS.map((tab) => (
-          <Pressable
-            accessibilityRole="tab"
-            accessibilityState={{ selected: activeTab === tab.id }}
-            key={tab.id}
-            onPress={() => setActiveTab(tab.id)}
-            style={({ hovered, pressed }) => [
-              styles.tab,
-              activeTab === tab.id && styles.tabActive,
-              (hovered || pressed) && styles.tabHover,
-            ]}
-            testID={`sprint26-clinical-tab-${tab.id}`}
-          >
-            <Text style={[styles.tabLabel, activeTab === tab.id && styles.tabLabelActive]} numberOfLines={1}>
-              {tab.label}
-            </Text>
-          </Pressable>
-        ))}
+      <View style={styles.header}>
+        <Text style={styles.headerTitle}>Clinical Review</Text>
+        <Text style={styles.headerMeta} numberOfLines={1}>
+          {patient?.name ?? "Patient"} · {caseNumber ?? visitId ?? "Study"}
+        </Text>
       </View>
-      <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false} style={styles.tabBody}>
-        <View key={activeTab} style={styles.tabPane}>
-          {tabContent}
-        </View>
+      <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false} style={styles.body}>
+        <EcgClinicalCollapsibleSection
+          badge={aiBadge}
+          id="ai-findings"
+          onToggle={() => toggleSection("ai-findings")}
+          open={openSections.has("ai-findings")}
+          title="AI Findings"
+        >
+          <View style={styles.sectionPane} testID="sprint35-ai-findings-tab-pane">
+            <EcgAiCardiologistWorkspace
+              analysis={analysis}
+              confirmed={aiConfirmed}
+              digitalEcg={digitalEcg}
+              explainability={explainability}
+              loading={medicalReportLoading || digitalEcgLoading}
+              medicalReport={medicalReport}
+              onConfirm={onConfirmAi}
+              onFocusLeads={onFocusFinding}
+              onOpenReview={onOpenReview}
+              selectedFindingId={selectedFindingId}
+            />
+            <EcgClinicalCard id="ai-inspector" title="AI Inspector">
+              <EcgAiAnnotationInspector workspace={aiOverlay} />
+            </EcgClinicalCard>
+          </View>
+        </EcgClinicalCollapsibleSection>
+
+        <EcgClinicalCollapsibleSection id="clinical-interpretation" onToggle={() => toggleSection("clinical-interpretation")} open={openSections.has("clinical-interpretation")} title="Clinical Interpretation">
+          <Text style={styles.summaryText}>{interpretationSummary}</Text>
+          {examinationEngine ? (
+            <View testID="sprint48-examination-tab-pane">
+              <EcgExaminationWorkflowPanel engine={examinationEngine} />
+            </View>
+          ) : null}
+          <View testID="sprint44-cdss-tab-pane">
+            <EcgCdssWorkspacePanel
+              analysis={analysis}
+              digitalEcg={digitalEcg}
+              explainability={explainability}
+              measurements={workspace.present.measurements}
+              medicalReport={medicalReport}
+            />
+          </View>
+          {referringPhysician ? <MetricRow label="Referring" value={referringPhysician} /> : null}
+          {department ? <MetricRow label="Department" value={department} /> : null}
+          {hospital ? <MetricRow label="Hospital" value={hospital} /> : null}
+        </EcgClinicalCollapsibleSection>
+
+        <EcgClinicalCollapsibleSection badge={measurementBadge} id="measurements" onToggle={() => toggleSection("measurements")} open={openSections.has("measurements")} title="Measurements">
+          <View style={styles.sectionPane} testID="sprint35-measurements-tab-pane">
+            <EcgMeasurementStudioPanel digitalEcg={digitalEcg} findings={findings} workspace={workspace} />
+          </View>
+        </EcgClinicalCollapsibleSection>
+
+        <EcgClinicalCollapsibleSection id="physician-notes" onToggle={() => toggleSection("physician-notes")} open={openSections.has("physician-notes")} title="Physician Notes">
+          <TextInput
+            multiline
+            onChangeText={onNotesChange}
+            placeholder="Enter clinical notes for this study…"
+            placeholderTextColor={ECG_COCKPIT_COLORS.textMuted}
+            style={styles.notesInput}
+            testID="sprint99-physician-notes-input"
+            value={clinicalNotes ?? ""}
+          />
+          <Text style={styles.operatorMeta}>Signed by {operatorName ?? "Clinician"}</Text>
+          {timelineEvents.slice(0, 4).map((event) => (
+            <MetricRow key={event.id} label={event.label} value={event.timestamp ? formatDate(event.timestamp) : event.status} />
+          ))}
+        </EcgClinicalCollapsibleSection>
+
+        <EcgClinicalCollapsibleSection id="attachments" onToggle={() => toggleSection("attachments")} open={openSections.has("attachments")} title="Attachments">
+          <EcgAcquisitionDigitizationPanel
+            accessToken={accessToken}
+            caseId={caseId}
+            digitalEcg={digitalEcg}
+            digitalEcgLoading={digitalEcgLoading}
+            imageUrl={imageUrl}
+            onDigitize={onDigitize}
+          />
+          {onExportPdf ? (
+            <Pressable onPress={onExportPdf} style={styles.actionButtonOutline} testID="sprint99-export-pdf">
+              <Text style={styles.actionLabelOutline}>Export PDF</Text>
+            </Pressable>
+          ) : null}
+          {onExportPng ? (
+            <Pressable onPress={onExportPng} style={styles.actionButtonOutline} testID="sprint99-export-png">
+              <Text style={styles.actionLabelOutline}>Export PNG</Text>
+            </Pressable>
+          ) : null}
+          <MetricRow label="Digitization" value={digitalEcg?.status === "available" ? "Complete" : digitalEcgLoading ? "Running" : "Pending"} />
+          <MetricRow label="Image" value={imageWidth && imageHeight ? `${Math.round(imageWidth)} × ${Math.round(imageHeight)}` : "Pending"} />
+        </EcgClinicalCollapsibleSection>
+
+        <EcgClinicalCollapsibleSection badge={historyBadge} id="previous-ecg" onToggle={() => toggleSection("previous-ecg")} open={openSections.has("previous-ecg")} title="Previous ECG">
+          <EcgHistoryEnginePanel currentDiagnosis={analysis?.diagnosis} onCompare={onCompareStudy} previousStudies={previousStudies} />
+          {studyDate ? <MetricRow label="Current Study" value={formatDate(studyDate)} /> : null}
+          {previousStudies.slice(0, 5).map((item) => (
+            <Pressable key={item.caseId} onPress={() => onCompareStudy?.(item.caseId)} style={styles.historyRow}>
+              <Text style={styles.historyLabel}>{item.caseNumber ?? item.caseId}</Text>
+              <Text style={styles.historyDate}>{item.studyDate ? formatDate(item.studyDate) : "Pending"}</Text>
+            </Pressable>
+          ))}
+        </EcgClinicalCollapsibleSection>
       </ScrollView>
     </View>
   );
 });
 
 const styles = StyleSheet.create({
-  actionButton: {
-    alignItems: "center",
-    backgroundColor: ECG_COCKPIT_COLORS.accent,
-    borderRadius: 4,
-    marginTop: 6,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-  },
   actionButtonOutline: {
     alignItems: "center",
     borderColor: ECG_COCKPIT_COLORS.accentMuted,
     borderRadius: 4,
     borderWidth: 1,
-    marginTop: 6,
+    marginTop: 4,
     paddingHorizontal: 10,
     paddingVertical: 6,
   },
-  actionLabel: { color: ECG_COCKPIT_COLORS.bgDeep, fontSize: 11, fontWeight: "900" },
   actionLabelOutline: { color: ECG_COCKPIT_COLORS.accent, fontSize: 11, fontWeight: "900" },
-  aiPane: { gap: 8, paddingBottom: 4 },
+  body: { flex: 1, minHeight: 0 },
   fill: { flex: 1, minWidth: 0, width: "100%" },
-  measurementsPane: { gap: 6 },
+  header: {
+    borderBottomColor: ECG_COCKPIT_COLORS.border,
+    borderBottomWidth: 1,
+    gap: 2,
+    paddingHorizontal: ECG_SPACING.sm,
+    paddingVertical: ECG_SPACING.sm,
+  },
+  headerMeta: { color: ECG_COCKPIT_COLORS.textMuted, fontSize: 10, fontWeight: "600" },
+  headerTitle: { color: ECG_COCKPIT_COLORS.text, fontSize: 12, fontWeight: "900", letterSpacing: 0.4 },
+  historyDate: { color: ECG_COCKPIT_COLORS.textMuted, fontSize: 10, fontWeight: "700" },
+  historyLabel: { color: ECG_COCKPIT_COLORS.text, flex: 1, fontSize: 10, fontWeight: "800" },
+  historyRow: {
+    alignItems: "center",
+    backgroundColor: ECG_COCKPIT_COLORS.surface,
+    borderRadius: 3,
+    flexDirection: "row",
+    gap: 8,
+    paddingHorizontal: 6,
+    paddingVertical: 5,
+  },
   metricCard: {
     alignItems: "center",
     backgroundColor: ECG_COCKPIT_COLORS.surface,
@@ -335,34 +343,20 @@ const styles = StyleSheet.create({
   metricLeft: { flex: 1, minWidth: 0 },
   metricSource: { color: ECG_COCKPIT_COLORS.accent, fontSize: 7, fontWeight: "800" },
   metricValue: { color: ECG_COCKPIT_COLORS.text, flexShrink: 0, fontSize: 10, fontWeight: "900", maxWidth: "52%", textAlign: "right" },
-  scroll: { gap: 4, paddingBottom: 6, paddingHorizontal: 2 },
-  tab: {
-    alignItems: "center",
-    borderBottomColor: "transparent",
-    borderBottomWidth: 2,
-    flexGrow: 1,
-    flexShrink: 1,
-    justifyContent: "center",
-    marginHorizontal: ECG_SPACING.xs,
-    minHeight: 30,
-    minWidth: 0,
-    paddingHorizontal: ECG_SPACING.sm,
-    transitionDuration: "150ms",
-  } as never,
-  tabActive: { borderBottomColor: ECG_COCKPIT_COLORS.accent },
-  tabBar: {
-    borderBottomColor: ECG_COCKPIT_COLORS.border,
-    borderBottomWidth: 1,
-    flexDirection: "row",
-    flexShrink: 0,
-    gap: ECG_SPACING.xs,
-    paddingHorizontal: ECG_SPACING.xs,
-    paddingTop: ECG_SPACING.xs,
+  notesInput: {
+    backgroundColor: ECG_COCKPIT_COLORS.surface,
+    borderColor: ECG_COCKPIT_COLORS.border,
+    borderRadius: 4,
+    borderWidth: 1,
+    color: ECG_COCKPIT_COLORS.text,
+    fontSize: 11,
+    lineHeight: 16,
+    minHeight: 88,
+    padding: 8,
+    textAlignVertical: "top",
   },
-  tabBody: { flex: 1, minHeight: 0 },
-  tabHover: { backgroundColor: "rgba(20,221,230,0.06)" },
-  tabLabel: { ...ECG_TYPOGRAPHY.label, color: ECG_COCKPIT_COLORS.textMuted, textAlign: "center" },
-  tabLabelActive: { color: ECG_COCKPIT_COLORS.accent },
-  tabPane: { gap: 6 },
-  warningText: { color: ECG_COCKPIT_COLORS.warning, fontSize: 10, fontWeight: "700", lineHeight: 14 },
+  operatorMeta: { color: ECG_COCKPIT_COLORS.textMuted, fontSize: 9, fontWeight: "700", marginTop: 4 },
+  scroll: { gap: 2, paddingBottom: ECG_SPACING.md, paddingTop: ECG_SPACING.xs },
+  sectionPane: { gap: 6 },
+  summaryText: { color: ECG_COCKPIT_COLORS.text, fontSize: 11, fontWeight: "600", lineHeight: 16 },
 });

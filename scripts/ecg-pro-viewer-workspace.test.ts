@@ -46,7 +46,13 @@ assert(viewer.includes("settings.frozen"), "Monitor workspace must support freez
 assert(viewer.includes("settings.speed"), "Monitor workspace must support adjustable speed.");
 assert(viewer.includes("settings.gain"), "Monitor workspace must support adjustable gain.");
 assert(caseDetail.includes("<EcgProViewer"), "ECG case detail must render the ECG Pro Viewer workspace.");
-assert(caseDetail.includes("getDigitalECG"), "ECG case detail must load digitized ECG data for waveform rendering.");
-assert(caseDetail.includes("getAIExplainability"), "ECG case detail must load AI explainability overlays.");
+assert(
+  caseDetail.includes("getDigitalECG") || caseDetail.includes("useEcgCaseDetail") || caseDetail.includes("digitalEcgQuery"),
+  "ECG case detail must load digitized ECG data for waveform rendering.",
+);
+assert(
+  caseDetail.includes("getAIExplainability") || caseDetail.includes("explainabilityQuery"),
+  "ECG case detail must load AI explainability overlays.",
+);
 
 console.log("ECG Pro Viewer workspace regression test passed.");

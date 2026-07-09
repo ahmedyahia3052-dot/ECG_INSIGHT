@@ -47,7 +47,7 @@ async function main() {
     ["compact toolbar tokens", tokens.includes("toolbarMaxHeight") && tokens.includes("toolbarButtonSize")],
     ["panel width tokens", tokens.includes("leftExpandedWidth") && tokens.includes("rightExpandedWidth")],
     ["viewport target tokens", tokens.includes("viewportTargetMin") && tokens.includes("viewportTargetMax")],
-    ["four tab right panel", right.includes("sprint35-clinical-tabs") && right.includes('"AI Findings"') && !right.includes('{ id: "patient"')],
+    ["four tab right panel", (right.includes("sprint35-clinical-tabs") && right.includes('"AI Findings"') && !right.includes('{ id: "patient"')) || (right.includes("EcgClinicalCollapsibleSection") && right.includes('"AI Findings"') && right.includes('id="ai-findings"'))],
     ["ai findings pane", right.includes("sprint35-ai-findings-tab-pane")],
     ["clinical summary groups", left.includes('title="Patient"') && left.includes('title="Study"') && left.includes('title="Acquisition"') && left.includes('title="Workflow"')],
     ["floating toolbox sprint35", floating.includes("sprint35-floating-tool-palette") && floating.includes('label: "Pointer"') && floating.includes('label: "Full Screen"')],

@@ -68,6 +68,9 @@ assertContains("server/src/modules/compliance/compliance.routes.ts", [
 assertContains("artifacts/ecg-insight/components/enterprise/EnterpriseUI.tsx", [
   "ProtectedRoute",
   "EnterpriseShell",
+]);
+
+assertContains("artifacts/ecg-insight/routes/registry.ts", [
   "/settings",
   "/admin-dashboard",
   "/owner/licenses",

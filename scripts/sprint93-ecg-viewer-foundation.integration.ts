@@ -13,14 +13,24 @@ function assertContains(path: string, needles: string[]) {
   }
 }
 
+function assertContainsOneOf(path: string, needles: string[]) {
+  const content = read(path);
+  if (!needles.some((needle) => content.includes(needle))) {
+    throw new Error(`${path} is missing one of required markers: ${needles.join(", ")}`);
+  }
+}
+
 assertContains("artifacts/ecg-insight/app/(protected)/ecg-viewer.tsx", [
   "EcgProViewerFoundationScreen",
   "useEcgWorkspaceCaseResolver",
   "ecg-viewer-resolving",
 ]);
 
-assertContains("artifacts/ecg-insight/components/ecg/viewer/pro-foundation/EcgProViewerFoundationScreen.tsx", [
+assertContainsOneOf("artifacts/ecg-insight/components/ecg/viewer/pro-foundation/EcgProViewerFoundationScreen.tsx", [
   "sprint95-ecg-pro-viewer-root",
+  "sprint101-ecg-pro-viewer-root",
+]);
+assertContains("artifacts/ecg-insight/components/ecg/viewer/pro-foundation/EcgProViewerFoundationScreen.tsx", [
   "EcgProViewerToolbar",
   "EcgProViewerToolsPanel",
   "EcgProViewerInfoPanel",
@@ -40,7 +50,7 @@ assertContains("artifacts/ecg-insight/services/ecgViewerApi.ts", [
   "getEcgViewerBundle",
 ]);
 
-assertContains("artifacts/ecg-insight/components/enterprise/EnterpriseUI.tsx", [
+assertContains("artifacts/ecg-insight/routes/registry.ts", [
   'href: "/ecg-viewer"',
   "/ecg-viewer",
 ]);

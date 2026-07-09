@@ -24,11 +24,13 @@ export function ecgFloatingPalette(page: Page): Locator {
 
 export function ecgClinicalRightPanel(page: Page): Locator {
   return page
-    .getByTestId("sprint35-clinical-right-panel")
+    .getByTestId("sprint99-clinical-right-panel")
+    .or(page.getByTestId("sprint35-clinical-right-panel"))
     .or(page.getByTestId("sprint335-clinical-right-panel"))
     .or(page.getByTestId("sprint33-clinical-right-panel"))
     .or(page.getByTestId("sprint32-clinical-right-panel"))
-    .or(page.getByTestId("sprint30-clinical-right-panel"));
+    .or(page.getByTestId("sprint30-clinical-right-panel"))
+    .first();
 }
 
 export function ecgLeftRail(page: Page): Locator {
@@ -172,19 +174,23 @@ export async function ensureRightPanelOpen(page: Page) {
 
 export async function openMeasurementsTab(page: Page) {
   await ensureRightPanelOpen(page);
-  await page.getByTestId("sprint26-clinical-tab-measurements").click();
-  await expect(page.getByTestId("sprint15-ecg-measurements-panel")).toBeVisible({ timeout: 15_000 });
+  await page.getByTestId("sprint99-clinical-section-toggle-measurements").click();
+  await expect(page.getByTestId("sprint35-measurements-tab-pane")).toBeVisible({ timeout: 15_000 });
 }
 
 export async function openAiTab(page: Page) {
   await ensureRightPanelOpen(page);
-  await page.getByTestId("sprint26-clinical-tab-ai").click();
-  await expect(page.getByTestId("sprint14-ecg-ai-annotation-inspector")).toBeVisible({ timeout: 15_000 });
+  await page.getByTestId("sprint99-clinical-section-toggle-ai-findings").click();
+  await expect(page.getByTestId("sprint35-ai-findings-tab-pane")).toBeVisible({ timeout: 15_000 });
 }
 
-export async function activateMonitorView(page: Page) {
-  await ecgViewMode(page, "monitor").click();
-  await expect(page.getByTestId("sprint37-live-monitor-ready")).toBeVisible({ timeout: 30_000 });
+/** Sprint 99 — live monitor is route-only; workspace no longer embeds monitor mode. */
+export async function activateMonitorView(page: Page, caseId?: string) {
+  const resolvedCaseId = caseId ?? new URL(page.url()).searchParams.get("caseId") ?? undefined;
+  if (!resolvedCaseId) {
+    throw new Error("activateMonitorView requires caseId after Sprint 99 workspace decoupling.");
+  }
+  await openEcgLiveMonitor(page, resolvedCaseId);
 }
 
 export async function openEcgWorkspace(page: Page, caseId?: string) {

@@ -143,9 +143,11 @@ async function main() {
   assert(response.status === 200, "Owner should be able to disable MFA.");
 
   const protectedShell = readFileSync("artifacts/ecg-insight/components/enterprise/EnterpriseUI.tsx", "utf8");
+  const routeRegistry = readFileSync("artifacts/ecg-insight/routes/registry.ts", "utf8");
+  const enterpriseNavBundle = `${protectedShell}\n${routeRegistry}`;
   const unauthorizedScreen = readFileSync("artifacts/ecg-insight/app/unauthorized.tsx", "utf8");
   assert(unauthorizedScreen.includes("/dashboard"), "Unauthorized route should return users to the protected dashboard.");
-  assert(protectedShell.includes("ownerOnly") && protectedShell.includes("/owner/licenses"), "Owner/admin navigation should be hidden from non-owner users.");
+  assert(enterpriseNavBundle.includes("ownerOnly") && enterpriseNavBundle.includes("/owner/licenses"), "Owner/admin navigation should be hidden from non-owner users.");
 
   await new Promise<void>((resolve, reject) => server.close((error) => (error ? reject(error) : resolve())));
   await cleanupUsers([owner.id, superAdmin.id, doctor.id]);

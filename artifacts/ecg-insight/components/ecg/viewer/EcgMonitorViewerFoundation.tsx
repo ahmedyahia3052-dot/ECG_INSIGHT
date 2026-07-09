@@ -132,19 +132,19 @@ export function EcgMonitorViewerFoundation({
   const analysisQuery = useQuery({
     enabled: !!token && !!ecgCase.id,
     queryFn: () => getAIResult(token!, ecgCase.id),
-    queryKey: ["ecg-monitor-ai-result", token, ecgCase.id],
+    queryKey: ["ecg-workspace-ai-result", token, ecgCase.id],
     retry: false,
   });
   const explainabilityQuery = useQuery({
     enabled: !!token && !!ecgCase.id,
     queryFn: () => getAIExplainability(token!, ecgCase.id),
-    queryKey: ["ecg-monitor-ai-explainability", token, ecgCase.id],
+    queryKey: ["ecg-workspace-ai-explainability", token, ecgCase.id],
     retry: false,
   });
   const digitalEcgQuery = useQuery({
     enabled: !!token && !!ecgCase.id,
     queryFn: () => getDigitalECG(token!, ecgCase.id),
-    queryKey: ["ecg-monitor-digital-ecg", token, ecgCase.id],
+    queryKey: ["ecg-workspace-digital-ecg", token, ecgCase.id],
     retry: false,
   });
   const digitalEcg = digitalEcgQuery.data?.digitalEcg ?? null;
@@ -170,8 +170,7 @@ export function EcgMonitorViewerFoundation({
   const digitizeMutation = useMutation({
     mutationFn: () => digitizeECG(token!, { caseId: ecgCase.id }),
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ["ecg-monitor-digital-ecg", token, ecgCase.id] });
-      await queryClient.invalidateQueries({ queryKey: ["ecg-live-monitor-digital-ecg", token, ecgCase.id] });
+      await queryClient.invalidateQueries({ queryKey: ["ecg-workspace-digital-ecg", token, ecgCase.id] });
     },
   });
 
@@ -318,6 +317,9 @@ export function EcgMonitorViewerFoundation({
   const effectiveMagnifier = showMagnifier || diagnostic.leadMagnifier;
 
   const openStudy = (nextCaseId: string) => router.push(`/ecg-workspace?caseId=${nextCaseId}` as never);
+  const openLiveMonitor = useCallback(() => {
+    router.push(`/ecg-live-monitor/${ecgCase.id}` as never);
+  }, [ecgCase.id, router]);
 
   const cycleLead = useCallback(() => {
     setSelectedLead((current) => {
@@ -506,7 +508,7 @@ export function EcgMonitorViewerFoundation({
   }, [exitDiagnostic, popLayoutSnapshot]);
 
   useEffect(() => {
-    controls.applyFit("hero");
+    controls.applyFit("width");
   }, [controls, layoutMode]);
 
   useEcgWorkstationShortcuts({
@@ -557,12 +559,13 @@ export function EcgMonitorViewerFoundation({
       { group: "FILE", icon: "upload", id: "upload", label: "Upload ECG", onPress: () => router.push("/upload-ecg" as never), shortcut: "Ctrl+U" },
       { group: "VIEW", icon: "eye", id: "ai-review", label: "AI Review Mode", onPress: () => enterprise.setViewMode("ai-review"), shortcut: "A" },
       { group: "VIEW", icon: "file", id: "report", label: "Report Preview", onPress: () => enterprise.setViewMode("report"), shortcut: "R" },
+      { group: "VIEW", icon: "activity", id: "live-monitor", label: "Open Live Monitor", onPress: openLiveMonitor },
       { group: "DIGITIZE", icon: "cpu", id: "digitize", label: "Run Digitization", onPress: () => digitizeMutation.mutate() },
       { group: "MEASURE", icon: "sliders", id: "measure", label: "Measurement Mode", onPress: () => enterprise.setViewMode("measurement") },
       { group: "EXPORT", icon: "file-text", id: "export-pdf", label: "Export PDF", onPress: () => void exportPdf() },
       { group: "EXPORT", icon: "image", id: "export-png", label: "Export PNG", onPress: () => void exportPng() },
     ],
-    [digitizeMutation, enterprise, exportPdf, exportPng, router],
+    [digitizeMutation, enterprise, exportPdf, exportPng, openLiveMonitor, router],
   );
 
   return (

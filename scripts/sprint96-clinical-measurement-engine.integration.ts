@@ -13,12 +13,22 @@ function assertContains(path: string, needles: string[]) {
   }
 }
 
+function assertContainsOneOf(path: string, needles: string[]) {
+  const content = read(path);
+  if (!needles.some((needle) => content.includes(needle))) {
+    throw new Error(`${path} is missing one of required Sprint 96 markers: ${needles.join(", ")}`);
+  }
+}
+
+assertContainsOneOf("artifacts/ecg-insight/components/ecg/viewer/pro-foundation/EcgProViewerFoundationScreen.tsx", [
+  "sprint96-ecg-pro-viewer-image-canvas",
+  "sprint101-ecg-pro-viewer-image-canvas",
+]);
 assertContains("artifacts/ecg-insight/components/ecg/viewer/pro-foundation/EcgProViewerFoundationScreen.tsx", [
   "EcgProViewerMeasurementLayer",
   "EcgProViewerClinicalMeasurementsPanel",
   "useEcgProViewerClinicalMeasurements",
   "useEcgMeasurementWorkspace",
-  "sprint96-ecg-pro-viewer-image-canvas",
 ]);
 
 assertContains("artifacts/ecg-insight/components/ecg/viewer/pro-foundation/EcgProViewerToolsPanel.tsx", [
@@ -33,13 +43,24 @@ assertContains("artifacts/ecg-insight/components/ecg/viewer/pro-foundation/EcgPr
   "sprint96-ecg-pro-viewer-measurement-layer",
 ]);
 
-assertContains("artifacts/ecg-insight/components/ecg/viewer/pro-foundation/EcgProViewerClinicalMeasurementsPanel.tsx", [
+assertContains("artifacts/ecg-insight/components/ecg/viewer/pro-foundation/clinicalMeasurementCards.ts", [
   "Heart Rate",
   "QTc",
-  "T Wave Duration",
-  "P Axis",
+  "T Duration",
+  "Axis",
+  "tWaveDurationMs",
+]);
+
+assertContainsOneOf("artifacts/ecg-insight/components/ecg/viewer/pro-foundation/EcgProViewerClinicalMeasurementsPanel.tsx", [
   "sprint96-auto-measurement",
+  "sprint101-auto-measurement",
+]);
+assertContainsOneOf("artifacts/ecg-insight/components/ecg/viewer/pro-foundation/EcgProViewerClinicalMeasurementsPanel.tsx", [
   "sprint96-save-manual-measurement",
+  "sprint101-save-manual-measurement",
+]);
+assertContains("artifacts/ecg-insight/components/ecg/viewer/pro-foundation/EcgProViewerClinicalMeasurementsPanel.tsx", [
+  "buildClinicalMeasurementCards",
 ]);
 
 assertContains("artifacts/ecg-insight/services/clinicalMeasurementApi.ts", [
