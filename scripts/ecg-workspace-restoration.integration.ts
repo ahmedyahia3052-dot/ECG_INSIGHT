@@ -52,8 +52,11 @@ assertContains("artifacts/ecg-insight/components/ecg/viewer/EcgViewerRightRail.t
   "sprint165-ecg-right-rail",
 ]);
 
-assertContains("artifacts/ecg-insight/components/enterprise/EnterpriseUI.tsx", [
+assertContains("artifacts/ecg-insight/routes/registry.ts", [
   'href: "/ecg-workspace"',
+]);
+
+assertContains("artifacts/ecg-insight/components/enterprise/EnterpriseUI.tsx", [
   'pathname.startsWith("/ecg-workspace")',
 ]);
 
