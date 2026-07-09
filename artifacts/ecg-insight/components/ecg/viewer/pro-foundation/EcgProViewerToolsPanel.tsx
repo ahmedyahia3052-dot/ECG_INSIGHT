@@ -3,6 +3,7 @@ import React from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
 import type { EcgViewerControls } from "../useEcgViewerControls";
+import type { EcgMeasurementWorkspace } from "../useEcgMeasurementWorkspace";
 import type { EcgProViewerCanvasMode, EcgProViewerDisplayMode, EcgProViewerLayoutPreset, EcgProViewerTheme } from "./types";
 import { ECG_PRO_VIEWER_THEMES } from "./types";
 
@@ -69,6 +70,22 @@ export function EcgProViewerToolsPanel({
         <ToolItem active={layoutPreset === "3x4"} icon="layout" label="3x4" onPress={() => onLayoutPresetChange("3x4")} palette={palette} testID="sprint95-tool-layout-3x4" />
         <ToolItem active={layoutPreset === "6x2"} icon="columns" label="6x2" onPress={() => onLayoutPresetChange("6x2")} palette={palette} testID="sprint95-tool-layout-6x2" />
         <ToolItem icon="move" label="Pan" onPress={controls.togglePanMode} palette={palette} testID="sprint95-tool-pan" />
+        <ToolItem
+          active={toolMode === "caliper"}
+          icon="maximize-2"
+          label="Calipers"
+          onPress={() => workspace?.setToolMode("caliper")}
+          palette={palette}
+          testID="sprint96-tool-calipers"
+        />
+        <ToolItem
+          active={toolMode === "measurement"}
+          icon="sliders"
+          label="Measure"
+          onPress={() => workspace?.setToolMode("measurement")}
+          palette={palette}
+          testID="sprint96-tool-measurement"
+        />
         <ToolItem icon="grid" label={controls.grid.visible ? "Hide Grid" : "Show Grid"} onPress={controls.toggleGrid} palette={palette} />
         <ToolItem icon="sun" label="Grid Opacity" onPress={controls.cycleGridOpacity} palette={palette} />
         <ToolItem icon="rotate-cw" label="Rotate" onPress={controls.rotate} palette={palette} />

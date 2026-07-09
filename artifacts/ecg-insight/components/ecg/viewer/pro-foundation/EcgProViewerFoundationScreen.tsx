@@ -5,12 +5,15 @@ import { EmptyState, FullScreenLoader } from "@/components/enterprise/Enterprise
 import { getEcgViewerPreferences, saveEcgViewerPreferences } from "@/services/ecgViewerApi";
 import { EcgCompareViewer } from "../EcgCompareViewer";
 import { EcgProViewerEngine } from "../EcgProViewerEngine";
+import { useEcgMeasurementWorkspace } from "../useEcgMeasurementWorkspace";
 import { useEcgViewerControls } from "../useEcgViewerControls";
 import { STANDARD_ECG_LEADS } from "../types";
 import { EcgProViewerCanvas } from "./EcgProViewerCanvas";
 import { EcgProViewerCaseTabs } from "./EcgProViewerCaseTabs";
+import { EcgProViewerClinicalMeasurementsPanel } from "./EcgProViewerClinicalMeasurementsPanel";
 import { EcgProViewerComparisonPanel } from "./EcgProViewerComparisonPanel";
 import { EcgProViewerInfoPanel } from "./EcgProViewerInfoPanel";
+import { EcgProViewerMeasurementLayer } from "./EcgProViewerMeasurementLayer";
 import { EcgProViewerStatusBar } from "./EcgProViewerStatusBar";
 import { EcgProViewerToolbar } from "./EcgProViewerToolbar";
 import { EcgProViewerToolsPanel } from "./EcgProViewerToolsPanel";
@@ -23,6 +26,7 @@ import type {
   EcgProViewerPointer,
   EcgProViewerTheme,
 } from "./types";
+import { useEcgProViewerClinicalMeasurements } from "./useEcgProViewerClinicalMeasurements";
 import { useEcgProViewerComparison } from "./useEcgProViewerComparison";
 import { useEcgProViewerSession } from "./useEcgProViewerSession";
 import { useEcgProViewerShortcuts } from "./useEcgProViewerShortcuts";
@@ -85,6 +89,22 @@ export function EcgProViewerFoundationScreen({ caseId, tabsParam, token }: Props
     enabled: compareEnabled,
     token,
   });
+
+  const measurementWorkspace = useEcgMeasurementWorkspace({
+    controls,
+    operatorName: "ECG Pro Viewer",
+  });
+
+  const clinicalMeasurements = useEcgProViewerClinicalMeasurements({
+    caseId,
+    enabled: Boolean(token && caseId),
+    onHydrateWorkspace: measurementWorkspace.hydrate,
+    token,
+  });
+
+  useEffect(() => {
+    clinicalMeasurements.hydrateFromSnapshot();
+  }, [clinicalMeasurements.hydrateFromSnapshot]);
 
   useEcgProViewerShortcuts({
     canvasMode,
@@ -155,7 +175,7 @@ export function EcgProViewerFoundationScreen({ caseId, tabsParam, token }: Props
     );
   }
 
-  const imageCanvas = hasImage && canvasMode !== "waveform" ? (
+  const rawImageCanvas = hasImage && canvasMode !== "waveform" ? (
     Platform.OS === "web" ? (
       <EcgProViewerCanvas
         controls={controls}
@@ -177,6 +197,19 @@ export function EcgProViewerFoundationScreen({ caseId, tabsParam, token }: Props
     )
   ) : null;
 
+  const imageCanvas = rawImageCanvas ? (
+    <EcgProViewerMeasurementLayer
+      controls={controls}
+      imageHeight={enrichedSession!.imageHeight ?? 0}
+      imageWidth={enrichedSession!.imageWidth ?? 0}
+      workspace={measurementWorkspace}
+    >
+      <View style={styles.imageCanvas} testID="sprint96-ecg-pro-viewer-image-canvas">
+        {rawImageCanvas}
+      </View>
+    </EcgProViewerMeasurementLayer>
+  ) : null;
+
   const waveformCanvas = waveformEnabled && hasWaveform ? (
     <EcgProViewerWaveformCanvas
       activeLead={lead}
@@ -196,7 +229,6 @@ export function EcgProViewerFoundationScreen({ caseId, tabsParam, token }: Props
       currentDigitizedLeads={[]}
       currentImageUrl={enrichedSession!.imageUrl}
       currentLabel={caseId}
-      testID="sprint95-ecg-pro-viewer-compare"
     />
   ) : null;
 
@@ -247,6 +279,7 @@ export function EcgProViewerFoundationScreen({ caseId, tabsParam, token }: Props
             onDisplayModeChange={setDisplayMode}
             onLayoutPresetChange={setLayoutPreset}
             theme={theme}
+            workspace={measurementWorkspace}
           />
         ) : null}
         <View style={styles.centerColumn}>
@@ -269,6 +302,16 @@ export function EcgProViewerFoundationScreen({ caseId, tabsParam, token }: Props
         </Pressable>
       ) : null}
 
+      <EcgProViewerClinicalMeasurementsPanel
+        autoPending={clinicalMeasurements.autoPending}
+        onAutoMeasure={() => void clinicalMeasurements.autoMeasure()}
+        onSaveManual={() => void clinicalMeasurements.saveManual(measurementWorkspace.exportState())}
+        record={clinicalMeasurements.latestRecord}
+        savePending={clinicalMeasurements.savePending}
+        theme={theme}
+        workspace={measurementWorkspace}
+      />
+
       <EcgProViewerStatusBar controls={controls} fps={fps} pointer={pointer} theme={theme} />
 
       {lead !== "ALL" && STANDARD_ECG_LEADS.includes(lead) ? (
@@ -282,6 +325,7 @@ const styles = StyleSheet.create({
   canvasRegion: { flex: 1, minHeight: 360 },
   centerColumn: { flex: 1, minWidth: 0 },
   fullscreen: { ...StyleSheet.absoluteFillObject, zIndex: 50 },
+  imageCanvas: { flex: 1 },
   infoToggle: { alignItems: "center", padding: 8 },
   infoToggleText: { color: "#38BDF8", fontSize: 12, fontWeight: "700" },
   leadBadge: { color: "#94A3B8", fontSize: 11, paddingHorizontal: 12 },
