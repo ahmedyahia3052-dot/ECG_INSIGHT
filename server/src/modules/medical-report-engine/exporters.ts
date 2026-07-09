@@ -1,5 +1,6 @@
 import { buildFhirBundle } from "../enterprise-report-engine/fhir-export";
 import { composeEnterpriseReportDocument } from "../enterprise-report-engine/composer";
+import { loadAiOverlayForReport } from "../ai-annotation-overlay-engine";
 import { renderEnterpriseReportHtml } from "../enterprise-report-engine/html-renderer";
 import { renderEnterpriseReportPdf } from "../enterprise-report-engine/pdf-renderer";
 import type { EnterpriseReportDocument } from "../enterprise-report-engine/types";
@@ -46,6 +47,7 @@ export async function exportMedicalReportJson(
   baseUrl = "",
 ): Promise<MedicalReportJsonExportDto> {
   const document = await composeEnterpriseReportDocument(reportId, baseUrl);
+  const overlayExport = await loadAiOverlayForReport(dto.caseId);
   return {
     document: {
       ...dto,
@@ -69,6 +71,7 @@ export async function exportMedicalReportJson(
     engineVersion: MEDICAL_REPORT_ENGINE_VERSION,
     exportedAt: new Date().toISOString(),
     format: "json",
+    overlayExport: overlayExport ?? undefined,
   };
 }
 

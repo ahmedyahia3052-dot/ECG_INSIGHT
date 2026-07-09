@@ -91,6 +91,7 @@ export interface EcgViewerBundleDto {
   leads: EcgViewerLeadDto[];
   annotations: EcgViewerAnnotationDto[];
   overlay: EcgViewerOverlayConfig | null;
+  aiOverlay?: Record<string, unknown> | null;
   aiJobStatus: { pending: number; completed: number } | null;
 }
 

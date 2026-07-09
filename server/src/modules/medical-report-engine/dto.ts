@@ -1,5 +1,6 @@
 import type { EnterpriseReportType, ReportStatus } from "@prisma/client";
 import type { FhirExportBundle } from "../enterprise-report-engine/types";
+import type { AiOverlayReportExportDto } from "../ai-annotation-overlay-engine/dto";
 import type { MedicalReportLifecycle, MedicalReportSectionKey, PdfRenderStage } from "./types";
 
 export type MedicalReportMeasurementsDto = {
@@ -93,6 +94,7 @@ export type MedicalReportJsonExportDto = {
   engineVersion: string;
   exportedAt: string;
   format: "json";
+  overlayExport?: AiOverlayReportExportDto;
 };
 
 export type MedicalReportFhirExportDto = {

@@ -1,6 +1,7 @@
 import type { EnterpriseReportType, ReportTemplateCategory } from "@prisma/client";
 import { prisma } from "../../config/prisma";
 import { AppError } from "../../middleware/error";
+import { loadAiOverlayForReport } from "../ai-annotation-overlay-engine";
 import { defaultTemplateForType, templateBySlug } from "./templates";
 import { computeContentHash, computeVerificationHash, pseudoBarcodeSvg, pseudoQrSvg } from "./security";
 import type { EnterpriseReportDocument } from "./types";
@@ -101,6 +102,8 @@ export async function composeEnterpriseReportDocument(
   const imageFile = report.case.files.find((file) => file.mimeType.startsWith("image/"));
   const verificationUrl = report.verificationUrl ?? `/api/enterprise-report-engine/verify/${report.reportUuid}?token=${report.verificationToken}`;
   const patientName = `${report.patient.firstName} ${report.patient.middleName ?? ""} ${report.patient.lastName}`.replace(/\s+/g, " ").trim();
+  const aiOverlay = await loadAiOverlayForReport(report.caseId);
+  const overlayUrl = aiOverlay?.enabled ? `${baseUrl}/api/ai-annotation-overlay-engine/cases/${report.caseId}/export` : undefined;
 
   const document: EnterpriseReportDocument = {
     ai: {
@@ -129,7 +132,7 @@ export async function composeEnterpriseReportDocument(
       digitizedEcg: report.case.preprocessedImagePath ?? undefined,
       measurements: measurement ? `/api/ecg/measurements/${measurement.id}` : undefined,
       originalEcg: imageFile ? `${baseUrl}/api/ecg/files/${imageFile.id}/download` : report.case.imagePath ?? report.case.pdfPath ?? undefined,
-      overlay: undefined,
+      overlay: overlayUrl,
       processedEcg: report.case.preprocessedImagePath ?? undefined,
     },
     branding: {

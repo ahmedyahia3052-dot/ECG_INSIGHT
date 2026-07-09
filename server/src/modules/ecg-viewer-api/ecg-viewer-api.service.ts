@@ -28,6 +28,12 @@ import type {
   EcgViewerWaveformDto,
 } from "./types";
 import { ecgViewerRepository } from "./repository";
+import {
+  generateViewerAiOverlay,
+  getViewerAiOverlay,
+  renderViewerAiOverlay,
+  toggleViewerAiOverlay,
+} from "../ai-annotation-overlay-engine";
 
 type AuthContext = { id: string; role: string };
 
@@ -519,13 +525,14 @@ export async function exportViewerCase(
 
 export async function getViewerBundle(caseId: string, auth: AuthContext): Promise<EcgViewerBundleDto> {
   await assertCaseAccess(caseId, auth);
-  const [image, metadata, measurements, leads, annotations, overlay] = await Promise.all([
+  const [image, metadata, measurements, leads, annotations, overlay, aiOverlay] = await Promise.all([
     getViewerImage(caseId, auth),
     getViewerMetadata(caseId, auth),
     getViewerMeasurements(caseId, auth),
     getViewerLeads(caseId, auth),
     getViewerAnnotations(caseId, auth),
     getOverlayConfig(caseId, auth),
+    getViewerAiOverlay(caseId, auth).catch(() => null),
   ]);
 
   const [pendingJobs, completedJobs] = await Promise.all([
@@ -535,6 +542,7 @@ export async function getViewerBundle(caseId: string, auth: AuthContext): Promis
 
   return {
     aiJobStatus: { completed: completedJobs, pending: pendingJobs },
+    aiOverlay: aiOverlay ?? null,
     annotations: [...annotations.ai, ...annotations.physician],
     caseId,
     image,
@@ -545,3 +553,5 @@ export async function getViewerBundle(caseId: string, auth: AuthContext): Promis
     version: ECG_VIEWER_API_VERSION,
   };
 }
+
+export { getViewerAiOverlay, generateViewerAiOverlay, renderViewerAiOverlay, toggleViewerAiOverlay };
