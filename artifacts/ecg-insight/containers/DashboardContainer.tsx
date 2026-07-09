@@ -5,9 +5,9 @@ import { boltUiAdapter } from "@/adapters/bolt";
 import { AsyncStateView } from "@/components/async-states/AsyncStateView";
 import { useAuth } from "@/context/AuthContext";
 import { useDashboardData } from "@/hooks/domain/useDashboardData";
-import { BoltDashboardHost } from "@/bolt-ui";
+import { DashboardBoltPresentation } from "@/presentation/bolt";
 
-/** Container — business logic + data only. Renders imported original Bolt dashboard. */
+/** Container — business logic + data only. Uses Expo-compatible Bolt presentation (Metro web). */
 export function DashboardContainer() {
   const router = useRouter();
   const { authToken, user } = useAuth();
@@ -39,7 +39,7 @@ export function DashboardContainer() {
       isError={contract.status === "error"}
       isLoading={contract.status === "loading"}
     >
-      <BoltDashboardHost contract={contract} />
+      <DashboardBoltPresentation contract={contract} />
     </AsyncStateView>
   );
 }

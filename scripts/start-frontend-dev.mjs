@@ -7,8 +7,10 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(__dirname, "..");
 const frontendDir = path.join(root, "artifacts", "ecg-insight");
 
+const detached = process.env.E2E_DETACHED === "1";
 const env = {
   ...process.env,
+  ...(detached ? { CI: process.env.CI ?? "1" } : {}),
   EXPO_NO_DOCTOR: "1",
   EXPO_OFFLINE: "1",
   EXPO_PUBLIC_API_URL: process.env.EXPO_PUBLIC_API_URL ?? "/api",
@@ -25,7 +27,6 @@ function resolveStdio() {
   return ["ignore", logFd, logFd];
 }
 
-const detached = process.env.E2E_DETACHED === "1";
 const child = spawn(`npx expo start ${mode}--localhost --port 8081`, {
   cwd: frontendDir,
   detached,
