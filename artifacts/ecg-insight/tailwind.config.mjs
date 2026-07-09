@@ -7,6 +7,7 @@ export default {
     "./components/**/*.{tsx,ts}",
     "./design-system/**/*.{tsx,ts}",
     "./presentation/**/*.{tsx,ts}",
+    "./bolt-ui/**/*.{tsx,ts}",
   ],
   theme: boltTailwindTheme,
 };
