@@ -1,10 +1,18 @@
 import { Platform } from "react-native";
 
-import { downloadReportPdf, generateReport, listReports, reportHtmlUrl, reportPrintUrl } from "@/services/reports";
+import { downloadReportPdf, generateReport, getReport, listReports, reportHtmlUrl, reportPrintUrl } from "@/services/reports";
 
 export class ReportsDomainService {
   listDashboardReports(accessToken: string) {
     return listReports(accessToken, new URLSearchParams({ pageSize: "8" }));
+  }
+
+  listReports(accessToken: string, params = new URLSearchParams()) {
+    return listReports(accessToken, params);
+  }
+
+  getReport(accessToken: string, reportId: string) {
+    return getReport(accessToken, reportId);
   }
 
   generateReport(accessToken: string, caseId: string) {

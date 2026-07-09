@@ -181,6 +181,8 @@ export const integrationScripts = [
   "scripts/sprint101-ecg-pro-viewer.integration.ts",
   "scripts/sprint102-frontend-foundation.test.ts",
   "scripts/sprint102-frontend-foundation.integration.ts",
+  "scripts/sprint103-ui-integration-layer.test.ts",
+  "scripts/sprint103-ui-integration-layer.integration.ts",
   "scripts/bolt-ui-migration-foundation.test.ts",
   "scripts/bolt-ui-migration-foundation.integration.ts",
   "scripts/sprint96-clinical-measurement-engine.test.ts",
