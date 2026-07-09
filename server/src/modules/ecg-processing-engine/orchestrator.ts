@@ -1,10 +1,10 @@
 import { prisma } from "../../config/prisma";
+import { runDigitizationPipelineForFile } from "../ecg-digitization-engine/pipeline";
 import { persistMeasurementEngineResult, runMeasurementEngine } from "../ecg-measurement-engine/service";
 import { DIGITIZATION_PIPELINE_VERSION } from "../ecg-digitization/types";
 import { persistProcessingArtifacts } from "./persist";
 import {
   ingestUpload,
-  runFullDigitizationPipeline,
   runNoiseReductionStage,
   runNormalizeStage,
   runPerspectiveCorrectionStage,
@@ -78,7 +78,15 @@ export async function executeProcessingPipeline(ctx: ProcessingPipelineContext):
 
   await runTrackedStage(ctx, "UPLOAD_INGEST", () => ingestUpload(file));
 
-  const pipeline = await runTrackedStage(ctx, "PREPROCESS", () => runFullDigitizationPipeline(file));
+  const pipeline = await runTrackedStage(ctx, "PREPROCESS", () =>
+    runDigitizationPipelineForFile({
+      actorId: ctx.actorId,
+      caseId: ctx.caseId,
+      ecgFileId: ctx.ecgFileId,
+      file,
+      processingJobId: ctx.jobId,
+    }),
+  );
   ctx.pipeline = pipeline;
 
   await runTrackedStage(ctx, "NORMALIZE", () => runNormalizeStage(pipeline.preprocessing));

@@ -161,6 +161,8 @@ export const integrationScripts = [
   "scripts/sprint86-ai-orchestration-engine.integration.ts",
   "scripts/sprint87-clinical-case-management.test.ts",
   "scripts/sprint87-clinical-case-management.integration.ts",
+  "scripts/sprint94-ecg-digitization-engine.test.ts",
+  "scripts/sprint94-ecg-digitization-engine.integration.ts",
   "scripts/sprint88-ecg-ingestion-pipeline.test.ts",
   "scripts/sprint88-ecg-ingestion-pipeline.integration.ts",
   "scripts/sprint90-medical-report-engine.test.ts",
