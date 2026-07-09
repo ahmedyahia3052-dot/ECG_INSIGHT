@@ -1,11 +1,13 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLocalSearchParams } from "expo-router";
 import React, { useState } from "react";
-import { Platform, StyleSheet, Text, View } from "react-native";
+import { StyleSheet, Text, View } from "react-native";
 
 import { Badge, Card, EmptyState, Field, formatDate, medicalTheme, PageSection, PrimaryButton, SectionHeader } from "@/components/enterprise/EnterpriseUI";
+import { AsyncStateView } from "@/components/async-states/AsyncStateView";
 import { useAuth } from "@/context/AuthContext";
-import { downloadReportPdf, emailReport, finalizeReport, getReport, reportHtmlUrl, reportPrintUrl, signReport } from "@/services/reports";
+import { emailReport, finalizeReport, getReport, reportHtmlUrl, reportPrintUrl, signReport } from "@/services/reports";
+import { reportsDomainService } from "@/services/domain";
 
 export default function ReportDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -31,8 +33,15 @@ export default function ReportDetailScreen() {
   });
 
   const report = reportQuery.data?.report;
-  if (reportQuery.isLoading) return <Text style={styles.muted}>Loading report...</Text>;
+  if (reportQuery.isLoading) {
+    return (
+      <PageSection>
+        <AsyncStateView isLoading />
+      </PageSection>
+    );
+  }
   if (!report) return <EmptyState title="Report not found" message="The requested report could not be loaded." />;
+  if (!token) return <EmptyState title="Authentication required" message="Sign in to view this report." />;
 
   return (
     <PageSection>
@@ -48,11 +57,11 @@ export default function ReportDetailScreen() {
         <View style={styles.actions}>
           <PrimaryButton label="Finalize" onPress={() => finalizeMutation.mutate()} variant="outline" />
           <PrimaryButton label="Sign" onPress={() => signMutation.mutate()} variant="outline" />
-          <PrimaryButton label="Preview HTML" onPress={() => void openReportHtml(token, reportHtmlUrl(report.id))} variant="outline" />
-          <PrimaryButton label="Download PDF" onPress={() => void openReportPdf(token, report.id, "download")} />
-          <PrimaryButton label="Print" onPress={() => void openReportHtml(token, reportPrintUrl(report.id))} variant="outline" />
+          <PrimaryButton label="Preview HTML" onPress={() => token && void reportsDomainService.openReportHtml(token, reportHtmlUrl(report.id))} variant="outline" />
+          <PrimaryButton label="Download PDF" onPress={() => token && void reportsDomainService.openReportPdf(token, report.id, "download")} />
+          <PrimaryButton label="Print" onPress={() => token && void reportsDomainService.openReportHtml(token, reportPrintUrl(report.id))} variant="outline" />
           <PrimaryButton label="Email" onPress={() => emailMutation.mutate()} variant="outline" />
-          <PrimaryButton label="Share" onPress={() => void shareReport(report.reportNumber, report.verificationUrl)} variant="outline" />
+          <PrimaryButton label="Share" onPress={() => void reportsDomainService.shareReport(report.reportNumber, report.verificationUrl)} variant="outline" />
         </View>
       </Card>
       {message ? <Card><Text style={styles.success}>{message}</Text></Card> : null}
@@ -88,40 +97,6 @@ export default function ReportDetailScreen() {
       </View>
     </PageSection>
   );
-}
-
-async function openReportPdf(token: string | undefined, reportId: string, mode: "download" | "preview" = "preview") {
-  if (!token || Platform.OS !== "web" || typeof window === "undefined") return;
-  const blob = await downloadReportPdf(token, reportId);
-  const url = URL.createObjectURL(blob);
-  if (mode === "download") {
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = "ecg-medical-report.pdf";
-    link.click();
-  } else {
-    window.open(url, "_blank", "noopener,noreferrer");
-  }
-  setTimeout(() => URL.revokeObjectURL(url), 60_000);
-}
-
-async function openReportHtml(token: string | undefined, url: string) {
-  if (!token || Platform.OS !== "web" || typeof window === "undefined") return;
-  const response = await fetch(url, { credentials: "include", headers: { authorization: `Bearer ${token}` } });
-  const html = await response.text();
-  const blobUrl = URL.createObjectURL(new Blob([html], { type: "text/html" }));
-  window.open(blobUrl, "_blank", "noopener,noreferrer");
-  setTimeout(() => URL.revokeObjectURL(blobUrl), 60_000);
-}
-
-async function shareReport(reportNumber: string, verificationUrl?: string) {
-  if (Platform.OS !== "web" || typeof window === "undefined") return;
-  const url = verificationUrl ? `${window.location.origin}${verificationUrl}` : window.location.href;
-  if (navigator.share) {
-    await navigator.share({ title: `ECG Report ${reportNumber}`, text: "Secure ECG report verification link", url });
-    return;
-  }
-  await navigator.clipboard?.writeText(url);
 }
 
 function Info({ label, value }: { label: string; value: string }) {

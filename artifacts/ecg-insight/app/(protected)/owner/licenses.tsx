@@ -1,20 +1,13 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import React, { useMemo, useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
 
 import { Badge, Card, EmptyState, Field, formatDate, medicalTheme, PageSection, PrimaryButton, SectionHeader, StatCard } from "@/components/enterprise/EnterpriseUI";
 import { useAuth } from "@/context/AuthContext";
-import { apiRequest } from "@/services/api";
-import { grantOwnerLicense, listLicenses, updateOwnerLicense, type LicenseRecord, type SubscriptionPlanCode } from "@/services/subscriptions";
+import { OWNER_LICENSE_PLANS, useOwnerLicensesPage, type LicenseAction } from "@/hooks/domain/useOwnerLicensesPage";
+import type { LicenseRecord, SubscriptionPlanCode } from "@/services/subscriptions";
 import { safeArray } from "@/utils/collections";
 
-type UserOption = { email: string; id: string; name: string; username?: string };
-type LicenseAction = "extend" | "resume" | "revoke" | "suspend";
-
-const plans: SubscriptionPlanCode[] = ["free", "basic", "professional", "enterprise", "lifetime"];
-
 export default function OwnerLicensesScreen() {
-  const queryClient = useQueryClient();
   const { authToken, user } = useAuth();
   const token = authToken?.token;
   const [query, setQuery] = useState("");
@@ -27,43 +20,28 @@ export default function OwnerLicensesScreen() {
   const [message, setMessage] = useState("");
 
   const isOwner = user?.email?.toLowerCase() === "ahmedyahia3052@gmail.com";
+  const { actionMutation, filterLicenses, grantMutation, licenses, licensesQuery, users, usersQuery } = useOwnerLicensesPage(token, isOwner);
 
-  const licensesQuery = useQuery({
-    enabled: !!token && isOwner,
-    queryFn: () => listLicenses(token!),
-    queryKey: ["owner-licenses", token],
-    retry: false,
-  });
-  const usersQuery = useQuery({
-    enabled: !!token && isOwner,
-    queryFn: () => apiRequest<{ users: UserOption[] }>("/users", { accessToken: token! }),
-    queryKey: ["owner-license-users", token],
-    retry: false,
-  });
+  const filteredLicenses = useMemo(() => filterLicenses(query), [filterLicenses, query]);
 
-  const invalidate = () => queryClient.invalidateQueries({ queryKey: ["owner-licenses", token] });
-  const grantMutation = useMutation({
-    mutationFn: () => grantOwnerLicense(token!, { expiresAt: lifetime ? undefined : expiresAt || undefined, lifetime, notes, plan, startsAt, userId }),
-    onSuccess: () => {
-      setMessage("License granted successfully.");
-      return invalidate();
-    },
-    onError: (error) => setMessage(error instanceof Error ? error.message : "Unable to grant license."),
-  });
-  const actionMutation = useMutation({
-    mutationFn: ({ action, license }: { action: LicenseAction; license: LicenseRecord }) => updateOwnerLicense(token!, license.id, { action, expiresAt: action === "extend" ? expiresAt || license.expiryDate || undefined : undefined, notes }),
-    onSuccess: (_payload, variables) => {
-      setMessage(`License ${variables.action} completed.`);
-      return invalidate();
-    },
-  });
+  const grantLicense = () => {
+    grantMutation.mutate(
+      { expiresAt: lifetime ? undefined : expiresAt || undefined, lifetime, notes, plan, startsAt, userId },
+      {
+        onError: (error) => setMessage(error instanceof Error ? error.message : "Unable to grant license."),
+        onSuccess: () => setMessage("License granted successfully."),
+      },
+    );
+  };
 
-  const licenses = safeArray(licensesQuery.data?.licenses);
-  const filteredLicenses = useMemo(() => {
-    const needle = query.trim().toLowerCase();
-    if (!needle) return licenses;
-    return safeArray(licenses).filter((license) => [license.userName, license.email, license.username, license.status, license.subscriptionType].filter(Boolean).join(" ").toLowerCase().includes(needle));
-  }, [licenses, query]);
+  const runLicenseAction = (action: LicenseAction, license: LicenseRecord) => {
+    actionMutation.mutate(
+      { action, expiresAt, license, notes },
+      {
+        onSuccess: () => setMessage(`License ${action} completed.`),
+      },
+    );
+  };
 
   if (!isOwner) {
     return <EmptyState title="Owner access required" message="This hidden enterprise licensing system is available only to ahmedyahia3052@gmail.com." />;
@@ -93,15 +71,15 @@ export default function OwnerLicensesScreen() {
           <Field label="Notes" onChangeText={setNotes} value={notes} />
         </View>
         <View style={styles.actions}>
-          {plans.map((item) => <PrimaryButton key={item} label={item} onPress={() => { setPlan(item); setLifetime(item === "lifetime"); }} variant={plan === item ? "primary" : "outline"} />)}
+          {OWNER_LICENSE_PLANS.map((item) => <PrimaryButton key={item} label={item} onPress={() => { setPlan(item); setLifetime(item === "lifetime"); }} variant={plan === item ? "primary" : "outline"} />)}
           <PrimaryButton label={lifetime ? "Lifetime: On" : "Lifetime: Off"} onPress={() => setLifetime((value) => !value)} variant={lifetime ? "primary" : "outline"} />
-          <PrimaryButton disabled={!userId || grantMutation.isPending} label={grantMutation.isPending ? "Granting..." : "Grant License"} onPress={() => grantMutation.mutate()} />
+          <PrimaryButton disabled={!userId || grantMutation.isPending} label={grantMutation.isPending ? "Granting..." : "Grant License"} onPress={grantLicense} />
         </View>
       </Card>
 
       <Card style={styles.form}>
         <SectionHeader title="Users" subtitle="Select a user to grant access." />
-        {safeArray(usersQuery.data?.users).filter((item) => !query || [item.name, item.email, item.username].filter(Boolean).join(" ").toLowerCase().includes(query.toLowerCase())).slice(0, 10).map((item) => (
+        {safeArray(users).filter((item) => !query || [item.name, item.email, item.username].filter(Boolean).join(" ").toLowerCase().includes(query.toLowerCase())).slice(0, 10).map((item) => (
           <View key={item.id} style={styles.row}>
             <View style={styles.rowMain}>
               <Text style={styles.rowTitle}>{item.name}</Text>
@@ -110,10 +88,12 @@ export default function OwnerLicensesScreen() {
             <PrimaryButton label="Select" onPress={() => setUserId(item.id)} variant={userId === item.id ? "primary" : "outline"} />
           </View>
         ))}
+        {usersQuery.isLoading ? <Text style={styles.muted}>Loading users…</Text> : null}
       </Card>
 
       <Card style={styles.form}>
         <SectionHeader title="Active Licenses" subtitle="User, plan, lifecycle status, dates, lifetime flag, and owner actions." />
+        {licensesQuery.isLoading ? <Text style={styles.muted}>Loading licenses…</Text> : null}
         {filteredLicenses.length ? filteredLicenses.map((license) => (
           <View key={license.id} style={styles.row}>
             <View style={styles.rowMain}>
@@ -123,13 +103,13 @@ export default function OwnerLicensesScreen() {
             </View>
             <Badge label={license.status} tone={license.status === "ACTIVE" ? "success" : license.status === "SUSPENDED" ? "warning" : "critical"} />
             <View style={styles.actions}>
-              <PrimaryButton label="Extend" onPress={() => actionMutation.mutate({ action: "extend", license })} variant="outline" />
-              <PrimaryButton label="Suspend" onPress={() => actionMutation.mutate({ action: "suspend", license })} variant="outline" />
-              <PrimaryButton label="Resume" onPress={() => actionMutation.mutate({ action: "resume", license })} variant="outline" />
-              <PrimaryButton label="Revoke" onPress={() => actionMutation.mutate({ action: "revoke", license })} variant="danger" />
+              <PrimaryButton label="Extend" onPress={() => runLicenseAction("extend", license)} variant="outline" />
+              <PrimaryButton label="Suspend" onPress={() => runLicenseAction("suspend", license)} variant="outline" />
+              <PrimaryButton label="Resume" onPress={() => runLicenseAction("resume", license)} variant="outline" />
+              <PrimaryButton label="Revoke" onPress={() => runLicenseAction("revoke", license)} variant="danger" />
             </View>
           </View>
-        )) : <EmptyState title="No licenses found" message="Grant a license or adjust search filters." />}
+        )) : licensesQuery.isLoading ? null : <EmptyState title="No licenses found" message="Grant a license or adjust search filters." />}
       </Card>
     </PageSection>
   );

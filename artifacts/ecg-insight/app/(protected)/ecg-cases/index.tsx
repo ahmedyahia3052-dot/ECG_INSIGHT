@@ -1,13 +1,11 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "expo-router";
-import React, { useMemo, useState } from "react";
+import React, { useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
 
 import { Badge, Card, EmptyState, Field, formatDate, medicalTheme, PageSection, patientDisplayName, PrimaryButton, SectionHeader } from "@/components/enterprise/EnterpriseUI";
 import { useAuth } from "@/context/AuthContext";
-import { analyzeCase } from "@/services/ai";
-import { approveCase, listCases, rejectCase, updateCaseStatus, type ApiECGCase } from "@/services/clinical";
-import { generateReport } from "@/services/reports";
+import { useEcgCasesPage } from "@/hooks/domain/useEcgCasesPage";
+import type { ApiECGCase } from "@/services/clinical";
 
 type StatusFilter = "all" | ApiECGCase["status"];
 type SeverityFilter = "all" | NonNullable<ApiECGCase["severity"]>;
@@ -17,36 +15,21 @@ const severityOptions: SeverityFilter[] = ["all", "normal", "abnormal", "critica
 
 export default function EcgCasesScreen() {
   const router = useRouter();
-  const queryClient = useQueryClient();
   const { authToken } = useAuth();
   const token = authToken?.token;
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState<StatusFilter>("all");
   const [severity, setSeverity] = useState<SeverityFilter>("all");
 
-  const params = useMemo(() => {
-    const next = new URLSearchParams({ pageSize: "50" });
-    if (query.trim()) next.set("q", query.trim());
-    if (status !== "all") next.set("status", status);
-    if (severity !== "all") next.set("severity", severity);
-    return next;
-  }, [query, severity, status]);
-
-  const casesQuery = useQuery({
-    enabled: !!token,
-    queryFn: () => listCases(token!, params),
-    queryKey: ["enterprise-ecg-cases", token, params.toString()],
-    retry: false,
-  });
-
-  const invalidate = () => queryClient.invalidateQueries({ queryKey: ["enterprise-ecg-cases", token] });
-  const analyzeMutation = useMutation({ mutationFn: (id: string) => analyzeCase(token!, id), onSuccess: invalidate });
-  const approveMutation = useMutation({ mutationFn: (id: string) => approveCase(token!, id), onSuccess: invalidate });
-  const rejectMutation = useMutation({ mutationFn: (id: string) => rejectCase(token!, id, { reason: "Rejected from ECG Case Management." }), onSuccess: invalidate });
-  const reportMutation = useMutation({ mutationFn: (id: string) => generateReport(token!, id), onSuccess: invalidate });
-  const processingMutation = useMutation({ mutationFn: (id: string) => updateCaseStatus(token!, id, "processing"), onSuccess: invalidate });
-
-  const cases = casesQuery.data?.cases ?? [];
+  const {
+    analyzeMutation,
+    approveMutation,
+    cases,
+    casesQuery,
+    processingMutation,
+    rejectMutation,
+    reportMutation,
+  } = useEcgCasesPage(token, { query, severity, status });
 
   return (
     <PageSection>

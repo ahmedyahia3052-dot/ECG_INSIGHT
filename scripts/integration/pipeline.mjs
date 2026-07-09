@@ -179,6 +179,8 @@ export const integrationScripts = [
   "scripts/sprint99-ecg-workspace-refactor.integration.ts",
   "scripts/sprint101-ecg-pro-viewer.test.ts",
   "scripts/sprint101-ecg-pro-viewer.integration.ts",
+  "scripts/sprint102-frontend-foundation.test.ts",
+  "scripts/sprint102-frontend-foundation.integration.ts",
   "scripts/sprint96-clinical-measurement-engine.test.ts",
   "scripts/sprint96-clinical-measurement-engine.integration.ts",
   "scripts/sprint97-ai-annotation-overlay-engine.test.ts",

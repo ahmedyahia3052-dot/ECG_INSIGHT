@@ -1,88 +1,35 @@
 import { Feather } from "@expo/vector-icons";
-import { useQuery } from "@tanstack/react-query";
 import { useRouter } from "expo-router";
 import React from "react";
 import { StyleSheet, Text, View } from "react-native";
 
 import { Badge, Card, EmptyState, formatDate, medicalTheme, PageSection, patientDisplayName, PrimaryButton, roleLabel, SectionHeader } from "@/components/enterprise/EnterpriseUI";
 import { useAuth } from "@/context/AuthContext";
-import { listNotifications } from "@/services/collaboration";
-import { listCases, listPatients } from "@/services/clinical";
-import { getEnterpriseClinicalDashboard } from "@/services/enterpriseClinical";
-import { listReports } from "@/services/reports";
-import { getMySubscription } from "@/services/subscriptions";
-import { safeArray } from "@/utils/collections";
-
-function greeting() {
-  const hour = new Date().getHours();
-  if (hour < 12) return "Good Morning";
-  if (hour < 17) return "Good Afternoon";
-  return "Good Evening";
-}
-
-function currentTimeLabel() {
-  return new Date().toLocaleString(undefined, {
-    dateStyle: "medium",
-    timeStyle: "short",
-  });
-}
+import { useDashboardData } from "@/hooks/domain/useDashboardData";
 
 export default function DashboardScreen() {
   const router = useRouter();
   const { authToken, user } = useAuth();
   const token = authToken?.token;
 
-  const casesQuery = useQuery({
-    enabled: !!token,
-    queryFn: () => listCases(token!, new URLSearchParams({ pageSize: "8" })),
-    queryKey: ["enterprise-dashboard-cases", token],
-    retry: false,
-  });
-  const patientsQuery = useQuery({
-    enabled: !!token,
-    queryFn: () => listPatients(token!, new URLSearchParams({ pageSize: "8" })),
-    queryKey: ["enterprise-dashboard-patients", token],
-    retry: false,
-  });
-  const reportsQuery = useQuery({
-    enabled: !!token,
-    queryFn: () => listReports(token!, new URLSearchParams({ pageSize: "8" })),
-    queryKey: ["enterprise-dashboard-reports", token],
-    retry: false,
-  });
-  const notificationsQuery = useQuery({
-    enabled: !!token,
-    queryFn: () => listNotifications(token!, new URLSearchParams({ pageSize: "8" })),
-    queryKey: ["enterprise-dashboard-notifications", token],
-    retry: false,
-  });
-  const subscriptionQuery = useQuery({
-    enabled: !!token,
-    queryFn: () => getMySubscription(token!),
-    queryKey: ["enterprise-dashboard-subscription", token],
-    retry: false,
-  });
+  const {
+    cases,
+    enterprise,
+    notifications,
+    patients,
+    queries: { cases: casesQuery, enterprise: enterpriseQuery, patients: patientsQuery, reports: reportsQuery, subscription: subscriptionQuery },
+    snapshot,
+    subscription,
+  } = useDashboardData(token);
 
-  const enterpriseQuery = useQuery({
-    enabled: !!token,
-    queryFn: () => getEnterpriseClinicalDashboard(token!),
-    queryKey: ["enterprise-clinical-dashboard", token],
-    retry: false,
-  });
-
-  const cases = safeArray(casesQuery.data?.cases);
-  const patients = safeArray(patientsQuery.data?.patients);
-  const reports = safeArray(reportsQuery.data?.reports);
-  const notifications = safeArray(notificationsQuery.data?.notifications);
-  const criticalCases = cases.filter((item) => item.priority === "critical").length;
-  const abnormalCases = cases.filter((item) => item.finalDiagnosis || item.priority === "high").length;
-  const pendingReports = reports.filter((item) => item.status === "draft" || item.status === "under_review").length;
-  const enterprise = enterpriseQuery.data?.dashboard;
-  const pendingReviews = enterprise?.pendingReviews ?? cases.filter((item) => item.status === "ai_completed" || item.status === "under_review").length;
+  const criticalCases = snapshot.kpis.criticalCases;
+  const abnormalCases = snapshot.kpis.abnormalCases;
+  const pendingReports = snapshot.kpis.pendingReports;
+  const pendingReviews = enterprise?.pendingReviews ?? snapshot.kpis.pendingReviews;
   const loadingKpis = casesQuery.isLoading || patientsQuery.isLoading || reportsQuery.isLoading || enterpriseQuery.isLoading;
-  const subscriptionLabel = subscriptionQuery.data?.lifetimeAccess.granted
+  const subscriptionLabel = subscription?.lifetimeAccess.granted
     ? "Lifetime Premium"
-    : subscriptionQuery.data?.plan.name ?? "Subscription Active";
+    : subscription?.plan.name ?? "Subscription Active";
 
   return (
     <PageSection>
@@ -90,9 +37,9 @@ export default function DashboardScreen() {
         <EcgHeroWave />
         <View style={styles.heroContent}>
           <Text style={styles.kicker}>Enterprise Clinical Command Center</Text>
-          <Text style={styles.heroTitle}>{greeting()}, {user?.name ?? "Doctor"}</Text>
+          <Text style={styles.heroTitle}>{snapshot.greeting}, {user?.name ?? "Doctor"}</Text>
           <Text style={styles.heroText}>
-            {user?.institution ?? "ECG Insight Organization"} • {roleLabel(user?.role)} • {currentTimeLabel()}
+            {user?.institution ?? "ECG Insight Organization"} • {roleLabel(user?.role)} • {snapshot.timeLabel}
           </Text>
           <Text style={styles.heroText}>
             Last login: current secure session restored by ECG Insight authentication.
