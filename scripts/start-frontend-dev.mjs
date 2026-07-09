@@ -11,8 +11,9 @@ const env = {
   ...process.env,
   EXPO_NO_DOCTOR: "1",
   EXPO_OFFLINE: "1",
-  EXPO_PUBLIC_API_URL: "http://localhost:3002/api",
+  EXPO_PUBLIC_API_URL: process.env.EXPO_PUBLIC_API_URL ?? "/api",
   EXPO_PUBLIC_APP_ENV: "development",
+  EXPO_PUBLIC_USE_DEV_PROXY: process.env.EXPO_PUBLIC_USE_DEV_PROXY ?? "true",
   NODE_ENV: "development",
 };
 

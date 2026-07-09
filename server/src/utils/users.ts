@@ -71,6 +71,7 @@ export function serializeUser(
     | "lifetimeGrantedAt"
     | "lifetimeGrantedBy"
     | "name"
+    | "organizationId"
     | "ownerPasswordSetupRequired"
     | "ownerTwoFactorRequired"
     | "phoneNumber"
@@ -104,6 +105,7 @@ export function serializeUser(
     name: user.name,
     organizationCountry: organization?.country ?? undefined,
     organizationEmail: organization?.email ?? undefined,
+    organizationId: user.organizationId ?? undefined,
     organizationName: organization?.name ?? undefined,
     organizationType: organization ? organizationTypeLabel(organization.type) : undefined,
     ownerPasswordSetupRequired: user.ownerPasswordSetupRequired,

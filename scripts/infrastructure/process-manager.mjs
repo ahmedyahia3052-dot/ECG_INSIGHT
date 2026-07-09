@@ -253,9 +253,12 @@ export class ProcessManager {
       command: "npx",
       cwd: frontendDir,
       env: {
+        EXPO_DEV_API_PROXY: this.apiOrigin,
         EXPO_NO_DOCTOR: "1",
         EXPO_OFFLINE: "1",
-        EXPO_PUBLIC_API_URL: `${this.apiOrigin}/api`,
+        EXPO_PUBLIC_API_URL: "/api",
+        EXPO_PUBLIC_APP_ENV: "development",
+        EXPO_PUBLIC_USE_DEV_PROXY: "true",
         NODE_ENV: "development",
         ...options.env,
       },

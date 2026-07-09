@@ -30,9 +30,15 @@ assertContains("prisma/migrations/20260626203000_sprint36_security_hardening/mig
   "CREATE TABLE IF NOT EXISTS \"KeyRotationEvent\"",
 ]);
 
-assertContains("server/src/auth/auth.service.ts", [
+assertContains("server/src/modules/authentication/service/authentication.service.ts", [
   "assertPasswordNotReused",
+]);
+
+assertContains("server/src/modules/authentication/repository/user-auth.repository.ts", [
   "FAILED_LOGIN",
+]);
+
+assertContains("server/src/modules/authentication/service/session.service.ts", [
   "Refresh token reuse detected.",
   "MAX_CONCURRENT_SESSIONS",
 ]);
