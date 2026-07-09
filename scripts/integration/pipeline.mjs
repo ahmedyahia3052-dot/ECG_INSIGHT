@@ -173,6 +173,8 @@ export const integrationScripts = [
   "scripts/sprint89-ecg-viewer-api.integration.ts",
   "scripts/sprint93-ecg-viewer-foundation.test.ts",
   "scripts/sprint93-ecg-viewer-foundation.integration.ts",
+  "scripts/sprint95-ecg-pro-viewer.test.ts",
+  "scripts/sprint95-ecg-pro-viewer.integration.ts",
   "scripts/sprint47-acquisition-digitization.integration.ts",
   "scripts/sprint48-hospital-examination-workflow.integration.ts",
   "scripts/sprint49-live-monitor-hmi.integration.ts",

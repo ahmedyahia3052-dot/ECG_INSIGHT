@@ -1,20 +1,37 @@
-import React, { useCallback, useMemo, useState } from "react";
+﻿import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Linking, Platform, Pressable, StyleSheet, Text, useWindowDimensions, View } from "react-native";
 
 import { EmptyState, FullScreenLoader } from "@/components/enterprise/EnterpriseUI";
+import { getEcgViewerPreferences, saveEcgViewerPreferences } from "@/services/ecgViewerApi";
+import { EcgCompareViewer } from "../EcgCompareViewer";
 import { EcgProViewerEngine } from "../EcgProViewerEngine";
 import { useEcgViewerControls } from "../useEcgViewerControls";
 import { STANDARD_ECG_LEADS } from "../types";
 import { EcgProViewerCanvas } from "./EcgProViewerCanvas";
+import { EcgProViewerCaseTabs } from "./EcgProViewerCaseTabs";
+import { EcgProViewerComparisonPanel } from "./EcgProViewerComparisonPanel";
 import { EcgProViewerInfoPanel } from "./EcgProViewerInfoPanel";
 import { EcgProViewerStatusBar } from "./EcgProViewerStatusBar";
 import { EcgProViewerToolbar } from "./EcgProViewerToolbar";
 import { EcgProViewerToolsPanel } from "./EcgProViewerToolsPanel";
-import type { EcgProViewerDisplayMode, EcgProViewerLeadSelection, EcgProViewerPointer, EcgProViewerTheme } from "./types";
+import { EcgProViewerWaveformCanvas } from "./EcgProViewerWaveformCanvas";
+import type {
+  EcgProViewerCanvasMode,
+  EcgProViewerDisplayMode,
+  EcgProViewerLayoutPreset,
+  EcgProViewerLeadSelection,
+  EcgProViewerPointer,
+  EcgProViewerTheme,
+} from "./types";
+import { useEcgProViewerComparison } from "./useEcgProViewerComparison";
 import { useEcgProViewerSession } from "./useEcgProViewerSession";
+import { useEcgProViewerShortcuts } from "./useEcgProViewerShortcuts";
+import { useEcgProViewerTabs } from "./useEcgProViewerTabs";
+import { useEcgProViewerWaveform } from "./useEcgProViewerWaveform";
 
 type Props = {
   caseId?: string;
+  tabsParam?: string;
   token?: string;
 };
 
@@ -33,18 +50,68 @@ function printAsset(url?: string) {
   opened?.addEventListener("load", () => opened.print(), { once: true });
 }
 
-export function EcgProViewerFoundationScreen({ caseId, token }: Props) {
+export function EcgProViewerFoundationScreen({ caseId, tabsParam, token }: Props) {
   const controls = useEcgViewerControls();
   const { height, width } = useWindowDimensions();
   const isMobile = width < 768;
   const isTablet = width >= 768 && width < 1100;
   const [theme, setTheme] = useState<EcgProViewerTheme>("dark");
   const [displayMode, setDisplayMode] = useState<EcgProViewerDisplayMode>("image-grid");
+  const [canvasMode, setCanvasMode] = useState<EcgProViewerCanvasMode>("hybrid");
+  const [layoutPreset, setLayoutPreset] = useState<EcgProViewerLayoutPreset>("12-lead");
+  const [compareEnabled, setCompareEnabled] = useState(false);
+  const [fps, setFps] = useState(0);
   const [lead, setLead] = useState<EcgProViewerLeadSelection>("ALL");
   const [pointer, setPointer] = useState<EcgProViewerPointer>(null);
   const [infoOpen, setInfoOpen] = useState(!isMobile);
 
+  const { selectCase, tabIds } = useEcgProViewerTabs({ activeCaseId: caseId, tabsParam });
+  const baselineCaseId = useMemo(() => tabIds.find((id) => id !== caseId), [caseId, tabIds]);
+
   const { isError, isLoading, session } = useEcgProViewerSession({ caseId, token });
+  const baselineSessionQuery = useEcgProViewerSession({ caseId: compareEnabled ? baselineCaseId : undefined, token });
+
+  const waveformEnabled = canvasMode !== "image" || displayMode === "waveform";
+  const { digitalEcg, isLoading: waveformLoading } = useEcgProViewerWaveform({
+    caseId,
+    enabled: waveformEnabled,
+    paper: controls.grid,
+    token,
+  });
+
+  const { comparison } = useEcgProViewerComparison({
+    baselineCaseId,
+    caseId,
+    enabled: compareEnabled,
+    token,
+  });
+
+  useEcgProViewerShortcuts({
+    canvasMode,
+    controls,
+    onCanvasModeChange: setCanvasMode,
+    onCompareToggle: () => setCompareEnabled((value) => !value),
+    onLayoutPresetChange: setLayoutPreset,
+  });
+
+  useEffect(() => {
+    if (!token) return;
+    void getEcgViewerPreferences(token).then((response) => {
+      const prefs = response.preferences;
+      const nextLayout = prefs.layoutPreset;
+      if (typeof nextLayout === "string") setLayoutPreset(nextLayout as EcgProViewerLayoutPreset);
+      const nextCanvas = prefs.canvasMode;
+      if (typeof nextCanvas === "string") setCanvasMode(nextCanvas as EcgProViewerCanvasMode);
+    });
+  }, [token]);
+
+  useEffect(() => {
+    if (!token) return;
+    const timer = setTimeout(() => {
+      void saveEcgViewerPreferences(token, { canvasMode, layoutPreset, theme });
+    }, 600);
+    return () => clearTimeout(timer);
+  }, [canvasMode, layoutPreset, theme, token]);
 
   const enrichedSession = useMemo(() => {
     if (!session) return null;
@@ -72,11 +139,14 @@ export function EcgProViewerFoundationScreen({ caseId, token }: Props) {
     );
   }
 
-  if (isLoading) {
+  if (isLoading || (waveformEnabled && waveformLoading)) {
     return <FullScreenLoader label="Loading professional ECG viewer…" />;
   }
 
-  if (isError || !enrichedSession?.imageUrl) {
+  const hasImage = !!enrichedSession?.imageUrl;
+  const hasWaveform = !!digitalEcg?.leads?.length;
+
+  if (isError || (!hasImage && !hasWaveform)) {
     return (
       <EmptyState
         message="Upload an ECG image for this case, then reopen ECG Pro Viewer."
@@ -85,57 +155,110 @@ export function EcgProViewerFoundationScreen({ caseId, token }: Props) {
     );
   }
 
-  const canvas = Platform.OS === "web" ? (
-    <EcgProViewerCanvas
+  const imageCanvas = hasImage && canvasMode !== "waveform" ? (
+    Platform.OS === "web" ? (
+      <EcgProViewerCanvas
+        controls={controls}
+        displayMode={displayMode}
+        imageUrl={enrichedSession!.imageUrl}
+        onPointerMove={onPointerMove}
+        theme={theme}
+      />
+    ) : (
+      <EcgProViewerEngine
+        assetHeight={enrichedSession!.imageHeight}
+        assetWidth={enrichedSession!.imageWidth}
+        controls={controls}
+        imageUrl={displayMode === "grid" ? undefined : enrichedSession!.imageUrl}
+        onPointerMove={onPointerMove}
+        showMiniNavigator={false}
+        testID="sprint95-ecg-pro-viewer-native-engine"
+      />
+    )
+  ) : null;
+
+  const waveformCanvas = waveformEnabled && hasWaveform ? (
+    <EcgProViewerWaveformCanvas
+      activeLead={lead}
       controls={controls}
-      displayMode={displayMode}
-      imageUrl={enrichedSession.imageUrl}
-      onPointerMove={onPointerMove}
-      theme={theme}
+      digitalEcg={digitalEcg}
+      layoutPreset={layoutPreset}
+      onFpsUpdate={setFps}
     />
-  ) : (
-    <EcgProViewerEngine
-      assetHeight={enrichedSession.imageHeight}
-      assetWidth={enrichedSession.imageWidth}
+  ) : null;
+
+  const compareCanvas = compareEnabled && baselineCaseId && hasImage ? (
+    <EcgCompareViewer
+      accessToken={token}
+      compareImageUrl={baselineSessionQuery.session?.imageUrl}
+      compareLabel={baselineCaseId}
       controls={controls}
-      imageUrl={displayMode === "grid" ? undefined : enrichedSession.imageUrl}
-      onPointerMove={onPointerMove}
-      showMiniNavigator={false}
-      testID="sprint93-ecg-pro-viewer-native-engine"
+      currentDigitizedLeads={[]}
+      currentImageUrl={enrichedSession!.imageUrl}
+      currentLabel={caseId}
     />
+  ) : null;
+
+  const canvas = compareCanvas ?? (
+    <View style={styles.stack}>
+      {imageCanvas}
+      {canvasMode !== "image" ? waveformCanvas : null}
+    </View>
   );
 
   return (
     <View
       style={[styles.root, controls.fullscreen && styles.fullscreen, { minHeight: Math.max(height - 48, 640) }]}
-      testID="sprint93-ecg-pro-viewer-root"
+      testID="sprint95-ecg-pro-viewer-root"
     >
+      <EcgProViewerCaseTabs activeCaseId={caseId} onSelect={selectCase} tabIds={tabIds} theme={theme} />
+
       <EcgProViewerToolbar
-        caseName={enrichedSession.caseNumber}
+        canvasMode={canvasMode}
+        caseName={enrichedSession?.caseNumber}
+        compareEnabled={compareEnabled}
         controls={controls}
         displayMode={displayMode}
-        imageUrl={enrichedSession.imageUrl}
+        imageUrl={enrichedSession?.imageUrl}
+        layoutPreset={layoutPreset}
         lead={lead}
+        onCanvasModeChange={setCanvasMode}
+        onCompareToggle={() => setCompareEnabled((value) => !value)}
         onDisplayModeChange={setDisplayMode}
-        onDownload={() => openAsset(enrichedSession.imageUrl)}
+        onDownload={() => openAsset(enrichedSession?.imageUrl)}
+        onLayoutPresetChange={setLayoutPreset}
         onLeadChange={setLead}
-        onPrint={() => printAsset(enrichedSession.imageUrl)}
+        onPrint={() => printAsset(enrichedSession?.imageUrl)}
         onThemeToggle={() => setTheme((value) => (value === "dark" ? "light" : "dark"))}
-        patientName={enrichedSession.patientName}
-        studyDate={enrichedSession.studyDate}
+        patientName={enrichedSession?.patientName}
+        studyDate={enrichedSession?.studyDate}
         theme={theme}
       />
 
       <View style={styles.workspace}>
-        {!isMobile ? <EcgProViewerToolsPanel controls={controls} displayMode={displayMode} onDisplayModeChange={setDisplayMode} theme={theme} /> : null}
+        {!isMobile ? (
+          <EcgProViewerToolsPanel
+            canvasMode={canvasMode}
+            controls={controls}
+            displayMode={displayMode}
+            layoutPreset={layoutPreset}
+            onCanvasModeChange={setCanvasMode}
+            onDisplayModeChange={setDisplayMode}
+            onLayoutPresetChange={setLayoutPreset}
+            theme={theme}
+          />
+        ) : null}
         <View style={styles.centerColumn}>
           <View style={styles.canvasRegion}>{canvas}</View>
+          {compareEnabled ? (
+            <EcgProViewerComparisonPanel baselineCaseId={baselineCaseId} comparison={comparison} theme={theme} />
+          ) : null}
         </View>
         {!isMobile && !isTablet ? (
-          <EcgProViewerInfoPanel controls={controls} session={enrichedSession} theme={theme} />
+          <EcgProViewerInfoPanel controls={controls} session={enrichedSession!} theme={theme} />
         ) : null}
         {(isMobile || isTablet) && infoOpen ? (
-          <EcgProViewerInfoPanel controls={controls} session={enrichedSession} theme={theme} />
+          <EcgProViewerInfoPanel controls={controls} session={enrichedSession!} theme={theme} />
         ) : null}
       </View>
 
@@ -145,10 +268,10 @@ export function EcgProViewerFoundationScreen({ caseId, token }: Props) {
         </Pressable>
       ) : null}
 
-      <EcgProViewerStatusBar controls={controls} pointer={pointer} theme={theme} />
+      <EcgProViewerStatusBar controls={controls} fps={fps} pointer={pointer} theme={theme} />
 
       {lead !== "ALL" && STANDARD_ECG_LEADS.includes(lead) ? (
-        <Text style={styles.leadBadge} testID="sprint93-selected-lead">Lead focus: {lead}</Text>
+        <Text style={styles.leadBadge} testID="sprint95-selected-lead">Lead focus: {lead}</Text>
       ) : null}
     </View>
   );
@@ -162,5 +285,6 @@ const styles = StyleSheet.create({
   infoToggleText: { color: "#38BDF8", fontSize: 12, fontWeight: "700" },
   leadBadge: { color: "#94A3B8", fontSize: 11, paddingHorizontal: 12 },
   root: { flex: 1 },
+  stack: { flex: 1, gap: 8 },
   workspace: { flex: 1, flexDirection: "row", minHeight: 420 },
 });
