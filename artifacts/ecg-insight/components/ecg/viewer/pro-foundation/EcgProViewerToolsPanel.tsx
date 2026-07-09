@@ -15,6 +15,7 @@ type Props = {
   onDisplayModeChange: (mode: EcgProViewerDisplayMode) => void;
   onLayoutPresetChange: (preset: EcgProViewerLayoutPreset) => void;
   theme: EcgProViewerTheme;
+  workspace?: EcgMeasurementWorkspace;
 };
 
 function ToolItem({
@@ -54,10 +55,12 @@ export function EcgProViewerToolsPanel({
   onDisplayModeChange,
   onLayoutPresetChange,
   theme,
+  workspace,
 }: Props) {
   const palette = ECG_PRO_VIEWER_THEMES[theme];
+  const toolMode = workspace?.present.toolMode ?? "select";
   return (
-    <View style={[styles.root, { backgroundColor: palette.panel, borderRightColor: palette.border }]} testID="sprint95-ecg-pro-viewer-tools">
+    <View style={[styles.root, { backgroundColor: palette.panel, borderRightColor: palette.border }]} testID="sprint96-ecg-pro-viewer-tools">
       <Text style={[styles.title, { color: palette.muted }]}>TOOLS</Text>
       <ScrollView contentContainerStyle={styles.list}>
         <ToolItem active={layoutPreset === "12-lead"} icon="grid" label="12-Lead" onPress={() => onLayoutPresetChange("12-lead")} palette={palette} testID="sprint95-tool-layout-12-lead" />

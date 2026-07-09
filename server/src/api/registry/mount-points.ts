@@ -32,6 +32,7 @@ export const API_MOUNT_POINTS: Array<{ module: string; prefix: string; tag: stri
   { module: "ecg", prefix: "/ecg", tag: "ecg" },
   { module: "ecg-processing-engine", prefix: "/ecg-processing-engine", tag: "ecg" },
   { module: "ai-orchestration-engine", prefix: "/ai-orchestration-engine", tag: "ai" },
+  { module: "ai-annotation-overlay-engine", prefix: "/ai-annotation-overlay-engine", tag: "ecg" },
   { module: "medical-report-engine", prefix: "/medical-report-engine", tag: "reports" },
   { module: "ecg-diagnostic-pipeline", prefix: "/ecg/diagnostic-pipeline", tag: "ecg" },
   { module: "ecg-benchmark", prefix: "/ecg/benchmark", tag: "ecg" },

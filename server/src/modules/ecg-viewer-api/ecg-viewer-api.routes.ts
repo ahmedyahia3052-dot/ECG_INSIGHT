@@ -6,9 +6,11 @@ import {
   createPhysicianAnnotation,
   deletePhysicianAnnotation,
   exportViewerCase,
+  generateViewerAiOverlay,
   generateViewerReport,
   getEcgViewerApiStatus,
   getOverlayConfig,
+  getViewerAiOverlay,
   getViewerAnnotations,
   getViewerBundle,
   getViewerImage,
@@ -18,11 +20,14 @@ import {
   getViewerPreferences,
   getViewerWaveform,
   getZoomPresets,
+  renderViewerAiOverlay,
   saveOverlayConfig,
   saveViewerMeasurements,
   saveViewerPreferences,
+  toggleViewerAiOverlay,
   updatePhysicianAnnotation,
 } from "./ecg-viewer-api.service";
+import { toggleOverlaySchema } from "../ai-annotation-overlay-engine/schemas";
 import {
   annotationIdParamsSchema,
   caseIdParamsSchema,
@@ -208,6 +213,42 @@ ecgViewerApiRouter.put(
     }
   },
 );
+
+ecgViewerApiRouter.get("/cases/:caseId/ai-overlay", async (req, res, next) => {
+  try {
+    const params = caseIdParamsSchema.parse(req.params);
+    res.json({ aiOverlay: await getViewerAiOverlay(params.caseId, req.auth!) });
+  } catch (error) {
+    next(error);
+  }
+});
+
+ecgViewerApiRouter.post("/cases/:caseId/ai-overlay/generate", requireRole("DOCTOR"), async (req, res, next) => {
+  try {
+    const params = caseIdParamsSchema.parse(req.params);
+    res.status(201).json({ aiOverlay: await generateViewerAiOverlay(params.caseId, req.auth!, req.body) });
+  } catch (error) {
+    next(error);
+  }
+});
+
+ecgViewerApiRouter.put("/cases/:caseId/ai-overlay/toggle", requireRole("DOCTOR"), validateBody(toggleOverlaySchema), async (req, res, next) => {
+  try {
+    const params = caseIdParamsSchema.parse(req.params);
+    res.json({ aiOverlay: await toggleViewerAiOverlay(params.caseId, req.auth!, req.body.enabled) });
+  } catch (error) {
+    next(error);
+  }
+});
+
+ecgViewerApiRouter.get("/cases/:caseId/ai-overlay/render", async (req, res, next) => {
+  try {
+    const params = caseIdParamsSchema.parse(req.params);
+    res.json({ render: await renderViewerAiOverlay(params.caseId, req.auth!) });
+  } catch (error) {
+    next(error);
+  }
+});
 
 ecgViewerApiRouter.get("/cases/:caseId/compare", async (req, res, next) => {
   try {
