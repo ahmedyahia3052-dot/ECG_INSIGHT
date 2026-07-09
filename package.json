@@ -17,7 +17,7 @@
     "backup:service": "tsx scripts/backup-service.ts",
     "db:seed": "tsx prisma/seed.ts",
     "db:seed:enterprise-dashboard": "tsx scripts/enterprise-dashboard-release-seed.ts",
-    "lint": "eslint server/src prisma artifacts/ecg-insight/app artifacts/ecg-insight/components artifacts/ecg-insight/context artifacts/ecg-insight/data artifacts/ecg-insight/hooks artifacts/ecg-insight/services --no-error-on-unmatched-pattern",
+    "lint": "eslint server/src prisma artifacts/ecg-insight/app artifacts/ecg-insight/components artifacts/ecg-insight/context artifacts/ecg-insight/data artifacts/ecg-insight/hooks artifacts/ecg-insight/services artifacts/ecg-insight/design-system --no-error-on-unmatched-pattern",
     "qa:enterprise": "playwright test --grep @enterprise",
     "qa:playwright:sequential": "node scripts/run-playwright-sequential.mjs",
     "qa:pipeline": "node scripts/run-enterprise-ci-pipeline.mjs",
