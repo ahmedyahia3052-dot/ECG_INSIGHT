@@ -13,5 +13,6 @@ export * from "./utilities";
 export * from "./hooks";
 export * from "./providers";
 export * from "./styles";
+export * from "./shell";
 
-export const DESIGN_SYSTEM_VERSION = "104.1.0-p1.2";
+export const DESIGN_SYSTEM_VERSION = "104.2.0-p1.3";

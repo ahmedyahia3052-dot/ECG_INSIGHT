@@ -4,11 +4,7 @@ import { Redirect, Slot, usePathname, useRouter } from "expo-router";
 import React, { PropsWithChildren, ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
-  Animated,
-  Easing,
-  PanResponder,
   Pressable,
-  RefreshControl,
   ScrollView,
   StyleProp,
   StyleSheet,
@@ -19,10 +15,10 @@ import {
   View,
   ViewStyle,
 } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useAuth } from "@/context/AuthContext";
 import { useDashboardStore } from "@/context/DashboardStore";
+import { BoltAppShell } from "@/design-system/shell";
 import { APP_NAV_ITEMS, resolvePageMeta, roleRank } from "@/routes";
 import { deleteNotification, listNotifications, markAllNotificationsRead, markNotificationRead, type NotificationRecord } from "@/services/collaboration";
 import { globalSearch, type GlobalSearchResult } from "@/services/search";
@@ -54,12 +50,9 @@ export function EnterpriseShell({ children }: PropsWithChildren) {
   const router = useRouter();
   const pathname = usePathname();
   const { width } = useWindowDimensions();
-  const insets = useSafeAreaInsets();
   const queryClient = useQueryClient();
   const { authToken, logout, user } = useAuth();
-  const [hoveredNav, setHoveredNav] = useState<string | null>(null);
   const [expandedNotificationId, setExpandedNotificationId] = useState<string | null>(null);
-  const notificationEntrance = useRef(new Animated.Value(0)).current;
   const searchInputRef = useRef<TextInput>(null);
   const {
     closeDrawer,
@@ -166,17 +159,12 @@ export function EnterpriseShell({ children }: PropsWithChildren) {
 
   useEffect(() => {
     if (!notificationOpen || typeof document === "undefined") return undefined;
-    notificationEntrance.setValue(0);
-    Animated.parallel([
-      Animated.timing(notificationEntrance, { duration: 180, easing: Easing.out(Easing.quad), toValue: 1, useNativeDriver: true }),
-      Animated.spring(notificationEntrance, { damping: 18, stiffness: 190, toValue: 1, useNativeDriver: true }),
-    ]).start();
     const closeOnEscape = (event: KeyboardEvent) => {
       if (event.key === "Escape") closeNotificationCenter();
     };
     document.addEventListener("keydown", closeOnEscape);
     return () => document.removeEventListener("keydown", closeOnEscape);
-  }, [closeNotificationCenter, notificationEntrance, notificationOpen]);
+  }, [closeNotificationCenter, notificationOpen]);
 
   useEffect(() => {
     const timeout = setTimeout(() => setDebouncedSearch(searchText.trim()), 260);
@@ -207,336 +195,67 @@ export function EnterpriseShell({ children }: PropsWithChildren) {
     return () => document.removeEventListener("keydown", handleSearchShortcut);
   }, [focusSearch]);
 
-  const sidebar = (
-    <View style={[styles.sidebar, sidebarCompact && styles.sidebarCollapsed, isMobile && styles.drawer, { paddingTop: isMobile ? insets.top + 18 : 24 }]}>
-      <View style={[styles.brandRow, sidebarCompact && styles.brandRowCollapsed]}>
-        <View style={styles.logo}><Feather name="activity" size={20} color={medicalTheme.background} /></View>
-        {!sidebarCompact ? (
-          <View>
-            <Text style={styles.brand}>ECG Insight</Text>
-            <Text style={styles.brandSub}>Medical AI Platform</Text>
-          </View>
-        ) : null}
-      </View>
-
-      <View style={[styles.userCard, sidebarCompact && styles.userCardCollapsed]}>
-        <View style={styles.avatar}><Text style={styles.avatarText}>{user?.avatarInitials ?? "DR"}</Text></View>
-        {!sidebarCompact ? (
-          <View style={styles.userText}>
-            <Text numberOfLines={1} style={styles.userName}>{user?.name ?? "Clinical User"}</Text>
-            <Text numberOfLines={1} style={styles.userRole}>{roleLabel(user?.role)} • Online</Text>
-          </View>
-        ) : null}
-      </View>
-
-      {!isMobile ? (
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
-          onPress={toggleSidebarCollapsed}
-          style={styles.collapseButton}
-        >
-          <Feather name={sidebarCollapsed ? "chevrons-right" : "chevrons-left"} size={17} color={medicalTheme.primary} />
-          {!sidebarCompact ? <Text style={styles.collapseText}>Collapse</Text> : null}
-        </Pressable>
-      ) : null}
-
-      <ScrollView contentContainerStyle={[styles.navScroll, sidebarCompact && styles.navScrollCollapsed]} showsVerticalScrollIndicator style={styles.navScrollArea}>
-        {(["CLINICAL", "WORKSPACE", "DEVELOPER"] as const).map((group) => {
-          const groupItems = navItems.filter((item) => item.group === group);
-          if (!groupItems.length) return null;
-          return (
-            <View key={group} style={[styles.navGroup, sidebarCompact && styles.navGroupCollapsed]}>
-              {!sidebarCompact ? <Text style={styles.navGroupTitle}>{group}</Text> : null}
-              {groupItems.map((item) => {
-                const active = pathname === item.href || (item.href !== "/dashboard" && pathname.startsWith(`${item.href}/`));
-                const hovered = hoveredNav === item.href;
-                return (
-                  <Pressable
-                    accessibilityRole="button"
-                    accessibilityLabel={`Open ${item.title}`}
-                    key={`${item.group}-${item.href}-${item.title}`}
-                    onHoverIn={() => setHoveredNav(item.href)}
-                    onHoverOut={() => setHoveredNav(null)}
-                    onPress={() => navigate(item.href)}
-                    style={[styles.navItem, sidebarCompact && styles.navItemCollapsed, hovered && styles.navItemHover, active && styles.navItemActive]}
-                  >
-                    {active ? <View style={styles.activeRail} /> : null}
-                    <View style={[styles.navIconWrap, (active || hovered) && styles.navIconWrapActive]}>
-                      <Feather name={item.icon} size={18} color={active || hovered ? medicalTheme.primary : medicalTheme.muted} />
-                    </View>
-                    {!sidebarCompact ? <Text style={[styles.navText, active && styles.navTextActive]}>{item.title}</Text> : null}
-                    {item.href === "/notifications" && unreadCount ? <View style={styles.badgeDot} /> : null}
-                    {sidebarCompact && hovered ? <View style={styles.tooltip}><Text style={styles.tooltipText}>{item.title}</Text></View> : null}
-                  </Pressable>
-                );
-              })}
-            </View>
-          );
-        })}
-      </ScrollView>
-
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel="Log out"
-        onPress={() => void logout().then(() => router.replace("/login?force=1" as never))}
-        style={[styles.logoutButton, sidebarCompact && styles.logoutButtonCollapsed]}
-      >
-        <Feather name="log-out" size={18} color={medicalTheme.critical} />
-        {!sidebarCompact ? <Text style={styles.logoutText}>Logout</Text> : null}
-      </Pressable>
-    </View>
-  );
 
   return (
-    <View style={styles.shellRoot}>
-      {!isEcgMonitorWorkspace && !isMobile ? sidebar : null}
-      {isMobile && drawerOpen ? (
-        <View style={styles.mobileOverlay}>
-          <Pressable style={styles.backdrop} onPress={closeDrawer} />
-          {sidebar}
-        </View>
-      ) : null}
-      <View style={[styles.contentRoot, isFullBleedWorkspace && styles.contentRootFullBleed]}>
-        {!isFullBleedWorkspace ? (
-          <>
-        <View style={[styles.topbar, { paddingTop: isMobile ? insets.top + 12 : 18 }]}>
-          {isMobile ? (
-            <Pressable accessibilityRole="button" accessibilityLabel="Open navigation" onPress={openDrawer} style={styles.iconButton}>
-              <Feather name="menu" size={20} color={medicalTheme.text} />
-            </Pressable>
-          ) : null}
-          <View style={styles.titleBlock}>
-            <Text style={styles.breadcrumb}>ECG Insight / {meta.title}</Text>
-            <Text style={styles.pageTitle}>{meta.title}</Text>
-            <Text style={styles.pageSubtitle}>{meta.subtitle}</Text>
-          </View>
-          <View style={styles.topActions}>
-            <View style={styles.searchWrap}>
-              <View style={[styles.searchBox, searchFocused && styles.searchBoxFocused]}>
-                <Feather name="search" size={16} color={medicalTheme.muted} />
-                <TextInput
-                  accessibilityLabel="Global search"
-                  onBlur={() => setTimeout(() => focusSearch(false), 140)}
-                  onChangeText={setSearchText}
-                  onFocus={() => focusSearch(true)}
-                  onSubmitEditing={() => {
-                    const firstResult = searchResults[0];
-                    if (firstResult) openSearchResult(firstResult);
-                    else rememberSearch(searchText);
-                  }}
-                  placeholder="Search patient, ECG ID, report, physician..."
-                  placeholderTextColor={medicalTheme.muted}
-                  ref={searchInputRef}
-                  returnKeyType="search"
-                  style={styles.searchInput}
-                  value={searchText}
-                />
-                {searchText ? (
-                  <Pressable accessibilityLabel="Clear search" onPress={() => setSearchText("")}>
-                    <Feather name="x" size={15} color={medicalTheme.muted} />
-                  </Pressable>
-                ) : <Text style={styles.shortcutHint}>Ctrl+K</Text>}
-              </View>
-              {showSearchPanel ? (
-                <Card style={styles.searchPanel}>
-                  {searchText.trim().length < 2 ? (
-                    <>
-                      <Text style={styles.searchPanelTitle}>Recent searches</Text>
-                      {recentSearches.length ? recentSearches.map((item) => (
-                        <Pressable key={item} onPress={() => setSearchText(item)} style={styles.searchRecentRow}>
-                          <Feather name="clock" size={14} color={medicalTheme.primary} />
-                          <Text style={styles.searchResultTitle}>{item}</Text>
-                        </Pressable>
-                      )) : <Text style={styles.searchEmptyText}>Start typing to search patients, ECG cases, reports, organizations, and doctors.</Text>}
-                    </>
-                  ) : searchQuery.isLoading ? (
-                    <Text style={styles.searchEmptyText}>Searching clinical workspace...</Text>
-                  ) : searchQuery.isError ? (
-                    <Text style={styles.searchErrorText}>Search is temporarily unavailable. Please try again.</Text>
-                  ) : searchResults.length ? (
-                    searchResults.map((result) => (
-                      <Pressable key={`${result.type}-${result.id}`} onPress={() => openSearchResult(result)} style={styles.searchResultRow}>
-                        <View style={styles.searchResultIcon}>
-                          <Feather name={searchResultIcon(result.type)} size={15} color={medicalTheme.primary} />
-                        </View>
-                        <View style={styles.searchResultText}>
-                          <Text numberOfLines={1} style={styles.searchResultTitle}>{result.title}</Text>
-                          <Text numberOfLines={1} style={styles.searchResultSubtitle}>{searchResultTypeLabel(result.type)}{result.meta ? ` • ${result.meta}` : ""}{result.subtitle ? ` • ${result.subtitle}` : ""}</Text>
-                        </View>
-                      </Pressable>
-                    ))
-                  ) : <Text style={styles.searchEmptyText}>No matching clinical records found.</Text>}
-                </Card>
-              ) : null}
-            </View>
-            <Pressable accessibilityLabel="Notifications" accessibilityRole="button" onPress={toggleNotificationCenter} style={styles.iconButton}>
-              <Feather name="bell" size={18} color={medicalTheme.text} />
-              {unreadCount ? <View style={styles.countBadge}><Text style={styles.countBadgeText}>{unreadCount > 9 ? "9+" : unreadCount}</Text></View> : null}
-            </Pressable>
-          </View>
-        </View>
-        <ScrollView contentContainerStyle={styles.pageScroll} showsVerticalScrollIndicator={false}>
-          {children}
-        </ScrollView>
-          </>
-        ) : (
-          <View style={styles.fullBleedPage}>{children}</View>
-        )}
-      </View>
-      {notificationOpen ? (
-        <View style={styles.notificationOverlay} pointerEvents="box-none">
-          <Pressable style={styles.notificationBackdrop} onPress={closeNotificationCenter} />
-          <Animated.View
-            style={[
-              styles.card,
-              styles.notificationDrawer,
-              isMobile && styles.notificationDrawerMobile,
-              {
-                opacity: notificationEntrance,
-                transform: [
-                  { translateY: notificationEntrance.interpolate({ inputRange: [0, 1], outputRange: [isMobile ? 280 : -14, 0] }) },
-                  { scale: notificationEntrance.interpolate({ inputRange: [0, 1], outputRange: [0.98, 1] }) },
-                ],
-              },
-            ]}
-          >
-            <View style={styles.sheetHandle} />
-            <SectionHeader
-              title="Alerts"
-              subtitle="Premium haptic-ready notification sheet with live clinical, system, subscription, and workflow alerts."
-              action={<PrimaryButton disabled={!unreadCount || readAllNotificationMutation.isPending} label="Read All" onPress={() => readAllNotificationMutation.mutate()} variant="outline" />}
-            />
-            <View style={styles.notificationSearchBox}>
-              <Feather name="search" size={15} color={medicalTheme.muted} />
-              <TextInput
-                accessibilityLabel="Search notifications"
-                onChangeText={setNotificationSearch}
-                placeholder="Search notifications..."
-                placeholderTextColor={medicalTheme.muted}
-                style={styles.notificationSearchInput}
-                value={notificationSearch}
-              />
-            </View>
-            <View style={styles.notificationCounterRow}>
-              <View style={styles.notificationCounterCard}>
-                <Text style={[styles.notificationCounterValue, { color: medicalTheme.critical }]}>{criticalCount}</Text>
-                <Text style={styles.notificationCounterLabel}>Critical</Text>
-              </View>
-              <View style={styles.notificationCounterCard}>
-                <Text style={[styles.notificationCounterValue, { color: medicalTheme.primary }]}>{unreadCount}</Text>
-                <Text style={styles.notificationCounterLabel}>Unread</Text>
-              </View>
-              <View style={styles.notificationCounterCard}>
-                <Text style={[styles.notificationCounterValue, { color: medicalTheme.success }]}>{notificationQuery.data?.total ?? notifications.length}</Text>
-                <Text style={styles.notificationCounterLabel}>Total</Text>
-              </View>
-            </View>
-            <View style={styles.notificationFilters}>
-              {(["all", "unread", "critical", "system", "license"] as const).map((filter) => (
-                <PrimaryButton key={filter} label={notificationFilterLabel(filter)} onPress={() => setNotificationFilter(filter)} variant={notificationFilter === filter ? "primary" : "outline"} />
-              ))}
-            </View>
-            <ScrollView
-              refreshControl={<RefreshControl colors={[medicalTheme.primary]} onRefresh={() => void notificationQuery.refetch()} refreshing={notificationQuery.isRefetching} tintColor={medicalTheme.primary} />}
-              style={styles.notificationList}
-              showsVerticalScrollIndicator
-            >
-              {filteredNotifications.length ? filteredNotifications.map((notification) => (
-                <PremiumNotificationCard
-                  expanded={expandedNotificationId === notification.id}
-                  key={notification.id}
-                  notification={notification}
-                  onArchive={() => deleteNotificationMutation.mutate(notification.id)}
-                  onExpand={() => setExpandedNotificationId(expandedNotificationId === notification.id ? null : notification.id)}
-                  onMarkRead={() => readNotificationMutation.mutate(notification.id)}
-                  onOpen={() => openNotification(notification)}
-                />
-              )) : (
-                <EmptyState title={notificationQuery.isLoading ? "Loading alerts..." : "No critical alerts"} message={notificationQuery.isError ? "Unable to load live notifications. Please try again." : "STEMI alerts, urgent reviews, failed analyses, subscription notices, and system events will appear here."} />
-              )}
-            </ScrollView>
-            <PrimaryButton label="Open Notification History" onPress={() => navigate("/notifications")} variant="outline" />
-          </Animated.View>
-        </View>
-      ) : null}
-    </View>
-  );
-}
-
-function PremiumNotificationCard({
-  expanded,
-  notification,
-  onArchive,
-  onExpand,
-  onMarkRead,
-  onOpen,
-}: {
-  expanded: boolean;
-  notification: NotificationRecord;
-  onArchive: () => void;
-  onExpand: () => void;
-  onMarkRead: () => void;
-  onOpen: () => void;
-}) {
-  const translateX = useRef(new Animated.Value(0)).current;
-  const scale = useRef(new Animated.Value(1)).current;
-  const panResponder = useMemo(() => PanResponder.create({
-    onMoveShouldSetPanResponder: (_event, gesture) => Math.abs(gesture.dx) > 14,
-    onPanResponderMove: Animated.event([null, { dx: translateX }], { useNativeDriver: false }),
-    onPanResponderRelease: (_event, gesture) => {
-      if (gesture.dx < -72) onMarkRead();
-      if (gesture.dx > 72) onArchive();
-      Animated.spring(translateX, { damping: 18, stiffness: 220, toValue: 0, useNativeDriver: true }).start();
-    },
-  }), [onArchive, onMarkRead, translateX]);
-  const critical = isCriticalNotification(notification);
-  const category = classifyNotification(notification);
-
-  const pressIn = () => {
-    hapticReadyInteraction("notification-card-press");
-    Animated.spring(scale, { damping: 14, stiffness: 260, toValue: 0.985, useNativeDriver: true }).start();
-  };
-  const pressOut = () => Animated.spring(scale, { damping: 14, stiffness: 260, toValue: 1, useNativeDriver: true }).start();
-
-  return (
-    <View style={styles.swipeFrame}>
-      <View style={styles.swipeActionRail}>
-        <Text style={[styles.swipeActionText, { color: medicalTheme.success }]}>Archive</Text>
-        <Text style={[styles.swipeActionText, { color: medicalTheme.primary }]}>Mark read</Text>
-      </View>
-      <Animated.View {...panResponder.panHandlers} style={{ transform: [{ translateX }, { scale }] }}>
-        <Pressable
-          accessibilityRole="button"
-          onLongPress={onExpand}
-          onPress={onOpen}
-          onPressIn={pressIn}
-          onPressOut={pressOut}
-          style={[styles.notificationCard, critical && styles.notificationCardCritical]}
-        >
-          <View style={styles.notificationCardHeader}>
-            <View style={styles.notificationTitleRow}>
-              <View style={[styles.notificationIcon, critical && styles.notificationIconCritical]}>
-                {critical ? <View style={styles.criticalPulse} /> : null}
-                <Feather name={notificationIcon(notification)} size={16} color={notificationColor(notification)} />
-              </View>
-              <View style={styles.notificationTextWrap}>
-                <Text numberOfLines={1} style={styles.notificationTitle}>{notification.title}</Text>
-                <Text style={styles.notificationMeta}>{category} • {formatDate(notification.timestamp)}</Text>
-              </View>
-            </View>
-            <Badge label={notificationStatusLabel(notification)} tone={critical ? "critical" : notification.read ? "muted" : "primary"} />
-          </View>
-          <Text numberOfLines={expanded ? undefined : 3} style={styles.notificationMessage}>{notification.message}</Text>
-          {expanded ? <Text style={styles.notificationHint}>Swipe left to mark read, swipe right to archive, long press to collapse.</Text> : null}
-          <View style={styles.notificationActions}>
-            {!notification.read ? <PrimaryButton label="Mark read" onPress={onMarkRead} variant="outline" /> : null}
-            <PrimaryButton label="Open details" onPress={onOpen} variant="outline" />
-            <PrimaryButton label="Archive" onPress={onArchive} variant="danger" />
-          </View>
-        </Pressable>
-      </Animated.View>
-    </View>
+    <BoltAppShell
+      breadcrumb={`ECG Insight / ${meta.title}`}
+      closeDrawer={closeDrawer}
+      closeNotificationCenter={closeNotificationCenter}
+      criticalCount={criticalCount}
+      debouncedSearch={debouncedSearch}
+      drawerOpen={drawerOpen}
+      expandedNotificationId={expandedNotificationId}
+      filteredNotifications={filteredNotifications}
+      focusSearch={focusSearch}
+      hideSidebar={isEcgMonitorWorkspace}
+      isFullBleedWorkspace={isFullBleedWorkspace}
+      isMobile={isMobile}
+      navItems={navItems}
+      notificationFilter={notificationFilter}
+      notificationOpen={notificationOpen}
+      notificationQueryError={notificationQuery.isError}
+      notificationQueryLoading={notificationQuery.isLoading}
+      notificationQueryRefetching={notificationQuery.isRefetching}
+      notificationSearch={notificationSearch}
+      notificationsTotal={notificationQuery.data?.total ?? notifications.length}
+      onArchiveNotification={(id) => deleteNotificationMutation.mutate(id)}
+      onLogout={() => void logout().then(() => router.replace("/login?force=1" as never))}
+      onMarkAllNotificationsRead={() => readAllNotificationMutation.mutate()}
+      onMarkNotificationRead={(id) => readNotificationMutation.mutate(id)}
+      onNavigate={navigate}
+      onNotificationExpand={setExpandedNotificationId}
+      onOpenNotification={openNotification}
+      onOpenSearchResult={openSearchResult}
+      onRefetchNotifications={() => void notificationQuery.refetch()}
+      onRememberSearch={rememberSearch}
+      onSearchTextChange={setSearchText}
+      onSetNotificationFilter={setNotificationFilter}
+      onSetNotificationSearch={setNotificationSearch}
+      openDrawer={openDrawer}
+      pageMeta={meta}
+      pathname={pathname}
+      readAllPending={readAllNotificationMutation.isPending}
+      recentSearches={recentSearches}
+      searchFocused={searchFocused}
+      searchInputRef={searchInputRef}
+      searchQueryError={searchQuery.isError}
+      searchQueryLoading={searchQuery.isLoading}
+      searchResults={searchResults}
+      searchText={searchText}
+      showSearchPanel={showSearchPanel}
+      sidebarCollapsed={sidebarCollapsed}
+      sidebarCompact={sidebarCompact}
+      toggleNotificationCenter={toggleNotificationCenter}
+      toggleSidebarCollapsed={toggleSidebarCollapsed}
+      unreadCount={unreadCount}
+      user={{
+        avatarInitials: user?.avatarInitials,
+        name: user?.name,
+        role: user?.role,
+      }}
+    >
+      {children}
+    </BoltAppShell>
   );
 }
 
@@ -550,68 +269,9 @@ function notificationMatchesFilter(notification: NotificationRecord, filter: "al
   return haystack.includes(filter);
 }
 
-function notificationFilterLabel(filter: "all" | "critical" | "license" | "system" | "unread") {
-  if (filter === "all") return "All";
-  if (filter === "unread") return "Unread";
-  if (filter === "critical") return "Critical";
-  if (filter === "system") return "System";
-  return "License";
-}
-
 function isCriticalNotification(notification: NotificationRecord) {
   const haystack = `${notification.type} ${notification.category ?? ""} ${notification.title} ${notification.message}`.toLowerCase();
   return haystack.includes("critical") || haystack.includes("stemi") || haystack.includes("urgent") || haystack.includes("failed");
-}
-
-function classifyNotification(notification: NotificationRecord) {
-  const haystack = `${notification.type} ${notification.category ?? ""} ${notification.title} ${notification.message}`.toLowerCase();
-  if (haystack.includes("stemi")) return "STEMI";
-  if (haystack.includes("subscription") || haystack.includes("license") || haystack.includes("billing")) return "License";
-  if (haystack.includes("system") || haystack.includes("sync") || haystack.includes("failed")) return "System";
-  if (haystack.includes("urgent") || haystack.includes("review")) return "Urgent review";
-  return "Clinical";
-}
-
-function notificationStatusLabel(notification: NotificationRecord) {
-  if (isCriticalNotification(notification)) return "Critical";
-  return notification.read ? "Read" : "Unread";
-}
-
-function searchResultIcon(type: GlobalSearchResult["type"]): keyof typeof Feather.glyphMap {
-  if (type === "case") return "activity";
-  if (type === "doctor") return "user-check";
-  if (type === "employee") return "briefcase";
-  if (type === "organization") return "briefcase";
-  if (type === "report") return "file-text";
-  return "users";
-}
-
-function searchResultTypeLabel(type: GlobalSearchResult["type"]) {
-  if (type === "case") return "ECG Case";
-  if (type === "doctor") return "Doctor";
-  if (type === "employee") return "Employee";
-  if (type === "organization") return "Organization";
-  if (type === "report") return "Report";
-  return "Patient";
-}
-
-function notificationIcon(notification: NotificationRecord): keyof typeof Feather.glyphMap {
-  const haystack = `${notification.type} ${notification.entityType ?? ""} ${notification.title}`.toLowerCase();
-  if (haystack.includes("critical")) return "alert-triangle";
-  if (haystack.includes("license") || haystack.includes("subscription")) return "award";
-  if (haystack.includes("system")) return "server";
-  return "bell";
-}
-
-function notificationColor(notification: NotificationRecord) {
-  if (notification.type === "critical") return medicalTheme.critical;
-  if (notification.type === "warning") return medicalTheme.warning;
-  if (notification.type === "success") return medicalTheme.success;
-  return medicalTheme.primary;
-}
-
-function hapticReadyInteraction(_eventName: string) {
-  // Central hook for native haptics when this shell is embedded in the mobile app.
 }
 
 export function FullScreenLoader({ label }: { label: string }) {
