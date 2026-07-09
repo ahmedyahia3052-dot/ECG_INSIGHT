@@ -5,7 +5,7 @@ import { boltUiAdapter } from "@/adapters/bolt";
 import { AsyncStateView } from "@/components/async-states/AsyncStateView";
 import { useAuth } from "@/context/AuthContext";
 import { useDashboardData } from "@/hooks/domain/useDashboardData";
-import { DashboardLegacyPresentation } from "@/legacy-ui/screens/DashboardLegacyPresentation";
+import { DashboardBoltPresentation } from "@/presentation/bolt";
 
 /** Container — business logic + data only. Bolt UI replaces DashboardLegacyPresentation. */
 export function DashboardContainer() {
@@ -26,8 +26,10 @@ export function DashboardContainer() {
       onAddPatient: () => router.push("/patients/create" as never),
       onAnalyzeEcg: () => router.push("/ecg-analysis" as never),
       onGenerateReport: () => router.push("/reports" as never),
+      onOpenCase: (caseId) => router.push(`/ecg-cases/${caseId}` as never),
       onOpenCopilot: () => router.push("/copilot" as never),
       onUploadEcg: () => router.push("/upload-ecg" as never),
+      onViewAllCases: () => router.push("/ecg-cases" as never),
     },
   );
 
@@ -37,7 +39,7 @@ export function DashboardContainer() {
       isError={contract.status === "error"}
       isLoading={contract.status === "loading"}
     >
-      <DashboardLegacyPresentation contract={contract} />
+      <DashboardBoltPresentation contract={contract} />
     </AsyncStateView>
   );
 }
