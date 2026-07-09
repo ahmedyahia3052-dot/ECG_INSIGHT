@@ -1,0 +1,54 @@
+/**
+ * Bolt global styles reference — mirrors approved Bolt UI index.css.
+ * Import on web builds when Tailwind/NativeWind is activated; no runtime import in P1.2.
+ */
+@import "tailwindcss";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-medical-blue: var(--medical-blue);
+  --color-medical-teal: var(--medical-teal);
+  --color-ecg-red: var(--ecg-red);
+}
+
+:root {
+  --radius: 0.5rem;
+  --medical-blue: oklch(0.38 0.1 243);
+  --medical-teal: oklch(0.7 0.14 187);
+  --ecg-red: oklch(0.63 0.24 29);
+  --background: oklch(0.98 0.004 243);
+  --foreground: oklch(0.15 0.02 243);
+  --primary: oklch(0.38 0.1 243);
+  --primary-foreground: oklch(0.985 0 0);
+  --sidebar: oklch(0.22 0.05 243);
+  --sidebar-foreground: oklch(0.95 0.01 243);
+}
+
+.dark {
+  --background: oklch(0.1 0.02 243);
+  --foreground: oklch(0.95 0.01 243);
+  --primary: oklch(0.7 0.14 187);
+  --primary-foreground: oklch(0.1 0.02 243);
+  --sidebar: oklch(0.12 0.03 243);
+  --sidebar-foreground: oklch(0.95 0.01 243);
+}
+
+@keyframes ecg-pulse {
+  0%, 100% { opacity: 0.3; }
+  50% { opacity: 1; }
+}
+
+.ecg-pulse {
+  animation: ecg-pulse 2s ease-in-out infinite;
+}
