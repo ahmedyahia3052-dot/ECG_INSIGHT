@@ -1360,6 +1360,8 @@ model User {
   clinicalEventsPublished     ClinicalEvent[]           @relation("ClinicalEventActor")
   preferences                 UserPreference?
   uploadedCases               ECGCase[]                 @relation("UploadedCases")
+  clinicalVisitsCreated       ClinicalVisit[]           @relation("ClinicalVisitCreatedBy")
+  clinicalVisitsUpdated       ClinicalVisit[]           @relation("ClinicalVisitUpdatedBy")
   clinicalMeasurementRecords  ClinicalMeasurementRecord[] @relation("ClinicalMeasurementRecords")
   assignedCases               ECGCase[]                 @relation("AssignedCases")
   reviewedCases               ECGCase[]                 @relation("ReviewedCases")
@@ -1589,6 +1591,7 @@ model Patient {
   createdBy              User?                  @relation("PatientCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
   updatedBy              User?                  @relation("PatientUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
   cases                  ECGCase[]
+  clinicalVisits         ClinicalVisit[]
   cardiacHistory         CardiacHistory?
   procedureHistories     ProcedureHistory[]
   cardiacProcedures      CardiacProcedure[]
@@ -2221,11 +2224,44 @@ model FitnessDecision {
   @@index([createdAt])
 }
 
+enum ClinicalVisitStatus {
+  SCHEDULED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+/// Clinical encounter/visit — required for production Patient → Visit → Case workflow.
+model ClinicalVisit {
+  id             String              @id @default(cuid())
+  visitNumber    String              @unique
+  patientId      String
+  organizationId String?
+  reason         String?
+  status         ClinicalVisitStatus @default(IN_PROGRESS)
+  startedAt      DateTime?
+  endedAt        DateTime?
+  createdById    String?
+  updatedById    String?
+  deletedAt      DateTime?
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
+  patient        Patient             @relation(fields: [patientId], references: [id])
+  cases          ECGCase[]
+  createdBy      User?               @relation("ClinicalVisitCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  updatedBy      User?               @relation("ClinicalVisitUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
+
+  @@index([patientId, createdAt])
+  @@index([organizationId])
+  @@index([status])
+}
+
 model ECGCase {
   id                    String                 @id @default(cuid())
   caseId                String                 @unique
   caseNumber            String?                @unique
   patientId             String
+  visitId               String?
   uploadedById          String
   assignedDoctorId      String?
   reviewedById          String?
@@ -2271,6 +2307,7 @@ model ECGCase {
   createdAt             DateTime               @default(now())
   updatedAt             DateTime               @updatedAt
   patient               Patient                @relation(fields: [patientId], references: [id])
+  visit                 ClinicalVisit?         @relation(fields: [visitId], references: [id], onDelete: SetNull)
   uploadedBy            User                   @relation("UploadedCases", fields: [uploadedById], references: [id])
   createdBy             User?                  @relation("CaseCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
   updatedBy             User?                  @relation("CaseUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)

@@ -61,6 +61,7 @@ import { organizationDomainRouter } from "./organization-domain";
 import { notificationsRouter } from "../notifications/notifications.routes";
 import { ocrRouter } from "./ocr/ocr.routes";
 import { patientsRouter } from "../patients/patients.routes";
+import { visitsRouter, patientVisitsRouter } from "../visits/visits.routes";
 import { preferencesRouter } from "./preferences/preferences.routes";
 import {
   fitnessAssessmentsRouter,
@@ -155,7 +156,9 @@ modulesRouter.use("/organization-platform", organizationPlatformRouter);
 modulesRouter.use("/organization-domain", organizationDomainRouter);
 modulesRouter.use("/organizations", organizationsRouter);
 modulesRouter.use("/patients", ecgLongitudinalPatientsRouter);
+modulesRouter.use("/patients/:patientId/visits", patientVisitsRouter);
 modulesRouter.use("/patients", patientsRouter);
+modulesRouter.use("/visits", visitsRouter);
 modulesRouter.use("/preferences", preferencesRouter);
 modulesRouter.use("/pacs", pacsRouter);
 modulesRouter.use("/fhir", fhirRouter);

@@ -241,6 +241,7 @@ casesRouter.post("/", requireRole("DOCTOR"), validateBody(caseCreateSchema), asy
             heartRate: req.body.heartRate,
             imagePath: req.body.ecgImage,
             patientId: req.body.patientId,
+            visitId: req.body.visitId,
             prInterval: req.body.prInterval,
             priority: fromApiPriority(req.body.priority),
             qrsDuration: req.body.qrsDuration,

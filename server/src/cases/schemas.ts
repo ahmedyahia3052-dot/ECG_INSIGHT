@@ -35,6 +35,7 @@ export const caseCreateSchema = z.object({
   heartRate: z.coerce.number().int().min(0).max(350).optional(),
   interpretation: z.string().trim().max(8000).optional(),
   patientId: z.string().min(1),
+  visitId: z.string().min(1).optional(),
   prInterval: z.coerce.number().int().min(0).max(1000).optional(),
   priority: z.enum(["low", "medium", "high", "critical"]).default("medium"),
   qrsDuration: z.coerce.number().int().min(0).max(1000).optional(),
