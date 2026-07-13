@@ -1,14 +1,16 @@
 import type { NextFunction, Request, Response } from "express";
 import passport from "passport";
 import { Strategy as AppleStrategy } from "passport-apple";
+import { Strategy as FacebookStrategy } from "passport-facebook";
 import { Strategy as GoogleStrategy } from "passport-google-oauth20";
+import { Strategy as LinkedInStrategy } from "passport-linkedin-oauth2";
 import { Strategy as MicrosoftStrategy } from "passport-microsoft";
 
 import { env } from "../config/env";
 import { AppError } from "../middleware/error";
 import { oauthLogin } from "./auth.service";
 
-type OAuthProvider = "APPLE" | "GOOGLE" | "MICROSOFT";
+export type OAuthProvider = "APPLE" | "GOOGLE" | "MICROSOFT" | "FACEBOOK" | "LINKEDIN";
 
 type OAuthProfile = {
   displayName?: string;
@@ -25,40 +27,59 @@ type OAuthUser = {
 };
 
 type VerifyCallback = (error: Error | null, user?: OAuthUser) => void;
+
+const ALL_PROVIDERS: OAuthProvider[] = ["GOOGLE", "APPLE", "MICROSOFT", "FACEBOOK", "LINKEDIN"];
+
 function callbackBaseUrl() {
   const configured = env.OAUTH_CALLBACK_BASE_URL ?? env.EXPO_PUBLIC_API_URL;
   return configured.replace(/\/+$/, "").replace(/\/api(?:\/v\d+)?$/i, "/api");
 }
 
 function providerDisplayName(provider: OAuthProvider) {
-  if (provider === "GOOGLE") return "Google";
-  if (provider === "APPLE") return "Apple";
-  return "Microsoft";
+  switch (provider) {
+    case "GOOGLE":
+      return "Google";
+    case "APPLE":
+      return "Apple";
+    case "MICROSOFT":
+      return "Microsoft";
+    case "FACEBOOK":
+      return "Facebook";
+    case "LINKEDIN":
+      return "LinkedIn";
+    default:
+      return "OAuth";
+  }
 }
 
-function nameFromProfile(profile: OAuthProfile, fallbackEmail?: string) {
+function nameFromProfile(profile: OAuthProfile, fallbackEmail?: string, provider: OAuthProvider = "GOOGLE") {
   const fullName = [profile.name?.givenName, profile.name?.familyName].filter(Boolean).join(" ").trim();
-  return profile.displayName || fullName || fallbackEmail?.split("@")[0] || `${providerDisplayName("GOOGLE")} User`;
+  return profile.displayName || fullName || fallbackEmail?.split("@")[0] || `${providerDisplayName(provider)} User`;
 }
 
 function userFromProfile(provider: OAuthProvider, profile: OAuthProfile): OAuthUser {
   const email = profile.emails?.find((item) => item.value)?.value;
   return {
     email,
-    name: nameFromProfile(profile, email),
+    name: nameFromProfile(profile, email, provider),
     provider,
     providerUserId: profile.id ?? email ?? "",
   };
 }
 
-function configured(provider: OAuthProvider) {
+export function configured(provider: OAuthProvider) {
   if (provider === "GOOGLE") return Boolean(env.GOOGLE_OAUTH_CLIENT_ID && env.GOOGLE_OAUTH_CLIENT_SECRET);
-  if (provider === "APPLE") return Boolean(env.APPLE_OAUTH_CLIENT_ID && env.APPLE_OAUTH_TEAM_ID && env.APPLE_OAUTH_KEY_ID && env.APPLE_OAUTH_PRIVATE_KEY);
-  return Boolean(env.MICROSOFT_OAUTH_CLIENT_ID && env.MICROSOFT_OAUTH_CLIENT_SECRET);
+  if (provider === "APPLE") {
+    return Boolean(env.APPLE_OAUTH_CLIENT_ID && env.APPLE_OAUTH_TEAM_ID && env.APPLE_OAUTH_KEY_ID && env.APPLE_OAUTH_PRIVATE_KEY);
+  }
+  if (provider === "MICROSOFT") return Boolean(env.MICROSOFT_OAUTH_CLIENT_ID && env.MICROSOFT_OAUTH_CLIENT_SECRET);
+  if (provider === "FACEBOOK") return Boolean(env.FACEBOOK_OAUTH_CLIENT_ID && env.FACEBOOK_OAUTH_CLIENT_SECRET);
+  if (provider === "LINKEDIN") return Boolean(env.LINKEDIN_OAUTH_CLIENT_ID && env.LINKEDIN_OAUTH_CLIENT_SECRET);
+  return false;
 }
 
 export function oauthProviderStatuses() {
-  return (["GOOGLE", "APPLE", "MICROSOFT"] as OAuthProvider[]).map((provider) => ({
+  return ALL_PROVIDERS.map((provider) => ({
     configured: configured(provider),
     provider,
   }));
@@ -138,11 +159,60 @@ export function configureOAuthPassport() {
       ),
     );
   }
+
+  if (configured("FACEBOOK")) {
+    passport.use(
+      "facebook",
+      new FacebookStrategy(
+        {
+          callbackURL: `${callbackBaseUrl()}/auth/facebook/callback`,
+          clientID: env.FACEBOOK_OAUTH_CLIENT_ID!,
+          clientSecret: env.FACEBOOK_OAUTH_CLIENT_SECRET!,
+          profileFields: ["id", "emails", "name", "displayName"],
+          enableProof: true,
+        },
+        (_accessToken, _refreshToken, profile, done) => doneWithProfile("FACEBOOK", profile as OAuthProfile, done),
+      ),
+    );
+  }
+
+  if (configured("LINKEDIN")) {
+    passport.use(
+      "linkedin",
+      new LinkedInStrategy(
+        {
+          callbackURL: `${callbackBaseUrl()}/auth/linkedin/callback`,
+          clientID: env.LINKEDIN_OAUTH_CLIENT_ID!,
+          clientSecret: env.LINKEDIN_OAUTH_CLIENT_SECRET!,
+          scope: ["r_emailaddress", "r_liteprofile"],
+        },
+        (_accessToken: string, _refreshToken: string, profile: OAuthProfile, done: VerifyCallback) =>
+          doneWithProfile("LINKEDIN", profile, done),
+      ),
+    );
+  }
+}
+
+function oauthScope(provider: OAuthProvider): string[] {
+  switch (provider) {
+    case "GOOGLE":
+      return ["profile", "email"];
+    case "APPLE":
+      return ["name", "email"];
+    case "MICROSOFT":
+      return ["user.read"];
+    case "FACEBOOK":
+      return ["email", "public_profile"];
+    case "LINKEDIN":
+      return ["r_emailaddress", "r_liteprofile"];
+    default:
+      return [];
+  }
 }
 
 export function startOAuth(provider: OAuthProvider) {
   const strategy = provider.toLowerCase();
-  const scope = provider === "GOOGLE" ? ["profile", "email"] : provider === "APPLE" ? ["name", "email"] : ["user.read"];
+  const scope = oauthScope(provider);
   return (req: Request, res: Response, next: NextFunction) => {
     try {
       assertConfigured(provider);
@@ -159,7 +229,7 @@ export function completeOAuth(provider: OAuthProvider) {
     (req: Request, res: Response, next: NextFunction) => {
       try {
         assertConfigured(provider);
-        passport.authenticate(strategy, { failureRedirect: "/login?oauth=failed", session: false })(req, res, next);
+        passport.authenticate(strategy, { failureRedirect: "/auth/login?oauth=failed", session: false })(req, res, next);
       } catch (error) {
         next(error);
       }
@@ -172,7 +242,8 @@ export function completeOAuth(provider: OAuthProvider) {
       }
       try {
         await oauthLogin({ ...oauthUser, rememberMe: true }, req, res);
-        res.redirect(`${env.CLIENT_ORIGIN.split(",")[0].replace(/\/+$/, "")}/dashboard`);
+        const origin = env.CLIENT_ORIGIN.split(",")[0].replace(/\/+$/, "");
+        res.redirect(`${origin}/auth/oauth/callback`);
       } catch (error) {
         next(error);
       }

@@ -25,6 +25,8 @@ enum OAuthProvider {
   GOOGLE
   APPLE
   MICROSOFT
+  FACEBOOK
+  LINKEDIN
 }
 
 enum PhoneOtpPurpose {
@@ -1334,6 +1336,7 @@ model User {
   updatedAt                   DateTime                  @updatedAt
   sessions                    Session[]
   oauthIdentities             OAuthIdentity[]
+  webAuthnCredentials         WebAuthnCredential[]
   phoneOtps                   PhoneOtp[]
   subscription                Subscription?
   commercialSubscriptions     UserSubscription[]
@@ -4904,6 +4907,38 @@ model OAuthIdentity {
   @@unique([provider, providerUserId])
   @@index([userId])
   @@index([provider])
+}
+
+/// WebAuthn / passkey credential (Face ID, Touch ID, Windows Hello, Android biometrics).
+model WebAuthnCredential {
+  id           String    @id @default(cuid())
+  userId       String
+  credentialId String    @unique
+  publicKey    Bytes
+  counter      BigInt    @default(0)
+  deviceType   String?
+  backedUp     Boolean   @default(false)
+  transports   Json?
+  friendlyName String?
+  createdAt    DateTime  @default(now())
+  lastUsedAt   DateTime?
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model WebAuthnChallenge {
+  id        String   @id @default(cuid())
+  userId    String?
+  email     String?
+  challenge String
+  type      String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([email])
+  @@index([userId])
+  @@index([expiresAt])
 }
 
 model PhoneOtp {

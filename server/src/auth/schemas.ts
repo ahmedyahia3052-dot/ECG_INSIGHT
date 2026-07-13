@@ -88,9 +88,30 @@ export const oauthLoginSchema = z.object({
   email: z.string().email().optional(),
   idToken: z.string().trim().optional(),
   name: z.string().trim().min(2).max(120).optional(),
-  provider: z.enum(["GOOGLE", "APPLE", "MICROSOFT"]),
+  provider: z.enum(["GOOGLE", "APPLE", "MICROSOFT", "FACEBOOK", "LINKEDIN"]),
   providerUserId: z.string().trim().min(2).max(200),
   rememberMe: z.boolean().default(true),
+});
+
+export const mfaVerifySchema = z.object({
+  code: z.string().trim().min(4).max(32),
+  mfaToken: z.string().min(20),
+  rememberMe: z.boolean().optional(),
+});
+
+export const webAuthnLoginOptionsSchema = z.object({
+  email: z.string().email(),
+});
+
+export const webAuthnLoginVerifySchema = z.object({
+  email: z.string().email(),
+  rememberMe: z.boolean().default(true),
+  response: z.record(z.string(), z.unknown()),
+});
+
+export const webAuthnRegisterVerifySchema = z.object({
+  friendlyName: z.string().trim().max(80).optional(),
+  response: z.record(z.string(), z.unknown()),
 });
 
 export const forgotPasswordSchema = z.object({

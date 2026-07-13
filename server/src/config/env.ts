@@ -85,6 +85,13 @@ const envSchema = z
     }),
     GOOGLE_OAUTH_CLIENT_ID: z.string().optional(),
     GOOGLE_OAUTH_CLIENT_SECRET: z.string().optional(),
+    FACEBOOK_OAUTH_CLIENT_ID: z.string().optional(),
+    FACEBOOK_OAUTH_CLIENT_SECRET: z.string().optional(),
+    LINKEDIN_OAUTH_CLIENT_ID: z.string().optional(),
+    LINKEDIN_OAUTH_CLIENT_SECRET: z.string().optional(),
+    WEBAUTHN_RP_ID: z.string().optional(),
+    WEBAUTHN_RP_NAME: z.string().default("ECG Insight"),
+    WEBAUTHN_ORIGIN: optionalUrl,
     LLM_OPENAI_FALLBACK: z
       .enum(["true", "false"])
       .default("false")

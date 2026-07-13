@@ -61,7 +61,7 @@ export const oauthLogin = (
   body: {
     email?: string;
     name?: string;
-    provider: "GOOGLE" | "APPLE" | "MICROSOFT";
+    provider: "GOOGLE" | "APPLE" | "MICROSOFT" | "FACEBOOK" | "LINKEDIN";
     providerUserId: string;
     rememberMe: boolean;
   },

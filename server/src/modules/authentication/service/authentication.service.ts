@@ -36,6 +36,7 @@ import {
   logoutCurrentSession,
   rotateRefreshSession,
 } from "./session.service";
+import { buildMfaRequiredPayload } from "../../../auth/mfa-challenge.service";
 
 function organizationTypeForRegistration(type?: string) {
   switch (type) {
@@ -223,6 +224,11 @@ export class AuthenticationService {
       userAgent: req.get("user-agent") ?? undefined,
     });
 
+    const mfaPayload = await buildMfaRequiredPayload(user.id, body.rememberMe);
+    if (mfaPayload) {
+      return mfaPayload;
+    }
+
     return createAuthenticatedSession({
       rememberMe: body.rememberMe,
       req,
@@ -396,7 +402,7 @@ export class AuthenticationService {
     body: {
       email?: string;
       name?: string;
-      provider: "GOOGLE" | "APPLE" | "MICROSOFT";
+      provider: "GOOGLE" | "APPLE" | "MICROSOFT" | "FACEBOOK" | "LINKEDIN";
       providerUserId: string;
       rememberMe: boolean;
     },

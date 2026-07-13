@@ -10,6 +10,7 @@ import {
   changePasswordSchema,
   forgotPasswordSchema,
   loginSchema,
+  mfaVerifySchema,
   oauthLoginSchema,
   ownerPasswordSetupSchema,
   requestPhoneOtpSchema,
@@ -19,6 +20,9 @@ import {
   updateProfileSchema,
   verifyPhoneOtpSchema,
   verifyEmailSchema,
+  webAuthnLoginOptionsSchema,
+  webAuthnLoginVerifySchema,
+  webAuthnRegisterVerifySchema,
 } from "./schemas";
 import {
   changeOwnPassword,
@@ -37,6 +41,17 @@ import {
   verifyPhoneOtp,
   verifyEmail,
 } from "./auth.service";
+import { verifyLoginMfa } from "./mfa-challenge.service";
+import {
+  authenticationOptions,
+  listCredentials,
+  registrationOptions,
+  removeCredential,
+  verifyAuthentication,
+  verifyRegistration,
+  webAuthnStatus,
+} from "./webauthn.service";
+import type { AuthenticationResponseJSON, RegistrationResponseJSON } from "@simplewebauthn/server";
 
 export const authRouter = Router();
 
@@ -99,6 +114,10 @@ authRouter.get("/oauth/apple", startOAuth("APPLE"));
 authRouter.get("/oauth/apple/callback", ...completeOAuth("APPLE"));
 authRouter.get("/oauth/microsoft", startOAuth("MICROSOFT"));
 authRouter.get("/oauth/microsoft/callback", ...completeOAuth("MICROSOFT"));
+authRouter.get("/oauth/facebook", startOAuth("FACEBOOK"));
+authRouter.get("/oauth/facebook/callback", ...completeOAuth("FACEBOOK"));
+authRouter.get("/oauth/linkedin", startOAuth("LINKEDIN"));
+authRouter.get("/oauth/linkedin/callback", ...completeOAuth("LINKEDIN"));
 
 authRouter.get("/google", startOAuth("GOOGLE"));
 authRouter.get("/google/callback", ...completeOAuth("GOOGLE"));
@@ -106,10 +125,91 @@ authRouter.get("/apple", startOAuth("APPLE"));
 authRouter.get("/apple/callback", ...completeOAuth("APPLE"));
 authRouter.get("/microsoft", startOAuth("MICROSOFT"));
 authRouter.get("/microsoft/callback", ...completeOAuth("MICROSOFT"));
+authRouter.get("/facebook", startOAuth("FACEBOOK"));
+authRouter.get("/facebook/callback", ...completeOAuth("FACEBOOK"));
+authRouter.get("/linkedin", startOAuth("LINKEDIN"));
+authRouter.get("/linkedin/callback", ...completeOAuth("LINKEDIN"));
 
 authRouter.post("/oauth/login", validateBody(oauthLoginSchema), async (req, res, next) => {
   try {
     res.json(await oauthLogin(req.body, req, res));
+  } catch (error) {
+    next(error);
+  }
+});
+
+authRouter.post("/mfa/verify", validateBody(mfaVerifySchema), async (req, res, next) => {
+  try {
+    res.json(await verifyLoginMfa(req.body, req, res));
+  } catch (error) {
+    next(error);
+  }
+});
+
+authRouter.get("/webauthn/status", (_req, res) => {
+  res.json(webAuthnStatus());
+});
+
+authRouter.post("/webauthn/register/options", requireAuth, async (req, res, next) => {
+  try {
+    res.json(await registrationOptions(req.auth!.id));
+  } catch (error) {
+    next(error);
+  }
+});
+
+authRouter.post("/webauthn/register/verify", requireAuth, validateBody(webAuthnRegisterVerifySchema), async (req, res, next) => {
+  try {
+    res.json(
+      await verifyRegistration(
+        req.auth!.id,
+        req.body.response as RegistrationResponseJSON,
+        req.body.friendlyName,
+      ),
+    );
+  } catch (error) {
+    next(error);
+  }
+});
+
+authRouter.post("/webauthn/login/options", validateBody(webAuthnLoginOptionsSchema), async (req, res, next) => {
+  try {
+    res.json(await authenticationOptions(req.body.email));
+  } catch (error) {
+    next(error);
+  }
+});
+
+authRouter.post("/webauthn/login/verify", validateBody(webAuthnLoginVerifySchema), async (req, res, next) => {
+  try {
+    res.json(
+      await verifyAuthentication(
+        {
+          email: req.body.email,
+          rememberMe: req.body.rememberMe,
+          response: req.body.response as AuthenticationResponseJSON,
+        },
+        req,
+        res,
+      ),
+    );
+  } catch (error) {
+    next(error);
+  }
+});
+
+authRouter.get("/webauthn/credentials", requireAuth, async (req, res, next) => {
+  try {
+    res.json(await listCredentials(req.auth!.id));
+  } catch (error) {
+    next(error);
+  }
+});
+
+authRouter.delete("/webauthn/credentials/:id", requireAuth, async (req, res, next) => {
+  try {
+    const credentialId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+    res.json(await removeCredential(req.auth!.id, credentialId));
   } catch (error) {
     next(error);
   }
