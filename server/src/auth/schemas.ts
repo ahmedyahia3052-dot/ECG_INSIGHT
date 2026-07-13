@@ -86,7 +86,7 @@ export const verifyPhoneOtpSchema = z.object({
 
 export const oauthLoginSchema = z.object({
   email: z.string().email().optional(),
-  idToken: z.string().trim().optional(),
+  idToken: z.string().trim().min(20),
   name: z.string().trim().min(2).max(120).optional(),
   provider: z.enum(["GOOGLE", "APPLE", "MICROSOFT", "FACEBOOK", "LINKEDIN"]),
   providerUserId: z.string().trim().min(2).max(200),

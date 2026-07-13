@@ -4941,6 +4941,52 @@ model WebAuthnChallenge {
   @@index([expiresAt])
 }
 
+/// Short-lived OAuth CSRF state + PKCE verifier + OIDC nonce.
+model OAuthState {
+  id           String   @id @default(cuid())
+  state        String   @unique
+  codeVerifier String?
+  nonce        String?
+  provider     String?
+  expiresAt    DateTime
+  createdAt    DateTime @default(now())
+
+  @@index([expiresAt])
+}
+
+/// Admin-managed OAuth provider credentials (encrypted secret). Env vars still take precedence.
+model AuthProviderConfig {
+  id              String        @id @default(cuid())
+  provider        OAuthProvider @unique
+  enabled         Boolean       @default(false)
+  clientId        String?
+  clientSecretEnc String?
+  redirectUri     String?
+  scopes          Json?
+  extraJson       Json?
+  updatedById     String?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  @@index([enabled])
+}
+
+/// Outbound email queue for password reset / verification when SMTP is configured.
+model EmailOutbox {
+  id          String    @id @default(cuid())
+  toEmail     String
+  subject     String
+  bodyText    String
+  template    String?
+  status      String    @default("PENDING")
+  error       String?
+  sentAt      DateTime?
+  createdAt   DateTime  @default(now())
+
+  @@index([status])
+  @@index([createdAt])
+}
+
 model PhoneOtp {
   id          String          @id @default(cuid())
   userId      String?

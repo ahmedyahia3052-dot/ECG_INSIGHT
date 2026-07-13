@@ -3,6 +3,7 @@ import { apiDocsRouter } from "../api/docs";
 import { aiRouter } from "../ai/ai.routes";
 import { aiFoundationRouter } from "../ai-foundation/foundation.routes";
 import { authRouter } from "../auth/auth.routes";
+import { authAdminRouter } from "../auth/auth-admin.routes";
 import { casesRouter } from "../cases/cases.routes";
 import {
   assistantRouter,
@@ -95,6 +96,7 @@ modulesRouter.use(apiDocsRouter);
 
 modulesRouter.use("/health", healthRouter);
 modulesRouter.use("/auth", authRouter);
+modulesRouter.use("/admin", authAdminRouter);
 modulesRouter.use("/audit", auditRouter);
 modulesRouter.use("/assistant", assistantRouter);
 modulesRouter.use("/ai", aiRouter);

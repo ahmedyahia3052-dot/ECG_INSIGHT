@@ -284,8 +284,20 @@ export class AuthenticationService {
         hashOpaqueToken(resetToken),
         new Date(Date.now() + PASSWORD_RESET_TTL_MS),
       );
+      const { enqueueEmail, passwordResetEmailBody } = await import("../../../auth/email-outbox.service");
+      const { env } = await import("../../../config/env");
+      const origin = env.CLIENT_ORIGIN.split(",")[0].replace(/\/+$/, "");
+      const resetUrl = `${origin}/auth/reset-password?email=${encodeURIComponent(user.email)}&token=${encodeURIComponent(resetToken)}`;
+      await enqueueEmail({
+        toEmail: user.email,
+        subject: "ECG Insight password reset",
+        bodyText: passwordResetEmailBody({ email: user.email, token: resetToken, resetUrl }),
+        template: "password_reset",
+      });
     }
-    return { resetToken: user ? resetToken : undefined };
+    // Never reveal whether the account exists. Token only returned outside production for local QA.
+    const { env } = await import("../../../config/env");
+    return { resetToken: env.NODE_ENV !== "production" && user ? resetToken : undefined };
   }
 
   async resetPassword(body: { email: string; newPassword: string; token: string }) {

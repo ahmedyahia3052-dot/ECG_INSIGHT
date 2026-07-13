@@ -135,6 +135,7 @@ const envSchema = z
     S3_SECRET_KEY: z.string().optional(),
     S3_REGION: z.string().default("us-east-1"),
     ECG_STORAGE_MAX_BYTES: z.coerce.number().int().positive().default(50 * 1024 * 1024),
+    SMTP_URL: z.string().optional(),
     TRUST_PROXY: z
       .enum(["true", "false"])
       .default("false")

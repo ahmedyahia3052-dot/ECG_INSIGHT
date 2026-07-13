@@ -6,6 +6,7 @@ import { validateBody } from "../middleware/validate";
 import { redactAuthSecrets } from "../utils/auth-response-safety";
 import { serializeUser } from "../utils/users";
 import { completeOAuth, oauthProviderStatuses, startOAuth } from "./oauth-passport";
+import { verifyOAuthIdToken } from "./oauth-token-verify";
 import {
   changePasswordSchema,
   forgotPasswordSchema,
@@ -104,8 +105,12 @@ authRouter.post("/phone/verify", validateBody(verifyPhoneOtpSchema), async (req,
   }
 });
 
-authRouter.get("/oauth/providers", (_req, res) => {
-  res.json({ providers: oauthProviderStatuses() });
+authRouter.get("/oauth/providers", async (_req, res, next) => {
+  try {
+    res.json({ providers: await oauthProviderStatuses() });
+  } catch (error) {
+    next(error);
+  }
 });
 
 authRouter.get("/oauth/google", startOAuth("GOOGLE"));
@@ -132,7 +137,23 @@ authRouter.get("/linkedin/callback", ...completeOAuth("LINKEDIN"));
 
 authRouter.post("/oauth/login", validateBody(oauthLoginSchema), async (req, res, next) => {
   try {
-    res.json(await oauthLogin(req.body, req, res));
+    const verified = await verifyOAuthIdToken({
+      provider: req.body.provider,
+      idToken: req.body.idToken,
+      providerUserId: req.body.providerUserId,
+      email: req.body.email,
+    });
+    res.json(
+      await oauthLogin(
+        {
+          ...req.body,
+          email: verified.email ?? req.body.email,
+          providerUserId: verified.providerUserId,
+        },
+        req,
+        res,
+      ),
+    );
   } catch (error) {
     next(error);
   }
