@@ -349,6 +349,27 @@ async function main() {
       sessions.status === 200 && Array.isArray((sessions.body as { sessions?: unknown[] })?.sessions),
       `status=${sessions.status}`,
     );
+
+    const historyApi = await request("/auth/login-history", { token: accessToken });
+    record(
+      "Session: device / login history API",
+      historyApi.status === 200 && Array.isArray((historyApi.body as { history?: unknown[] })?.history),
+      `status=${historyApi.status}`,
+    );
+
+    const trust = await request("/security/devices", {
+      method: "POST",
+      token: accessToken,
+      body: { deviceFingerprint: "accept-trusted-device-01", deviceName: "Acceptance Workstation" },
+    });
+    record("Session: trusted device register", trust.status === 201 || trust.status === 200, `status=${trust.status}`);
+
+    const devices = await request("/security/devices", { token: accessToken });
+    record(
+      "Session: trusted devices list",
+      devices.status === 200 && Array.isArray((devices.body as { devices?: unknown[] })?.devices),
+      `status=${devices.status}`,
+    );
   }
 
   // ---------- Password change ----------

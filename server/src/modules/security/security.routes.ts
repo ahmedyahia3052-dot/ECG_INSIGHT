@@ -305,9 +305,9 @@ securityRouter.post("/devices", async (req, res, next) => {
     const body = z.object({ deviceFingerprint: z.string().trim().min(8), deviceName: z.string().trim().min(1) }).parse(req.body);
     const device = await prisma.trustedDevice.upsert({
       create: {
-        ...requestContext(req),
         deviceFingerprint: body.deviceFingerprint,
         deviceName: body.deviceName,
+        ipAddress: req.ip,
         trusted: true,
         userId: req.auth!.id,
       },
