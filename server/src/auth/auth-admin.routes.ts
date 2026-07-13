@@ -10,6 +10,10 @@ import {
 } from "./auth-provider-config.service";
 import { reconfigureOAuthPassport } from "./oauth-passport";
 import { webAuthnStatus } from "./webauthn.service";
+import { getAuthModuleSettings, upsertAuthModuleSettings } from "./auth-settings.service";
+import { authModuleSettingsSchema } from "./schemas";
+import { listRecentOutbox } from "./email-outbox.service";
+import { env } from "../config/env";
 
 export const authAdminRouter = Router();
 
@@ -17,8 +21,42 @@ authAdminRouter.use(requireAuth, requireRole("OWNER", "SUPER_ADMIN", "ADMIN"));
 
 authAdminRouter.get("/auth-providers", async (_req, res, next) => {
   try {
-    const [oauth, webauthn] = await Promise.all([listProviderAdminViews(), Promise.resolve(webAuthnStatus())]);
-    res.json({ ...oauth, webauthn });
+    const [oauth, webauthn, settings] = await Promise.all([
+      listProviderAdminViews(),
+      Promise.resolve(webAuthnStatus()),
+      getAuthModuleSettings(),
+    ]);
+    res.json({ ...oauth, webauthn, settings });
+  } catch (error) {
+    next(error);
+  }
+});
+
+authAdminRouter.get("/auth-settings", async (_req, res, next) => {
+  try {
+    res.json({ settings: await getAuthModuleSettings() });
+  } catch (error) {
+    next(error);
+  }
+});
+
+authAdminRouter.put("/auth-settings", validateBody(authModuleSettingsSchema), async (req, res, next) => {
+  try {
+    const settings = await upsertAuthModuleSettings(req.body, req.auth!.id);
+    res.json({ settings });
+  } catch (error) {
+    next(error);
+  }
+});
+
+authAdminRouter.get("/email-outbox", async (req, res, next) => {
+  try {
+    if (env.NODE_ENV === "production") {
+      res.status(403).json({ message: "Email outbox listing is disabled in production." });
+      return;
+    }
+    const limit = Number(req.query.limit ?? 20);
+    res.json({ messages: await listRecentOutbox(limit) });
   } catch (error) {
     next(error);
   }

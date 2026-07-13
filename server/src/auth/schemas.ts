@@ -146,6 +146,11 @@ export const updateProfileSchema = z.object({
   specialization: z.string().trim().max(120).nullable().optional(),
 });
 
+export const updateEmailSchema = z.object({
+  email: z.string().email(),
+  password: z.string().min(1),
+});
+
 export const ownerPasswordSetupSchema = z.object({
   email: z.string().email(),
   newPassword: z.string().min(12).max(128),
@@ -155,4 +160,20 @@ export const ownerPasswordSetupSchema = z.object({
 export const verifyEmailSchema = z.object({
   email: z.string().email(),
   token: z.string().min(12),
+});
+
+export const authModuleSettingsSchema = z.object({
+  emailVerificationRequired: z.boolean().optional(),
+  mfaRequired: z.boolean().optional(),
+  rememberMeEnabled: z.boolean().optional(),
+  passkeysEnabled: z.boolean().optional(),
+  biometricsEnabled: z.boolean().optional(),
+  sessionLifetimeSeconds: z.number().int().min(300).max(60 * 60 * 24 * 90).optional(),
+  rememberMeLifetimeSeconds: z.number().int().min(3600).max(60 * 60 * 24 * 365).optional(),
+  passwordMinLength: z.number().int().min(8).max(128).optional(),
+  passwordRequireUppercase: z.boolean().optional(),
+  passwordRequireLowercase: z.boolean().optional(),
+  passwordRequireNumber: z.boolean().optional(),
+  passwordRequireSymbol: z.boolean().optional(),
+  passwordHistoryCount: z.number().int().min(1).max(24).optional(),
 });

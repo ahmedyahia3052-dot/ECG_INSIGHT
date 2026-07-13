@@ -35,11 +35,15 @@ export function readRefreshCookie(req: Request): string | null {
 
 export function sessionRequestMeta(req: Request) {
   return {
+    deviceFingerprint:
+      req.get("x-device-fingerprint")?.trim() ||
+      req.get("x-ecg-device-fingerprint")?.trim() ||
+      undefined,
     ipAddress: req.ip,
     userAgent: req.get("user-agent") ?? undefined,
   };
 }
 
 export function deviceNameFromRequest(req: Request) {
-  return req.get("sec-ch-ua-platform") ?? undefined;
+  return req.get("sec-ch-ua-platform") ?? req.get("x-device-name") ?? undefined;
 }

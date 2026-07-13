@@ -70,3 +70,37 @@ export function passwordResetEmailBody(input: { email: string; token: string; re
     `Token (for support/debug only): ${input.token}`,
   ].join("\n");
 }
+
+export function emailVerificationBody(input: { email: string; token: string; verifyUrl: string }) {
+  return [
+    "ECG Insight — Verify your email",
+    "",
+    `Confirm ${input.email} to activate your account.`,
+    "",
+    `Open this link (expires in 24 hours):`,
+    input.verifyUrl,
+    "",
+    `If you did not create an account, ignore this email.`,
+    "",
+    `Token (development delivery): ${input.token}`,
+  ].join("\n");
+}
+
+/** Development delivery mechanism — list recent outbox rows (never includes passwords). */
+export async function listRecentOutbox(limit = 20) {
+  return prisma.emailOutbox.findMany({
+    orderBy: { createdAt: "desc" },
+    take: Math.min(Math.max(limit, 1), 100),
+    select: {
+      id: true,
+      toEmail: true,
+      subject: true,
+      template: true,
+      status: true,
+      error: true,
+      createdAt: true,
+      sentAt: true,
+      bodyText: true,
+    },
+  });
+}

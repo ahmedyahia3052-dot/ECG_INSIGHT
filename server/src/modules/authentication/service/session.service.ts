@@ -66,6 +66,10 @@ export async function createAuthenticatedSession(input: {
   });
 
   const staleSessions = await sessionRepository.trimConcurrentSessions(input.userId, MAX_CONCURRENT_SESSIONS);
+  const staleJwtIds = staleSessions
+    .map((record) => record.sessionId)
+    .filter((id): id is string => typeof id === "string" && id.length > 0);
+  await sessionRepository.revokeJwtSessionsByIds(staleJwtIds);
   await sessionRepository.deactivateSessions(staleSessions.map((record) => record.id));
 
   setRefreshCookie(input.res, refreshToken, expiresInSeconds);

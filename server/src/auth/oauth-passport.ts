@@ -1,4 +1,4 @@
-import type { NextFunction, Request, Response } from "express";
+import type { NextFunction, Request, RequestHandler, Response } from "express";
 import passport from "passport";
 import { Strategy as AppleStrategy } from "passport-apple";
 import { Strategy as FacebookStrategy } from "passport-facebook";
@@ -216,7 +216,8 @@ export function startOAuth(provider: OAuthProvider) {
         throw new AppError(503, "OAuth provider not configured by administrator", "OAUTH_PROVIDER_NOT_CONFIGURED");
       }
       registerStrategy(config);
-      passport.authenticate(strategy, {
+      // Passport strategy name is dynamic (google|apple|...); cast for TS overloads.
+      (passport.authenticate as (strategy: string, options: object) => RequestHandler)(strategy, {
         scope: config.scopes,
         session: false,
         state: true,

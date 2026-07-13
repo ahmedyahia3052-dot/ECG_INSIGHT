@@ -44,6 +44,11 @@ export const resendVerificationEmail = (emailInput: string) => authenticationSer
 export const changeOwnPassword = (userId: string, body: { currentPassword: string; newPassword: string }) =>
   authenticationService.changePassword(userId, body);
 
+export const updateOwnEmail = (userId: string, body: { email: string; password: string }) =>
+  authenticationService.updateEmail(userId, body);
+
+export const listOwnLoginHistory = (userId: string) => authenticationService.listLoginHistory(userId);
+
 export const issueAuthResponse = (
   input: Parameters<typeof authenticationService.issueAuthResponse>[0],
 ) => authenticationService.issueAuthResponse(input);

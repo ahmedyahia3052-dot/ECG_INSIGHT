@@ -124,6 +124,7 @@ export class SessionRepository {
   }
 
   registerEnterpriseSession(input: {
+    deviceFingerprint?: string;
     deviceName?: string;
     expiresAt: Date;
     ipAddress?: string;
@@ -134,6 +135,7 @@ export class SessionRepository {
     return prisma.userSession.create({
       data: {
         active: true,
+        deviceFingerprint: input.deviceFingerprint,
         deviceName: input.deviceName,
         expiresAt: input.expiresAt,
         ipAddress: input.ipAddress,
@@ -153,11 +155,20 @@ export class SessionRepository {
     });
   }
 
-  deactivateSessions(sessionIds: string[]) {
-    if (!sessionIds.length) return Promise.resolve({ count: 0 });
+  deactivateSessions(userSessionIds: string[]) {
+    if (!userSessionIds.length) return Promise.resolve({ count: 0 });
     return prisma.userSession.updateMany({
       data: { active: false, revokedAt: new Date() },
-      where: { id: { in: sessionIds } },
+      where: { id: { in: userSessionIds } },
+    });
+  }
+
+  /** Revoke JWT refresh sessions linked from enterprise UserSession rows. */
+  revokeJwtSessionsByIds(sessionIds: string[]) {
+    if (!sessionIds.length) return Promise.resolve({ count: 0 });
+    return prisma.session.updateMany({
+      data: { revokedAt: new Date() },
+      where: { id: { in: sessionIds }, revokedAt: null },
     });
   }
 }

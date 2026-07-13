@@ -49,7 +49,7 @@ export class UserAuthRepository {
     });
   }
 
-  recordFailedLogin(user: User, reqMeta: { ipAddress?: string; userAgent?: string }) {
+  recordFailedLogin(user: User, reqMeta: { ipAddress?: string; userAgent?: string; deviceId?: string }) {
     const failedLoginAttempts = user.failedLoginAttempts + 1;
     const lockedUntil =
       failedLoginAttempts >= 5 ? new Date(Date.now() + 15 * 60 * 1000) : null;
@@ -66,6 +66,17 @@ export class UserAuthRepository {
           message: "Failed login attempt.",
           metadata: { failedLoginAttempts, locked: Boolean(lockedUntil) },
           userAgent: reqMeta.userAgent,
+        },
+      }),
+      prisma.loginHistory.create({
+        data: {
+          deviceId: reqMeta.deviceId,
+          failureReason: "INVALID_CREDENTIALS",
+          ipAddress: reqMeta.ipAddress,
+          organizationId: user.organizationId ?? undefined,
+          success: false,
+          userAgent: reqMeta.userAgent,
+          userId: user.id,
         },
       }),
       ...(lockedUntil
@@ -151,15 +162,38 @@ export class UserAuthRepository {
     });
   }
 
-  recordLogin(userId: string, reqMeta: { ipAddress?: string; userAgent?: string }) {
-    return prisma.auditLog.create({
-      data: {
-        action: "LOGIN",
-        actorId: userId,
-        ipAddress: reqMeta.ipAddress,
-        message: "User logged in.",
-        userAgent: reqMeta.userAgent,
-      },
+  async recordLogin(
+    userId: string,
+    reqMeta: { ipAddress?: string; userAgent?: string; deviceId?: string; organizationId?: string | null },
+  ) {
+    await prisma.$transaction([
+      prisma.auditLog.create({
+        data: {
+          action: "LOGIN",
+          actorId: userId,
+          ipAddress: reqMeta.ipAddress,
+          message: "User logged in.",
+          userAgent: reqMeta.userAgent,
+        },
+      }),
+      prisma.loginHistory.create({
+        data: {
+          deviceId: reqMeta.deviceId,
+          ipAddress: reqMeta.ipAddress,
+          organizationId: reqMeta.organizationId ?? undefined,
+          success: true,
+          userAgent: reqMeta.userAgent,
+          userId,
+        },
+      }),
+    ]);
+  }
+
+  listLoginHistory(userId: string, take = 50) {
+    return prisma.loginHistory.findMany({
+      orderBy: { createdAt: "desc" },
+      take,
+      where: { userId },
     });
   }
 

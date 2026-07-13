@@ -18,6 +18,7 @@ import {
   registerSchema,
   resendVerificationSchema,
   resetPasswordSchema,
+  updateEmailSchema,
   updateProfileSchema,
   verifyPhoneOtpSchema,
   verifyEmailSchema,
@@ -39,6 +40,8 @@ import {
   resetPassword,
   setupOwnerPassword,
   organizationTypeForRegistration,
+  updateOwnEmail,
+  listOwnLoginHistory,
   verifyPhoneOtp,
   verifyEmail,
 } from "./auth.service";
@@ -382,6 +385,22 @@ authRouter.post("/change-password", requireAuth, validateBody(changePasswordSche
   try {
     await changeOwnPassword(req.auth!.id, req.body);
     res.status(204).send();
+  } catch (error) {
+    next(error);
+  }
+});
+
+authRouter.post("/update-email", requireAuth, validateBody(updateEmailSchema), async (req, res, next) => {
+  try {
+    res.json(redactAuthSecrets(await updateOwnEmail(req.auth!.id, req.body)));
+  } catch (error) {
+    next(error);
+  }
+});
+
+authRouter.get("/login-history", requireAuth, async (req, res, next) => {
+  try {
+    res.json({ history: await listOwnLoginHistory(req.auth!.id) });
   } catch (error) {
     next(error);
   }

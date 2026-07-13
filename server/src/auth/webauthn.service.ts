@@ -16,8 +16,20 @@ import { env } from "../config/env";
 import { AppError } from "../middleware/error";
 import { createAuthenticatedSession } from "../modules/authentication";
 import type { Request, Response } from "express";
+import { getAuthModuleSettings } from "./auth-settings.service";
 
 const CHALLENGE_TTL_MS = 5 * 60 * 1000;
+
+async function assertPasskeysEnabled() {
+  const settings = await getAuthModuleSettings();
+  if (!settings.passkeysEnabled && !settings.biometricsEnabled) {
+    throw new AppError(
+      403,
+      "Passkeys / biometrics are disabled by administrator.",
+      "WEBAUTHN_DISABLED",
+    );
+  }
+}
 
 function rpConfig() {
   const rpID = env.WEBAUTHN_RP_ID?.trim();
@@ -89,6 +101,7 @@ async function consumeChallenge(input: {
 }
 
 export async function registrationOptions(userId: string) {
+  await assertPasskeysEnabled();
   const { rpID, rpName } = rpConfig();
   const user = await prisma.user.findUnique({ where: { id: userId } });
   if (!user) throw new AppError(404, "User not found.", "USER_NOT_FOUND");
@@ -117,6 +130,7 @@ export async function registrationOptions(userId: string) {
 }
 
 export async function verifyRegistration(userId: string, response: RegistrationResponseJSON, friendlyName?: string) {
+  await assertPasskeysEnabled();
   const { rpID, origin } = rpConfig();
   const expectedChallenge = await consumeChallenge({ type: "registration", userId });
   const verification = await verifyRegistrationResponse({
@@ -154,6 +168,7 @@ export async function verifyRegistration(userId: string, response: RegistrationR
 }
 
 export async function authenticationOptions(email: string) {
+  await assertPasskeysEnabled();
   const { rpID } = rpConfig();
   const normalized = email.trim().toLowerCase();
   const user = await prisma.user.findUnique({ where: { email: normalized } });
@@ -188,6 +203,7 @@ export async function verifyAuthentication(
   req: Request,
   res: Response,
 ) {
+  await assertPasskeysEnabled();
   const { rpID, origin } = rpConfig();
   const normalized = body.email.trim().toLowerCase();
   const user = await prisma.user.findUnique({ where: { email: normalized } });

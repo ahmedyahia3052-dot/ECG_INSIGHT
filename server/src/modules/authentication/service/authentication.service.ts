@@ -37,6 +37,14 @@ import {
   rotateRefreshSession,
 } from "./session.service";
 import { buildMfaRequiredPayload } from "../../../auth/mfa-challenge.service";
+import { getAuthModuleSettings } from "../../../auth/auth-settings.service";
+import {
+  enqueueEmail,
+  emailVerificationBody,
+  passwordResetEmailBody,
+} from "../../../auth/email-outbox.service";
+import { env } from "../../../config/env";
+import { sessionRequestMeta } from "./cookie.service";
 
 function organizationTypeForRegistration(type?: string) {
   switch (type) {
@@ -104,7 +112,7 @@ export class AuthenticationService {
     req: Request,
     res: Response,
   ) {
-    if (body.email) assertPasswordPolicy(body.password ?? "");
+    if (body.email) await assertPasswordPolicy(body.password ?? "");
     const phoneNumber = body.phoneNumber ? normalizePhone(body.phoneNumber) : undefined;
     const email = body.email?.trim().toLowerCase() ?? (phoneNumber ? phoneEmail(phoneNumber) : "");
     const existing = await userAuthRepository.findByEmail(email);
@@ -166,6 +174,25 @@ export class AuthenticationService {
       return createdUser;
     });
 
+    const settings = await getAuthModuleSettings();
+    const origin = env.CLIENT_ORIGIN.split(",")[0].replace(/\/+$/, "");
+    const verifyUrl = `${origin}/auth/verify-email?email=${encodeURIComponent(email)}&token=${encodeURIComponent(emailToken)}`;
+    await enqueueEmail({
+      toEmail: email,
+      subject: "ECG Insight — Verify your email",
+      bodyText: emailVerificationBody({ email, token: emailToken, verifyUrl }),
+      template: "email_verification",
+    });
+
+    // Production: do not issue a session until email is verified when policy requires it.
+    if (settings.emailVerificationRequired) {
+      return {
+        emailVerificationToken: env.NODE_ENV !== "production" ? emailToken : undefined,
+        requiresEmailVerification: true,
+        user: serializeUser(user),
+      };
+    }
+
     const auth = await createAuthenticatedSession({
       rememberMe: true,
       req,
@@ -175,7 +202,8 @@ export class AuthenticationService {
 
     return {
       accessToken: auth.accessToken,
-      emailVerificationToken: emailToken,
+      emailVerificationToken: env.NODE_ENV !== "production" ? emailToken : undefined,
+      requiresEmailVerification: false,
       user: auth.user,
     };
   }
@@ -185,6 +213,10 @@ export class AuthenticationService {
     req: Request,
     res: Response,
   ) {
+    const settings = await getAuthModuleSettings();
+    const meta = sessionRequestMeta(req);
+    const rememberMe = settings.rememberMeEnabled ? body.rememberMe : false;
+
     const user = await userAuthRepository.findByEmail(body.email);
     if (user?.lockedUntil && user.lockedUntil > new Date()) {
       throw new AppError(423, "Account is temporarily locked after failed login attempts.", "ACCOUNT_LOCKED");
@@ -193,8 +225,9 @@ export class AuthenticationService {
     if (!user || !(await verifyPassword(body.password, user.passwordHash))) {
       if (user) {
         await userAuthRepository.recordFailedLogin(user, {
-          ipAddress: req.ip,
-          userAgent: req.get("user-agent") ?? undefined,
+          deviceId: meta.deviceFingerprint,
+          ipAddress: meta.ipAddress,
+          userAgent: meta.userAgent,
         });
       }
       const error = new AppError(401, "Invalid email or password.", "INVALID_CREDENTIALS");
@@ -207,7 +240,7 @@ export class AuthenticationService {
     if (!user.isActive) {
       throw new AppError(403, "Your account is inactive.", "USER_INACTIVE");
     }
-    if (!user.emailVerified) {
+    if (settings.emailVerificationRequired && !user.emailVerified) {
       throw new AppError(403, "Email verification is required before login.", "USER_UNVERIFIED");
     }
     if (user.forcePasswordReset) {
@@ -220,17 +253,27 @@ export class AuthenticationService {
 
     await userAuthRepository.clearLoginFailures(user.id);
     await userAuthRepository.recordLogin(user.id, {
-      ipAddress: req.ip,
-      userAgent: req.get("user-agent") ?? undefined,
+      deviceId: meta.deviceFingerprint,
+      ipAddress: meta.ipAddress,
+      organizationId: user.organizationId,
+      userAgent: meta.userAgent,
     });
 
-    const mfaPayload = await buildMfaRequiredPayload(user.id, body.rememberMe);
+    const mfaPayload = await buildMfaRequiredPayload(user.id, rememberMe);
     if (mfaPayload) {
       return mfaPayload;
     }
 
+    if (settings.mfaRequired) {
+      throw new AppError(
+        403,
+        "Multi-factor authentication enrollment is required before login.",
+        "MFA_ENROLLMENT_REQUIRED",
+      );
+    }
+
     return createAuthenticatedSession({
-      rememberMe: body.rememberMe,
+      rememberMe,
       req,
       res,
       userId: user.id,
@@ -252,17 +295,37 @@ export class AuthenticationService {
   async resendVerification(emailInput: string) {
     const user = await userAuthRepository.findByEmail(emailInput);
     if (!user) return { emailVerificationToken: undefined };
+    if (user.emailVerified) {
+      throw new AppError(400, "Email is already verified.", "EMAIL_ALREADY_VERIFIED");
+    }
     const emailVerificationToken = createVerificationToken();
     await userAuthRepository.setEmailVerificationToken(
       user.id,
       hashOpaqueToken(emailVerificationToken),
       new Date(Date.now() + EMAIL_VERIFICATION_TTL_MS),
     );
-    return { emailVerificationToken };
+    const origin = env.CLIENT_ORIGIN.split(",")[0].replace(/\/+$/, "");
+    const verifyUrl = `${origin}/auth/verify-email?email=${encodeURIComponent(user.email)}&token=${encodeURIComponent(emailVerificationToken)}`;
+    await enqueueEmail({
+      toEmail: user.email,
+      subject: "ECG Insight — Verify your email",
+      bodyText: emailVerificationBody({
+        email: user.email,
+        token: emailVerificationToken,
+        verifyUrl,
+      }),
+      template: "email_verification",
+    });
+    return {
+      emailVerificationToken: env.NODE_ENV !== "production" ? emailVerificationToken : undefined,
+    };
   }
 
   async verifyEmail(body: { email: string; token: string }) {
     const user = await userAuthRepository.findByEmail(body.email);
+    if (user?.emailVerified) {
+      throw new AppError(400, "Email is already verified.", "EMAIL_ALREADY_VERIFIED");
+    }
     if (
       !user ||
       !user.emailVerificationTokenHash ||
@@ -275,6 +338,54 @@ export class AuthenticationService {
     await userAuthRepository.markEmailVerified(user.id);
   }
 
+  async updateEmail(userId: string, body: { email: string; password: string }) {
+    const user = await userAuthRepository.findById(userId);
+    if (!user || !(await verifyPassword(body.password, user.passwordHash))) {
+      throw new AppError(400, "Current password is incorrect.", "CURRENT_PASSWORD_INVALID");
+    }
+    const nextEmail = body.email.trim().toLowerCase();
+    if (nextEmail === user.email) {
+      return { user: serializeUser(user), requiresEmailVerification: false };
+    }
+    const existing = await userAuthRepository.findByEmail(nextEmail);
+    if (existing) {
+      throw new AppError(409, "An account with this email already exists.", "EMAIL_EXISTS");
+    }
+    const settings = await getAuthModuleSettings();
+    const emailToken = createVerificationToken();
+    await userAuthRepository.update(userId, {
+      email: nextEmail,
+      emailVerified: !settings.emailVerificationRequired,
+      emailVerificationExpiresAt: settings.emailVerificationRequired
+        ? new Date(Date.now() + EMAIL_VERIFICATION_TTL_MS)
+        : null,
+      emailVerificationTokenHash: settings.emailVerificationRequired
+        ? hashOpaqueToken(emailToken)
+        : null,
+    });
+    if (settings.emailVerificationRequired) {
+      const origin = env.CLIENT_ORIGIN.split(",")[0].replace(/\/+$/, "");
+      const verifyUrl = `${origin}/auth/verify-email?email=${encodeURIComponent(nextEmail)}&token=${encodeURIComponent(emailToken)}`;
+      await enqueueEmail({
+        toEmail: nextEmail,
+        subject: "ECG Insight — Verify your new email",
+        bodyText: emailVerificationBody({ email: nextEmail, token: emailToken, verifyUrl }),
+        template: "email_verification",
+      });
+    }
+    const updated = await userAuthRepository.findById(userId);
+    return {
+      emailVerificationToken:
+        settings.emailVerificationRequired && env.NODE_ENV !== "production" ? emailToken : undefined,
+      requiresEmailVerification: settings.emailVerificationRequired,
+      user: serializeUser(updated!),
+    };
+  }
+
+  async listLoginHistory(userId: string) {
+    return userAuthRepository.listLoginHistory(userId);
+  }
+
   async requestPasswordReset(emailInput: string) {
     const user = await userAuthRepository.findByEmail(emailInput);
     const resetToken = createVerificationToken();
@@ -284,8 +395,6 @@ export class AuthenticationService {
         hashOpaqueToken(resetToken),
         new Date(Date.now() + PASSWORD_RESET_TTL_MS),
       );
-      const { enqueueEmail, passwordResetEmailBody } = await import("../../../auth/email-outbox.service");
-      const { env } = await import("../../../config/env");
       const origin = env.CLIENT_ORIGIN.split(",")[0].replace(/\/+$/, "");
       const resetUrl = `${origin}/auth/reset-password?email=${encodeURIComponent(user.email)}&token=${encodeURIComponent(resetToken)}`;
       await enqueueEmail({
@@ -296,7 +405,6 @@ export class AuthenticationService {
       });
     }
     // Never reveal whether the account exists. Token only returned outside production for local QA.
-    const { env } = await import("../../../config/env");
     return { resetToken: env.NODE_ENV !== "production" && user ? resetToken : undefined };
   }
 
@@ -454,7 +562,7 @@ export class AuthenticationService {
   }
 
   async setupOwnerPassword(body: { email: string; newPassword: string; username: string }) {
-    assertPasswordPolicy(body.newPassword);
+    await assertPasswordPolicy(body.newPassword);
     const owner = await prisma.user.findFirst({
       where: {
         email: body.email.trim().toLowerCase(),
