@@ -35,6 +35,7 @@ import { ecgFilesRouter } from "./ecg-files/ecg-files.routes";
 import { ecgInterpretationEngineRouter } from "./ecg-interpretation-engine";
 import { ecgBenchmarkRouter } from "./ecg-benchmark/ecg-benchmark.routes";
 import { ecgProcessingEngineRouter } from "./ecg-processing-engine";
+import { ecgProcessingRouter } from "./ecg-processing/ecg-processing.routes";
 import { ecgDigitizationEngineRouter } from "./ecg-digitization-engine";
 import { aiOrchestrationEngineRouter } from "./ai-orchestration-engine";
 import { aiAnnotationOverlayEngineRouter } from "./ai-annotation-overlay-engine";
